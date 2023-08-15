@@ -1,0 +1,51 @@
+cmake_minimum_required(VERSION 3.16)
+
+project(CppStarter)
+
+# specify the C++ standard
+set(CMAKE_EXPORT_COMPILE_COMMANDS YES)
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED True)
+
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE "DEBUG")
+  message(STATUS "Build type not specified: Use debug by default")
+endif(NOT CMAKE_BUILD_TYPE)
+
+
+#
+# Create options for including cmake files from the cmake folder with a bit of output.
+#
+macro(check_include)
+  if(NOT ${ARGC} EQUAL 3)
+    message(FATAL_ERROR "Call to 'check_include' with ${ARGC} arguments instead of 3")
+  endif()
+  OPTION(${ARGV0} "Enable ${ARGV0}" ON)
+  if (${ARGV0})
+    message(STATUS "${ARGV1}: enabled")
+    include(cmake/${ARGV2})
+  else()
+    message(STATUS "${ARGV1}: disabled")
+  endif()
+endmacro()
+
+#Enable all checks in debug mode
+
+if (CMAKE_BUILD_TYPE EQUAL "Release")
+    set(CLANG_FORMAT OFF)
+    set(CLANG_TIDY OFF)
+    set(CPP_CHECK OFF)
+    set(IWYU OFF)
+endif ()
+
+
+message(STATUS "Checks:")
+list(APPEND CMAKE_MESSAGE_INDENT "  ") #indent +1
+check_include(CLANG_FORMAT "clang-format" ClangFormat.cmake)
+check_include(CLANG_TIDY   "clang-tidy"   ClangTidy.cmake)
+check_include(CPP_CHECK    "cppcheck"     CppCheck.cmake)
+check_include(IWYU         "iwyu"         IWYU.cmake)
+list(POP_BACK CMAKE_MESSAGE_INDENT)    #indent -1
+
+
+add_subdirectory(src)

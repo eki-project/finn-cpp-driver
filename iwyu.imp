@@ -1,0 +1,6 @@
+[
+{ include: ["@\"armadillo_bits/.*\"", "public", "<armadillo>", "public"] },
+{ include: ["@<pybind11/detail/.*>", "public", "<pybind11/pybind11.h>", "public"] },
+{ include: ["@\"catch2/catch_test_macros.hpp\"", "public", "<catch2/catch_test_macros.hpp>", "public"] },
+]
+

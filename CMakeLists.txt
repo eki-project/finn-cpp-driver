@@ -4,15 +4,40 @@ project(CppStarter)
 
 # specify the C++ standard
 set(CMAKE_EXPORT_COMPILE_COMMANDS YES)
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_STANDARD_REQUIRED True)
+set(CMAKE_CXX_STANDARD 23)
+#set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "DEBUG")
   message(STATUS "Build type not specified: Use debug by default")
 endif(NOT CMAKE_BUILD_TYPE)
 
+include(FetchContent)
 
+FetchContent_Declare(
+  googletest
+  GIT_REPOSITORY https://github.com/google/googletest.git
+  GIT_TAG        main
+)
+
+# Build Unit tests
+# Include before clang-tidy inclusion to exclude folder from clang-tidy
+
+set(FINNC_ENABLE_TESTING "Build all tests (default is ON)" ON)
+FetchContent_MakeAvailable(googletest)
+include(cmake/AddUnittest.cmake)
+enable_testing()
+
+if (FINNC_ENABLE_TESTING)
+  message("Finn C++ unittests")
+  add_subdirectory(unittests)
+endif()
+
+### Enable compiler warnings
+option(FINNC_ENABLE_WARNINGS "Enable warnings" ON)
+if (FINNC_ENABLE_WARNINGS)
+  include(cmake/CompilerWarnings.cmake)
+endif (FINNC_ENABLE_WARNINGS)
 #
 # Create options for including cmake files from the cmake folder with a bit of output.
 #

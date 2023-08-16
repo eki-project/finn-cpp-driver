@@ -1,6 +1,3 @@
 #include <iostream>
 
-int main() {
-  std::cout << "Hello ";
-  std::cout << "World! " << std::endl;
-}
+int main() { std::cout << "Hello World! " << std::endl; }

@@ -5,16 +5,11 @@ include(cmake/PreventInSourceBuilds.cmake)
 project(FinnCPPDriver)
 
 # specify the C++ standard
-set(CMAKE_EXPORT_COMPILE_COMMANDS YES)
 set(CMAKE_CXX_EXTENSIONS ON)
 set(CMAKE_CXX_STANDARD 20)
-#set(CMAKE_CXX_STANDARD_REQUIRED True)
 message(STATUS "Using C++ Standard ${CMAKE_CXX_STANDARD}")
 
-if(NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE "DEBUG")
-  message(STATUS "Build type not specified: Use debug by default")
-endif(NOT CMAKE_BUILD_TYPE)
+include(cmake/StandardProjectSettings.cmake)
 
 include(FetchContent)
 
@@ -42,10 +37,22 @@ endif()
 #mdspan
 include_directories(SYSTEM external/mdspan/include)
 
+#Compiler Options
+
+add_library(finnc_options INTERFACE)
+add_library(finnc::finnc_options ALIAS finnc_options)
+
 ### Enable compiler warnings
 option(FINNC_ENABLE_WARNINGS "Enable warnings" ON)
 if (FINNC_ENABLE_WARNINGS)
   include(cmake/CompilerWarnings.cmake)
+  finnc_set_project_warnings(
+    finnc_options
+    OFF
+    ""
+    ""
+    ""
+    "")
 endif (FINNC_ENABLE_WARNINGS)
 
 #
@@ -73,14 +80,15 @@ if (CMAKE_BUILD_TYPE EQUAL "Release")
     set(IWYU OFF)
 endif ()
 
-if((CMAKE_CXX_COMPILER_ID MATCHES ".*Clang.*" OR CMAKE_CXX_COMPILER_ID MATCHES ".*GNU.*") AND NOT WIN32)
-  set(SUPPORTS_UBSAN ON)
-else()
-  set(SUPPORTS_UBSAN OFF)
-endif()
-
-
 #Sanitizers & Checks
+
+include(cmake/Sanitizers.cmake)
+
+OPTION(FINNC_ENABLE_SANITIZERS "Enable default analyzers" ON)
+OPTION(FINNC_ENABLE_THREAD_SANITIZERS "Enable thread analyzer" OFF)
+OPTION(FINNC_ENABLE_MEMORY_SANITIZERS "Enable memory analyzer" OFF)
+
+finncpp_enable_sanitizers(finnc_options, ${FINNC_ENABLE_SANITIZERS}, ${FINNC_ENABLE_SANITIZERS}, ${FINNC_ENABLE_SANITIZERS}, ${FINNC_ENABLE_THREAD_SANITIZERS}, ${FINNC_ENABLE_MEMORY_SANITIZERS})
 
 message(STATUS "Checks:")
 list(APPEND CMAKE_MESSAGE_INDENT "  ") #indent +1

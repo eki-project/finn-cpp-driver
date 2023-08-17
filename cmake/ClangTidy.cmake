@@ -1,6 +1,6 @@
 find_program(CLANG_TIDY_FOUND "clang-tidy")
 if(NOT CLANG_TIDY_FOUND)
-    message(FATAL_ERROR "clang-tidy not found")
+    message(WARNING "clang-tidy requested, but not found!")
 endif()
 
 set(CMAKE_CXX_CLANG_TIDY

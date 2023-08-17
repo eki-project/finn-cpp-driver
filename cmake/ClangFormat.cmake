@@ -1,6 +1,6 @@
 find_program(CLANG_FORMAT_FOUND "clang-format")
 if (NOT CLANG_FORMAT_FOUND)
-    message(FATAL_ERROR "clang-format not found")
+    message(WARNING "clang-format requested, but not found!")
 endif()
 
 #find all files to check

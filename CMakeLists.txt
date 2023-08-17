@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake")
+
 include(cmake/PreventInSourceBuilds.cmake)
 
 project(FinnCPPDriver)
@@ -28,19 +30,33 @@ include(cmake/AddUnittest.cmake)
 enable_testing()
 
 if (FINNC_ENABLE_TESTING)
-  message("Finn C++ unittests")
+  message(STATUS "Finn C++ unittests:")
   add_subdirectory(unittests)
 endif()
 
 #INCLUDES
 
+#XRT
+find_package(OpenCL REQUIRED)
+find_package(XRT REQUIRED)
+
+#OpenMP
+find_package(OpenMP)
+
 #mdspan
 include_directories(SYSTEM external/mdspan/include)
 
 #Compiler Options
-
 add_library(finnc_options INTERFACE)
 add_library(finnc::finnc_options ALIAS finnc_options)
+
+OPTION(FINNC_ENABLE_ALLOPT "Enable all optimizations" ON)
+if(${FINNC_ENABLE_ALLOPT})
+  message(STATUS "All optimizations are enabled")
+  target_compile_options(
+    finnc_options
+    INTERFACE -O3 -march=native -mtune=native -fstack-protector-strong -fopenmp -ffunction-sections -fdata-sections -pipe -funroll-loops)
+endif()
 
 ### Enable compiler warnings
 option(FINNC_ENABLE_WARNINGS "Enable warnings" ON)
@@ -88,7 +104,12 @@ OPTION(FINNC_ENABLE_SANITIZERS "Enable default analyzers" ON)
 OPTION(FINNC_ENABLE_THREAD_SANITIZERS "Enable thread analyzer" OFF)
 OPTION(FINNC_ENABLE_MEMORY_SANITIZERS "Enable memory analyzer" OFF)
 
-finncpp_enable_sanitizers(finnc_options, ${FINNC_ENABLE_SANITIZERS}, ${FINNC_ENABLE_SANITIZERS}, ${FINNC_ENABLE_SANITIZERS}, ${FINNC_ENABLE_THREAD_SANITIZERS}, ${FINNC_ENABLE_MEMORY_SANITIZERS})
+finncpp_enable_sanitizers(finnc_options
+                          ${FINNC_ENABLE_SANITIZERS}
+                          ${FINNC_ENABLE_SANITIZERS}
+                          ${FINNC_ENABLE_SANITIZERS}
+                          ${FINNC_ENABLE_THREAD_SANITIZERS}
+                          ${FINNC_ENABLE_MEMORY_SANITIZERS})
 
 message(STATUS "Checks:")
 list(APPEND CMAKE_MESSAGE_INDENT "  ") #indent +1

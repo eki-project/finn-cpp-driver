@@ -60,13 +60,13 @@ function(
     SANITIZERS
     ","
     LIST_OF_SANITIZERS)
-
   if(LIST_OF_SANITIZERS)
     if(NOT
        "${LIST_OF_SANITIZERS}"
        STREQUAL
        "")
       if(NOT MSVC)
+        message(STATUS "Enabled code sanitizers: ${LIST_OF_SANITIZERS}")
         target_compile_options(${project_name} INTERFACE -fsanitize=${LIST_OF_SANITIZERS})
         target_link_options(${project_name} INTERFACE -fsanitize=${LIST_OF_SANITIZERS})
       else()

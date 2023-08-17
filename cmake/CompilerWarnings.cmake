@@ -73,7 +73,7 @@ else()
   message(AUTHOR_WARNING "No compiler warnings set for '${CMAKE_CXX_COMPILER_ID}' compiler.")
 endif()
 
-string (REPLACE ";" " " PROJECT_WARNINGS "${PROJECT_WARNINGS}")
+#string (REPLACE ";" " " PROJECT_WARNINGS "${PROJECT_WARNINGS}")
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${PROJECT_WARNINGS}")
 
 get_property(

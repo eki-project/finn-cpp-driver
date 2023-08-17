@@ -4,8 +4,10 @@ project(CppStarter)
 
 # specify the C++ standard
 set(CMAKE_EXPORT_COMPILE_COMMANDS YES)
-set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_EXTENSIONS ON)
+set(CMAKE_CXX_STANDARD 20)
 #set(CMAKE_CXX_STANDARD_REQUIRED True)
+message(STATUS "Using C++ Standard ${CMAKE_CXX_STANDARD}")
 
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "DEBUG")
@@ -32,6 +34,11 @@ if (FINNC_ENABLE_TESTING)
   message("Finn C++ unittests")
   add_subdirectory(unittests)
 endif()
+
+#INCLUDES
+
+#mdspan
+include_directories(SYSTEM external/mdspan/include)
 
 ### Enable compiler warnings
 option(FINNC_ENABLE_WARNINGS "Enable warnings" ON)

@@ -1,5 +1,77 @@
 ---
-Checks:          '*,-fuchsia-*,-google-*,-zircon-*,-abseil-*,-modernize-use-trailing-return-type,-llvm*'
+Checks:          '*,
+                -fuchsia-*,
+                -zircon-*,
+                -abseil-*,
+                -linuxkernel-*,
+                -objc-*,
+                -android-*,
+                -cert-*,
+                bugprone-*,
+                    -bugprone-easily-swappable-parameters,
+                    -bugprone-reserved-identifier,
+                modernize-*,
+                    -modernize-use-trailing-return-type,
+                    -modernize-avoid-c-arrays,
+                    -modernize-use-nodiscard,
+                clang-analyzer-*,
+                google-*,
+                llvm-*,
+                    -llvm-include-order,
+                    -llvm-header-guard,
+                -llvmlibc-*,
+                -altera-id-dependent-backward-branch,
+                misc-*,
+                    -misc-non-private-member-variables-in-classes,
+                    -misc-no-recursion,
+                readability-*,
+                    -readability-isolate-declaration,
+                    -readability-named-parameter,
+                    -readability-magic-numbers,
+                    -readability-static-accessed-through-instance,
+                cppcoreguidelines-*,
+                    -cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+                    -cppcoreguidelines-owning-memory,
+                    -cppcoreguidelines-pro-bounds-constant-array-index,
+                    -cppcoreguidelines-pro-bounds-pointer-arithmetic,
+                    -cppcoreguidelines-pro-type-vararg,
+                    -cppcoreguidelines-avoid-magic-numbers,
+                '
 WarningsAsErrors: ''
-HeaderFilterRegex: ''
-FormatStyle:     none
+HeaderFilterRegex: 'src/.*$'
+FormatStyle:     file
+CheckOptions:
+    - key:    readability-identifier-length.MinimumParameterNameLength
+      value:  1
+    - key:    readability-identifier-length.MinimumLoopCounterNameLength
+      value:  1
+    - key:    readability-identifier-naming.ClassCase
+      value:  CamelCase
+    - key:    readability-identifier-naming.EnumCase
+      value:  UPPER_CASE
+    - key:    readability-identifier-naming.EnumConstantCase
+      value:  UPPER_CASE
+    - key:    readability-identifier-naming.ScopedEnumConstantCase
+      value:  UPPER_CASE
+    - key:    readability-identifier-naming.FunctionCase
+      value:  camelBack
+    - key:    readability-identifier-naming.MemberCase
+      value:  camelBack
+    - key:    readability-identifier-naming.ConstantMemberCase
+      value:  camelBack
+    - key:    readability-identifier-naming.ClassMethodCase
+      value:  camelBack
+    - key:    readability-identifier-naming.MethodCase
+      value:  camelBack
+    - key:    readability-identifier-naming.VirtualMethodCase
+      value:  camelBack
+    - key:    readability-identifier-naming.ParameterCase
+      value:  camelBack
+    - key:    readability-identifier-naming.UnionCase
+      value:  camelBack
+    - key:    readability-identifier-naming.VariableCase
+      value:  camelBack
+    - key:    readability-identifier-naming.GlobalConstantCase
+      value:  UPPER_CASE
+    - key:    readability-identifier-naming.NamespaceCase
+      value:  CamelCase

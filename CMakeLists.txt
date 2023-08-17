@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(CppStarter)
+include(cmake/PreventInSourceBuilds.cmake)
+
+project(FinnCPPDriver)
 
 # specify the C++ standard
 set(CMAKE_EXPORT_COMPILE_COMMANDS YES)
@@ -45,6 +47,7 @@ option(FINNC_ENABLE_WARNINGS "Enable warnings" ON)
 if (FINNC_ENABLE_WARNINGS)
   include(cmake/CompilerWarnings.cmake)
 endif (FINNC_ENABLE_WARNINGS)
+
 #
 # Create options for including cmake files from the cmake folder with a bit of output.
 #
@@ -70,9 +73,18 @@ if (CMAKE_BUILD_TYPE EQUAL "Release")
     set(IWYU OFF)
 endif ()
 
+if((CMAKE_CXX_COMPILER_ID MATCHES ".*Clang.*" OR CMAKE_CXX_COMPILER_ID MATCHES ".*GNU.*") AND NOT WIN32)
+  set(SUPPORTS_UBSAN ON)
+else()
+  set(SUPPORTS_UBSAN OFF)
+endif()
+
+
+#Sanitizers & Checks
 
 message(STATUS "Checks:")
 list(APPEND CMAKE_MESSAGE_INDENT "  ") #indent +1
+check_include(IPO          "InterproceduralOptimization" InterproceduralOptimization.cmake)
 check_include(CLANG_FORMAT "clang-format" ClangFormat.cmake)
 check_include(CLANG_TIDY   "clang-tidy"   ClangTidy.cmake)
 check_include(CPP_CHECK    "cppcheck"     CppCheck.cmake)

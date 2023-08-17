@@ -21,6 +21,8 @@ FetchContent_Declare(
   GIT_TAG        main
 )
 
+include(cmake/CheckSubmodules.cmake)
+
 # Build Unit tests
 # Include before clang-tidy inclusion to exclude folder from clang-tidy
 

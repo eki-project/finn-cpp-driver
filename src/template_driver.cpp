@@ -9,11 +9,11 @@
 #include "template_driver.hpp"
 
 // XRT
+#include "experimental/xrt_ip.h"
 #include "xrt.h"
 #include "xrt/xrt_bo.h"
 #include "xrt/xrt_device.h"
 #include "xrt/xrt_kernel.h"
-#include "experimental/xrt_ip.h"
 
 using std::string;
 

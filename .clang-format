@@ -12,12 +12,12 @@ BinPackParameters: 'true'
 BreakConstructorInitializers: BeforeColon
 BreakInheritanceList: BeforeColon
 BreakStringLiterals: true
-ColumnLimit: '120'
+ColumnLimit: '240'
 Cpp11BracedListStyle: 'true'
 FixNamespaceComments: 'true'
 IndentCaseLabels: 'true'
 IndentPPDirectives: BeforeHash
-IndentWidth: '2'
+IndentWidth: '4'
 IndentWrappedFunctionNames: 'true'
 IncludeBlocks: Regroup
 KeepEmptyLinesAtTheStartOfBlocks: 'false'
@@ -40,4 +40,4 @@ SpacesInCStyleCastParentheses: 'false'
 SpacesInContainerLiterals: 'false'
 SpacesInParentheses: 'false'
 SpacesInSquareBrackets: 'false'
-TabWidth: '2'
+TabWidth: '4'

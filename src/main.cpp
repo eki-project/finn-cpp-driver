@@ -1,12 +1,23 @@
 #include <iostream>
 
+#include "utils/finn_types/datatype.h"
 #include "utils/mdspan.h"
 
+
 int main() {
+  static DatatypeInt<16> b;
+  std::initializer_list<int> iList = {4, 2, 1};
+
+  std::array<int, 8> mem{};
+  int i = 0;
+  for (auto&& var : mem) {
+    var = ++i;
+  }
+  auto spa = makeMDSpan(mem.data(), {4, 2, 1});
+  std::cout << spa(0, 1, 0) << "\n";
+  std::cout << spa(0, 0, 0) << "\n";
+  std::cout << spa(1, 1, 0) << "\n";
+  std::cout << spa(1, 0, 0) << "\n";
+  std::cout << b.getNumPossibleValues() << "\n";
   std::cout << "Hello World! " << std::endl;
-  std::array<int, 4> d = {0, 1, 2, 3};
-  stdex::mdspan m{d.data(), stdex::extents{2, 2}};
-  for (std::size_t i = 0; i < m.extent(0); ++i)
-    for (std::size_t j = 0; j < m.extent(1); ++j)
-      std::cout << "m[" << i << ", " << j << "] == " << m(i, j) << " Using []\n";
 }

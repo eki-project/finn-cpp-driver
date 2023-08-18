@@ -1,5 +1,9 @@
 #include <iostream>
 #include <numeric>
+#include <experimental/random>
+
+// Helper
+#include "utils/driver.h"
 
 // Created by FINN during compilation
 #include "template_driver.hpp"
@@ -14,16 +18,17 @@
 using std::string;
 
 
-enum DRIVER_MODE {
-    EXECUTE,
-    THROUGHPUT_TEST
-};
+
+
+template<typename T> // This typeparameter should usually be a pointer, which was returned by xrt::bo.map<>()
+void fillBufferMapRandomized(T map, size_t size, Datatype datatype) {
+
+}
 
 
 // Create buffers, one buffer per given shape, and bytewidth
-std::vector<xrt::bo> createIOBuffers(const xrt::device &device, std::vector<int> widths, std::vector<std::vector<int>> shape) {
+std::vector<xrt::bo> createIOBuffers(const xrt::device &device, const std::vector<int> &widths, const std::vector<std::vector<int>> &shape) {
     std::vector<xrt::bo> buffers = {};
-    #pragma unroll
     for (unsigned int i = 0; i < widths.size(); i++) {
         int elements = std::accumulate(std::begin(shape[i]), std::end(shape[i]), 1, std::multiplies<int>());
         buffers.push_back(xrt::bo(device, widths[i] * elements, xrt::bo::flags::cacheable, 1));  // TODO(bwintermann): Correct memory group setting missing, assuming 1 here
@@ -34,9 +39,9 @@ std::vector<xrt::bo> createIOBuffers(const xrt::device &device, std::vector<int>
 
 // Create mappings of the given datatype for the given buffers
 template<typename T>
-std::vector<T> createMemoryMaps(std::vector<xrt::bo> buffers) {
+std::vector<T> createMemoryMaps(std::vector<xrt::bo> &buffers) {
     std::vector<T> maps = {};
-    for (xrt::bo buffer : buffers) {
+    for (xrt::bo &buffer : buffers) {
         maps.push_back(buffer.map<T>());
     }
     return maps;
@@ -59,8 +64,12 @@ int main() {
     if (transferMode == "memory_buffered") {
         std::vector<xrt::bo> inputBuffers = createIOBuffers(device, INPUT_BYTEWIDTH, ISHAPE_PACKED);
         std::vector<xrt::bo> outputBuffers = createIOBuffers(device, OUTPUT_BYTEWIDTH, OSHAPE_PACKED);
+
+
+        // TODO(bwintermann): Depends on datatypes!
         std::vector<int*> inputBufferMaps = createMemoryMaps<int*>(inputBuffers); 
         std::vector<int*> outputBufferMaps = createMemoryMaps<int*>(outputBuffers); 
+
     } else if (transferMode == "stream") {
         // TODO(bwintermann): Add stream implementation
     } else {

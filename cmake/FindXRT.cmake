@@ -10,6 +10,9 @@ set(XRT_INCDIR_SUFFIXES
   "include"
   "include/CL"
   "usr/include/xrt/CL"
+  "include/xrt"
+  "include/deprecated"
+  "include/experimental"
 )
 
 set(XRT_LIBDIR_SUFFIXES

@@ -38,6 +38,10 @@ endif()
 
 #INCLUDES
 
+#Threads
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
+
 #XRT
 find_package(OpenCL REQUIRED)
 find_package(XRT REQUIRED)

@@ -1,34 +1,32 @@
+#include <concepts>
+#include <csignal>
+#include <experimental/random>
 #include <iostream>
 #include <numeric>
-#include <experimental/random>
-#include <csignal>
-#include <concepts>
 
 // Helper
 #include "utils/driver.h"
-#include "utils/finn_types/datatype.h"
+#include "utils/finn_types/datatype.hpp"
 #include "utils/mdspan.h"
 
 // Created by FINN during compilation
 #include "template_driver.hpp"
 
 // XRT
+#include "experimental/xrt_ip.h"
 #include "xrt.h"
 #include "xrt/xrt_bo.h"
 #include "xrt/xrt_device.h"
 #include "xrt/xrt_kernel.h"
-#include "experimental/xrt_ip.h"
 
 using std::string;
 
-template <typename T>
-concept IsDatatype = std::derived_from<T, Datatype>;
-
-template<typename T, IsDatatype D> // This typeparameter should usually be a pointer, which was returned by xrt::bo.map<>()
-void fillBufferMapRandomized(T &map, size_t &size, D &datatype) {
+// Because Datatype is now implemented using CRTP, an additional template parameter U is needed.
+template<typename T, typename U, IsDatatype<U> D>  // This typeparameter should usually be a pointer, which was returned by xrt::bo.map<>()
+void fillBufferMapRandomized(T& map, size_t& size, D& datatype) {
     // TODO(bwintermann): Need ability to differentiate between float and int!
     // FIXME: Datatype is an abstract class
-    
+
     // Integer values
     for (unsigned int i = 0; i < size; i++) {
         map[i] = std::experimental::randint(datatype.min(), datatype.max());
@@ -37,7 +35,7 @@ void fillBufferMapRandomized(T &map, size_t &size, D &datatype) {
 
 
 // Create buffers, one buffer per given shape, and bytewidth
-std::vector<xrt::bo> createIOBuffers(const xrt::device &device, const std::initializer_list<unsigned int> &widths, const std::initializer_list<std::initializer_list<unsigned int>> &shape) {
+std::vector<xrt::bo> createIOBuffers(const xrt::device& device, const std::initializer_list<unsigned int>& widths, const std::initializer_list<std::initializer_list<unsigned int>>& shape) {
     std::vector<xrt::bo> buffers = {};
     for (unsigned int i = 0; i < widths.size(); i++) {
         unsigned int elements = std::accumulate(std::begin(shape.begin()[i]), std::end(shape.begin()[i]), 1, std::multiplies<>());
@@ -49,10 +47,10 @@ std::vector<xrt::bo> createIOBuffers(const xrt::device &device, const std::initi
 
 // Create mappings of the given datatype for the given buffers
 template<typename T>
-std::vector<MemoryMap<T>> createMemoryMaps(std::vector<xrt::bo> &buffers, std::initializer_list<std::initializer_list<unsigned int>> shapes, SHAPE_TYPE shapeType) {
+std::vector<MemoryMap<T>> createMemoryMaps(std::vector<xrt::bo>& buffers, std::initializer_list<std::initializer_list<unsigned int>> shapes, SHAPE_TYPE shapeType) {
     std::vector<MemoryMap<T>> maps = {};
     unsigned int index = 0;
-    for (xrt::bo &buffer : buffers) {
+    for (xrt::bo& buffer : buffers) {
         MemoryMap<T> memmap = {buffer.map<T*>(), buffer.size(), shapes.begin()[index], shapeType};
         maps.emplace_back(memmap);
         index++;
@@ -61,15 +59,14 @@ std::vector<MemoryMap<T>> createMemoryMaps(std::vector<xrt::bo> &buffers, std::i
 }
 
 template<typename T>
-decltype(auto) createTensorFromMap(MemoryMap<T> &mmap, std::initializer_list<unsigned int> &dimensions) {
+decltype(auto) createTensorFromMap(MemoryMap<T>& mmap, std::initializer_list<unsigned int>& dimensions) {
     unsigned int expectedElements = std::accumulate(std::begin(dimensions), std::end(dimensions), 1, std::multiplies<>());
     if (expectedElements != mmap.size) {
         std::cout << "During creation of Tensor (mdspan) from a xrt::bo map: Map has size " << mmap.size << " but the dimensions array fits " << expectedElements << " elements!" << std::endl;
-        raise(SIGTERM); 
+        raise(SIGTERM);
     }
     return makeMDSpan(mmap.map, dimensions);
-} 
-
+}
 
 
 int main() {
@@ -90,7 +87,7 @@ int main() {
 
 
         // TODO(bwintermann): Depends on datatypes!
-        std::vector<MemoryMap<int>> inputBufferMaps = createMemoryMaps<int>(inputBuffers, ISHAPE_PACKED, SHAPE_TYPE::PACKED); 
+        std::vector<MemoryMap<int>> inputBufferMaps = createMemoryMaps<int>(inputBuffers, ISHAPE_PACKED, SHAPE_TYPE::PACKED);
         std::vector<MemoryMap<int>> outputBufferMaps = createMemoryMaps<int>(outputBuffers, OSHAPE_PACKED, SHAPE_TYPE::PACKED);
 
 

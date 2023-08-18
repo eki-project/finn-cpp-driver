@@ -1,12 +1,21 @@
 #include <iostream>
 
-#include "utils/finn_types/datatype.h"
+#include "utils/finn_types/datatype.hpp"
 #include "utils/mdspan.h"
 
 
 int main() {
+  DatatypeFloat a;
+  DatatypeFloat d;
+  static_assert(a == d);
+
   static DatatypeInt<16> b;
-  std::initializer_list<int> iList = {4, 2, 1};
+  static DatatypeInt<17> c;
+  static_assert(b != c);
+
+  static DatatypeInt<17> e;
+  static_assert(e == c);
+
 
   std::array<int, 8> mem{};
   int i = 0;

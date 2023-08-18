@@ -14,7 +14,7 @@ namespace stdex = Kokkos;
 #endif
 
 template<typename T, typename Array, std::size_t... I>
-auto makeMDSpanImpl(T* data, const Array& a, std::index_sequence<I...>) {
+auto makeMDSpanImpl(T* data, const Array& a, [[maybe_unused]] std::index_sequence<I...> u) {
   return stdex::mdspan(data, a[I]...);
 }
 

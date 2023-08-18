@@ -6,4 +6,18 @@ enum DRIVER_MODE {
     THROUGHPUT_TEST
 };
 
+enum SHAPE_TYPE {
+    NORMAL,
+    FOLDED,
+    PACKED
+};
+
+template<typename T>
+__attribute__((alligned(32))) struct MemoryMap {
+    T* map;
+    size_t size;
+    std::initializer_list<int> dims;
+    SHAPE_TYPE shapeType;
+};
+
 #endif

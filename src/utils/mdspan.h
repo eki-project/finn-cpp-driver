@@ -1,6 +1,8 @@
 #ifndef _UTILS_MDSPAN_H_
 #define _UTILS_MDSPAN_H_
 
+#include <span>
+
 #ifdef __cpp_lib_mdspan
 using stdex::mdspan = std::mdspan;
 
@@ -11,8 +13,8 @@ namespace stdex = Kokkos;
 
 #endif
 
-template<typename Array, std::size_t... I>
-auto makeMDSpanImpl(int* data, const Array& a, std::index_sequence<I...>) {
+template<typename T, typename Array, std::size_t... I>
+auto makeMDSpanImpl(T* data, const Array& a, std::index_sequence<I...>) {
   return stdex::mdspan(data, a[I]...);
 }
 

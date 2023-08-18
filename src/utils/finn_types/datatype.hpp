@@ -23,7 +23,6 @@ template<typename T, typename D>
 concept IsDatatype = std::derived_from<T, Datatype<D>>;
 
 
-// TODO(linusjun) restrict D for Datatype types
 template<typename D>
 class Datatype {
      public:
@@ -57,13 +56,16 @@ class Datatype {
     virtual ~Datatype() = default;
 
      protected:
-    Datatype() = default;
     Datatype(Datatype&&) noexcept = default;
     Datatype(const Datatype&) = default;
     Datatype& operator=(Datatype&&) noexcept = default;
     Datatype& operator=(const Datatype&) = default;
 
      private:
+    // Some somewhat hacky code to make sure that CRTP is implemented correctly by all Derived classes -> creates error if for class A : public Base<B> A!=B
+    Datatype() = default;
+    friend D;
+
     template<typename T>
     bool static allowed_impl([[maybe_unused]] const T& val) {
         return false;

@@ -2,7 +2,7 @@
 #include <numeric>
 #include <experimental/random>
 #include <csignal>
-
+#include <concepts>
 
 // Helper
 #include "utils/driver.h"
@@ -21,10 +21,11 @@
 
 using std::string;
 
+template <typename T>
+concept IsDatatype = std::derived_from<T, Datatype>;
 
-
-template<typename T> // This typeparameter should usually be a pointer, which was returned by xrt::bo.map<>()
-void fillBufferMapRandomized(T &map, size_t &size, Datatype &datatype) {
+template<typename T, IsDatatype D> // This typeparameter should usually be a pointer, which was returned by xrt::bo.map<>()
+void fillBufferMapRandomized(T &map, size_t &size, D &datatype) {
     // TODO(bwintermann): Need ability to differentiate between float and int!
     // FIXME: Datatype is an abstract class
     
@@ -36,11 +37,11 @@ void fillBufferMapRandomized(T &map, size_t &size, Datatype &datatype) {
 
 
 // Create buffers, one buffer per given shape, and bytewidth
-std::vector<xrt::bo> createIOBuffers(const xrt::device &device, const std::initializer_list<int> &widths, const std::initializer_list<std::initializer_list<int>> &shape) {
+std::vector<xrt::bo> createIOBuffers(const xrt::device &device, const std::initializer_list<unsigned int> &widths, const std::initializer_list<std::initializer_list<unsigned int>> &shape) {
     std::vector<xrt::bo> buffers = {};
     for (unsigned int i = 0; i < widths.size(); i++) {
-        int elements = std::accumulate(std::begin(shape.begin()[i]), std::end(shape.begin()[i]), 1, std::multiplies<>());
-        buffers.push_back(xrt::bo(device, widths.begin()[i] * elements, xrt::bo::flags::cacheable, 1));  // TODO(bwintermann): Correct memory group setting missing, assuming 1 here
+        unsigned int elements = std::accumulate(std::begin(shape.begin()[i]), std::end(shape.begin()[i]), 1, std::multiplies<>());
+        buffers.emplace_back(xrt::bo(device, (int) (widths.begin()[i] * elements), xrt::bo::flags::cacheable, 1));  // TODO(bwintermann): Correct memory group setting missing, assuming 1 here
     }
     return buffers;
 }
@@ -48,19 +49,19 @@ std::vector<xrt::bo> createIOBuffers(const xrt::device &device, const std::initi
 
 // Create mappings of the given datatype for the given buffers
 template<typename T>
-std::vector<MemoryMap<T>> createMemoryMaps(std::vector<xrt::bo> &buffers, std::initializer_list<std::initializer_list<int>> shapes, SHAPE_TYPE shapeType) {
+std::vector<MemoryMap<T>> createMemoryMaps(std::vector<xrt::bo> &buffers, std::initializer_list<std::initializer_list<unsigned int>> shapes, SHAPE_TYPE shapeType) {
     std::vector<MemoryMap<T>> maps = {};
     unsigned int index = 0;
     for (xrt::bo &buffer : buffers) {
-        MemoryMap<T> mm = {buffer.map<T*>(), buffer.size(), shapes.begin()[index], shapeType};
-        maps.push_back(mm);
+        MemoryMap<T> memmap = {buffer.map<T*>(), buffer.size(), shapes.begin()[index], shapeType};
+        maps.emplace_back(memmap);
         index++;
     }
     return maps;
 }
 
 template<typename T>
-decltype(auto) createTensorFromMap(MemoryMap<T> &mmap, std::initializer_list<int> &dimensions) {
+decltype(auto) createTensorFromMap(MemoryMap<T> &mmap, std::initializer_list<unsigned int> &dimensions) {
     unsigned int expectedElements = std::accumulate(std::begin(dimensions), std::end(dimensions), 1, std::multiplies<>());
     if (expectedElements != mmap.size) {
         std::cout << "During creation of Tensor (mdspan) from a xrt::bo map: Map has size " << mmap.size << " but the dimensions array fits " << expectedElements << " elements!" << std::endl;
@@ -76,7 +77,6 @@ int main() {
     int deviceIndex = 0;
     string binaryFile = "finn_accel.xclbin";
     DRIVER_MODE driverExecutionMode = DRIVER_MODE::THROUGHPUT_TEST;
-
 
     xrt::device device = xrt::device(deviceIndex);
     xrt::uuid uuid = device.load_xclbin(binaryFile);
@@ -104,5 +104,13 @@ int main() {
         std::cout << "Unknown transfer mode (" << TRANSFER_MODE << "). Please specify a known one in the DataflowBuildConfig!" << std::endl;
         return 1;
     }
+
+    // Test execution
+    if (driverExecutionMode == DRIVER_MODE::THROUGHPUT_TEST) {
+        // generate random data
+    } else if (driverExecutionMode == DRIVER_MODE::EXECUTE) {
+        // read from npy / npz file
+    }
+
     return 0;
 }

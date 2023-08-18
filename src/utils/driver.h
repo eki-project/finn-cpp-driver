@@ -13,10 +13,10 @@ enum SHAPE_TYPE {
 };
 
 template<typename T>
-__attribute__((alligned(32))) struct MemoryMap {
+__attribute__((packed)) struct MemoryMap {
     T* map;
     size_t size;
-    std::initializer_list<int> dims;
+    std::initializer_list<unsigned int> dims;
     SHAPE_TYPE shapeType;
 };
 

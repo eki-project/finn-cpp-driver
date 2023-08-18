@@ -6,10 +6,9 @@ A C/C++ Driver for FINN generated accelerators
 
 Getting Started
 ---------------
+
 * Install XRT Runtime and development packages [Download](https://www.xilinx.com/support/download/index.html/content/xilinx/en/downloadNav/alveo/u280.html)
-* Set the XRT env var to your XRT development package installation ```export XILINX_XRT=<path>``` (commonly ```/opt/xilinx/xrt```)
-
-
+* If you use a non default install directory for XRT (default: ```/opt/xilinx/xrt```) set the XRT env var to your XRT development package installation ```export XILINX_XRT=<path>```.
 
 ```bash
 git clone git@github.com:eki-project/finn-cpp-driver.git

@@ -12,6 +12,10 @@ enum class BUFFER_OP_RESULT {
     OVER_BOUNDS_READ = -3
 };
 
+enum class TRANSFER_MODE {
+    MEMORY_BUFFERED = 0, STREAMED = 1
+};
+
 /**
  * @brief A struct to wrap the memory map that a xrt::bo object writes/reads to/from. It also contains information about the buffers tensor shape, it's size in bytes and its shape type, as well as convenience functions for interaction
  * 

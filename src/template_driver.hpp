@@ -1,9 +1,10 @@
 // PLACEHOLDER FOR TESTING
 #include <string>
 #include <vector>
+#include "utils/driver.h"
 
 constexpr std::string_view PLATFORM = "alveo";
-constexpr std::string_view TRANSFER_MODE = "memory_buffered";
+constexpr TRANSFER_MODE transferMode = TRANSFER_MODE::MEMORY_BUFFERED;
 
 constexpr std::initializer_list<unsigned int> INPUT_BYTEWIDTH = {1, 1, 2};
 constexpr std::initializer_list<unsigned int> OUTPUT_BYTEWIDTH = {1, 1, 2};

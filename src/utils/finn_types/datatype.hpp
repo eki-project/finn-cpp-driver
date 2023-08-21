@@ -26,33 +26,103 @@ concept IsDatatype = std::derived_from<T, Datatype<D>>;
 template<typename D>
 class Datatype {
      public:
+    /**
+     * @brief Query whether type is signed type.
+     *
+     * @return true Type is signed
+     * @return false Type is unsigned
+     */
     constexpr virtual bool sign() const = 0;
 
+    /**
+     * @brief Queries bitwidth of type
+     *
+     * @return constexpr std::size_t Bitwidth
+     */
     constexpr virtual std::size_t bitwidth() const = 0;
 
+    /**
+     * @brief Minimum value that can be stored in the datatype
+     *
+     * @return constexpr double Value
+     */
     constexpr virtual double min() const = 0;
+
+    /**
+     * @brief Maximum value that can be stored in the datatype
+     *
+     * @return constexpr double Value
+     */
     constexpr virtual double max() const = 0;
 
+    /**
+     * @brief Test whether value is allowed in Datatype
+     *
+     * @tparam T Type of value
+     * @param val Value to be tested
+     * @return true Value is allowed
+     * @return false Value is not allowed
+     */
     template<Integral T>
     bool allowed(const T& val) const {
         return static_cast<D*>(this)->template allowedImpl<T>(val);
-    };
+    }
 
+    /**
+     * @brief Get the Number of Possible Values for Datatype
+     *
+     * @return constexpr double Number of possible values
+     */
     constexpr virtual double getNumPossibleValues() const { return (min() < 0) ? -min() + max() + 1 : min() + max() + 1; }
 
+    /**
+     * @brief Test whether Datatype is integer type
+     *
+     * @return true Type is integer type
+     * @return false Type is not an integer type
+     */
     constexpr virtual bool isInteger() const = 0;
+
+    /**
+     * @brief Test whether Datatype is a fixed point type
+     *
+     * @return true Type is fixed point type
+     * @return false Type is not a fixed point type
+     */
     constexpr virtual bool isFixedPoint() const = 0;
 
+    /**
+     * @brief Comparison Operator equality
+     *
+     * @tparam D2 CRTP Type of other Datatype
+     * @param lhs first Datatype to be compared against second Datatype
+     * @param rhs second Datatype to be compared against first Datatype
+     * @return true Both Datatypes are equal
+     * @return false Datatypes are not equal
+     */
     template<typename D2>
     constexpr friend bool operator==([[maybe_unused]] const Datatype<D>& lhs, [[maybe_unused]] const Datatype<D2>& rhs) {
         return std::is_same_v<D, D2>;
     }
 
+    /**
+     * @brief Comparison Operator inequality
+     *
+     * @tparam D2 CRTP Type of other Datatype
+     * @param lhs first Datatype to be compared against second Datatype
+     * @param rhs second Datatype to be compared against first Datatype
+     * @return true Both Datatypes are not equal
+     * @return false Datatypes are equal
+     */
     template<typename D2>
     constexpr friend bool operator!=(const Datatype<D>& lhs, const Datatype<D2>& rhs) {
         return !(lhs == rhs);
     }
 
+    /**
+     * @brief Destroy the Datatype object
+     *
+     */
     virtual ~Datatype() = default;
 
      protected:
@@ -66,10 +136,18 @@ class Datatype {
     Datatype() = default;
     friend D;
 
+    /**
+     * @brief Implementation of the allowed method. Is implemented by each subclass individually.
+     *
+     * @tparam T
+     * @param val
+     * @return true
+     * @return false
+     */
     template<typename T>
     bool static allowedImpl([[maybe_unused]] const T& val) {
         return false;
-    };
+    }
 };
 
 
@@ -91,7 +169,7 @@ class DatatypeFloat : public Datatype<DatatypeFloat> {
     template<typename T>
     [[maybe_unused]] bool allowedImpl(const T& val) const {
         return (val >= min()) && (val <= max());
-    };
+    }
 };
 
 template<std::size_t B>
@@ -119,7 +197,7 @@ class DatatypeInt : public Datatype<DatatypeInt<B>> {
     // cppcheck-supress unusedPrivateFunction
     [[maybe_unused]] bool allowedImpl(const T& val) const {
         return (val >= min()) && (val <= max());
-    };
+    }
 };
 
 template<std::size_t B, std::size_t I>
@@ -147,7 +225,7 @@ class DatatypeFixed : public Datatype<DatatypeFixed<B, I>> {
     [[maybe_unused]] bool allowedImpl(const T& val) const {
         T intEquivalent = val * (1U << I);
         return (intEquivalent >= min()) && (intEquivalent <= max());
-    };
+    }
 };
 
 template<std::size_t B>
@@ -175,7 +253,7 @@ class DatatypeUInt : public Datatype<DatatypeUInt<B>> {
     // cppcheck-supress unusedPrivateFunction
     [[maybe_unused]] bool allowedImpl(const T& val) const {
         return (val >= min()) && (val <= max());
-    };
+    }
 };
 
 using DatatypeBinary = DatatypeUInt<1>;
@@ -199,7 +277,7 @@ class DatatypeBipolar : public Datatype<DatatypeBipolar> {
     // cppcheck-supress unusedPrivateFunction
     [[maybe_unused]] static bool allowedImpl(const T& val) {
         return (val == -1 || val == 1);
-    };
+    }
 };
 
 class DatatypeTernary : public Datatype<DatatypeTernary> {
@@ -221,7 +299,7 @@ class DatatypeTernary : public Datatype<DatatypeTernary> {
     // cppcheck-supress unusedPrivateFunction
     [[maybe_unused]] static bool allowedImpl(const T& val) {
         return (val == -1 || val == 1 || val == 0);
-    };
+    }
 };
 
 

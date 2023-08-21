@@ -29,7 +29,7 @@ void fillBufferMapRandomized(T& map, size_t& size, D& datatype) {
     // FIXME: Datatype is an abstract class
 
     // Integer values
-    for (unsigned int i = 0; i < size; i++) {
+    for (unsigned int i = 0; i < size; ++i) {
         map[i] = std::experimental::randint(datatype.min(), datatype.max());
     }
 }
@@ -38,7 +38,7 @@ void fillBufferMapRandomized(T& map, size_t& size, D& datatype) {
 // Create buffers, one buffer per given shape, and bytewidth
 std::vector<xrt::bo> createIOBuffers(const xrt::device& device, const std::initializer_list<unsigned int>& widths, const std::initializer_list<std::initializer_list<unsigned int>>& shape) {
     std::vector<xrt::bo> buffers = {};
-    for (unsigned int i = 0; i < widths.size(); i++) {
+    for (unsigned int i = 0; i < widths.size(); ++i) {
         auto elements = static_cast<unsigned int>(std::accumulate(std::begin(shape.begin()[i]), std::end(shape.begin()[i]), 1, std::multiplies<>()));
         buffers.emplace_back(xrt::bo(device, static_cast<size_t>(widths.begin()[i] * elements), xrt::bo::flags::cacheable, 1));  // TODO(bwintermann): Correct memory group setting missing, assuming 1 here
     }
@@ -48,7 +48,7 @@ std::vector<xrt::bo> createIOBuffers(const xrt::device& device, const std::initi
 
 // Create mappings of the given datatype for the given buffers
 template<typename T>
-std::vector<MemoryMap<T>> createMemoryMaps(std::vector<xrt::bo>& buffers, std::initializer_list<std::initializer_list<unsigned int>> shapes, SHAPE_TYPE shapeType) {
+std::vector<MemoryMap<T>> createMemoryMaps(std::vector<xrt::bo>& buffers, std::initializer_list<std::initializer_list<unsigned int>>& shapes, SHAPE_TYPE shapeType) {
     std::vector<MemoryMap<T>> maps = {};
     unsigned int index = 0;
     for (xrt::bo& buffer : buffers) {

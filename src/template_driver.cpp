@@ -18,8 +18,6 @@
 using std::string;
 
 
-
-
 int main() {
     // TODO(bwintermann): Make into command line arguments
     int deviceIndex = 0;

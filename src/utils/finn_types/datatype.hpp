@@ -19,7 +19,7 @@ concept UnsignedIntegral = Integral<T> && !SignedIntegral<T>;
 template<typename T>
 class Datatype;
 
-template<typename T, typename D>
+template<typename T, typename D = T>
 concept IsDatatype = std::derived_from<T, Datatype<D>>;
 
 
@@ -35,7 +35,7 @@ class Datatype {
 
     template<Integral T>
     bool allowed(const T& val) const {
-        return static_cast<D*>(this)->template allowed_impl<T>(val);
+        return static_cast<D*>(this)->template allowedImpl<T>(val);
     };
 
     constexpr virtual double getNumPossibleValues() const { return (min() < 0) ? -min() + max() + 1 : min() + max() + 1; }
@@ -67,7 +67,7 @@ class Datatype {
     friend D;
 
     template<typename T>
-    bool static allowed_impl([[maybe_unused]] const T& val) {
+    bool static allowedImpl([[maybe_unused]] const T& val) {
         return false;
     };
 };
@@ -89,7 +89,7 @@ class DatatypeFloat : public Datatype<DatatypeFloat> {
      private:
     // cppcheck-supress unusedPrivateFunction
     template<typename T>
-    [[maybe_unused]] bool allowed_impl(const T& val) const {
+    [[maybe_unused]] bool allowedImpl(const T& val) const {
         return (val >= min()) && (val <= max());
     };
 };
@@ -117,7 +117,7 @@ class DatatypeInt : public Datatype<DatatypeInt<B>> {
      private:
     template<typename T>
     // cppcheck-supress unusedPrivateFunction
-    [[maybe_unused]] bool allowed_impl(const T& val) const {
+    [[maybe_unused]] bool allowedImpl(const T& val) const {
         return (val >= min()) && (val <= max());
     };
 };
@@ -144,7 +144,7 @@ class DatatypeFixed : public Datatype<DatatypeFixed<B, I>> {
      private:
     template<typename T>
     // cppcheck-supress unusedPrivateFunction
-    [[maybe_unused]] bool allowed_impl(const T& val) const {
+    [[maybe_unused]] bool allowedImpl(const T& val) const {
         T intEquivalent = val * (1U << I);
         return (intEquivalent >= min()) && (intEquivalent <= max());
     };
@@ -173,7 +173,7 @@ class DatatypeUInt : public Datatype<DatatypeUInt<B>> {
      private:
     template<typename T>
     // cppcheck-supress unusedPrivateFunction
-    [[maybe_unused]] bool allowed_impl(const T& val) const {
+    [[maybe_unused]] bool allowedImpl(const T& val) const {
         return (val >= min()) && (val <= max());
     };
 };
@@ -197,7 +197,7 @@ class DatatypeBipolar : public Datatype<DatatypeBipolar> {
      private:
     template<typename T>
     // cppcheck-supress unusedPrivateFunction
-    [[maybe_unused]] static bool allowed_impl(const T& val) {
+    [[maybe_unused]] static bool allowedImpl(const T& val) {
         return (val == -1 || val == 1);
     };
 };
@@ -219,7 +219,7 @@ class DatatypeTernary : public Datatype<DatatypeTernary> {
      private:
     template<typename T>
     // cppcheck-supress unusedPrivateFunction
-    [[maybe_unused]] static bool allowed_impl(const T& val) {
+    [[maybe_unused]] static bool allowedImpl(const T& val) {
         return (val == -1 || val == 1 || val == 0);
     };
 };

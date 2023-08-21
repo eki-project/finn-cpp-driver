@@ -1,8 +1,9 @@
 #include <concepts>
-#include <csignal>
 #include <experimental/random>
 #include <iostream>
 #include <numeric>
+#include <stdexcept>
+#include <string>
 
 // Helper
 #include "utils/driver.h"
@@ -22,7 +23,7 @@
 using std::string;
 
 // Because Datatype is now implemented using CRTP, an additional template parameter U is needed.
-template<typename T, typename U, IsDatatype<U> D>  // This typeparameter should usually be a pointer, which was returned by xrt::bo.map<>()
+template<typename T, typename U, IsDatatype<U> D = Datatype<U>>  // This typeparameter should usually be a pointer, which was returned by xrt::bo.map<>()
 void fillBufferMapRandomized(T& map, size_t& size, D& datatype) {
     // TODO(bwintermann): Need ability to differentiate between float and int!
 
@@ -37,8 +38,8 @@ void fillBufferMapRandomized(T& map, size_t& size, D& datatype) {
 std::vector<xrt::bo> createIOBuffers(const xrt::device& device, const std::initializer_list<unsigned int>& widths, const std::initializer_list<std::initializer_list<unsigned int>>& shape) {
     std::vector<xrt::bo> buffers = {};
     for (unsigned int i = 0; i < widths.size(); i++) {
-        unsigned int elements = std::accumulate(std::begin(shape.begin()[i]), std::end(shape.begin()[i]), 1, std::multiplies<>());
-        buffers.emplace_back(xrt::bo(device, (int) (widths.begin()[i] * elements), xrt::bo::flags::cacheable, 1));  // TODO(bwintermann): Correct memory group setting missing, assuming 1 here
+        auto elements = static_cast<unsigned int>(std::accumulate(std::begin(shape.begin()[i]), std::end(shape.begin()[i]), 1, std::multiplies<>()));
+        buffers.emplace_back(xrt::bo(device, static_cast<size_t>(widths.begin()[i] * elements), xrt::bo::flags::cacheable, 1));  // TODO(bwintermann): Correct memory group setting missing, assuming 1 here
     }
     return buffers;
 }
@@ -59,10 +60,9 @@ std::vector<MemoryMap<T>> createMemoryMaps(std::vector<xrt::bo>& buffers, std::i
 
 template<typename T>
 decltype(auto) createTensorFromMap(MemoryMap<T>& mmap, std::initializer_list<unsigned int>& dimensions) {
-    unsigned int expectedElements = std::accumulate(std::begin(dimensions), std::end(dimensions), 1, std::multiplies<>());
+    auto expectedElements = static_cast<unsigned int>(std::accumulate(std::begin(dimensions), std::end(dimensions), 1, std::multiplies<>()));
     if (expectedElements != mmap.size) {
-        std::cout << "During creation of Tensor (mdspan) from a xrt::bo map: Map has size " << mmap.size << " but the dimensions array fits " << expectedElements << " elements!" << std::endl;
-        raise(SIGTERM);
+        throw std::length_error("During creation of Tensor (mdspan) from a xrt::bo map: Map has size " + std::to_string(mmap.size) + " but the dimensions array fits " + std::to_string(expectedElements) + " elements!");
     }
     return makeMDSpan(mmap.map, dimensions);
 }
@@ -97,8 +97,7 @@ int main() {
     } else if (TRANSFER_MODE == "stream") {
         // TODO(bwintermann): Add stream implementation
     } else {
-        std::cout << "Unknown transfer mode (" << TRANSFER_MODE << "). Please specify a known one in the DataflowBuildConfig!" << std::endl;
-        return 1;
+        throw std::runtime_error("Unknown transfer mode (" + std::string(TRANSFER_MODE) + "). Please specify a known one in the DataflowBuildConfig!");
     }
 
     // Test execution

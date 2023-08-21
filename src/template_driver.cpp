@@ -25,7 +25,6 @@ using std::string;
 template<typename T, typename U, IsDatatype<U> D>  // This typeparameter should usually be a pointer, which was returned by xrt::bo.map<>()
 void fillBufferMapRandomized(T& map, size_t& size, D& datatype) {
     // TODO(bwintermann): Need ability to differentiate between float and int!
-    // FIXME: Datatype is an abstract class
 
     // Integer values
     for (unsigned int i = 0; i < size; i++) {

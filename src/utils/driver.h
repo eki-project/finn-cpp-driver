@@ -12,6 +12,11 @@ enum class BUFFER_OP_RESULT {
     OVER_BOUNDS_READ = -3
 };
 
+/**
+ * @brief A struct to wrap the memory map that a xrt::bo object writes/reads to/from. It also contains information about the buffers tensor shape, it's size in bytes and its shape type, as well as convenience functions for interaction
+ * 
+ * @tparam T The datatype of the memory map 
+ */
 template<typename T>
 struct MemoryMap {
     T* map;
@@ -29,13 +34,28 @@ struct MemoryMap {
     }
 
     /**
+     * @brief Write a single element into the given map index 
+     * 
+     * @param elem The element itself 
+     * @param index The index of the map where to place the element
+     * @return BUFFER_OP_RESULT 
+     */
+    BUFFER_OP_RESULT writeSingleElement(T elem, unsigned int index) {
+        if (index < 0 || index >= getElementCount()) {
+            return BUFFER_OP_RESULT::OVER_BOUNDS_WRITE;
+        }
+        map[index] = elem;
+        return BUFFER_OP_RESULT::SUCCESS;
+    }
+
+    /**
      * @brief Writes the given elements into the data map, which is mapped to the XRT buffer object. Returns whether or not the operation was successful.
      * 
      * @param elements The container with the elements to write.  
      * @param startIndex The index from which the map should be accessed, so if startIndex=2, the map fields 2,3,4... are being written
      * @return BUFFER_OP_RESULT 
      */
-    BUFFER_OP_RESULT writeElements(std::vector& elements, unsigned int& startIndex) {
+    BUFFER_OP_RESULT writeElements(std::vector<T> elements, unsigned int& startIndex) {
         if (startIndex + elements.size() > getElementCount()) {
             return BUFFER_OP_RESULT::OVER_BOUNDS_WRITE;
         }
@@ -53,7 +73,7 @@ struct MemoryMap {
      * @param elementCount The number of elements to read
      * @return BUFFER_OP_RESULT 
      */
-    BUFFER_OP_RESULT readElements(std::vector& readBuffer, unsigned int& startIndex, unsigned int elementCount) {
+    BUFFER_OP_RESULT readElements(std::vector<T> readBuffer, unsigned int& startIndex, unsigned int elementCount) {
         if (startIndex + elementCount > getElementCount()) {
             return BUFFER_OP_RESULT::OVER_BOUNDS_READ;
         }

@@ -1,21 +1,14 @@
 #ifndef DRIVER_HPP
 #define DRIVER_HPP
 
-enum DRIVER_MODE {
-    EXECUTE,
-    THROUGHPUT_TEST
-};
+enum class DRIVER_MODE { EXECUTE = 0, THROUGHPUT_TEST = 1 };
 
-enum SHAPE_TYPE {
-    NORMAL,
-    FOLDED,
-    PACKED
-};
+enum class SHAPE_TYPE { NORMAL = 0, FOLDED = 1, PACKED = 2 };
 
 template<typename T>
-__attribute__((packed)) struct MemoryMap {
+struct MemoryMap {
     T* map;
-    size_t size;
+    std::size_t size;
     std::initializer_list<unsigned int> dims;
     SHAPE_TYPE shapeType;
 };

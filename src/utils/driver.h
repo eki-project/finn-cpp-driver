@@ -3,13 +3,11 @@
 
 enum class DRIVER_MODE { EXECUTE = 0, THROUGHPUT_TEST = 1 };
 
-enum class SHAPE_TYPE { NORMAL = 0, FOLDED = 1, PACKED = 2 };
+enum class SHAPE_TYPE { NORMAL = 0, FOLDED = 1, PACKED = 2, INVALID = -1 };
 
 enum class BUFFER_OP_RESULT { SUCCESS = 0, FAILURE = -1, OVER_BOUNDS_WRITE = -2, OVER_BOUNDS_READ = -3 };
 
-enum class TRANSFER_MODE {
-    MEMORY_BUFFERED = 0, STREAMED = 1
-};
+enum class TRANSFER_MODE { MEMORY_BUFFERED = 0, STREAMED = 1, INVALID = -1 };
 
 /**
  * @brief A struct to wrap the memory map that a xrt::bo object writes/reads to/from. It also contains information about the buffers tensor shape, it's size in bytes and its shape type, as well as convenience functions for interaction
@@ -18,17 +16,33 @@ enum class TRANSFER_MODE {
  */
 template<typename T>
 struct MemoryMap {
-    T* map;
-    std::size_t size;
-    std::initializer_list<unsigned int> dims;
-    SHAPE_TYPE shapeType;
+    /**
+     * @brief Stores the Buffer of memory used for communication
+     *
+     */
+    T* map = nullptr;
+    /**
+     * @brief Size of the mapped buffer (in bytes (?))
+     *
+     */
+    std::size_t size = 0;
+    /**
+     * @brief Dimensions of the buffer (in elements)
+     *
+     */
+    std::initializer_list<unsigned int> dims = {};
+    /**
+     * @brief Layout of the buffer
+     *
+     */
+    SHAPE_TYPE shapeType = SHAPE_TYPE::INVALID;
 
     /**
      * @brief Get the number of elements contained in the memory map
      *
      * @return unsigned int
      */
-    const unsigned int getElementCount() const { return static_cast<unsigned int>(size / sizeof(T)); }
+    unsigned int getElementCount() const { return static_cast<unsigned int>(size / sizeof(T)); }
 
     /**
      * @brief Write a single element into the given map index
@@ -38,7 +52,7 @@ struct MemoryMap {
      * @return BUFFER_OP_RESULT
      */
     BUFFER_OP_RESULT writeSingleElement(const T& elem, const unsigned int index) {
-        if (index < 0 || index >= getElementCount()) {
+        if (index >= getElementCount()) {  // Check against negative values is unnecessary, because type is unsigned.
             return BUFFER_OP_RESULT::OVER_BOUNDS_WRITE;
         }
         map[index] = elem;
@@ -70,7 +84,7 @@ struct MemoryMap {
      * @param elementCount The number of elements to read
      * @return BUFFER_OP_RESULT
      */
-    BUFFER_OP_RESULT readElements(std::vector<T>& readBuffer, const unsigned int startIndex, const unsigned int elementCount) {
+    BUFFER_OP_RESULT readElements(std::vector<T>& readBuffer, const unsigned int startIndex, const unsigned int elementCount) const {
         if (startIndex + elementCount > getElementCount()) {
             return BUFFER_OP_RESULT::OVER_BOUNDS_READ;
         }

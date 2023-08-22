@@ -4,6 +4,7 @@
 // Default
 #include <string>
 #include <vector>
+#include <variant>
 
 // Helpers
 #include "driver.h"
@@ -34,8 +35,17 @@ namespace keywords = boost::log::keywords;
 
 
 // TODO(bwintermann): Remove, only here because this type might change a few times over next few iterations
-using Shapes = std::initializer_list<std::initializer_list<unsigned int>>;
+using Shape = std::initializer_list<unsigned int>;
+using Shapes = std::initializer_list<Shape>;
 using Bytewidths = std::initializer_list<unsigned int>;
+
+/**
+ * @brief Describes a list (initializer_list) of types Shape OR MemoryMap<T>. In the first case a buffer with the appropiate byte size is simply created, with the latter, an existing memory mapped is taken as input for chaining FPGAs together
+ * 
+ * @tparam T The datatype of the DeviceHandler 
+ */
+template<typename T>
+using BOMemoryDefinitionArguments = std::initializer_list<std::variant<Shape, MemoryMap<T>>;
 
 
 /**
@@ -74,13 +84,13 @@ class DeviceHandler {
      * @param pDriverMode The mode for which the driver is instantiated (memory_buffered or memory-less streaming)
      * @param pInputBytewidths
      * @param pOutputBytewidths
-     * @param pInputShapes
-     * @param pOutputShapes
+     * @param pInputMemoryDefinition For every buffer either specify a shape e.g. (1,2,12), which is expanded to 1*2*12 * bytewidth bytes memory, OR specify a pointer to an existing memory map to receive that one as input for multi-FPGA
+     * @param pOutputMemoryDefinition Same as inputMemoryDefintion
      * @param pInputShapeType
      * @param pOutputShapeType
      * @param pLogger Boost Severity Logger passed from main
      */
-    DeviceHandler(const std::string& pName, const bool pIsHelperDevice, const int pDeviceIndex, const std::string& pBinaryFile, const DRIVER_MODE pDriverMode, const Bytewidths& pInputBytewidths, const Bytewidths& pOutputBytewidths, const Shapes& pInputShapes, const Shapes& pOutputShapes,
+    DeviceHandler(const std::string& pName, const bool pIsHelperDevice, const int pDeviceIndex, const std::string& pBinaryFile, const DRIVER_MODE pDriverMode, const Bytewidths& pInputBytewidths, const Bytewidths& pOutputBytewidths, const BOMemoryDefinitionArguments<T>& pInputMemoryDefinition, const BOMemoryDefinitionArguments<T>& pOutputMemoryDefinition,
                   const SHAPE_TYPE pInputShapeType, const SHAPE_TYPE pOutputShapeType, src::severity_logger<logging::trivial::severity_level>& pLogger)
         : name(pName), isHelperDevice(pIsHelperDevice), deviceIndex(pDeviceIndex), binaryFile(pBinaryFile), driverMode(pDriverMode), logger(pLogger) {
         if (!pIsHelperDevice) {
@@ -89,8 +99,8 @@ class DeviceHandler {
             BOOST_LOG_SEV(logger, logging::trivial::info) << "Initializing " << name << " as a helper device for Multi-FPGA usage\n";
         }
         initializeDevice();
-        initializeBufferObjects(pInputBytewidths, pInputShapes, pOutputBytewidths, pOutputShapes);
-        initializeMemoryMaps(pInputShapes, pInputShapeType, pOutputShapes, pOutputShapeType);
+        initializeBufferObjects(pInputBytewidths, pInputMemoryDefinition, pOutputBytewidths, pOutputMemoryDefinition);
+        initializeMemoryMaps(pInputMemoryDefinition, pInputShapeType, pOutputMemoryDefinition, pOutputShapeType);
     }
 
     /**
@@ -108,29 +118,29 @@ class DeviceHandler {
      * @brief Create IO XRT BufferObjects from the given bytewidths and dimensions. If this is a device that is directly communicating with the host (main device), the buffer is marked as cachable. If it is a helper device in a Multi-FPGA group, the buffers are marked as p2p, to enable sending between multiple boards. 
      *
      * @param inBytewidths
-     * @param inDims
+     * @param inputMemoryDefinitions
      * @param outBytewidths
-     * @param outDims
+     * @param outputMemoryDefinitions
      */
-    void initializeBufferObjects(const Bytewidths& inBytewidths, const Shapes& inDims, const Bytewidths& outBytewidths, const Shapes& outDims) {
+    void initializeBufferObjects(const Bytewidths& inBytewidths, const BOMemoryDefinitionArguments<T>& inputMemoryDefinitions, const Bytewidths& outBytewidths, const BOMemoryDefinitionArguments<T>& outputMemoryDefinitions) {
         BOOST_LOG_SEV(logger, logging::trivial::info) << "(" << name << ") " << "Initializing xrt::bo objects for input and output";
         xrt::bo::flags boFlag = (!isHelperDevice) ? xrt::bo::flags::cacheable : xrt::bo::flags::p2p;
-        inputBufferObjects = createIOBuffers(device, inBytewidths, inDims);
-        outputBufferObjects = createIOBuffers(device, outBytewidths, outDims);
+        inputBufferObjects = createIOBuffers(device, inBytewidths, inputMemoryDefinitions);
+        outputBufferObjects = createIOBuffers(device, outBytewidths, outputMemoryDefinitions);
     }
 
     /**
      * @brief Create memory maps the template type given by the device handler class.
      *
-     * @param inputDims
-     * @param inputShapeType
-     * @param outputDims
+     * @param inputMemoryDefinitions
+     * @param inputShapeType 
+     * @param outputMemoryDefinitions
      * @param outputShapeType
      */
-    void initializeMemoryMaps(const Shapes& inputDims, const SHAPE_TYPE inputShapeType, const Shapes& outputDims, const SHAPE_TYPE outputShapeType) {
+    void initializeMemoryMaps(const BOMemoryDefinitionArguments<T>& inputMemoryDefinitions, const SHAPE_TYPE inputShapeType, const BOMemoryDefinitionArguments<T>& outputMemoryDefinitions, const SHAPE_TYPE outputShapeType) {
         BOOST_LOG_SEV(logger, logging::trivial::info) << "(" << name << ") " << "Creating memory maps";
-        inputMemoryMaps = createMemoryMaps(inputBufferObjects, inputDims, inputShapeType);
-        outputMemoryMaps = createMemoryMaps(outputBufferObjects, outputDims, outputShapeType);
+        inputMemoryMaps = createMemoryMaps(inputBufferObjects, inputMemoryDefinitions, inputShapeType);
+        outputMemoryMaps = createMemoryMaps(outputBufferObjects, outputMemoryDefinitions, outputShapeType);
     }
 
     /**
@@ -166,11 +176,11 @@ class DeviceHandler {
      * @param device The XRT device to map the buffer to
      * @param boFlag The buffer flag passed. Most of the times use cacheable
      * @param widths The bitwidths of the buffers datatypes
-     * @param shape The shapes of the buffer
+     * @param memoryDefinitions List of variants, which can either contain a Shape type or a MemoryMap<T> type
      * @return std::vector<xrt::bo>
      */
-    std::vector<xrt::bo> createIOBuffers(const xrt::device& device, const xrt::bo::flags boFlag, const Bytewidths& widths, const Shapes& shape) {
-        if (widths.size() != shape.size()) {
+    std::vector<xrt::bo> createIOBuffers(const xrt::device& device, const xrt::bo::flags boFlag, const Bytewidths& widths, const BOMemoryDefinitionArguments<T>& memoryDefinitions) {
+        if (widths.size() != memoryDefinitions.size()) {
             std::string err = "The number of bytewidths passed does not match the number of shape lists passed (" + std::to_string(widths.size()) + ", " + std::to_string(shape.size()) + ")!";
             BOOST_LOG_SEV(logger, logging::trivial::error) << "(" << name << ") " << err;
             throw std::length_error(err);
@@ -180,8 +190,13 @@ class DeviceHandler {
         // FIXME, TODO(bwintermann): Differentiate between BITwidth and BYTEwidth (which gets passed by FINN?)
         std::vector<xrt::bo> buffers = {};
         for (unsigned int i = 0; i < widths.size(); i++) {
-            auto elements = static_cast<unsigned int>(std::accumulate(std::begin(shape.begin()[i]), std::end(shape.begin()[i]), 1, std::multiplies<>()));
-            buffers.emplace_back(xrt::bo(device, static_cast<size_t>(widths.begin()[i] * elements), boFlag, 1));  // TODO(bwintermann): Correct memory group setting missing, assuming 1 here
+            if (std::holds_alternative<Shape>(memoryDefinitions[i])) {
+                auto shape = memoryDefinitions[i];
+                auto elements = static_cast<unsigned int>(std::accumulate(std::begin(shape.begin()[i]), std::end(shape.begin()[i]), 1, std::multiplies<>()));
+                buffers.emplace_back(xrt::bo(device, static_cast<size_t>(widths.begin()[i] * elements), boFlag, 0));  // TODO(bwintermann): Correct memory group setting missing, assuming 1 here
+            } else if (std::holds_alternative<MemoryMap<T>>(memoryDefinitions[i])) {
+                buffers.emplace_back(xrt::bo(device, memoryDefinitions[i].map, memoryDefinitions[i].size, boFlag, 0));
+            }
         }
         return buffers;
     }
@@ -204,6 +219,35 @@ class DeviceHandler {
             ++index;
         }
         return maps;
+    }
+
+    /**
+     * @brief Get a buffer object by index
+     * 
+     * @param mode 
+     * @param index 
+     * @return xrt::bo 
+     */
+    xrt::bo getBufferObject(IO_SWITCH mode, unsigned int index) {
+        if (mode == IO_SWITCH::INPUT) {
+            if (index >= inputBufferObjects.size()) {
+                std::string err = "Trying to get inputBufferObject at index " + std::to_string(index) + " failed, there are only " + std::to_string(inputBufferObjects.size()) + " objects available!";
+                BOOST_LOG_SEV(logger, logging::trivial::error) << "(" << name << ") " << err;
+                throw std::length_error(err);
+            }
+            return inputBufferObjects[index];
+        } else if (mode == IO_SWITCH::OUTPUT) {
+            if (index >= outputBufferObjects.size()) {
+                std::string err = "Trying to get outputBufferObject at index " + std::to_string(index) + " failed, there are only " + std::to_string(outputBufferObjects.size()) + " objects available!";
+                BOOST_LOG_SEV(logger, logging::trivial::error) << "(" << name << ") " << err;
+                throw std::length_error(err);
+            }
+            return outputBufferObjects[index];
+        } else {
+            std::string err = "Unknown retrieval mode for function getBufferObject() " + std::to_string(mode) + "!";
+            BOOST_LOG_SEV(logger, logging::trivial::error) << "(" << name << ") " << err;
+            throw std::runtime_error(err);
+        }
     }
 
     /**

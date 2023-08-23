@@ -2,12 +2,12 @@
 #include <string>
 #include <vector>
 
-#include "utils/driver.h"
+#include "utils/memoryMap.h"
 
 constexpr std::string_view PLATFORM = "alveo";
 constexpr TRANSFER_MODE transferMode = TRANSFER_MODE::MEMORY_BUFFERED;
 
-constexpr std::initializer_list<unsigned int> INPUT_BYTEWIDTH = {1, 1, 2};
+constexpr std::initializer_list<unsigned int> INPUT_BYTEWIDTH = {1, 1, 2}; // E.g. INT5, INT7, INT13
 constexpr std::initializer_list<unsigned int> OUTPUT_BYTEWIDTH = {1, 1, 2};
 
 const std::initializer_list<std::string> IDMA_NAMES = {"a", "b", "c"};

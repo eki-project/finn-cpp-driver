@@ -1,17 +1,13 @@
+/**
+ * @file memoryMap.h
+ * This file contains code for the MemoryMap struct, which is a wrapper around a C-style array that serves as a input/output map to an xrt::bo object. It provides the array's size in byte and elements, keeps track of it's dimensions (shapes) and shape-type. It also contains a RingBuffer object that can be used to efficiently put new data into the xrt::bo to sync to a device. A MemoryMap is usually owned by a DeviceHandler.
+ */
+
 #ifndef DRIVER_HPP
 #define DRIVER_HPP
 
 #include "ringBuffer.hpp"
-
-enum class DRIVER_MODE { EXECUTE = 0, THROUGHPUT_TEST = 1 };
-
-enum class SHAPE_TYPE { NORMAL = 0, FOLDED = 1, PACKED = 2, INVALID = -1 };
-
-enum class BUFFER_OP_RESULT { SUCCESS = 0, FAILURE = -1, OVER_BOUNDS_WRITE = -2, OVER_BOUNDS_READ = -3 };
-
-enum class TRANSFER_MODE { MEMORY_BUFFERED = 0, STREAMED = 1, INVALID = -1 };
-
-enum class IO_SWITCH { INPUT = 0, OUTPUT = 1, INOUT = 2, INVALID = -1 }; // General purpose, no specific usecase
+#include "finnUtils.h"
 
 /**
  * @brief A struct to wrap the memory map that a xrt::bo object writes/reads to/from. It also contains information about the buffers tensor shape, it's size in bytes and its shape type, as well as convenience functions for interaction
@@ -33,7 +29,7 @@ struct MemoryMap {
      */
     T* map = nullptr;
     /**
-     * @brief Size of the mapped buffer (in bytes (?))
+     * @brief Size of the mapped buffer (in bytes (?)) To get the number of elements use getElementCount()
      *
      */
     std::size_t size = 0;
@@ -60,6 +56,18 @@ struct MemoryMap {
      * @return unsigned int
      */
     unsigned int getElementCount() const { return static_cast<unsigned int>(size / sizeof(T)); }
+
+    /**
+     * @brief Load a new set of data from the internal ring buffer. 
+     * 
+     * @param cycle Whether or not the ring buffer internal index should be updated ((recommended true)). 
+     */
+    void loadFromRingBuffer(bool cycle) {
+        if (ringBuffer.targetSize != getElementCount()) {
+            throw std::length_error("Ring buffer of memory map " + name + " has target size " + std::to_string(ringBuffer.targetSize) + " but the memory map actual size is " + std::to_string(getElementCount()));
+        }
+        ringBuffer.copyActivePartToArray(map, cycle);
+    }
 
     /**
      * @brief Write a single element into the given map index

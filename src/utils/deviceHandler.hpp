@@ -1,3 +1,9 @@
+/**
+ * @file deviceHandler.hpp
+ * This file contains the DeviceHandler class. When doing FINN inference, one device handler per FPGA is required (Multi-FPGA coming soon). The core of the class is made up of several associated lists.
+ * 
+ */
+
 #ifndef DEVICE_HANDLER_H
 #define DEVICE_HANDLER_H
 
@@ -7,7 +13,8 @@
 #include <variant>
 
 // Helpers
-#include "driver.h"
+#include "memoryMap.h"
+#include "finnUtils.h"
 #include "finn_types/datatype.hpp"
 
 // XRT
@@ -64,7 +71,8 @@ class DeviceHandler {
 
     xrt::device device;
     xrt::uuid uuid;
-    xrt::ip kernelIp;
+    std::vector<xrt::kernel> inputKernels;
+    std::vector<xrt::kernel> outputKernels;
 
     std::vector<std::string> inputNames;
     std::vector<std::string> outputNames;
@@ -78,19 +86,22 @@ class DeviceHandler {
 
      public:
     /**
-     * @brief Construct a new Device Handler object. Requires the Bytewidths, dimensions and shape-types of all input and outputs
+     * @brief Construct a new Device Handler object. Requires the Bytewidths, dimensions and shape-types of all input and outputs. This class always handles multiple buffers, so everything is passed as a vector
      *
      * @param pName The name of the DeviceHandler for unique identification and logging purposes
      * @param pIsHelperDevice Specifies whether this handler is for a main device, which communicates with the host and is used in both Single- and Multi-FPGAs, or a helper device, which is part of a p2p network for Multi-FPGA applications
      * @param pDeviceIndex The device index, usually 0?
      * @param pBinaryFile The path to the .xclbin FINN file
      * @param pDriverMode The mode for which the driver is instantiated (memory_buffered or memory-less streaming)
-     * @param pInputBytewidths
-     * @param pOutputBytewidths
+     * @param pInputBytewidths How many bytes each buffer element requires
+     * @param pOutputBytewidths How many bytes each buffer element requires
      * @param pInputMemoryDefinition For every buffer either specify a shape e.g. (1,2,12), which is expanded to 1*2*12 * bytewidth bytes memory, OR specify a pointer to an existing memory map to receive that one as input for multi-FPGA
      * @param pOutputMemoryDefinition Same as inputMemoryDefintion
-     * @param pInputShapeType
-     * @param pOutputShapeType
+     * @param pInputShapeType The type of shape supplied, is of type SHAPE_TYPE
+     * @param pOutputShapeType The type of shape supplied, is of type SHAPE_TYPE
+     * @param pInputNames Names for input buffers as well as names for the kernels
+     * @param pOutputNames Names for output buffers as well as names for the kernels
+     * @param ringBufferSizeFactor How many times larger the RingBuffer objects belonging to the xrt::bo objects should be (for efficient loading of data)
      * @param pLogger Boost Severity Logger passed from main
      */
     DeviceHandler(const std::string& pName, const bool pIsHelperDevice, const int pDeviceIndex, const std::string& pBinaryFile, const DRIVER_MODE pDriverMode, const Bytewidths& pInputBytewidths, const Bytewidths& pOutputBytewidths, const BOMemoryDefinitionArguments<T>& pInputMemoryDefinition, const BOMemoryDefinitionArguments<T>& pOutputMemoryDefinition,
@@ -112,20 +123,27 @@ class DeviceHandler {
         for (auto name : pOutputNames) {
             outputNames.push_back(name);
         }
-        initializeDevice();
+        initializeDevice(pInputNames, pOutputNames);
         initializeBufferObjects(pInputBytewidths, pInputMemoryDefinition, pOutputBytewidths, pOutputMemoryDefinition);
         initializeMemoryMaps(pInputMemoryDefinition, pInputShapeType, pOutputMemoryDefinition, pOutputShapeType, ringBufferSizeFactor);
     }
 
     /**
-     * @brief Initializes and fill the class members variables for the XRT device, its UUID, and the IP handler
+     * @brief Initializes and fill the class members variables for the XRT device, its UUID, and initializes all kernels
      *
+     * @param inputKernelNames List of names of kernels
+     * @param outputKernelNames List of names of kernels
      */
-    void initializeDevice() {
+    void initializeDevice(const std::initializer_list<std::string> inputKernelNames, const std::initializer_list<std::string> outputKernelNames) {
         BOOST_LOG_SEV(logger, logging::trivial::info) << "(" << name << ") " << "Initializing xrt::device, loading xclbin and assigning IP\n";
         device = xrt::device(deviceIndex);
         uuid = device.load_xclbin(binaryFile);
-        kernelIp = xrt::ip(device, uuid, "PLACEHOLDER_KERNEL_NAME");  // TODO(bwintermann): Remove kernel placeholder
+        for (auto kname : inputKernelNames) {
+            inputKernels.push_back(xrt::kernel(device, uuid, kname));
+        }
+        for (auto kname : outputKernelNames) {
+            outputKernels.push_back(xrt::kernel(device, uuid, kname));
+        }
     }
 
     /**
@@ -156,32 +174,6 @@ class DeviceHandler {
         inputMemoryMaps = createMemoryMaps(inputBufferObjects, inputMemoryDefinitions, inputShapeType, ringBufferSizeFactor);
         outputMemoryMaps = createMemoryMaps(outputBufferObjects, outputMemoryDefinitions, outputShapeType, ringBufferSizeFactor);
     }
-
-    /**
-     * @brief Write randomized values to a buffer map. Raises an error if a write fails-
-     *
-     * @tparam U The bitwidth of the FINN datatype that is used to fill the map
-     * @tparam D The FINN datatype that is used to fill the map. Must be able to be contained in the datatype T
-     * @param mmap The MemoryMap itself
-     * @param datatype The FINN Datatype (subclass)
-     */
-    template<typename U, IsDatatype<U> D = Datatype<U>>  // This typeparameter should usually be a pointer, which was returned by xrt::bo.map<>()
-    void fillBufferMapRandomized(MemoryMap<T>& mmap, D& datatype) {
-        // TODO(bwintermann): Need ability to differentiate between float and int!
-        // TODO(bwintermann): Check if the datatype of the map T fits the FINN datatype D that is passed (in bitwidth and fixed/float/int)
-        // Integer values
-        for (unsigned int i = 0; i < mmap.getElementCount(); i++) {
-            BUFFER_OP_RESULT res = mmap.writeSingleElement(std::experimental::randint(datatype.min(), datatype.max()), i);
-
-            if (res == BUFFER_OP_RESULT::OVER_BOUNDS_WRITE) {
-                std::string err = "Error when trying to fill a memory mapped buffer: The write index exceeded the bounds of the map (tried to write at " + std::to_string(i) + " but bounds of map are 0 and " +
-                                   std::to_string(mmap.getElementCount()) + ")!";
-                BOOST_LOG_SEV(logger, logging::trivial::error) << "(" << name << ") " << err;
-                throw std::runtime_error(err);
-            }
-        }
-    }
-
 
     // Create buffers, one buffer per given shape, and bytewidth
     /**
@@ -352,8 +344,33 @@ class DeviceHandler {
     }
 
 
-    // TODO(bwintermann): Implementation
-    void throughputTest();
+    /**
+     * @brief Throughput test 
+     * @deprecated Based on a deprecated method of the ring buffer
+     * 
+     * @param min Min random value 
+     * @param max Max random value
+     */
+    void throughputTest(int min, int max, unsigned int times, unsigned int memoryMapIndex) {
+        for (unsigned int i = 0; i < times; i++) {
+            inputMemoryMaps[0].ringBuffer.fillRandomInt(min, max);
+            inputMemoryMaps[0].loadFromRingBuffer(true);
+            syncInputBuffersToDevice();
+
+            // TODO(bwintermann): DOES THE ODMA KERNEL WAIT UNTIL DATA ARRVIES?
+            // TODO(bwintermann): Which arguments do the input/output kernels require?
+            auto dataInRun = inputKernels[0](inputBufferObjects[0]);
+            auto dataOutRun = outputKernels[0](outputBufferObjects[0]);
+
+            // TODO(bwintermann): Naive, unbatched, temporary test solution
+            dataInRun.start();
+            dataOutRun.start();
+            dataInRun.wait();
+            dataOutRun.wait();
+
+            syncOutputBuffersFromDevice();
+        }
+    }
 
     // TODO(bwintermann): Implementation
     void executeBatch();

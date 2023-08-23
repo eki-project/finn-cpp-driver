@@ -1,3 +1,9 @@
+/**
+ * @file ringBuffer.hpp
+ * This file contains code for a RingBuffer class, specifically tailored for use in the FINN driver. 
+ *  
+ */
+
 
 template<typename T>
 class RingBuffer {
@@ -119,6 +125,19 @@ class RingBuffer {
         }
         if (updateIndex) {
             cycleActivePart();
+        }
+    }
+
+    /**
+     * @brief Fill the buffer with random integer values ranging from min to max
+     * @deprecated This has to perform possibly weird conversions from int -> T. To be replaced by a more general and powerful method   
+     * 
+     * @param min 
+     * @param max 
+     */
+    void fillRandomInt(int min, int max) {
+        for (unsigned int i = 0; i < size; i++) {
+            data[i] = std::experimental::randint(min, max);
         }
     }
 };

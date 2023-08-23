@@ -66,6 +66,9 @@ class DeviceHandler {
     xrt::uuid uuid;
     xrt::ip kernelIp;
 
+    std::vector<std::string> inputNames;
+    std::vector<std::string> outputNames;
+
     std::vector<xrt::bo> inputBufferObjects;
     std::vector<xrt::bo> outputBufferObjects;
     std::vector<MemoryMap<T>> inputMemoryMaps;
@@ -91,16 +94,27 @@ class DeviceHandler {
      * @param pLogger Boost Severity Logger passed from main
      */
     DeviceHandler(const std::string& pName, const bool pIsHelperDevice, const int pDeviceIndex, const std::string& pBinaryFile, const DRIVER_MODE pDriverMode, const Bytewidths& pInputBytewidths, const Bytewidths& pOutputBytewidths, const BOMemoryDefinitionArguments<T>& pInputMemoryDefinition, const BOMemoryDefinitionArguments<T>& pOutputMemoryDefinition,
-                  const SHAPE_TYPE pInputShapeType, const SHAPE_TYPE pOutputShapeType, src::severity_logger<logging::trivial::severity_level>& pLogger)
-        : name(pName), isHelperDevice(pIsHelperDevice), deviceIndex(pDeviceIndex), binaryFile(pBinaryFile), driverMode(pDriverMode), logger(pLogger) {
+                  const SHAPE_TYPE pInputShapeType, const SHAPE_TYPE pOutputShapeType, const std::initializer_list<std::string>& pInputNames, const std::initializer_list<std::string>& pOutputNames, const unsigned int ringBufferSizeFactor, src::severity_logger<logging::trivial::severity_level>& pLogger) : 
+        name(pName),
+        isHelperDevice(pIsHelperDevice),
+        deviceIndex(pDeviceIndex),
+        binaryFile(pBinaryFile),
+        driverMode(pDriverMode),
+        logger(pLogger) {
         if (!pIsHelperDevice) {
             BOOST_LOG_SEV(logger, logging::trivial::info) << "Initializing " << name << " as a host-communicating Single/Multi-FPGA device\n";
         } else {
             BOOST_LOG_SEV(logger, logging::trivial::info) << "Initializing " << name << " as a helper device for Multi-FPGA usage\n";
         }
+        for (auto name : pInputNames) {
+            inputNames.push_back(name);
+        }
+        for (auto name : pOutputNames) {
+            outputNames.push_back(name);
+        }
         initializeDevice();
         initializeBufferObjects(pInputBytewidths, pInputMemoryDefinition, pOutputBytewidths, pOutputMemoryDefinition);
-        initializeMemoryMaps(pInputMemoryDefinition, pInputShapeType, pOutputMemoryDefinition, pOutputShapeType);
+        initializeMemoryMaps(pInputMemoryDefinition, pInputShapeType, pOutputMemoryDefinition, pOutputShapeType, ringBufferSizeFactor);
     }
 
     /**
@@ -137,10 +151,10 @@ class DeviceHandler {
      * @param outputMemoryDefinitions
      * @param outputShapeType
      */
-    void initializeMemoryMaps(const BOMemoryDefinitionArguments<T>& inputMemoryDefinitions, const SHAPE_TYPE inputShapeType, const BOMemoryDefinitionArguments<T>& outputMemoryDefinitions, const SHAPE_TYPE outputShapeType) {
+    void initializeMemoryMaps(const BOMemoryDefinitionArguments<T>& inputMemoryDefinitions, const SHAPE_TYPE inputShapeType, const BOMemoryDefinitionArguments<T>& outputMemoryDefinitions, const SHAPE_TYPE outputShapeType, const unsigned int ringBufferSizeFactor) {
         BOOST_LOG_SEV(logger, logging::trivial::info) << "(" << name << ") " << "Creating memory maps";
-        inputMemoryMaps = createMemoryMaps(inputBufferObjects, inputMemoryDefinitions, inputShapeType);
-        outputMemoryMaps = createMemoryMaps(outputBufferObjects, outputMemoryDefinitions, outputShapeType);
+        inputMemoryMaps = createMemoryMaps(inputBufferObjects, inputMemoryDefinitions, inputShapeType, ringBufferSizeFactor);
+        outputMemoryMaps = createMemoryMaps(outputBufferObjects, outputMemoryDefinitions, outputShapeType, ringBufferSizeFactor);
     }
 
     /**
@@ -208,13 +222,25 @@ class DeviceHandler {
      * @param buffers The vector of buffers (usually created by createIOBuffers)
      * @param shapes
      * @param shapeType
+     * @param ringBufferSizeFactor The amount of times the memory map should fit into the ring buffer
      * @return std::vector<MemoryMap<T>>
      */
-    std::vector<MemoryMap<T>> createMemoryMaps(std::vector<xrt::bo>& buffers, Shapes shapes, SHAPE_TYPE shapeType) {
+    std::vector<MemoryMap<T>> createMemoryMaps(std::vector<xrt::bo>& buffers, Shapes shapes, SHAPE_TYPE shapeType, const unsigned int ringBufferSizeFactor) {
         std::vector<MemoryMap<T>> maps = {};
         unsigned int index = 0;
         for (auto&& buffer : buffers) {
-            MemoryMap<T> memmap = {buffer.map<T*>(), buffer.size(), shapes.begin()[index], shapeType};
+            unsigned int elementsInBuffer = static_cast<unsigned int>(buffer.size() / sizeof(T));
+            MemoryMap<T> memmap { 
+                inputNames[index],      // IDMA / ODMA Name
+                buffer.map<T*>(),       // Datatmap
+                buffer.size(),          // Size in bytes
+                shapes.begin()[index],  // Shape / Dimensions of the map
+                shapeType,              // Type of shape
+                RingBuffer<T>(          // Buffer to quickly load new data into/from the map
+                    elementsInBuffer,
+                    elementsInBuffer * ringBufferSizeFactor 
+                )
+            };
             maps.emplace_back(memmap);
             ++index;
         }
@@ -251,6 +277,65 @@ class DeviceHandler {
     }
 
     /**
+     * @brief Return a reference to the correct buffer list if mode is input or output. In any other case throw a runtime error 
+     * 
+     * @param mode 
+     * @return std::vector<xrt::bo>* 
+     */
+    std::vector<xrt::bo>* _resolveIOModeToBuffer(IO_SWITCH mode) {
+        if (mode == IO_SWITCH::INPUT) {
+            return &inputBufferObjects;
+        } else if (mode == IO_SWITCH::OUTPUT) {
+            return &outputBufferObjects;
+        } else {
+            std::string err = "Couldn't resolve IO_SWITCH to Buffer-Vector (IO_SWITCH = " << std::to_string(mode) << ")\n";
+            BOOST_LOG_SEV(logger, logging::trivial::error) << "(" << name << ") " << err;
+            throw std::runtime_error(err);
+        }
+    }
+
+    /**
+     * @brief General purpose method to sync multiple buffers from and to the device for specific indices. This method may be several times slower than syncInputBuffersToDevice and syncOutputBuffersFromDevice.
+     * To only sync one specific buffer use for example: deviceHandler.getBufferObject(IO_SWITCH::INPUT, 3).sync(XCL_BO_SYNC_BO_TO_DEVICE);
+     * 
+     * @param mode Whether the input or output buffers should be synced 
+     * @param indices The indices to sync
+     * @param syncDirection The direction to sync. This is on purpose not tied to the IO_SWITCH mode, although in almost all cases you will want to sync input TO device and output FROM device
+     */
+    void syncBuffers(IO_SWITCH mode, const std::vector<unsigned int>& indices, xclBOSyncDirection syncDirection) {
+        std::vector<xrt::bo>* buffers = _resolveIOModeToBuffer(mode);
+        for (auto index& : indices) {
+            if (index >= buffers->size()) {
+                std::string err = "Could not sync buffers. Trying to sync buffer " + std::to_string(index) + " but the buffer list (input or output) of device handler " + name + " has just " + std::to_string(buffers->size()) + " elements!\n";
+                BOOST_LOG_SEV(logger, logging::trivial::error) << "(" << name << ") " << err;
+                throw std::length_error(err);
+            }
+
+            (*buffers)[index].sync(syncDirection);
+        }
+    }
+
+    /**
+     * @brief Sync all inputBufferObjects to the device. This method is faster and should be used over the more general purpose but slower syncBuffers method!
+     * 
+     */
+    void syncInputBuffersToDevice() {
+        for (auto bo : inputBufferObjects) {
+            bo.sync(XCL_BO_SYNC_BO_TO_DEVICE);
+        }
+    }
+
+     /**
+     * @brief Sync all outputBufferObjects from the device. This method is faster and should be used over the more general purpose but slower syncBuffers method!
+     * 
+     */
+    void syncOutputBuffersFromDevice() {
+        for (auto bo : outputBufferObjects) {
+            bo.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
+        }
+    }
+
+    /**
      * @brief Creates a tensor (stdex::mdspan) from a given memory map (for easier math manipulation)
      *
      * @param mmap
@@ -266,6 +351,9 @@ class DeviceHandler {
         return makeMDSpan(mmap.map, mmap.dims);
     }
 
+
+    // TODO(bwintermann): Implementation
+    void throughputTest();
 
     // TODO(bwintermann): Implementation
     void executeBatch();

@@ -1,6 +1,8 @@
 #ifndef DRIVER_HPP
 #define DRIVER_HPP
 
+#include "ringBuffer.hpp"
+
 enum class DRIVER_MODE { EXECUTE = 0, THROUGHPUT_TEST = 1 };
 
 enum class SHAPE_TYPE { NORMAL = 0, FOLDED = 1, PACKED = 2, INVALID = -1 };
@@ -9,7 +11,7 @@ enum class BUFFER_OP_RESULT { SUCCESS = 0, FAILURE = -1, OVER_BOUNDS_WRITE = -2,
 
 enum class TRANSFER_MODE { MEMORY_BUFFERED = 0, STREAMED = 1, INVALID = -1 };
 
-enum class IO_SWITCH { INPUT = 0, OUTPUT = 1, INOUT = 2 }; // General purpose, no specific usecase
+enum class IO_SWITCH { INPUT = 0, OUTPUT = 1, INOUT = 2, INVALID = -1 }; // General purpose, no specific usecase
 
 /**
  * @brief A struct to wrap the memory map that a xrt::bo object writes/reads to/from. It also contains information about the buffers tensor shape, it's size in bytes and its shape type, as well as convenience functions for interaction
@@ -18,6 +20,13 @@ enum class IO_SWITCH { INPUT = 0, OUTPUT = 1, INOUT = 2 }; // General purpose, n
  */
 template<typename T>
 struct MemoryMap {
+
+    /**
+     * @brief The buffers/maps name as given by the FINN export 
+     * 
+     */
+    const std::string name;
+
     /**
      * @brief Stores the Buffer of memory used for communication
      *
@@ -38,6 +47,12 @@ struct MemoryMap {
      *
      */
     SHAPE_TYPE shapeType = SHAPE_TYPE::INVALID;
+
+    /**
+     * @brief RingBuffer used to quickly supply new values to the memory map 
+     * 
+     */
+    RingBuffer<T> ringBuffer;
 
     /**
      * @brief Get the number of elements contained in the memory map

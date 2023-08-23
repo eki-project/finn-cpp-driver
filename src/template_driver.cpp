@@ -6,7 +6,7 @@
 #include <string>
 
 // Helper
-#include "utils/device_handler.hpp"
+#include "utils/deviceHandler.hpp"
 #include "utils/driver.h"
 #include "utils/finn_types/datatype.hpp"
 #include "utils/mdspan.h"
@@ -71,6 +71,9 @@ int main() {
         OSHAPE_PACKED,
         SHAPE_TYPE::PACKED,     // Input shape type
         SHAPE_TYPE::PACKED,     // Output shape type
+        IDMA_NAMES,
+        ODMA_NAMES,
+        10,                     // Ring Buffer Size Factor
         lg                      // Logger instance
     );
     BOOST_LOG_SEV(lg, logging::trivial::info) << "Device handler initiated!";

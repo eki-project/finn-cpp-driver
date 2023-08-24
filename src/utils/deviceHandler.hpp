@@ -239,15 +239,22 @@ class DeviceHandler {
         unsigned int index = 0;
         for (auto&& buffer : buffers) {
             unsigned int elementsInBuffer = static_cast<unsigned int>(buffer.size() / sizeof(T));
-            // TODO(bwintermann): Fix this for variant
-            //  MemoryMap<T> memmap{inputNames[index],      // IDMA / ODMA Name
-            //                      buffer.map<T*>(),       // Datatmap
-            //                      buffer.size(),          // Size in bytes
-            //                      shapes.begin()[index],  // Shape / Dimensions of the map
-            //                      shapeType,              // Type of shape
-            //                      RingBuffer<T>(          // Buffer to quickly load new data into/from the map
-            //                          elementsInBuffer, elementsInBuffer * ringBufferSizeFactor)};
-            //  maps.emplace_back(memmap);
+            std::vector<unsigned int> correctedShapes;
+            for (auto shape : shapes) {
+                if (const shape_t* shapeInst = get_if<shape_t>(shape)) {
+                    correctedShapes.push_back(*shapeInst);
+                } else {
+                    correctedShapes.push_back(std::vector<unsigned int>());
+                }
+            }
+            MemoryMap<T> memmap{inputNames[index],      // IDMA / ODMA Name
+                                buffer.map<T*>(),       // Datatmap
+                                buffer.size(),          // Size in bytes
+                                correctedShapes,  // Shape / Dimensions of the map
+                                shapeType,              // Type of shape
+                                RingBuffer<T>(          // Buffer to quickly load new data into/from the map
+                                    elementsInBuffer, elementsInBuffer * ringBufferSizeFactor)};
+            maps.emplace_back(memmap);
             ++index;
         }
         return maps;

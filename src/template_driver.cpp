@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <boost/log/core.hpp>
 #include <boost/log/expressions.hpp>
 #include <boost/log/sinks/text_file_backend.hpp>
@@ -27,8 +28,6 @@ using std::string;
 
 namespace logging = boost::log;
 namespace src = boost::log::sources;
-namespace sinks = boost::log::sinks;
-namespace keywords = boost::log::keywords;
 
 void initLogging() {
     logging::add_file_log("cpp_driver.log");
@@ -39,8 +38,9 @@ template<typename T>
 BOMemoryDefinitionArguments<T> toVariant(const shape_list_t& inp) {
     std::vector<std::variant<shape_t, MemoryMap<T>>> ret;
     ret.reserve(inp.size());
-    // TODO(linusjun) Implement
-    return std::move(ret);
+
+    std::transform(inp.begin(), inp.end(), std::back_inserter(ret), [](const shape_t& shape) { return std::variant<shape_t, MemoryMap<T>>(shape); });
+    return ret;
 }
 
 
@@ -65,10 +65,10 @@ int main() {
                                                 false,      // Whether this is a helper node in a multi-fpga application
                                                 deviceIndex, binaryFile,
                                                 driverExecutionMode,  // Throughput test or execution of specific data
-                                                Config::INPUT_BYTEWIDTH, Config::OUTPUT_BYTEWIDTH, toVariant<int>(Config::ISHAPE_PACKED), toVariant<int>(Config::OSHAPE_PACKED),
+                                                Config::inputBytewidth, Config::outputBytewidth, toVariant<int>(Config::ishapePacked), toVariant<int>(Config::oshapePacked),
                                                 SHAPE_TYPE::PACKED,  // Input shape type
                                                 SHAPE_TYPE::PACKED,  // Output shape type
-                                                Config::IDMA_NAMES, Config::ODMA_NAMES,
+                                                Config::idmaNames, Config::odmaNames,
                                                 10,  // Ring Buffer Size Factor
                                                 log  // Logger instance
     );

@@ -95,19 +95,13 @@ class DeviceHandler {
      */
     DeviceHandler(const std::string& pName, const bool pIsHelperDevice, const int pDeviceIndex, const std::string& pBinaryFile, const DRIVER_MODE pDriverMode, const bytewidth_list_t& pInputBytewidths,
                   const bytewidth_list_t& pOutputBytewidths, const BOMemoryDefinitionArguments<T>& pInputMemoryDefinition, const BOMemoryDefinitionArguments<T>& pOutputMemoryDefinition, const SHAPE_TYPE pInputShapeType,
-                  const SHAPE_TYPE pOutputShapeType, const std::initializer_list<std::string>& pInputNames, const std::initializer_list<std::string>& pOutputNames, const unsigned int ringBufferSizeFactor,
+                  const SHAPE_TYPE pOutputShapeType, const std::vector<std::string>& pInputNames, const std::vector<std::string>& pOutputNames, const unsigned int ringBufferSizeFactor,
                   src::severity_logger<logging::trivial::severity_level>& pLogger)
-        : name(pName), isHelperDevice(pIsHelperDevice), deviceIndex(pDeviceIndex), binaryFile(pBinaryFile), driverMode(pDriverMode), logger(pLogger) {
+        : name(pName), isHelperDevice(pIsHelperDevice), deviceIndex(pDeviceIndex), binaryFile(pBinaryFile), driverMode(pDriverMode), inputNames(pInputNames), outputNames(pOutputNames), logger(pLogger) {
         if (!pIsHelperDevice) {
             BOOST_LOG_SEV(logger, logging::trivial::info) << "Initializing " << name << " as a host-communicating Single/Multi-FPGA device\n";
         } else {
             BOOST_LOG_SEV(logger, logging::trivial::info) << "Initializing " << name << " as a helper device for Multi-FPGA usage\n";
-        }
-        for (auto name : pInputNames) {
-            inputNames.push_back(name);
-        }
-        for (auto name : pOutputNames) {
-            outputNames.push_back(name);
         }
         initializeDevice(pInputNames, pOutputNames);
         initializeBufferObjects(pInputBytewidths, pInputMemoryDefinition, pOutputBytewidths, pOutputMemoryDefinition);
@@ -120,17 +114,13 @@ class DeviceHandler {
      * @param inputKernelNames List of names of kernels
      * @param outputKernelNames List of names of kernels
      */
-    void initializeDevice(const std::initializer_list<std::string> inputKernelNames, const std::initializer_list<std::string> outputKernelNames) {
+    void initializeDevice(const std::vector<std::string>& inputKernelNames, const std::vector<std::string>& outputKernelNames) {
         BOOST_LOG_SEV(logger, logging::trivial::info) << "(" << name << ") "
                                                       << "Initializing xrt::device, loading xclbin and assigning IP\n";
-        device = xrt::device(deviceIndex);
+        device = xrt::device(deviceIndex);  // NOLINT
         uuid = device.load_xclbin(binaryFile);
-        for (auto kname : inputKernelNames) {
-            inputKernels.push_back(xrt::kernel(device, uuid, kname));
-        }
-        for (auto kname : outputKernelNames) {
-            outputKernels.push_back(xrt::kernel(device, uuid, kname));
-        }
+        std::transform(inputKernelNames.begin(), inputKernelNames.end(), std::back_inserter(inputKernels), [this](const std::string& kname) { return xrt::kernel(device, uuid, kname); });
+        std::transform(outputKernelNames.begin(), outputKernelNames.end(), std::back_inserter(inputKernels), [this](const std::string& kname) { return xrt::kernel(device, uuid, kname); });
     }
 
     /**
@@ -196,13 +186,13 @@ class DeviceHandler {
     /**
      * @brief Create a vector of XRT buffer objects to interact with the fpga. Errors if the number of passed bitwidths does not match the number of shapes given.
      *
-     * @param device The XRT device to map the buffer to
+     * @param pDevice The XRT device to map the buffer to
      * @param boFlag The buffer flag passed. Most of the times use cacheable
      * @param widths The bitwidths of the buffers datatypes
      * @param memoryDefinitions List of variants, which can either contain a Shape type or a MemoryMap<T> type
      * @return std::vector<xrt::bo>
      */
-    std::vector<xrt::bo> createIOBuffers(const xrt::device& device, const xrt::bo::flags boFlag, const bytewidth_list_t& widths, const BOMemoryDefinitionArguments<T>& memoryDefinitions) {
+    std::vector<xrt::bo> createIOBuffers(const xrt::device& pDevice, const xrt::bo::flags boFlag, const bytewidth_list_t& widths, const BOMemoryDefinitionArguments<T>& memoryDefinitions) {
         if (widths.size() != memoryDefinitions.size()) {
             std::string err = "The number of bytewidths passed does not match the number of shape lists passed (" + std::to_string(widths.size()) + ", " + std::to_string(memoryDefinitions.size()) + ")!";
             BOOST_LOG_SEV(logger, logging::trivial::error) << "(" << name << ") " << err;
@@ -216,9 +206,9 @@ class DeviceHandler {
             if (const shape_t* shape = get_if<shape_t>(&memoryDefinitions[i])) {
                 // shape_t shape = memoryDefinitions[i];
                 auto elements = static_cast<unsigned int>(std::accumulate(shape->begin(), shape->end(), 1, std::multiplies<>()));
-                buffers.emplace_back(xrt::bo(device, static_cast<size_t>(widths.begin()[i] * elements), boFlag, 0));  // TODO(bwintermann): Correct memory group setting missing, assuming 1 here
+                buffers.emplace_back(xrt::bo(pDevice, static_cast<size_t>(widths.begin()[i] * elements), boFlag, 0));  // TODO(bwintermann): Correct memory group setting missing, assuming 1 here
             } else if (const MemoryMap<T>* memMap = get_if<MemoryMap<T>>(&memoryDefinitions[i])) {
-                buffers.emplace_back(xrt::bo(device, memMap->map, memMap->size, boFlag, 0));
+                buffers.emplace_back(xrt::bo(pDevice, memMap->map, memMap->size, boFlag, 0));
             }
         }
         return buffers;
@@ -275,29 +265,12 @@ class DeviceHandler {
                 throw std::length_error(err);
             }
             return outputBufferObjects[index];
-        } else {
-            std::string err = "Unknown retrieval mode for function getBufferObject() " + std::string(magic_enum::enum_name(mode)) + "!";
-            BOOST_LOG_SEV(logger, logging::trivial::error) << "(" << name << ") " << err;
-            throw std::runtime_error(err);
         }
-    }
-
-    /**
-     * @brief Return a reference to the correct buffer list if mode is input or output. In any other case throw a runtime error
-     *
-     * @param mode
-     * @return std::vector<xrt::bo>*
-     */
-    std::vector<xrt::bo>* _resolveIOModeToBuffer(IO_SWITCH mode) {
-        if (mode == IO_SWITCH::INPUT) {
-            return &inputBufferObjects;
-        } else if (mode == IO_SWITCH::OUTPUT) {
-            return &outputBufferObjects;
-        }
-        std::string err = "Couldn't resolve IO_SWITCH to Buffer-Vector (IO_SWITCH = " + std::string(magic_enum::enum_name(mode)) + ")\n";
+        std::string err = "Unknown retrieval mode for function getBufferObject() " + std::string(magic_enum::enum_name(mode)) + "!";
         BOOST_LOG_SEV(logger, logging::trivial::error) << "(" << name << ") " << err;
         throw std::runtime_error(err);
     }
+
 
     /**
      * @brief General purpose method to sync multiple buffers from and to the device for specific indices. This method may be several times slower than syncInputBuffersToDevice and syncOutputBuffersFromDevice.
@@ -308,7 +281,7 @@ class DeviceHandler {
      * @param syncDirection The direction to sync. This is on purpose not tied to the IO_SWITCH mode, although in almost all cases you will want to sync input TO device and output FROM device
      */
     void syncBuffers(IO_SWITCH mode, const std::vector<unsigned int>& indices, xclBOSyncDirection syncDirection) {
-        std::vector<xrt::bo>* buffers = _resolveIOModeToBuffer(mode);
+        std::vector<xrt::bo>* buffers = resolveIOModeToBuffer(mode);
         for (auto&& index : indices) {
             if (index >= buffers->size()) {
                 std::string err =
@@ -326,8 +299,8 @@ class DeviceHandler {
      *
      */
     void syncInputBuffersToDevice() {
-        for (auto&& bo : inputBufferObjects) {
-            bo.sync(XCL_BO_SYNC_BO_TO_DEVICE);
+        for (auto&& buffer : inputBufferObjects) {
+            buffer.sync(XCL_BO_SYNC_BO_TO_DEVICE);
         }
     }
 
@@ -336,8 +309,8 @@ class DeviceHandler {
      *
      */
     void syncOutputBuffersFromDevice() {
-        for (auto&& bo : outputBufferObjects) {
-            bo.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
+        for (auto&& buffer : outputBufferObjects) {
+            buffer.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
         }
     }
 
@@ -388,6 +361,24 @@ class DeviceHandler {
 
     // TODO(bwintermann): Implementation
     void executeBatch();
+
+     private:
+    /**
+     * @brief Return a reference to the correct buffer list if mode is input or output. In any other case throw a runtime error
+     *
+     * @param mode
+     * @return std::vector<xrt::bo>*
+     */
+    std::vector<xrt::bo>* resolveIOModeToBuffer(IO_SWITCH mode) {
+        if (mode == IO_SWITCH::INPUT) {
+            return &inputBufferObjects;
+        } else if (mode == IO_SWITCH::OUTPUT) {
+            return &outputBufferObjects;
+        }
+        std::string err = "Couldn't resolve IO_SWITCH to Buffer-Vector (IO_SWITCH = " + std::string(magic_enum::enum_name(mode)) + ")\n";
+        BOOST_LOG_SEV(logger, logging::trivial::error) << "(" << name << ") " << err;
+        throw std::runtime_error(err);
+    }
 };
 
 #endif

@@ -228,23 +228,19 @@ class DeviceHandler {
         std::vector<MemoryMap<T>> maps = {};
         unsigned int index = 0;
         for (auto&& buffer : buffers) {
-            unsigned int elementsInBuffer = static_cast<unsigned int>(buffer.size() / sizeof(T));
-            std::vector<unsigned int> correctedShapes;
-            for (auto shape : shapes) {
-                if (const shape_t* shapeInst = get_if<shape_t>(shape)) {
-                    correctedShapes.push_back(*shapeInst);
-                } else {
-                    correctedShapes.push_back(std::vector<unsigned int>());
-                }
+            auto elementsInBuffer = static_cast<unsigned int>(buffer.size() / sizeof(T));
+            if (const shape_t* shapeInst = get_if<shape_t>(&shapes[index])) {
+                MemoryMap<T> memMap{inputNames[index],  // IDMA / ODMA Name
+                                    buffer.map<T*>(),   // Datatmap
+                                    buffer.size(),      // Size in bytes
+                                    *shapeInst,         // Shape / Dimensions of the map
+                                    shapeType,          // Type of shape
+                                    RingBuffer<T>(      // Buffer to quickly load new data into/from the map
+                                        elementsInBuffer, elementsInBuffer * ringBufferSizeFactor)};
+                maps.emplace_back(memMap);
+            } else if (const MemoryMap<T>* memMap = get_if<MemoryMap<T>>(&shapes[index])) {
+                maps.emplace_back(*memMap);
             }
-            MemoryMap<T> memmap{inputNames[index],      // IDMA / ODMA Name
-                                buffer.map<T*>(),       // Datatmap
-                                buffer.size(),          // Size in bytes
-                                correctedShapes,  // Shape / Dimensions of the map
-                                shapeType,              // Type of shape
-                                RingBuffer<T>(          // Buffer to quickly load new data into/from the map
-                                    elementsInBuffer, elementsInBuffer * ringBufferSizeFactor)};
-            maps.emplace_back(memmap);
             ++index;
         }
         return maps;
@@ -265,7 +261,8 @@ class DeviceHandler {
                 throw std::length_error(err);
             }
             return inputBufferObjects[index];
-        } else if (mode == IO_SWITCH::OUTPUT) {
+        }
+        if (mode == IO_SWITCH::OUTPUT) {
             if (index >= outputBufferObjects.size()) {
                 std::string err = "Trying to get outputBufferObject at index " + std::to_string(index) + " failed, there are only " + std::to_string(outputBufferObjects.size()) + " objects available!";
                 BOOST_LOG_SEV(logger, logging::trivial::error) << "(" << name << ") " << err;
@@ -345,7 +342,7 @@ class DeviceHandler {
      * @param min Min random value
      * @param max Max random value
      */
-    void throughputTest(int min, int max, unsigned int times, unsigned int memoryMapIndex) {
+    void throughputTest(int min, int max, unsigned int times, [[maybe_unused]] unsigned int memoryMapIndex) {
         for (unsigned int i = 0; i < times; i++) {
             inputMemoryMaps[0].ringBuffer.fillRandomInt(min, max);
             inputMemoryMaps[0].loadFromRingBuffer(true);
@@ -379,7 +376,8 @@ class DeviceHandler {
     std::vector<xrt::bo>* resolveIOModeToBuffer(IO_SWITCH mode) {
         if (mode == IO_SWITCH::INPUT) {
             return &inputBufferObjects;
-        } else if (mode == IO_SWITCH::OUTPUT) {
+        }
+        if (mode == IO_SWITCH::OUTPUT) {
             return &outputBufferObjects;
         }
         std::string err = "Couldn't resolve IO_SWITCH to Buffer-Vector (IO_SWITCH = " + std::string(magic_enum::enum_name(mode)) + ")\n";

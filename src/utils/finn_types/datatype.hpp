@@ -69,7 +69,7 @@ class Datatype {
      */
     template<Integral T>
     bool allowed(const T& val) const {
-        return static_cast<D*>(this)->template allowedImpl<T>(val);
+        return static_cast<const D*>(this)->template allowedImpl<T>(val);
     }
 
     /**
@@ -180,6 +180,9 @@ class Datatype {
  *
  */
 class DatatypeFloat : public Datatype<DatatypeFloat> {
+     private:
+    friend class Datatype<DatatypeFloat>;
+
      public:
     /**
      * @brief @see Datatype
@@ -232,6 +235,9 @@ class DatatypeFloat : public Datatype<DatatypeFloat> {
  */
 template<std::size_t B>
 class DatatypeInt : public Datatype<DatatypeInt<B>> {
+     private:
+    friend class Datatype<DatatypeInt<B>>;
+
      public:
     /**
      * @brief @see Datatype
@@ -284,6 +290,9 @@ class DatatypeInt : public Datatype<DatatypeInt<B>> {
  */
 template<std::size_t B, std::size_t I>
 class DatatypeFixed : public Datatype<DatatypeFixed<B, I>> {
+     private:
+    friend class Datatype<DatatypeFixed<B, I>>;
+
      public:
     /**
      * @brief @see Datatype
@@ -350,6 +359,9 @@ class DatatypeFixed : public Datatype<DatatypeFixed<B, I>> {
  */
 template<std::size_t B>
 class DatatypeUInt : public Datatype<DatatypeUInt<B>> {
+     private:
+    friend class Datatype<DatatypeUInt<B>>;
+
      public:
     /**
      * @brief @see Datatype
@@ -406,6 +418,10 @@ using DatatypeBinary = DatatypeUInt<1>;
  *
  */
 class DatatypeBipolar : public Datatype<DatatypeBipolar> {
+     private:
+    friend class Datatype<DatatypeBipolar>;
+
+     public:
     /**
      * @brief @see Datatype
      */
@@ -459,6 +475,10 @@ class DatatypeBipolar : public Datatype<DatatypeBipolar> {
  *
  */
 class DatatypeTernary : public Datatype<DatatypeTernary> {
+     private:
+    friend class Datatype<DatatypeTernary>;
+
+     public:
     /**
      * @brief @see Datatype
      */

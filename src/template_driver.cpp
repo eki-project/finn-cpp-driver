@@ -61,16 +61,16 @@ int main() {
     DRIVER_MODE driverExecutionMode = DRIVER_MODE::THROUGHPUT_TEST;
     BOOST_LOG_SEV(log, logging::trivial::info) << "Device index: " << deviceIndex << "\nBinary File Path: " << binaryFile << "\n";  // Driver Mode: " << driverExecutionMode << "\n";
 
-    DeviceHandler<int> dha = DeviceHandler<int>("DEVICE1",  // Unique name
-                                                false,      // Whether this is a helper node in a multi-fpga application
-                                                deviceIndex, binaryFile,
-                                                driverExecutionMode,  // Throughput test or execution of specific data
-                                                Config::inputBytewidth, Config::outputBytewidth, toVariant<int>(Config::ishapePacked), toVariant<int>(Config::oshapePacked),
-                                                SHAPE_TYPE::PACKED,  // Input shape type
-                                                SHAPE_TYPE::PACKED,  // Output shape type
-                                                Config::idmaNames, Config::odmaNames,
-                                                10,  // Ring Buffer Size Factor
-                                                log  // Logger instance
+    [[maybe_unused]] DeviceHandler<int> dha = DeviceHandler<int>("DEVICE1",  // Unique name
+                                                                 false,      // Whether this is a helper node in a multi-fpga application
+                                                                 deviceIndex, binaryFile,
+                                                                 driverExecutionMode,  // Throughput test or execution of specific data
+                                                                 Config::inputBytewidth, Config::outputBytewidth, toVariant<int>(Config::ishapePacked), toVariant<int>(Config::oshapePacked),
+                                                                 SHAPE_TYPE::PACKED,  // Input shape type
+                                                                 SHAPE_TYPE::PACKED,  // Output shape type
+                                                                 Config::idmaNames, Config::odmaNames,
+                                                                 10,  // Ring Buffer Size Factor
+                                                                 log  // Logger instance
     );
     BOOST_LOG_SEV(log, logging::trivial::info) << "Device handler initiated!";
 

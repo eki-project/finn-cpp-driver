@@ -1,3 +1,6 @@
 [submodule "external/mdspan"]
 	path = external/mdspan
 	url = https://github.com/kokkos/mdspan.git
+[submodule "external/magic_enum"]
+	path = external/magic_enum
+	url = https://github.com/Neargye/magic_enum.git

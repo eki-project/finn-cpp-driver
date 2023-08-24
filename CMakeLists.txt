@@ -77,8 +77,15 @@ find_package(XRT REQUIRED)
 #OpenMP
 find_package(OpenMP)
 
+#Boost
+find_package(Boost 1.72.0 COMPONENTS log program_options ${BOOST_THREAD} REQUIRED)
+include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
+
 #mdspan
 include_directories(SYSTEM external/mdspan/include)
+
+#Magic Enums
+include_directories(SYSTEM external/magic_enum/include)
 
 #Compiler Options
 add_library(finnc_options INTERFACE)

@@ -4,11 +4,13 @@
 // Default
 #include <string>
 #include <vector>
-#include <variant>
 
 // Helpers
-#include "driver.h"
+#include <magic_enum.hpp>
+
+#include "MemoryMap.hpp"
 #include "finn_types/datatype.hpp"
+#include "types.h"
 
 // XRT
 #include "experimental/xrt_ip.h"
@@ -19,33 +21,21 @@
 
 // Logger
 #include <boost/log/core.hpp>
-#include <boost/log/trivial.hpp>
 #include <boost/log/expressions.hpp>
 #include <boost/log/sinks/text_file_backend.hpp>
-#include <boost/log/utility/setup/file.hpp>
-#include <boost/log/utility/setup/common_attributes.hpp>
-#include <boost/log/sources/severity_logger.hpp>
 #include <boost/log/sources/record_ostream.hpp>
+#include <boost/log/sources/severity_logger.hpp>
+#include <boost/log/trivial.hpp>
+#include <boost/log/utility/setup/common_attributes.hpp>
+#include <boost/log/utility/setup/file.hpp>
+
+#include "../config.h"
 
 
 namespace logging = boost::log;
 namespace src = boost::log::sources;
 namespace sinks = boost::log::sinks;
 namespace keywords = boost::log::keywords;
-
-
-// TODO(bwintermann): Remove, only here because this type might change a few times over next few iterations
-using Shape = std::initializer_list<unsigned int>;
-using Shapes = std::initializer_list<Shape>;
-using Bytewidths = std::initializer_list<unsigned int>;
-
-/**
- * @brief Describes a list (initializer_list) of types Shape OR MemoryMap<T>. In the first case a buffer with the appropiate byte size is simply created, with the latter, an existing memory mapped is taken as input for chaining FPGAs together
- * 
- * @tparam T The datatype of the DeviceHandler 
- */
-template<typename T>
-using BOMemoryDefinitionArguments = std::initializer_list<std::variant<Shape, MemoryMap<T>>;
 
 
 /**
@@ -75,7 +65,7 @@ class DeviceHandler {
 
      public:
     /**
-     * @brief Construct a new Device Handler object. Requires the Bytewidths, dimensions and shape-types of all input and outputs
+     * @brief Construct a new Device Handler object. Requires the bytewidth_list_t, dimensions and shape-types of all input and outputs
      *
      * @param pName The name of the DeviceHandler for unique identification and logging purposes
      * @param pIsHelperDevice Specifies whether this handler is for a main device, which communicates with the host and is used in both Single- and Multi-FPGAs, or a helper device, which is part of a p2p network for Multi-FPGA applications
@@ -90,8 +80,9 @@ class DeviceHandler {
      * @param pOutputShapeType
      * @param pLogger Boost Severity Logger passed from main
      */
-    DeviceHandler(const std::string& pName, const bool pIsHelperDevice, const int pDeviceIndex, const std::string& pBinaryFile, const DRIVER_MODE pDriverMode, const Bytewidths& pInputBytewidths, const Bytewidths& pOutputBytewidths, const BOMemoryDefinitionArguments<T>& pInputMemoryDefinition, const BOMemoryDefinitionArguments<T>& pOutputMemoryDefinition,
-                  const SHAPE_TYPE pInputShapeType, const SHAPE_TYPE pOutputShapeType, src::severity_logger<logging::trivial::severity_level>& pLogger)
+    DeviceHandler(const std::string& pName, const bool pIsHelperDevice, const int pDeviceIndex, const std::string& pBinaryFile, const DRIVER_MODE pDriverMode, const bytewidth_list_t& pInputBytewidths,
+                  const bytewidth_list_t& pOutputBytewidths, const BOMemoryDefinitionArguments<T>& pInputMemoryDefinition, const BOMemoryDefinitionArguments<T>& pOutputMemoryDefinition, const SHAPE_TYPE pInputShapeType,
+                  const SHAPE_TYPE pOutputShapeType, src::severity_logger<logging::trivial::severity_level>& pLogger)
         : name(pName), isHelperDevice(pIsHelperDevice), deviceIndex(pDeviceIndex), binaryFile(pBinaryFile), driverMode(pDriverMode), logger(pLogger) {
         if (!pIsHelperDevice) {
             BOOST_LOG_SEV(logger, logging::trivial::info) << "Initializing " << name << " as a host-communicating Single/Multi-FPGA device\n";
@@ -108,37 +99,41 @@ class DeviceHandler {
      *
      */
     void initializeDevice() {
-        BOOST_LOG_SEV(logger, logging::trivial::info) << "(" << name << ") " << "Initializing xrt::device, loading xclbin and assigning IP\n";
+        BOOST_LOG_SEV(logger, logging::trivial::info) << "(" << name << ") "
+                                                      << "Initializing xrt::device, loading xclbin and assigning IP\n";
         device = xrt::device(deviceIndex);
         uuid = device.load_xclbin(binaryFile);
         kernelIp = xrt::ip(device, uuid, "PLACEHOLDER_KERNEL_NAME");  // TODO(bwintermann): Remove kernel placeholder
     }
 
     /**
-     * @brief Create IO XRT BufferObjects from the given bytewidths and dimensions. If this is a device that is directly communicating with the host (main device), the buffer is marked as cachable. If it is a helper device in a Multi-FPGA group, the buffers are marked as p2p, to enable sending between multiple boards. 
+     * @brief Create IO XRT BufferObjects from the given bytewidths and dimensions. If this is a device that is directly communicating with the host (main device), the buffer is marked as cachable. If it is a helper device in a Multi-FPGA
+     * group, the buffers are marked as p2p, to enable sending between multiple boards.
      *
      * @param inBytewidths
      * @param inputMemoryDefinitions
      * @param outBytewidths
      * @param outputMemoryDefinitions
      */
-    void initializeBufferObjects(const Bytewidths& inBytewidths, const BOMemoryDefinitionArguments<T>& inputMemoryDefinitions, const Bytewidths& outBytewidths, const BOMemoryDefinitionArguments<T>& outputMemoryDefinitions) {
-        BOOST_LOG_SEV(logger, logging::trivial::info) << "(" << name << ") " << "Initializing xrt::bo objects for input and output";
+    void initializeBufferObjects(const bytewidth_list_t& inBytewidths, const BOMemoryDefinitionArguments<T>& inputMemoryDefinitions, const bytewidth_list_t& outBytewidths, const BOMemoryDefinitionArguments<T>& outputMemoryDefinitions) {
+        BOOST_LOG_SEV(logger, logging::trivial::info) << "(" << name << ") "
+                                                      << "Initializing xrt::bo objects for input and output";
         xrt::bo::flags boFlag = (!isHelperDevice) ? xrt::bo::flags::cacheable : xrt::bo::flags::p2p;
-        inputBufferObjects = createIOBuffers(device, inBytewidths, inputMemoryDefinitions);
-        outputBufferObjects = createIOBuffers(device, outBytewidths, outputMemoryDefinitions);
+        inputBufferObjects = createIOBuffers(device, boFlag, inBytewidths, inputMemoryDefinitions);
+        outputBufferObjects = createIOBuffers(device, boFlag, outBytewidths, outputMemoryDefinitions);
     }
 
     /**
      * @brief Create memory maps the template type given by the device handler class.
      *
      * @param inputMemoryDefinitions
-     * @param inputShapeType 
+     * @param inputShapeType
      * @param outputMemoryDefinitions
      * @param outputShapeType
      */
     void initializeMemoryMaps(const BOMemoryDefinitionArguments<T>& inputMemoryDefinitions, const SHAPE_TYPE inputShapeType, const BOMemoryDefinitionArguments<T>& outputMemoryDefinitions, const SHAPE_TYPE outputShapeType) {
-        BOOST_LOG_SEV(logger, logging::trivial::info) << "(" << name << ") " << "Creating memory maps";
+        BOOST_LOG_SEV(logger, logging::trivial::info) << "(" << name << ") "
+                                                      << "Creating memory maps";
         inputMemoryMaps = createMemoryMaps(inputBufferObjects, inputMemoryDefinitions, inputShapeType);
         outputMemoryMaps = createMemoryMaps(outputBufferObjects, outputMemoryDefinitions, outputShapeType);
     }
@@ -161,7 +156,7 @@ class DeviceHandler {
 
             if (res == BUFFER_OP_RESULT::OVER_BOUNDS_WRITE) {
                 std::string err = "Error when trying to fill a memory mapped buffer: The write index exceeded the bounds of the map (tried to write at " + std::to_string(i) + " but bounds of map are 0 and " +
-                                   std::to_string(mmap.getElementCount()) + ")!";
+                                  std::to_string(mmap.getElementCount()) + ")!";
                 BOOST_LOG_SEV(logger, logging::trivial::error) << "(" << name << ") " << err;
                 throw std::runtime_error(err);
             }
@@ -179,9 +174,9 @@ class DeviceHandler {
      * @param memoryDefinitions List of variants, which can either contain a Shape type or a MemoryMap<T> type
      * @return std::vector<xrt::bo>
      */
-    std::vector<xrt::bo> createIOBuffers(const xrt::device& device, const xrt::bo::flags boFlag, const Bytewidths& widths, const BOMemoryDefinitionArguments<T>& memoryDefinitions) {
+    std::vector<xrt::bo> createIOBuffers(const xrt::device& device, const xrt::bo::flags boFlag, const bytewidth_list_t& widths, const BOMemoryDefinitionArguments<T>& memoryDefinitions) {
         if (widths.size() != memoryDefinitions.size()) {
-            std::string err = "The number of bytewidths passed does not match the number of shape lists passed (" + std::to_string(widths.size()) + ", " + std::to_string(shape.size()) + ")!";
+            std::string err = "The number of bytewidths passed does not match the number of shape lists passed (" + std::to_string(widths.size()) + ", " + std::to_string(memoryDefinitions.size()) + ")!";
             BOOST_LOG_SEV(logger, logging::trivial::error) << "(" << name << ") " << err;
             throw std::length_error(err);
         }
@@ -190,12 +185,12 @@ class DeviceHandler {
         // FIXME, TODO(bwintermann): Differentiate between BITwidth and BYTEwidth (which gets passed by FINN?)
         std::vector<xrt::bo> buffers = {};
         for (unsigned int i = 0; i < widths.size(); i++) {
-            if (std::holds_alternative<Shape>(memoryDefinitions[i])) {
-                auto shape = memoryDefinitions[i];
-                auto elements = static_cast<unsigned int>(std::accumulate(std::begin(shape.begin()[i]), std::end(shape.begin()[i]), 1, std::multiplies<>()));
+            if (const shape_t* shape = get_if<shape_t>(&memoryDefinitions[i])) {
+                // shape_t shape = memoryDefinitions[i];
+                auto elements = static_cast<unsigned int>(std::accumulate(shape->begin(), shape->end(), 1, std::multiplies<>()));
                 buffers.emplace_back(xrt::bo(device, static_cast<size_t>(widths.begin()[i] * elements), boFlag, 0));  // TODO(bwintermann): Correct memory group setting missing, assuming 1 here
-            } else if (std::holds_alternative<MemoryMap<T>>(memoryDefinitions[i])) {
-                buffers.emplace_back(xrt::bo(device, memoryDefinitions[i].map, memoryDefinitions[i].size, boFlag, 0));
+            } else if (const MemoryMap<T>* memMap = get_if<MemoryMap<T>>(&memoryDefinitions[i])) {
+                buffers.emplace_back(xrt::bo(device, memMap->map, memMap->size, boFlag, 0));
             }
         }
         return buffers;
@@ -210,12 +205,13 @@ class DeviceHandler {
      * @param shapeType
      * @return std::vector<MemoryMap<T>>
      */
-    std::vector<MemoryMap<T>> createMemoryMaps(std::vector<xrt::bo>& buffers, Shapes shapes, SHAPE_TYPE shapeType) {
+    std::vector<MemoryMap<T>> createMemoryMaps(const std::vector<xrt::bo>& buffers, const BOMemoryDefinitionArguments<T>& shapes, SHAPE_TYPE shapeType) {
         std::vector<MemoryMap<T>> maps = {};
         unsigned int index = 0;
         for (auto&& buffer : buffers) {
-            MemoryMap<T> memmap = {buffer.map<T*>(), buffer.size(), shapes.begin()[index], shapeType};
-            maps.emplace_back(memmap);
+            // TODO(bwintermann) Fix this
+            //  MemoryMap<T> memmap = {buffer.map<T*>(), buffer.size(), shapes.begin()[index], shapeType};
+            //  maps.emplace_back(memmap);
             ++index;
         }
         return maps;
@@ -223,10 +219,10 @@ class DeviceHandler {
 
     /**
      * @brief Get a buffer object by index
-     * 
-     * @param mode 
-     * @param index 
-     * @return xrt::bo 
+     *
+     * @param mode
+     * @param index
+     * @return xrt::bo
      */
     xrt::bo getBufferObject(IO_SWITCH mode, unsigned int index) {
         if (mode == IO_SWITCH::INPUT) {
@@ -244,7 +240,7 @@ class DeviceHandler {
             }
             return outputBufferObjects[index];
         } else {
-            std::string err = "Unknown retrieval mode for function getBufferObject() " + std::to_string(mode) + "!";
+            std::string err = "Unknown retrieval mode for function getBufferObject() " + std::string(magic_enum::enum_name(mode)) + "!";
             BOOST_LOG_SEV(logger, logging::trivial::error) << "(" << name << ") " << err;
             throw std::runtime_error(err);
         }

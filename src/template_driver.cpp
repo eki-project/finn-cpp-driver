@@ -15,7 +15,7 @@
 
 // Helper
 #include "utils/MemoryMap.hpp"
-#include "utils/device_handler.hpp"
+#include "utils/deviceHandler.hpp"
 #include "utils/finn_types/datatype.hpp"
 #include "utils/mdspan.h"
 
@@ -68,7 +68,9 @@ int main() {
                                                 Config::INPUT_BYTEWIDTH, Config::OUTPUT_BYTEWIDTH, toVariant<int>(Config::ISHAPE_PACKED), toVariant<int>(Config::OSHAPE_PACKED),
                                                 SHAPE_TYPE::PACKED,  // Input shape type
                                                 SHAPE_TYPE::PACKED,  // Output shape type
-                                                log                  // Logger instance
+                                                Config::IDMA_NAMES, Config::ODMA_NAMES,
+                                                10,  // Ring Buffer Size Factor
+                                                log  // Logger instance
     );
     BOOST_LOG_SEV(log, logging::trivial::info) << "Device handler initiated!";
 

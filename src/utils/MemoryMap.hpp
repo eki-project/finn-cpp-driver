@@ -1,6 +1,13 @@
-#ifndef DRIVER_HPP
-#define DRIVER_HPP
+/**
+ * @file memoryMap.h
+ * This file contains code for the MemoryMap struct, which is a wrapper around a C-style array that serves as a input/output map to an xrt::bo object. It provides the array's size in byte and elements, keeps track of it's dimensions
+ * (shapes) and shape-type. It also contains a RingBuffer object that can be used to efficiently put new data into the xrt::bo to sync to a device. A MemoryMap is usually owned by a DeviceHandler.
+ */
 
+#ifndef MEMORY_MAP
+#define MEMORY_MAP
+
+#include "ringBuffer.hpp"
 #include "types.h"
 
 /**
@@ -11,12 +18,18 @@
 template<typename T>
 struct MemoryMap {
     /**
+     * @brief The buffers/maps name as given by the FINN export
+     *
+     */
+    const std::string name;
+
+    /**
      * @brief Stores the Buffer of memory used for communication
      *
      */
     T* map = nullptr;
     /**
-     * @brief Size of the mapped buffer (in bytes (?))
+     * @brief Size of the mapped buffer (in bytes (?)) To get the number of elements use getElementCount()
      *
      */
     std::size_t size = 0;
@@ -32,11 +45,29 @@ struct MemoryMap {
     SHAPE_TYPE shapeType = SHAPE_TYPE::INVALID;
 
     /**
+     * @brief RingBuffer used to quickly supply new values to the memory map
+     *
+     */
+    RingBuffer<T> ringBuffer;
+
+    /**
      * @brief Get the number of elements contained in the memory map
      *
      * @return unsigned int
      */
     unsigned int getElementCount() const { return static_cast<unsigned int>(size / sizeof(T)); }
+
+    /**
+     * @brief Load a new set of data from the internal ring buffer.
+     *
+     * @param cycle Whether or not the ring buffer internal index should be updated ((recommended true)).
+     */
+    void loadFromRingBuffer(bool cycle) {
+        if (ringBuffer.targetSize != getElementCount()) {
+            throw std::length_error("Ring buffer of memory map " + name + " has target size " + std::to_string(ringBuffer.targetSize) + " but the memory map actual size is " + std::to_string(getElementCount()));
+        }
+        ringBuffer.copyActivePartToArray(map, cycle);
+    }
 
     /**
      * @brief Write a single element into the given map index

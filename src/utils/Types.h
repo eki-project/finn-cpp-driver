@@ -14,7 +14,9 @@ enum class BUFFER_OP_RESULT { SUCCESS = 0, FAILURE = -1, OVER_BOUNDS_WRITE = -2,
 
 enum class TRANSFER_MODE { MEMORY_BUFFERED = 0, STREAMED = 1, INVALID = -1 };
 
-enum class IO_SWITCH { INPUT = 0, OUTPUT = 1, INOUT = 2 };  // General purpose, no specific usecase
+enum class IO { INPUT = 0, OUTPUT = 1, INOUT = 2, UNSPECIFIED = -1 };  // General purpose, no specific usecase
+
+enum class SIZE_SPECIFIER { BYTES = 0, ELEMENTS = 1, NUMBERS = 2, SAMPLES = 3, INVALID = -1 };
 
 // Forward Declarations
 template<typename T>

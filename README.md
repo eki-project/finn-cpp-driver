@@ -18,3 +18,83 @@ mkdir build && cd build
 cmake ..
 make -j $(nprocs)
 ```
+
+## TODO
+* Check if XRT frees the memory map itself
+* Does XRT ALWAYS take uint8? Even if not should we do it all the same?
+
+## Structure
+```
+Driver (bjarne)
+    Accelerator (linus)
+        DeviceHandler<uint8>[] OR DeviceHandler<InputType, OutputType>[] (linus)
+            XCLBIN-File
+            Name
+            DeviceIndex
+            xrt::kernel[]
+            DeviceBuffer[]<Type> (bjarne)
+                xrt::bo[]
+                bo-map*
+                sizes
+                Boost CircularBuffer
+                Boost CircularBuffer Methoden
+```
+
+### Driver
+```
+entrypoint?()
+```
+
+### DeviceHandler
+```
+DeviceHandler()
+initializeDevice()
+initializerDeviceBuffers()
+getDeviceBuffer()
+(getDeviceBufferInputOutputPair())
+syncBuffers() (vlt. mehrere)
+```
+
+
+### DeviceBuffer
+(only ever write from ringBuffer, never manually!)
+```
+Flag: IS_INPUT_OR_OUTPUT
+(Iterator für BOMap)
+fillBOMapRandom()
+sync()
+loadFromRingBuffer() (operator overloading?)
+loadToRingBuffer() (operator overloading?)
+[all RingBuffer convenience functions]
+getSizes()
+isEmpty()
+isFull()
+clear()
+```
+
+## Filetree
+* Filenames after class names, with UpperCamelCase
+* .h no template, .hpp templated
+* Split every non-template files into header and cpp file
+* utils.hpp only contains items that usable everywhere
+
+
+* utils: Utility functions and objects
+* utils - types.h: Enums and usings
+
+```
+src
+    FinnDriverUsercode.cpp
+    config
+        Config.h
+        protobuf_generated_code...
+    core
+        DeviceHandler.hpp
+        DeviceBuffer.hpp
+        Accelerator.hpp
+        Driver.hpp
+    utils
+        FinnDatatypes.hpp
+        Types.h
+        Mdspan.h
+```

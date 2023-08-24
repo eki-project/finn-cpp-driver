@@ -37,7 +37,7 @@ struct MemoryMap {
      * @brief Dimensions of the buffer (in elements)
      *
      */
-    std::initializer_list<unsigned int> dims = {};
+    std::vector<unsigned int> dims = {};
     /**
      * @brief Layout of the buffer
      *

@@ -26,7 +26,7 @@ static class DevNull {
 } dev_null;
 
 template<typename T>
-DevNull& operator<<(DevNull& dest, T) {
+DevNull& operator<<(DevNull& dest, [[maybe_unused]] T) {
     return dest;
 }
     #define FINN_LOG_DEBUG(LOGGER, SEV) dev_null

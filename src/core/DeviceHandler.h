@@ -21,7 +21,7 @@ namespace Finn {
         ~DeviceHandler() = default;
 
         void initializeDevice(std::size_t deviceIndex, const std::filesystem::path& xclbinPath, const std::vector<std::string>& inputKernelNames, const std::vector<std::string>& outputKernelNames);
-        void initializeBufferObjects();
+        void initializeBufferObjects() const;
 
          private:
         std::string name;

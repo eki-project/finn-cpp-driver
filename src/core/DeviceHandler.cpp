@@ -6,6 +6,7 @@
 namespace Finn {
     DeviceHandler::DeviceHandler(const std::filesystem::path& xclbinPath, const std::string& name, const std::size_t deviceIndex, const std::vector<std::string>& pInputNames, const std::vector<std::string>& pOutputNames) : name(name) {
         initializeDevice(deviceIndex, xclbinPath, pInputNames, pOutputNames);
+        initializeBufferObjects();
     }
 
     void DeviceHandler::initializeDevice(const std::size_t deviceIndex, const std::filesystem::path& xclbinPath, const std::vector<std::string>& inputKernelNames, const std::vector<std::string>& outputKernelNames) {
@@ -18,7 +19,10 @@ namespace Finn {
         std::transform(outputKernelNames.begin(), outputKernelNames.end(), std::back_inserter(inputKernels), [this](const std::string& kname) { return xrt::kernel(device, uuid, kname); });
     }
 
-    void DeviceHandler::initializeBufferObjects() {
+    void DeviceHandler::initializeBufferObjects() const {
+        auto log = Logger::getLogger();
+        FINN_LOG_DEBUG(log, loglevel::info) << "(" << name << ") "
+                                            << "Initializing buffer objects\n";
         // TODO(ljungemann) Implement
     }
 }  // namespace Finn

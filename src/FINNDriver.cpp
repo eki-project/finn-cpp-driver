@@ -5,6 +5,7 @@
 #include <string>
 
 // Helper
+#include "core/Accelerator.h"
 #include "core/DeviceBuffer.hpp"
 #include "utils/FinnDatatypes.hpp"
 #include "utils/Logger.h"
@@ -32,9 +33,17 @@ int main() {
     FINN_LOG(logger, loglevel::info) << "C++ Driver started";
     FINN_LOG_DEBUG(logger, loglevel::info) << "Test";
 
+    Finn::DeviceWrapper devWrap;
+    devWrap.xclbin = "design.xclbin";
+    devWrap.name = "SomeName";
+    devWrap.idmas = Config::idmaNames;
+    devWrap.odmas = Config::odmaNames;
+
+    Finn::Accelerator acc(devWrap);
+
 
     auto myDevice = xrt::device();
-    shape_t myShape = std::vector<unsigned int> {1,2,3};
+    shape_t myShape = std::vector<unsigned int>{1, 2, 3};
     DatatypeInt<2> myDatatype = DatatypeInt<2>();
     DeviceBuffer<uint8_t, DatatypeInt<2>> db = DeviceBuffer<uint8_t, DatatypeInt<2>>(myDevice, myShape, 100, IO::INPUT);
 

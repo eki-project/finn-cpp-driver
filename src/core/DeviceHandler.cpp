@@ -4,8 +4,8 @@
 
 
 namespace Finn {
-    DeviceHandler::DeviceHandler(const std::filesystem::path& xclbinPath, const std::string& name, const std::size_t deviceIndex, const std::vector<std::string>& pInputNames, const std::vector<std::string>& pOutputNames) : name(name) {
-        initializeDevice(deviceIndex, xclbinPath, pInputNames, pOutputNames);
+    DeviceHandler::DeviceHandler(const std::filesystem::path& xclbinPath, const std::string& name, const std::size_t deviceIndex, const std::vector<std::string>& inputNames, const std::vector<std::string>& outputNames) : name(name) {
+        initializeDevice(deviceIndex, xclbinPath, inputNames, outputNames);
         initializeBufferObjects();
     }
 

@@ -8,6 +8,9 @@ Checks:          '*,
                 -android-*,
                 -cert-*,
                 -altera-*,
+                -initializerList,
+                -llvm-else-after-return,
+                -readability-else-after-return,
                 bugprone-*,
                     -bugprone-easily-swappable-parameters,
                     -bugprone-reserved-identifier,
@@ -40,6 +43,7 @@ Checks:          '*,
                     -cppcoreguidelines-pro-bounds-pointer-arithmetic,
                     -cppcoreguidelines-pro-type-vararg,
                     -cppcoreguidelines-avoid-magic-numbers,
+                    -cppcoreguidelines-prefer-member-initializer,
                 '
 WarningsAsErrors: ''
 HeaderFilterRegex: 'src/.*$'

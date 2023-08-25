@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.16)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake")
+SET(CMAKE_COLOR_MAKEFILE ON)
+
 
 include(cmake/PreventInSourceBuilds.cmake)
 
@@ -78,7 +80,7 @@ find_package(XRT REQUIRED)
 find_package(OpenMP)
 
 #Boost
-find_package(Boost 1.72.0 COMPONENTS log program_options ${BOOST_THREAD} REQUIRED)
+find_package(Boost 1.72.0 COMPONENTS system log program_options ${BOOST_THREAD} REQUIRED)
 include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
 
 #mdspan

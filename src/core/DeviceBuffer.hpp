@@ -4,6 +4,39 @@
 #include <boost/circular_buffer.hpp>
 #include "../utils/Types.h"
 
+template<typename T>
+class RingBufferAssignmentProxy {
+    private: 
+    boost::circular_buffer<T>& ringBuffer;
+    unsigned int partIndex;
+    unsigned int elementIndex;
+    unsigned int elementsPerPart;
+
+    public:
+    RingBufferAssignmentProxy(boost::circular_buffer<T>& pRingBuffer, unsigned int pPartIndex, unsigned int pElementsPerPart) : ringBuffer(pRingBuffer), partIndex(pPartIndex), elementsPerPart(pElementsPerPart) {
+        elementIndex = partIndex * elementsPerPart;
+    }
+
+    RingBufferAssignmentProxy& operator=(const std::vector<T>& setValues) {
+        // Cuts vector off if too large
+        for (unsigned int i = 0; i < elementsPerPart; i++) {
+            ringBuffer[(elementIndex + i) % ringBuffer.size()] = setValues[i];
+        }
+        return *this;
+    }
+
+    std::vector<T> unpackToVector() {
+        std::vector<T> temp;
+        for (unsigned int i = 0; i < elementsPerPart; i++) {
+            temp.push_back(ringBuffer[(partIndex * elementsPerPart + i) % ringBuffer.size()]);
+        }
+        return temp;
+    }
+
+};
+
+
+
 /**
  * @brief 
  * 
@@ -13,39 +46,39 @@
 template<typename T, typename B>
 class DeviceBuffer {
     const IO bufferIOMode;
-    xrt::bo _bo;
+    xrt::bo internalBo;
     T* map;
-    const size_t sizeBytes; //sizeof(T) * elements
-    const unsigned int sizeElements;
-    const unsigned int sizeNumbers
+    size_t sizeBytes = 0; //sizeof(T) * elements
+    unsigned int sizeElements = 0;
+    unsigned int sizeNumbers = 0;
     const Datatype<B> finnDatatype;
     const shape_t* bufferShape;
     
     boost::circular_buffer<T> ringBuffer;
-    const unsigned int ringBufferSizeElements;    //! Size of ALL elements, not per active part
-    const unsigned int ringBufferActiveParts;
-    const unsigned int _ringBufferIndex;
+    unsigned int ringBufferElementSize = 0;    //! Size of ALL elements, not per active part
+    unsigned int ringBufferActiveParts = 0;
+    unsigned int ringBufferElementIndex = 0;
 
     public:
-    DeviceBuffer(xrt::device& device, const shape_t* pShape, unsigned int ringBufferSizeFactor, IO pBufferIOMode) : bufferShape(pShape), bufferIOMode(pBufferIOMode) {
+    DeviceBuffer(xrt::device& device, const shape_t* pShape, unsigned int ringBufferSizeFactor, IO pBufferIOMode, Datatype<B> pFinnDatatype) : bufferShape(pShape), bufferIOMode(pBufferIOMode), finnDatatype(pFinnDatatype) {
         sizeNumbers = static_cast<unsigned int>(std::accumulate(pShape->begin(), pShape->end(), 1, std::multiplies<>()));
         sizeElements = sizeNumbers * finnDatatype.getRequiredElementsPerNumber(sizeof(T));
         sizeBytes = sizeof(T) * sizeElements;
         
-        _bo = xrt::bo(device, sizeBytes, 0);        // TODO(bwintermann): Check if xrt::bo really takes bytes and not elements!
-        map = _bo.map<T*>();
+        internalBo = xrt::bo(device, sizeBytes, 0);        // TODO(bwintermann): Check if xrt::bo really takes bytes and not elements!
+        map = internalBo.map<T*>();
 
-        ringBufferSizeElements = sizeElements * ringBufferSizeFactor;
+        ringBufferElementSize = sizeElements * ringBufferSizeFactor;
         ringBufferActiveParts = ringBufferSizeFactor;
-        ringBuffer = boost::circular_buffer<T>(ringBufferSizeElements);
-        _ringBufferIndex = 0;
+        ringBuffer = boost::circular_buffer<T>(ringBufferElementSize);
+        ringBufferElementIndex = 0;
 
         static_assert(ringBuffer.size() == ringBuffer.capacity());
     }
 
-    const bool isInputBuffer() { return bufferIOMode == IO::INPUT };
-    const bool isOutputBuffer() { return bufferIOMode == IO::OUTPUT };
-    const bool isInOutBuffer() { return bufferIOMode == IO::INOUT };
+    bool isInputBuffer() const { return bufferIOMode == IO::INPUT; };
+    bool isOutputBuffer() const { return bufferIOMode == IO::OUTPUT; };
+    bool isInOutBuffer() const { return bufferIOMode == IO::INOUT; };
 
     /**
      * @brief Return the size of the buffer / map. Specifying BYTES returns the number of bytes, NUMBERS how many numbers the buffer has to store for one sample, ELEMENTS how many T's are required to store all NUMBERS and SAMPLE 1.  
@@ -53,7 +86,7 @@ class DeviceBuffer {
      * @param ss The type of size 
      * @return unsigned int 
      */
-    const unsigned int size(SIZE_SPECIFIER ss) {
+    unsigned int size(SIZE_SPECIFIER ss) const {
         if (ss == SIZE_SPECIFIER::BYTES) {
             return static_cast<unsigned int>(sizeBytes);
         } else if (ss == SIZE_SPECIFIER::ELEMENTS) {
@@ -73,7 +106,7 @@ class DeviceBuffer {
      * 
      * @return unsigned int 
      */
-    const unsigned int size() {
+    unsigned int size() const {
         return ringBufferActiveParts;
     }
 
@@ -82,8 +115,8 @@ class DeviceBuffer {
      * 
      * @return unsigned int 
      */
-    const unsigned int getCurrentIndex() {
-        return static_cast<unsigned int>(_ringBufferIndex / sizeElements);
+    unsigned int getCurrentIndex() const {
+        return static_cast<unsigned int>(ringBufferElementIndex / sizeElements);
     }
 
     private:
@@ -95,9 +128,9 @@ class DeviceBuffer {
         // TODO(bwintermann): Since this gets called automatically when syncing, maybe make private?
         // TODO(bwintermann): Iterators?
         for (unsigned int i = 0; i < sizeElements; i++) {
-            map[i] = ringBuffer[(_ringBufferIndex + i)  % ringBufferSizeElements];
+            map[i] = ringBuffer[(ringBufferElementIndex + i)  % ringBufferElementSize];
         }
-        _ringBufferIndex = (_ringBufferIndex + sizeElements) % ringBufferSizeElements;
+        ringBufferElementIndex = (ringBufferElementIndex + sizeElements) % ringBufferElementSize;
     }
 
     /**
@@ -106,7 +139,7 @@ class DeviceBuffer {
      * @param partIndex 
      */
     void load(unsigned int partIndex) {
-        _ringBufferIndex = partIndex * sizeElements;
+        ringBufferElementIndex = partIndex * sizeElements;
         loadNext();
     }
 
@@ -119,7 +152,7 @@ class DeviceBuffer {
      * @param arr The array to copy the data from
      * @param arrSize The size of the array to copy data from
      */
-    void set(const unsigned int partIndex, const bool makeCurrent = true, const T& arr, const unsigned int arrSize) {
+    void set(const unsigned int partIndex, const T& arr, const unsigned int arrSize, bool makeCurrent = true) {
         // TODO(bwintermann): Optimize this method
         // TODO(bwintermann): OPERATOR OVERLOADING
         if (partIndex >= ringBufferActiveParts) {
@@ -129,11 +162,11 @@ class DeviceBuffer {
             throw std::length_error("Mismatch in sizes: Trying to assign a ring buffer active part with an array of size " + std::to_string(arrSize) + " but a ring buffer active part has " + std::to_string(sizeElements) + " elements!");
         }
         for (unsigned int i = 0; i < arrSize; i++) {
-            ringBuffer[(partIndex * sizeElements + i) % ringBufferSizeElements] = arr[i];
+            ringBuffer[(partIndex * sizeElements + i) % ringBufferElementSize] = arr[i];
         }
 
         if (makeCurrent) {
-            _ringBufferIndex = partIndex * sizeElements;
+            ringBufferElementIndex = partIndex * sizeElements;
         }
     }
 
@@ -143,12 +176,22 @@ class DeviceBuffer {
      * @param partIndex 
      * @param target 
      */
-    void get(const unsigned int partIndex, T& target) {
+    void get(const unsigned int partIndex, T& target) const {
         // TODO(bwintermann): Make this method more efficient
         // TODO(bwintermann): OPERATOR OVERLOADING
         for (unsigned int i = 0; i < sizeElements; i++) {
-            target[i] = ringBuffer[(partIndex * sizeElements + i) % ringBufferSizeElements];
+            target[i] = ringBuffer[(partIndex * sizeElements + i) % ringBufferElementSize];
         }
+    }
+
+    /**
+     * @brief Returns a RingBufferAssignmentProxy, which can either be written to using the = operator, or read from, by using one of several unpack-methods to convert the data into the correct types
+     * 
+     * @param index 
+     * @return RingBufferAssignmentProxy<T> 
+     */
+    RingBufferAssignmentProxy<T> operator[](unsigned int index) {
+        return RingBufferAssignmentProxy<T>(ringBuffer, index, sizeElements);
     }
 
     /**
@@ -159,9 +202,9 @@ class DeviceBuffer {
      */
     unsigned int sync(unsigned int partIndex) {
         if (bufferIOMode == IO::INPUT || bufferIOMode == IO::OUTPUT) {
-            return sync(bufferIOMode, partIndex, true);
+            return syncHelper(bufferIOMode, partIndex, true);
         }
-        throw std::runtime_error("Invalid IO Mode when syncing!")
+        throw std::runtime_error("Invalid IO Mode when syncing!");
     }
 
     /**
@@ -171,9 +214,9 @@ class DeviceBuffer {
      */
     unsigned int sync() {
         if (bufferIOMode == IO::INPUT || bufferIOMode == IO::OUTPUT) {
-            return sync(bufferIOMode, 0, false);
+            return syncHelper(bufferIOMode, 0, false);
         }
-        throw std::runtime_error("Invalid IO Mode when syncing!")
+        throw std::runtime_error("Invalid IO Mode when syncing!");
     }
 
     
@@ -186,16 +229,16 @@ class DeviceBuffer {
      * @param loadCustomPart 
      * @return unsigned 
      */
-    unsigned int _sync(IO direction, unsigned int partIndex, bool loadCustomPart) {
+    unsigned int syncHelper(IO direction, unsigned int partIndex, bool loadCustomPart) {
         if (loadCustomPart) {
             load(partIndex);
         } else {
             loadNext();
         }
         if (direction == IO::INPUT) {
-            _bo.sync(XCL_BO_SYNC_BO_TO_DEVICE);
+            internalBo.sync(XCL_BO_SYNC_BO_TO_DEVICE);
         } else if (direction == IO::OUTPUT) {
-            _bo.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
+            internalBo.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
         } else {
             throw std::runtime_error("Specify either input or output as IO mode when calling sync manually (INOUT or UNSPECIFIED are invalid values)!");
         }

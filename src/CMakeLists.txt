@@ -1,5 +1,5 @@
-add_executable(main main.cpp)
-target_link_libraries(main PRIVATE finnc_options)
+#add_executable(main main.cpp)
+#target_link_libraries(main PRIVATE finnc_options)
 
 add_executable(finn FINNDriver.cpp core/DeviceHandler.hpp core/DeviceBuffer.hpp)
 target_include_directories(finn SYSTEM PUBLIC ${XRT_INCLUDE_DIRS})

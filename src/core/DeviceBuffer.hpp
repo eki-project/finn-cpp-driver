@@ -43,7 +43,7 @@ class RingBufferAssignmentProxy {
  * @tparam T The smallest unit of data that a device manager has to manage 
  * @tparam B The bitwidth of the original FINN datatype
  */
-template<typename T, typename B>
+template<typename T, typename F>
 class DeviceBuffer {
     const IO bufferIOMode;
     xrt::bo internalBo;
@@ -51,8 +51,8 @@ class DeviceBuffer {
     size_t sizeBytes = 0; //sizeof(T) * elements
     unsigned int sizeElements = 0;
     unsigned int sizeNumbers = 0;
-    const Datatype<B> finnDatatype;
-    const shape_t* bufferShape;
+    const F finnDatatype;
+    const shape_t bufferShape;
     
     boost::circular_buffer<T> ringBuffer;
     unsigned int ringBufferElementSize = 0;    //! Size of ALL elements, not per active part
@@ -60,9 +60,9 @@ class DeviceBuffer {
     unsigned int ringBufferElementIndex = 0;
 
     public:
-    DeviceBuffer(xrt::device& device, const shape_t* pShape, unsigned int ringBufferSizeFactor, IO pBufferIOMode, Datatype<B> pFinnDatatype) : bufferShape(pShape), bufferIOMode(pBufferIOMode), finnDatatype(pFinnDatatype) {
-        sizeNumbers = static_cast<unsigned int>(std::accumulate(pShape->begin(), pShape->end(), 1, std::multiplies<>()));
-        sizeElements = sizeNumbers * finnDatatype.getRequiredElementsPerNumber(sizeof(T));
+    DeviceBuffer(xrt::device& device, const shape_t pShape, unsigned int ringBufferSizeFactor, IO pBufferIOMode, F pFinnDatatype) : bufferShape(pShape), bufferIOMode(pBufferIOMode), finnDatatype(pFinnDatatype) {
+        sizeNumbers = static_cast<unsigned int>(std::accumulate(pShape.begin(), pShape.end(), 1, std::multiplies<>()));
+        sizeElements = sizeNumbers * finnDatatype.template requiredElements<T>();
         sizeBytes = sizeof(T) * sizeElements;
         
         internalBo = xrt::bo(device, sizeBytes, 0);        // TODO(bwintermann): Check if xrt::bo really takes bytes and not elements!
@@ -73,7 +73,7 @@ class DeviceBuffer {
         ringBuffer = boost::circular_buffer<T>(ringBufferElementSize);
         ringBufferElementIndex = 0;
 
-        static_assert(ringBuffer.size() == ringBuffer.capacity());
+        // static_assert(ringBuffer.size() == ringBuffer.capacity());
     }
 
     bool isInputBuffer() const { return bufferIOMode == IO::INPUT; };

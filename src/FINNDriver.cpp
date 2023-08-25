@@ -21,6 +21,9 @@
 // Created by FINN during compilation
 #include "config/config.h"
 
+// XRT
+#include "xrt/xrt_device.h"
+
 using std::string;
 
 
@@ -40,7 +43,6 @@ BOMemoryDefinitionArguments<T> toVariant(const shape_list_t& inp) {
     return std::move(ret);
 }
 
-
 int main() {
     // Initialize logging sink
     initLogging();
@@ -52,6 +54,11 @@ int main() {
     src::severity_logger<logging::trivial::severity_level> log;
     BOOST_LOG_SEV(log, logging::trivial::info) << "C++ Driver started";
 
+
+    auto myDevice = xrt::device();
+    shape_t myShape = std::vector<unsigned int> {1,2,3};
+    DatatypeInt<2> myDatatype = DatatypeInt<2>();
+    DeviceBuffer<uint8_t, DatatypeInt<2>> db = DeviceBuffer<uint8_t, DatatypeInt<2>>(myDevice, myShape, 100, IO::INPUT, myDatatype);
 
     return 0;
 }

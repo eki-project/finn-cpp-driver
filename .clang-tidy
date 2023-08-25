@@ -8,9 +8,7 @@ Checks:          '*,
                 -android-*,
                 -cert-*,
                 -altera-*,
-                -initializerList,
                 -llvm-else-after-return,
-                -readability-else-after-return,
                 bugprone-*,
                     -bugprone-easily-swappable-parameters,
                     -bugprone-reserved-identifier,
@@ -26,16 +24,19 @@ Checks:          '*,
                 llvm-*,
                     -llvm-include-order,
                     -llvm-header-guard,
+                    -llvm-else-after-return,
                 -llvmlibc-*,
                 -altera-id-dependent-backward-branch,
                 misc-*,
                     -misc-non-private-member-variables-in-classes,
                     -misc-no-recursion,
+                    -misc-unused-parameters,
                 readability-*,
                     -readability-isolate-declaration,
                     -readability-named-parameter,
                     -readability-magic-numbers,
                     -readability-static-accessed-through-instance,
+                    -readability-else-after-return,
                 cppcoreguidelines-*,
                     -cppcoreguidelines-pro-bounds-array-to-pointer-decay,
                     -cppcoreguidelines-owning-memory,
@@ -43,7 +44,6 @@ Checks:          '*,
                     -cppcoreguidelines-pro-bounds-pointer-arithmetic,
                     -cppcoreguidelines-pro-type-vararg,
                     -cppcoreguidelines-avoid-magic-numbers,
-                    -cppcoreguidelines-prefer-member-initializer,
                 '
 WarningsAsErrors: ''
 HeaderFilterRegex: 'src/.*$'
@@ -80,6 +80,6 @@ CheckOptions:
     - key:    readability-identifier-naming.VariableCase
       value:  camelBack
     - key:    readability-identifier-naming.GlobalConstantCase
-      value:  UPPER_CASE
+      value:  camelBack
     - key:    readability-identifier-naming.NamespaceCase
       value:  CamelCase

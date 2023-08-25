@@ -1,5 +1,5 @@
-#ifndef _SRC_UTILS_TYPES_H_
-#define _SRC_UTILS_TYPES_H_
+#ifndef TYPES_H
+#define TYPES_H
 
 #include <variant>
 #include <vector>
@@ -35,4 +35,4 @@ using bytewidth_list_t = std::vector<unsigned int>;
 template<typename T>
 using BOMemoryDefinitionArguments = std::vector<std::variant<shape_t, MemoryMap<T>>>;
 
-#endif  // _SRC_UTILS_TYPES_H_
+#endif  // TYPES_H

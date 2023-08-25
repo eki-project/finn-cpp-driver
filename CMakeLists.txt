@@ -80,7 +80,7 @@ find_package(XRT REQUIRED)
 find_package(OpenMP)
 
 #Boost
-find_package(Boost 1.72.0 COMPONENTS system log program_options ${BOOST_THREAD} REQUIRED)
+find_package(Boost 1.72.0 COMPONENTS system log log_setup program_options ${BOOST_THREAD} REQUIRED)
 include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
 
 #mdspan

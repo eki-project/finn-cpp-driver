@@ -36,7 +36,7 @@ int main() {
     auto myDevice = xrt::device();
     shape_t myShape = std::vector<unsigned int> {1,2,3};
     DatatypeInt<2> myDatatype = DatatypeInt<2>();
-    DeviceBuffer<uint8_t, DatatypeInt<2>> db = DeviceBuffer<uint8_t, DatatypeInt<2>>(myDevice, myShape, 100, IO::INPUT);
+    DeviceBuffer<uint8_t, DatatypeInt<2>> dbuffer = DeviceBuffer<uint8_t, DatatypeInt<2>>("MyDeviceBuffer", myDevice, myShape, 100, IO::INPUT);
 
     return 0;
 }

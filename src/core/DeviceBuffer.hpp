@@ -1,10 +1,19 @@
 #include <boost/circular_buffer.hpp>
+#include <magic_enum.hpp>
 
 #include "../utils/FinnDatatypes.hpp"
 #include "../utils/Types.h"
+#include "../utils/Logger.h"
+
 #include "xrt.h"
 #include "xrt/xrt_bo.h"
 
+
+/**
+ * @brief Proxy class used to enable operator[] overloading for the DeviceBuffer, since it internally works on a more fine grained ring buffer, which was to be managed when assigning and reading 
+ * 
+ * @tparam T The datatype found in the ring buffer of the DeviceBuffer  
+ */
 template<typename T>
 class RingBufferAssignmentProxy {
      private:
@@ -18,6 +27,12 @@ class RingBufferAssignmentProxy {
         elementIndex = partIndex * elementsPerPart;
     }
 
+    /**
+     * @brief Handle assignment by setting the ring buffer values to the values from the passed vector. If the vector is larger than the part of the buffer that was indexed, the overflowing rest of the buffer will be ignored 
+     * 
+     * @param setValues 
+     * @return RingBufferAssignmentProxy& 
+     */
     RingBufferAssignmentProxy& operator=(const std::vector<T>& setValues) {
         // Cuts vector off if too large
         for (unsigned int i = 0; i < elementsPerPart; i++) {
@@ -26,6 +41,11 @@ class RingBufferAssignmentProxy {
         return *this;
     }
 
+    /**
+     * @brief Retrieve a part from the device buffer and unpack it into a vector  
+     * 
+     * @return std::vector<T> 
+     */
     std::vector<T> unpackToVector() {
         std::vector<T> temp;
         for (unsigned int i = 0; i < elementsPerPart; i++) {
@@ -33,6 +53,25 @@ class RingBufferAssignmentProxy {
         }
         return temp;
     }
+
+    /**
+     * @brief Retrieve a part from the device buffer and unpack it into an array 
+     * 
+     * @tparam S The size of the array to be constructed. If the passed size is too small, a length error is thrown.
+     * @return std::array<T,S> 
+     */
+    template<std::size_t S>
+    std::array<T,S> unpackToArray() {
+        if (S < elementsPerPart) {
+            throw std::length_error("Tried to unpack " + std::to_string(elementsPerPart) + " elements into an array of size " + std::to_string(S));
+        }
+        std::array<T,S> temp;
+        for (unsigned int i = 0; i < elementsPerPart; i++) {
+            temp[i] = ringBuffer[(partIndex * elementsPerPart + i) % ringBuffer.size()];
+        }
+        return temp;
+    }
+
 };
 
 
@@ -40,13 +79,28 @@ class RingBufferAssignmentProxy {
  * @brief
  *
  * @tparam T The smallest unit of data that a device manager has to manage
- * @tparam B The bitwidth of the original FINN datatype
+ * @tparam F The FINN Datatype that this buffer receives. It is represented by one or multiple T's
  */
 template<typename T, typename F>
 class DeviceBuffer {
+    const std::string name;
+    /**
+     * @brief Number of numbers in a given input. For a Tensor with shape (1, 3, 4) this would be 1*3*4 
+     * 
+     */
     unsigned int sizeNumbers;
+    
+    /**
+     * @brief Number of elements that make up the data. If the tensor uses an INT16, this might be represented by two int8's, so that sizeElements = 2 * sizeNumbers 
+     * 
+     */
     unsigned int sizeElements;
-    size_t sizeBytes;  // sizeof(T) * elements
+    
+    /**
+     * @brief Number of bytes that make up all elements. If the tensor is of type INT32, represented here by int16_t's, then sizeElements = 2 * sizeNumbers and sizeBytes = 2 * sizeElemenets = 4 * sizeNumbers 
+     * 
+     */
+    size_bytes_t sizeBytes;  // sizeof(T) * elements
 
     const IO bufferIOMode;
     xrt::bo internalBo;
@@ -58,9 +112,13 @@ class DeviceBuffer {
     unsigned int ringBufferElementIndex = 0;
     boost::circular_buffer<T> ringBuffer;
 
+    logger_type& logger = Logger::getLogger();
+
      public:
-    DeviceBuffer(xrt::device& device, const shape_t pShape, unsigned int ringBufferSizeFactor, IO pBufferIOMode)
-        : sizeNumbers(static_cast<unsigned int>(std::accumulate(pShape.begin(), pShape.end(), 1, std::multiplies<>()))),
+    // NOLINTNEXTLINE(performance-unnecessary-value-param)
+    DeviceBuffer(const std::string& pName, xrt::device& device, const shape_t pShape, unsigned int ringBufferSizeFactor, IO pBufferIOMode)
+        : name(pName),
+          sizeNumbers(static_cast<unsigned int>(std::accumulate(pShape.begin(), pShape.end(), 1, std::multiplies<>()))),
           sizeElements(sizeNumbers * F().template requiredElements<T>()),
           sizeBytes(sizeof(T) * sizeElements),
           bufferIOMode(pBufferIOMode),
@@ -70,7 +128,10 @@ class DeviceBuffer {
           ringBufferElementSize(sizeElements * ringBufferSizeFactor),
           ringBufferActiveParts(ringBufferSizeFactor),
           ringBuffer(boost::circular_buffer<T>(ringBufferElementSize)) {
-        //static_assert(ringBuffer.size() == ringBuffer.capacity());
+        assert(ringBuffer.size() == ringBuffer.capacity());
+        assert(ringBufferElementSize % sizeElements == 0);
+        std::string tempShapeStr(bufferShape.begin(), bufferShape.end());
+        FINN_LOG(logger, loglevel::info) << "Instantiated "<< magic_enum::enum_name(bufferIOMode) << " DeviceBuffer " << name << " (Shape: " << tempShapeStr << ", Numbers: " << sizeNumbers << ", Elements: " << sizeElements << ", Bytes: " << sizeBytes << " and Buffer Elements: " << ringBufferElementSize << ")\n"; 
     }
 
     bool isInputBuffer() const { return bufferIOMode == IO::INPUT; };
@@ -93,7 +154,7 @@ class DeviceBuffer {
         } else if (ss == SIZE_SPECIFIER::SAMPLES) {
             return 1;
         } else {
-            throw std::runtime_error("Unknown size specifier!");
+            FinnUtils::logAndError<std::runtime_error>("Unknown size specifier!");
         }
     }
 
@@ -106,11 +167,12 @@ class DeviceBuffer {
     unsigned int size() const { return ringBufferActiveParts; }
 
     /**
-     * @brief Get the index of the current active buffer part! This does NOT return the actual ring buffer index, because that indexes elements, not active parts!
+     * @brief Get the index of the current active buffer part! This does NOT return the actual ring buffer element-wise index!
+     * If the elementwise index is between to parts, the index of the lower is returned. (E.g. if Part0 goes from 0-100 and the elementwise index is 50, then 0 is returned as the part index) 
      *
      * @return unsigned int
      */
-    unsigned int getCurrentIndex() const { return static_cast<unsigned int>(ringBufferElementIndex / sizeElements); }
+    unsigned int getCurrentIndex() const { return ringBufferElementIndex / sizeElements; }
 
      private:
     /**
@@ -196,10 +258,11 @@ class DeviceBuffer {
      * @return unsigned int
      */
     unsigned int sync(unsigned int partIndex) {
+        FINN_LOG_DEBUG(logger, loglevel::debug) << "Syncing buffer " << name << " with mode " << magic_enum::enum_name(bufferIOMode);
         if (bufferIOMode == IO::INPUT || bufferIOMode == IO::OUTPUT) {
             return syncHelper(bufferIOMode, partIndex, true);
         }
-        throw std::runtime_error("Invalid IO Mode when syncing!");
+        FinnUtils::logAndError<std::runtime_error>("Invalid IO Mode when syncing!");
     }
 
     /**
@@ -208,10 +271,11 @@ class DeviceBuffer {
      * @return unsigned int
      */
     unsigned int sync() {
+        FINN_LOG_DEBUG(logger, loglevel::debug) << "Syncing buffer " << name << " with mode " << magic_enum::enum_name(bufferIOMode);
         if (bufferIOMode == IO::INPUT || bufferIOMode == IO::OUTPUT) {
             return syncHelper(bufferIOMode, 0, false);
         }
-        throw std::runtime_error("Invalid IO Mode when syncing!");
+        FinnUtils::logAndError<std::runtime_error>("Invalid IO Mode when syncing!");
     }
 
 
@@ -235,7 +299,7 @@ class DeviceBuffer {
         } else if (direction == IO::OUTPUT) {
             internalBo.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
         } else {
-            throw std::runtime_error("Specify either input or output as IO mode when calling sync manually (INOUT or UNSPECIFIED are invalid values)!");
+            FinnUtils::logAndError<std::runtime_error>("Specify either input or output as IO mode when calling sync manually (INOUT or UNSPECIFIED are invalid values)!");
         }
         return getCurrentIndex();
     }

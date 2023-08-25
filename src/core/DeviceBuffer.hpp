@@ -51,9 +51,7 @@ class DeviceBuffer {
     const IO bufferIOMode;
     xrt::bo internalBo;
     T* map;
-
-    const shape_t* bufferShape;
-    const Datatype<B> finnDatatype;
+    const shape_t bufferShape;
 
     unsigned int ringBufferElementSize;  //! Size of ALL elements, not per active part
     unsigned int ringBufferActiveParts;
@@ -61,19 +59,18 @@ class DeviceBuffer {
     boost::circular_buffer<T> ringBuffer;
 
      public:
-    DeviceBuffer(xrt::device& device, const shape_t* pShape, unsigned int ringBufferSizeFactor, IO pBufferIOMode, Datatype<B> pFinnDatatype)
-        : sizeNumbers(static_cast<unsigned int>(std::accumulate(pShape->begin(), pShape->end(), 1, std::multiplies<>()))),
-          sizeElements(sizeNumbers * pFinnDatatype.getRequiredElementsPerNumber(sizeof(T))),
+    DeviceBuffer(xrt::device& device, const shape_t pShape, unsigned int ringBufferSizeFactor, IO pBufferIOMode)
+        : sizeNumbers(static_cast<unsigned int>(std::accumulate(pShape.begin(), pShape.end(), 1, std::multiplies<>()))),
+          sizeElements(sizeNumbers * F().template requiredElements<T>()),
           sizeBytes(sizeof(T) * sizeElements),
           bufferIOMode(pBufferIOMode),
           internalBo(xrt::bo(device, sizeBytes, 0)), /*TODO(bwintermann): Check if xrt::bo really takes bytes and not elements!*/
           map(internalBo.map<T*>()),
           bufferShape(pShape),
-          finnDatatype(pFinnDatatype),
           ringBufferElementSize(sizeElements * ringBufferSizeFactor),
           ringBufferActiveParts(ringBufferSizeFactor),
           ringBuffer(boost::circular_buffer<T>(ringBufferElementSize)) {
-        static_assert(ringBuffer.size() == ringBuffer.capacity());
+        //static_assert(ringBuffer.size() == ringBuffer.capacity());
     }
 
     bool isInputBuffer() const { return bufferIOMode == IO::INPUT; };

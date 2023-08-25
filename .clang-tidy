@@ -23,11 +23,13 @@ Checks:          '*,
                 llvm-*,
                     -llvm-include-order,
                     -llvm-header-guard,
+                    -llvm-else-after-return,
                 -llvmlibc-*,
                 -altera-id-dependent-backward-branch,
                 misc-*,
                     -misc-non-private-member-variables-in-classes,
                     -misc-no-recursion,
+                    -misc-unused-parameters,
                 readability-*,
                     -readability-isolate-declaration,
                     -readability-named-parameter,
@@ -76,6 +78,6 @@ CheckOptions:
     - key:    readability-identifier-naming.VariableCase
       value:  camelBack
     - key:    readability-identifier-naming.GlobalConstantCase
-      value:  UPPER_CASE
+      value:  camelBack
     - key:    readability-identifier-naming.NamespaceCase
       value:  CamelCase

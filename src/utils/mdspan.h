@@ -1,5 +1,5 @@
-#ifndef _UTILS_MDSPAN_H_
-#define _UTILS_MDSPAN_H_
+#ifndef MDSPAN_H
+#define MDSPAN_H
 
 #include <span>
 
@@ -39,8 +39,9 @@ auto makeMDSpanImpl(T* data, const Array& a, [[maybe_unused]] std::index_sequenc
  * @return auto mdspan
  */
 template<typename T, std::size_t N, typename Indices = std::make_index_sequence<N>>
+// NOLINTNEXTLINE
 auto makeMDSpan(T* data, const T (&list)[N]) {
     return makeMDSpanImpl(data, list, Indices{});
 }
 
-#endif  //_UTILS_MDSPAN_H_
+#endif  // MDSPAN_H

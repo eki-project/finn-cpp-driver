@@ -1,30 +1,29 @@
-#ifndef _SRC_CONFIG_H_
-#define _SRC_CONFIG_H_
+#ifndef CONFIG_H
+#define CONFIG_H
 
 #include <string>
-#include <string_view>
 
 // Helpers
-#include "utils/types.h"
+#include "../utils/Types.h"
 
 namespace Config {
     constexpr PLATFORM platform = PLATFORM::ALVEO;
     constexpr TRANSFER_MODE transferMode = TRANSFER_MODE::MEMORY_BUFFERED;
 
-    const bytewidth_list_t INPUT_BYTEWIDTH = {1, 1, 2};
-    const bytewidth_list_t OUTPUT_BYTEWIDTH = {1, 1, 2};
+    const bytewidth_list_t inputBytewidth = {1, 1, 2};
+    const bytewidth_list_t outputBytewidth = {1, 1, 2};
 
-    constexpr size_t idma_num = 1;
-    const std::initializer_list<std::string> IDMA_NAMES = {"a", "b", "c"};
-    const shape_list_t ISHAPE_NORMAL = {{1, 2, 3}};
-    const shape_list_t ISHAPE_FOLDED = {{1, 2, 3}};
-    const shape_list_t ISHAPE_PACKED = {{1, 2, 3}};
+    constexpr size_t idmaNum = 1;
+    const std::vector<std::string> idmaNames = {"a", "b", "c"};
+    const shape_list_t ishapeNormal = {{1, 2, 3}};
+    const shape_list_t ishapeFolded = {{1, 2, 3}};
+    const shape_list_t ishapePacked = {{1, 2, 3}};
 
-    constexpr size_t odma_num = 1;
-    const std::initializer_list<std::string> ODMA_NAMES = {"a", "b", "c"};
-    const shape_list_t OSHAPE_NORMAL = {{1, 2, 3}};
-    const shape_list_t OSHAPE_FOLDED = {{1, 2, 3}};
-    const shape_list_t OSHAPE_PACKED = {{1, 2, 3}};
+    constexpr size_t odmaNum = 1;
+    const std::vector<std::string> odmaNames = {"a", "b", "c"};
+    const shape_list_t oshapeNormal = {{1, 2, 3}};
+    const shape_list_t oshapeFolded = {{1, 2, 3}};
+    const shape_list_t oshapePacked = {{1, 2, 3}};
 };  // namespace Config
 
-#endif  // _SRC_CONFIG_H_
+#endif  // CONFIG_H

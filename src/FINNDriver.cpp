@@ -5,6 +5,7 @@
 #include <string>
 
 // Helper
+#include "core/DeviceBuffer.hpp"
 #include "utils/FinnDatatypes.hpp"
 #include "utils/Logger.h"
 

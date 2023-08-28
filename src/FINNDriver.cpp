@@ -69,7 +69,7 @@ int main() {
         dbuffer.syncToDevice();
         dbuffer.startRun();
         results += dbuffer.awaitRun();
-        dbuffer << myData[index];
+        myData[index] >> dbuffer;
         index++;
     }
     */
@@ -80,7 +80,7 @@ int main() {
     /*
     dbuffer.setAutoExecute(true);
     for (auto dat : myData) {
-        dbuffer << myData;
+        myData >> dbuffer;
     }
     results = dbuffer.fetchStoredResults();
     */

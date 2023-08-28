@@ -26,6 +26,11 @@ namespace FinnUtils {
         FINN_LOG(Logger::getLogger(), loglevel::error) << msg;
         throw E(msg);
     }
+
+    size_t shapeToElements(const shape_t& pShape) {
+        return static_cast<size_t>(std::accumulate(pShape.begin(), pShape.end(), 1, std::multiplies<>()));
+    }
+
 }  // namespace FinnUtils
 
 #endif

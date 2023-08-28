@@ -10,6 +10,8 @@
 #include "xrt/xrt_bo.h"
 
 
+// TODO(bwintermann): Replace this->... with using DeviceBuffer<T,F>::...
+
 namespace Finn {
 
 
@@ -38,7 +40,7 @@ namespace Finn {
             shape(pShape),
             mapSize(F().template requiredElements<T>()),
             internalBo(xrt::bo(device, mapSize * sizeof(T), 0)),
-            associatedKernel(pAssocatiatedKernel),
+            associatedKernel(pAssociatedKernel),
             map(internalBo.map<T*>()),
             ringBuffer(RingBuffer<T>(ringBufferSizeFactor, mapSize)) 
         {
@@ -52,36 +54,37 @@ namespace Finn {
 
     template<typename T, typename F>
     class DeviceInputBuffer : DeviceBuffer<T,F> {
-        const IO IO_MODE = IO::INPUT;
-        bool executeAutomatically;
+        using DeviceBuffer<T,F>::DeviceBuffer;
+        const IO ioMode = IO::INPUT;
+        bool executeAutomatically = false;
 
         public:
         void setExecuteAutomatically(bool value) {
             executeAutomatically = value;
         }
         
-        bool isEexecutedAutomatically() {
+        bool isExecutedAutomatically() {
             return executeAutomatically;
         }
 
         void sync() {
-            internalBo.sync(XCL_BO_SYNC_BO_TO_DEVICE);
+            this->internalBo.sync(XCL_BO_SYNC_BO_TO_DEVICE);
         }
 
         void execute() {
-            // TODO: Add arguments for kernel run!
-            auto run = associatedKernel(internalBo);
+            // TODO(bwintermann): Add arguments for kernel run!
+            auto run = associatedKernel(this->internalBo);
             run.start();
             run.wait();
         }
 
         void loadMap() {
-            ringBuffer.read(map, mapSize);
+            this->ringBuffer.read(this->map, this->mapSize);
         }
 
-        void preloadInputData(const std::vector<T>& vec, ) {
-            ringBuffer.store(vec);
-            if (executeAutomatically && ringBuffer.isFull()) {
+        void preloadInputData(const std::vector<T>& vec) {
+            this->ringBuffer.store(vec);
+            if (executeAutomatically && this->ringBuffer.isFull()) {
                 loadMap();
                 sync();
                 execute();
@@ -89,12 +92,12 @@ namespace Finn {
         }
 
         void write() {
-            if (ringBuffer.isPartValid()) {
+            if (this->ringBuffer.isPartValid()) {
                 loadMap();
                 sync();
                 execute();
             }
-            ringBuffer.cycleHeadPart();
+            this->ringBuffer.cycleHeadPart();
         }
 
     };
@@ -102,30 +105,30 @@ namespace Finn {
 
     template<typename T, typename F>
     class DeviceOutputBuffer : DeviceBuffer<T,F> {
-        const IO IO_MODE = IO::OUTPUT;
+        const IO ioMode = IO::OUTPUT;
         std::vector<std::vector<T>> longTermStorage;
 
 
         public:    
         void sync() {
-            internalBo.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
+            this->internalBo.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
         }
 
         void execute() {
-            // TODO: Add arguments for kernel run!
-            auto run = associatedKernel(internalBo);
+            // TODO(bwintermann): Add arguments for kernel run!
+            auto run = associatedKernel(this->internalBo);
             run.start();
             run.wait();
         }
 
         void saveMap() {
-            ringBuffer.store(map, mapSize);
+            this->ringBuffer.store(this->map, this->mapSize);
         }
 
         void archiveValidBufferParts() {
-            for (index_t i = 0; i < ringBuffer.size(SIZE_SPECIFIER::PARTS); i++) {
-                if (ringBuffer.isPartValid(i)) {
-                    longTermStorage.push_back(ringBuffer.getPart(i, false));
+            for (index_t i = 0; i < this->ringBuffer.size(SIZE_SPECIFIER::PARTS); i++) {
+                if (this->ringBuffer.isPartValid(i)) {
+                    longTermStorage.push_back(this->ringBuffer.getPart(i, false));
                 }
             }
         }
@@ -135,7 +138,7 @@ namespace Finn {
                 execute();
                 sync();
                 saveMap();
-                if (ringBuffer.isFull()) {
+                if (this->ringBuffer.isFull()) {
                     archiveValidBufferParts();
                 }
             }

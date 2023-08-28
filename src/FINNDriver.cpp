@@ -45,7 +45,9 @@ int main() {
     auto myDevice = xrt::device();
     shape_t myShape = std::vector<unsigned int>{1, 2, 3};
     DatatypeInt<2> myDatatype = DatatypeInt<2>();
-    Finn::DeviceBuffer<uint8_t, DatatypeInt<2>> dbuffer = Finn::DeviceBuffer<uint8_t, DatatypeInt<2>>("MyDeviceBuffer", myDevice, myShape, 100, IO::INPUT);
+    
+    //Finn::DeviceBuffer<uint8_t, DatatypeInt<2>> dbuffer = Finn::DeviceBuffer<uint8_t, DatatypeInt<2>>("MyDeviceBuffer", myDevice, myShape, 100, IO::INPUT);
+    //Finn::DeviceInputBuffer<uint8_t, DatatypeInt<2>> mydb = Finn::DeviceInputBuffer<uint8_t, DatatypeInt<2>>("My Device Buffer", myDevice, xrt::kernel(), myShape, 100);
 
     // Example usage 1
     /*

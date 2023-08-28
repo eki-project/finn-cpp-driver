@@ -2,6 +2,7 @@
 #define FINN_UTILS_H
 
 #include <cstdint>
+#include "Types.h"
 
 #include "Logger.h"
 

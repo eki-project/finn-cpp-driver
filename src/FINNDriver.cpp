@@ -47,5 +47,46 @@ int main() {
     DatatypeInt<2> myDatatype = DatatypeInt<2>();
     Finn::DeviceBuffer<uint8_t, DatatypeInt<2>> dbuffer = Finn::DeviceBuffer<uint8_t, DatatypeInt<2>>("MyDeviceBuffer", myDevice, myShape, 100, IO::INPUT);
 
+    // Example usage 1
+    /*
+    dbuffer[1] = myData;
+    print(dbuffer[1])
+    dbuffer.loadToMemory(1);
+    dbuffer.syncToDevice(1)
+    dbuffer.startRun(1, times=10)
+    results = dbuffer.awaitRun()
+    */
+
+    // Example usage 2
+    /*
+    int index = 0;
+    while (!dbuffer.isFull()) {
+        dbuffer << myData[index];
+        index++;
+    }
+    for (;;) {
+        dbuffer.loadToMemory();
+        dbuffer.syncToDevice();
+        dbuffer.startRun();
+        results += dbuffer.awaitRun();
+        dbuffer << myData[index];
+        index++;
+    }
+    */
+
+
+    // Example usage 3
+    // The buffer automatically executes data when the ring buffer is full, to use the first batch and then instatnly replace the last one with the new data
+    /*
+    dbuffer.setAutoExecute(true);
+    for (auto dat : myData) {
+        dbuffer << myData;
+    }
+    results = dbuffer.fetchStoredResults();
+    */
+    // Common operation in usage 2 AND 3: Internal pointer gets increased by one part for ever << operation.
+
+
+
     return 0;
 }

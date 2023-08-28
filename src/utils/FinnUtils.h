@@ -22,7 +22,7 @@ namespace FinnUtils {
      * @param msg
      */
     template<typename E>
-    [[noreturn]] void logAndError(const std::string msg) {
+    [[noreturn]] void logAndError(const std::string& msg) {
         FINN_LOG(Logger::getLogger(), loglevel::error) << msg;
         throw E(msg);
     }

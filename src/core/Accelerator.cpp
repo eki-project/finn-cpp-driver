@@ -5,7 +5,7 @@
 namespace Finn {
     Accelerator::Accelerator(const std::vector<DeviceWrapper>& deviceDefinitions) {
         std::size_t deviceIndex = 0;  // For now just set deviceIndex to zero.
-        std::transform(deviceDefinitions.begin(), deviceDefinitions.end(), std::back_inserter(devices), [this, &deviceIndex](const DeviceWrapper& dew) { return DeviceHandler(dew.xclbin, dew.name, deviceIndex, dew.idmas, dew.odmas); });
+        std::transform(deviceDefinitions.begin(), deviceDefinitions.end(), std::back_inserter(devices), [&deviceIndex](const DeviceWrapper& dew) { return DeviceHandler(dew.xclbin, dew.name, deviceIndex, dew.idmas, dew.odmas); });
     }
 
     Accelerator::Accelerator(const DeviceWrapper& deviceWrapper) {

@@ -1,0 +1,1 @@
+add_unittest(DeviceHandlerTest.cpp)

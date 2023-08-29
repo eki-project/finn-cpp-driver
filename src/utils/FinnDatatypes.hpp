@@ -5,7 +5,8 @@
 #include <limits>
 #include <type_traits>
 #include <utility>
-#include "FinnUtils.h" 
+
+#include "FinnUtils.h"
 
 template<class T>
 concept Integral = std::is_integral<T>::value;
@@ -96,16 +97,16 @@ class Datatype {
 
     /**
      * @brief Get the number of elements of type T that are required to store one instance of the FINN datatype F.
-     * For example to store a INT14 in uin8_t's, this function would return 2, since 2 uint8_t are required to store the INT14  
-     * 
+     * For example to store a INT14 in uin8_t's, this function would return 2, since 2 uint8_t are required to store the INT14
+     *
      * @tparam F
-     * @tparam T 
-     * @return unsigned int 
+     * @tparam T
+     * @return unsigned int
      */
     template<typename T>
     constexpr unsigned int requiredElements() const {
-        return static_cast<unsigned int>(FinnUtils::ceil(bitwidth() / (sizeof(T) * 8.0)));
-    }    
+        return static_cast<unsigned int>(FinnUtils::ceil(static_cast<float>(bitwidth()) / (sizeof(T) * 8.0)));
+    }
 
     /**
      * @brief Comparison Operator equality

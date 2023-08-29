@@ -105,8 +105,8 @@ namespace Finn {
      * 
      * 
      * 
-     * @tparam T 
-     * @tparam F 
+     * @tparam T The datatype that the buffer uses to represent everything internally. This is the datatype that gets put on the FPGAs
+     * @tparam F The FINN-datatype that represent the actual data. It is represented by one or multiple values of type T
      */
     template<typename T, typename F>
     class DeviceInputBuffer : DeviceBuffer<T,F> {
@@ -115,18 +115,38 @@ namespace Finn {
         bool executeAutomatically = false;
 
         public:
+        /**
+         * @brief Set the Execute Automatically Flag. If set, as soon as the buffer head pointer reaches the last element, the first one in the buffer (first input) gets loaded and executed on the board, the slot gets invalidated and is thus free'd for the next store operation.
+         * 
+         * @param value 
+         */
         void setExecuteAutomatically(bool value) {
             executeAutomatically = value;
         }
         
+        /**
+         * @brief Check whether the Execute Automatically Flag is set. 
+         * 
+         * @return true 
+         * @return false 
+         */
         bool isExecutedAutomatically() {
             return executeAutomatically;
         }
 
+        /**
+         * @brief Sync data from the map to the device.  
+         * 
+         */
         void sync() {
             this->internalBo.sync(XCL_BO_SYNC_BO_TO_DEVICE);
         }
 
+        /**
+         * @brief Start a run on the associated kernel and wait for it's result.
+         * @attention This method is blocking  
+         * 
+         */
         void execute() {
             // TODO(bwintermann): Add arguments for kernel run!
             auto run = associatedKernel(this->internalBo);
@@ -134,30 +154,70 @@ namespace Finn {
             run.wait();
         }
 
+        /**
+         * @brief Loads the head part into the xrt::bo memory map to make it ready for sync. This invalidates the read part and moves the head pointer to the next part. 
+         * 
+         */
         void loadMap() {
             this->ringBuffer.read(this->map, this->mapSize);
         }
 
-        void loadMap(index_t partIndex) {
-            this->ringBuffer.getPart(this->map, this->mapSize, partIndex, false);
+        /**
+         * @brief Loads the passed part into the xrt::bo memory map to make it ready for sync. This does NOT change the head pointer. The validity gets set according to the passed newValidity value.
+         * 
+         * @param partIndex 
+         * @param newValidity
+         */
+        void loadMap(index_t partIndex, bool newValidity) {
+            this->ringBuffer.getPart(this->map, this->mapSize, partIndex, newValidity);
         }
 
+        /**
+         * @brief Check if the head part is valid 
+         * 
+         * @return true 
+         * @return false 
+         */
         bool isHeadValid() {
             return this->ringBuffer.isPartValid();
         }
 
+        /**
+         * @brief Check if the part indexed by partIndex is valid 
+         * 
+         * @param partIndex 
+         * @return true 
+         * @return false 
+         */
         bool isPartValid(index_t partIndex) {
             return this->ringBuffer.isPartValid(partIndex);
         }
 
+        /**
+         * @brief Checks if the buffer is full (i.e. if all parts are valid - a ring buffer cannot be __full__ technically) 
+         * 
+         * @return true 
+         * @return false 
+         */
         bool isBufferFull() {
             return this->ringBuffer.isFull();
         }
 
+        /**
+         * @brief Get the index of the part on the "opposite" side of the ring buffer. The value is always ceil'd, so that the opposite of 3 in a 12-part buffer is 10, not 9. 
+         * 
+         * @return index_t 
+         */
         index_t getHeadOpposideIndex() {
             return this->ringBuffer.getHeadOpposite();
         }
 
+        /**
+         * @brief Return the size of the buffer as specified by the argument. Bytes returns all bytes the buffer takes up, elements returns the number of T-values, numbers the number of F-values. 
+         * 
+         * @param ss 
+         * @return size_t 
+         */
         size_t size(SIZE_SPECIFIER ss) {
             return this->ringBuffer.size(ss);
         }
@@ -197,16 +257,44 @@ namespace Finn {
     };
 
 
+    /**
+     * @brief DeviceBuffer for reading output data from the inference run.
+     * Example usage:
+     * @code {.cpp}
+     * auto myDB = DeviceOutputBuffer<uint8_t, DatatypeUint<2>>(...);
+     * for (int i = 0; i < 1000; i++) {
+     *      myDB.read(100); // Read inferences
+     * }
+     * auto inferenceData = myDB.retrieveArchive();
+     * myDB.clearArchive();
+     * @endcode
+     * This would read 100 samples at a time, 1000 times. The data gets read from the FPGA and stored in the internal ring buffer.
+     * When the ring buffer is full, the data gets placed in the long term storage (archive), from which it can be read or cleared. In order to avoid performance hickups,
+     * it is advised to make the ringBufferSizeFactor of the DeviceOutputBuffer a whole multiple of the batch size of your dataset, so that the longer copying of the ring buffer to the archive does not happen mid-batch-inference. 
+     * 
+     * @tparam T 
+     * @tparam F 
+     */
     template<typename T, typename F>
     class DeviceOutputBuffer : DeviceBuffer<T,F> {
         const IO ioMode = IO::OUTPUT;
         std::vector<std::vector<T>> longTermStorage;
 
-        public:    
+        public:  
+        /**
+         * @brief Sync data from the FPGA into the memory map 
+         * 
+         * @return * void 
+         */
         void sync() {
             this->internalBo.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
         }
 
+        /**
+         * @brief Execute the kernel and await it's return.
+         * @attention This function is blocking. 
+         * 
+         */
         void execute() {
             // TODO(bwintermann): Add arguments for kernel run!
             auto run = associatedKernel(this->internalBo);
@@ -214,10 +302,18 @@ namespace Finn {
             run.wait();
         }
 
+        /**
+         * @brief Store the contents of the memory map into the ring buffer. 
+         * 
+         */
         void saveMap() {
             this->ringBuffer.store(this->map, this->mapSize);
         }
 
+        /**
+         * @brief Put every valid read part of the ring buffer into the archive. 
+         * 
+         */
         void archiveValidBufferParts() {
             for (index_t i = 0; i < this->ringBuffer.size(SIZE_SPECIFIER::PARTS); i++) {
                 if (this->ringBuffer.isPartValid(i)) {
@@ -226,6 +322,28 @@ namespace Finn {
             }
         }
 
+        /**
+         * @brief Return the archive. 
+         * 
+         * @return std::vector<std::vector<T>> 
+         */
+        std::vector<std::vector<T>> retrieveArchive() {
+            return longTermStorage;
+        }
+
+        /**
+         * @brief Clear the archive of all it's entries by resizing it to 0. 
+         * 
+         */
+        void clearArchive() {
+            longTermStorage.resize(0);
+        }
+
+        /**
+         * @brief Read the specified number of samples from the device, only writing data into the archive when the ring buffer is full 
+         * 
+         * @param samples 
+         */
         void read(unsigned int samples) {
             for (unsigned int i = 0; i < samples; i++) {
                 execute();

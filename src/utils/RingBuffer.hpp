@@ -6,6 +6,12 @@
 #include "Types.h"
 #include "Logger.h"
 
+/**
+ * @brief Wrapper class for boost::circular_buffer, which handles abstraction.
+ * This wrapper keeps track of a "head" pointer, as well as which parts of the buffer are valid data or not. A part is made up from several values of type T. 
+ * 
+ * @tparam T 
+ */
 template<typename T>
 class RingBuffer {
     boost::circular_buffer<T> buffer;
@@ -14,6 +20,12 @@ class RingBuffer {
     const size_t elementsPerPart;
     index_t headPart = 0;
 
+    /**
+     * @brief Construct a new Ring Buffer object. It's size in terms of values of type T is given by pElementsPerPart * pParts. By default all parts are invalid data to start with.
+     * 
+     * @param pParts 
+     * @param pElementsPerPart 
+     */
     RingBuffer(const size_t pParts, const size_t pElementsPerPart) : 
         buffer(boost::circular_buffer<T>(pElementsPerPart * pParts)),
         validParts(std::vector<T>(pParts)),
@@ -26,10 +38,23 @@ class RingBuffer {
     }
 
     private:
+    /**
+     * @brief Return the element-wise index of the ring buffer, considering the part partIndex with it's element offset. (Useful for loops) 
+     * 
+     * @param partIndex 
+     * @param offset 
+     * @return index_t 
+     */
     index_t elementIndex(index_t partIndex, index_t offset) {
         return (partIndex * elementsPerPart + offset) % buffer.size();
     }
 
+    /**
+     * @brief Set the validity of a part given by it's index
+     * 
+     * @param partIndex 
+     * @param validity 
+     */
     void setPartValidity(index_t partIndex, bool validity) {
         if (partIndex > parts) {
             FinnUtils::logAndError<std::length_error>("Tried setting validity for an index that is too large.");
@@ -39,6 +64,12 @@ class RingBuffer {
 
 
     public:
+    /**
+     * @brief Return the RingBuffer's size, either in elements of T, in bytes or in parts 
+     * 
+     * @param ss 
+     * @return size_t 
+     */
     size_t size(SIZE_SPECIFIER ss) {
         if (ss == SIZE_SPECIFIER::ELEMENTS) {
             return buffer.size();
@@ -51,6 +82,11 @@ class RingBuffer {
         }
     }
 
+    /**
+     * @brief Count the number of valid parts in the buffer. 
+     * 
+     * @return unsigned int 
+     */
     unsigned int countValidParts() {
         unsigned int tmp = 0;
         for (auto val : validParts) {
@@ -59,10 +95,28 @@ class RingBuffer {
         return tmp;
     }
 
+    /**
+     * @brief Get the opposite index from the current head index.
+     * When the number of parts is odd, e.g. 13 and the pointer at 3, this would return 10, because the ceil'd half of parts is added onto the head index. 
+     * @return index_t 
+     */
+    index_t getHeadOpposite() {
+        return (headPart + FinnUtils::ceil(parts/2.0)) % parts;
+    }
+
+    /**
+     * @brief Increment the head pointer by one part. Loops around when the highest index is met. 
+     * 
+     */
     void cycleHeadPart() {
         headPart = (headPart + 1) % parts;
     }
 
+    /**
+     * @brief Set the head pointer to a given index
+     *       
+     * @param partIndex 
+     */
     void setHeadPart(index_t partIndex) {
         if (partIndex >= parts) {
             FinnUtils::logAndError<std::length_error>("Couldnt set head index manually, value too high!");
@@ -70,18 +124,49 @@ class RingBuffer {
         headPart = partIndex;
     }
 
+    /**
+     * @brief Check the validity of a given partIndex 
+     * 
+     * @param partIndex 
+     * @return true 
+     * @return false 
+     */
     bool isPartValid(index_t partIndex) {
         return partIndex < parts && validParts[partIndex];
     }
 
+    /**
+     * @brief Check the validity of the head pointer part 
+     * 
+     * @return true 
+     * @return false 
+     */
     bool isPartValid() {
         return validParts[headPart];
     }
 
+    /**
+     * @brief Returns true, if all parts of the buffer are marked as valid 
+     * 
+     * @return true 
+     * @return false 
+     */
     bool isFull() {
         return countValidParts() == parts;
     }
 
+    /**
+     * @name Storage / Input methods
+     * These methods are used to insert data into the buffer in various ways. The store-methods increment the head pointer, while setting the part that was just written to valid.
+     * The setPart-methods operate on a given index instead of the head index, they do not change the head pointer, and you can choose whether the validity of the newly inserted part should be set to true or false. 
+     * 
+     */
+    ///@{
+    /**
+     * @brief Insert a vector at the head pointer part, set the part valid, increase the pointer.
+     * 
+     * @param vec 
+     */
     void store(const std::vector<T>& vec) {
         if (vec.size() != elementsPerPart) {
             FinnUtils::logAndError<std::length_error>("Size mismatch when storing vector in Ring Buffer!");
@@ -93,6 +178,12 @@ class RingBuffer {
         cycleHeadPart();
     }
 
+    /**
+     * @brief Insert an array at the head pointer part, set the part valid, increase the pointer.
+     * 
+     * @param arr 
+     * @param arrSize 
+     */
     void store(const T& arr, const size_t arrSize) {
         if (arrSize != elementsPerPart) {
             FinnUtils::logAndError<std::length_error>("Size mismatch when storing array in Ring Buffer!");
@@ -104,6 +195,13 @@ class RingBuffer {
         cycleHeadPart();
     }
 
+    /**
+     * @brief Set the given partIndex to the passed vector values, do NOT increment the head pointer, and set the validity to the passed value
+     * 
+     * @param vec 
+     * @param partIndex 
+     * @param validity 
+     */
     void setPart(const std::vector<T>& vec, index_t partIndex, bool validity) {
         if (vec.size() != elementsPerPart) {
             FinnUtils::logAndError<std::length_error>("Size mismatch when storing vector in Ring Buffer!");
@@ -114,6 +212,14 @@ class RingBuffer {
         setPartValidity(partIndex, validity);
     }
 
+    /**
+     * @brief Set the given partIndex to the passed array values, do NOT increment the head pointer, and set the validity to the passed value
+     * 
+     * @param arr 
+     * @param arrSize 
+     * @param partIndex 
+     * @param validity 
+     */
     void setPart(const T& arr, const size_t arrSize, index_t partIndex, bool validity) {
         if (arrSize != elementsPerPart) {
             FinnUtils::logAndError<std::length_error>("Size mismatch when storing array in Ring Buffer!");
@@ -123,16 +229,38 @@ class RingBuffer {
         }
         setPartValidity(partIndex, validity);
     }
+    ///@}
 
+
+
+    /**
+     * @name Read / Output methods
+     * Just as with the store- and setPart methods, read and getPart read a part from the buffer. In similar fashion, read() reads from the head pointer, increments the head pointer and invalidates the just read part. The
+     * getPart methods read from the given partIndex, do NOT increase the head pointer and set the validity of the just read part as wished. 
+     */
+    ///@{
+
+    /**
+     * @brief Read from the head pointer and return as a vector. Increments head pointer and invalidates read data. 
+     * 
+     * @return std::vector<T> 
+     */
     std::vector<T> read() {
         std::vector<T> temp;
         for (size_t i = 0; i < elementsPerPart; i++) {
             temp.push_back(buffer[elementIndex(headPart, i)]);
         }
         setPartValidity(headPart, false);
+        cycleHeadPart();
         return temp;
     }
 
+    /**
+     * @brief Read from head pointer into the referenes array. Increments head pointer and invalidates read data. 
+     * 
+     * @param targetArr 
+     * @param arrSize 
+     */
     void read(T& targetArr, size_t arrSize) {
         if (arrSize != elementsPerPart) {
             FinnUtils::logAndError<std::length_error>("Size mismatching when trying to read ring buffer data into an array!");
@@ -141,8 +269,16 @@ class RingBuffer {
             targetArr[i] = buffer[elementIndex(headPart, i)];
         }
         setPartValidity(headPart, false);
+        cycleHeadPart();
     }
 
+    /**
+     * @brief Read from the given partIndex, do NOT change the head pointer and set validity as prompted. Returns data as a vector
+     * 
+     * @param partIndex 
+     * @param validity 
+     * @return std::vector<T> 
+     */
     std::vector<T> getPart(const index_t partIndex, const bool validity) {
         std::vector<T> temp;
         for (size_t i = 0; i < elementsPerPart; i++) {
@@ -152,6 +288,14 @@ class RingBuffer {
         return temp;
     }
 
+    /**
+     * @brief Read from the given partIndex, do NOT change the head pointer and set validity as prompted. Writes data into referenced array
+     * 
+     * @param arr 
+     * @param arrSize 
+     * @param partIndex 
+     * @param validity 
+     */
     void getPart(T& arr, const size_t arrSize, index_t partIndex, bool validity) {
         if (arrSize != elementsPerPart) {
             FinnUtils::logAndError<std::length_error>("Size mismatching when trying to read ring buffer data into an array!");
@@ -161,4 +305,5 @@ class RingBuffer {
         }
         setPartValidity(partIndex, validity);
     }
+    ///@}
 };

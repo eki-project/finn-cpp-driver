@@ -253,6 +253,17 @@ namespace Finn {
         void store(const T& arr, const size_t arrSize, index_t partIndex) {
             this->ringBuffer.setPart(arr, arrSize, partIndex, true);
         }
+
+        template<size_t sa>
+        void store(const std::array<T,sa> arr) {
+            store(arr.data(), arr.size());
+        }
+
+        template<size_t sa>
+        void store(const std::array<T,sa> arr, index_t partIndex) {
+            store(arr.data(), arr.size(), partIndex);
+        }
+
         ///@}
     };
 

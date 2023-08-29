@@ -1,4 +1,4 @@
-
+#include <span>
 #include <boost/circular_buffer.hpp>
 #include <magic_enum.hpp>
 
@@ -306,4 +306,79 @@ class RingBuffer {
         setPartValidity(partIndex, validity);
     }
     ///@}
+
+    /**
+     * @brief Simple iterator for accessing the ring buffer part-wise. Returns a span<T> when dereferenced. 
+     * 
+     */
+    struct RingBufferIterator {
+        private:
+        T* linearizedBuffer;        
+        size_t elementsPerPart;
+        index_t currentPart;
+        size_t parts;
+
+        public:
+        RingBufferIterator(index_t initialElementIndex, size_t pElementsPerPart, T* pLinearizedBuffer) 
+        :   elementsPerPart(pElementsPerPart),
+            linearizedBuffer(pLinearizedBuffer) {
+                linearizedBuffer += initialElementIndex; // Pointer arithmetic
+                currentPart = initialElementIndex / elementsPerPart;
+        }
+
+        std::span<T,std::dynamic_extent> operator*() const { return std::span{linearizedBuffer, elementsPerPart}; }
+        
+        RingBufferIterator& operator++() { 
+            if (currentPart == parts-1) {
+                linearizedBuffer -= elementsPerPart * (parts-1);
+                currentPart = 0;
+            } else {
+                linearizedBuffer += elementsPerPart;
+                currentPart++;
+            }
+            return *this; 
+        }  
+
+        RingBufferIterator& operator--() { 
+            if (currentPart == 0) {
+                linearizedBuffer += elementsPerPart * (parts-1);
+                currentPart = parts - 1;
+            } else {
+                linearizedBuffer -= elementsPerPart;
+                currentPart--;
+            }
+            return *this; 
+        }
+
+        friend bool operator== (const RingBufferIterator& a, const RingBufferIterator& b) { return a.currentPart == b.currentPart; };
+        friend bool operator!= (const RingBufferIterator& a, const RingBufferIterator& b) { return a.currentPart == b.currentPart; };   
+
+    };
+
+    /**
+     * @brief Return an iterator at the beginning of the ring buffer. Iterator returns a std::span<T,std::dynamic_extent> when dereferenced.
+     * 
+     * @return RingBufferIterator 
+     */
+    RingBufferIterator begin() {
+        return RingBufferIterator {0, elementsPerPart, buffer.linearize()};
+    }
+    
+    /**
+     * @brief Return an iterator at the current head part of the ring buffer. Iterator returns a std::span<T,std::dynamic_extent> when dereferenced.
+     * 
+     * @return RingBufferIterator 
+     */
+    RingBufferIterator head() {
+        return RingBufferIterator {headPart * elementsPerPart, elementsPerPart, buffer.linearize()};
+    }
+
+    /**
+     * @brief Return an iterator at the end of the ring buffer. Iterator returns a std::span<T,std::dynamic_extent> when dereferenced.
+     * 
+     * @return RingBufferIterator 
+     */
+    RingBufferIterator end() {
+        return RingBufferIterator {buffer.size()-1, elementsPerPart, buffer.linearize()};
+    }
 };

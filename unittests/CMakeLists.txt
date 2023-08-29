@@ -1,3 +1,5 @@
+add_subdirectory(xrtMock)
+
 add_custom_target(UnitTests)
 set_target_properties(UnitTests PROPERTIES FOLDER "Unittests")
 
@@ -9,4 +11,4 @@ add_custom_target(check-unittests
   DEPENDS UnitTests
 )
 
-
+add_subdirectory(core)

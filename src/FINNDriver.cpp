@@ -6,7 +6,7 @@
 
 // Helper
 #include "core/Accelerator.h"
-#include "core/DeviceBuffer.hpp"
+// #include "core/DeviceBuffer.hpp"
 #include "utils/FinnDatatypes.hpp"
 #include "utils/Logger.h"
 
@@ -45,9 +45,7 @@ int main() {
     auto myDevice = xrt::device();
     shape_t myShape = std::vector<unsigned int>{1, 2, 3};
     DatatypeInt<2> myDatatype = DatatypeInt<2>();
-    
-    //Finn::DeviceBuffer<uint8_t, DatatypeInt<2>> dbuffer = Finn::DeviceBuffer<uint8_t, DatatypeInt<2>>("MyDeviceBuffer", myDevice, myShape, 100, IO::INPUT);
-    //Finn::DeviceInputBuffer<uint8_t, DatatypeInt<2>> mydb = Finn::DeviceInputBuffer<uint8_t, DatatypeInt<2>>("My Device Buffer", myDevice, xrt::kernel(), myShape, 100);
+    // Finn::DeviceBuffer<uint8_t, DatatypeInt<2>> dbuffer = Finn::DeviceBuffer<uint8_t, DatatypeInt<2>>("MyDeviceBuffer", myDevice, myShape, 100, IO::INPUT);
 
     // Example usage 1
     /*
@@ -87,7 +85,6 @@ int main() {
     results = dbuffer.fetchStoredResults();
     */
     // Common operation in usage 2 AND 3: Internal pointer gets increased by one part for ever << operation.
-
 
 
     return 0;

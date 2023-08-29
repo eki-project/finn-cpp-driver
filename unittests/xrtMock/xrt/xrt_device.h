@@ -9,6 +9,8 @@
 namespace xrt {
     class device {
          public:
+        inline static unsigned int device_costum_constructor_called = 0;
+        inline static unsigned int device_param_didx = 0;
         /**
          * device() - Constructor for empty device
          */
@@ -27,6 +29,7 @@ namespace xrt {
          *
          * Throws if no device is found matching the specified index.
          */
+
         explicit device(unsigned int didx);
 
         /**
@@ -134,6 +137,7 @@ namespace xrt {
          * the xclbin.   Using this function allows one time
          * allocation of data that needs to be kept in memory.
          */
+        inline static std::string loaded_xclbin;
         uuid load_xclbin(const std::string& xclbin_fnm);
 
         /**
@@ -170,7 +174,7 @@ namespace xrt {
         // explicit operator bool() const { return handle != nullptr; }
         /// @endcond
 
-         protected:
+         public:
         uuid loadedUUID;
     };
 }  // namespace xrt

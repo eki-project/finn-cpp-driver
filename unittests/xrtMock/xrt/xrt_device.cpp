@@ -1,16 +1,20 @@
 #include "xrt_device.h"
 
-#include <iostream>
+#include <array>
+#include <numeric>
 
 namespace xrt {
 
     device::device(unsigned int didx) {
-        // Should do something with didx and throw for certain ids
-        std::cout << "something\n";
+        ++device_costum_constructor_called;
+        device_param_didx = didx;
     }
 
     uuid device::load_xclbin(const std::string& xclbin_fnm) {
-        loadedUUID = uuid();
+        loaded_xclbin = xclbin_fnm;
+        std::array<unsigned char, 16> id;
+        std::iota(id.begin(), id.end(), 1);
+        loadedUUID = uuid(id.data());
         return loadedUUID;
     }
 

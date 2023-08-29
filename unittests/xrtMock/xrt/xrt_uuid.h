@@ -5,15 +5,17 @@
 
 #include <algorithm>
 #include <array>
+#include <cstring>
 #include <string>
 
 
-using xuid_t = unsigned char[16];
+typedef unsigned char uuid_t[16];
 
 
 namespace xrt {
     class uuid {
-        xuid_t m_uuid;
+        uuid_t m_uuid;
+        inline static unsigned int uuid_constructors_called = 0;
 
          public:
         /**
@@ -30,7 +32,10 @@ namespace xrt {
          * A basic uuid is either a uuid_t on Linux, or a typedef
          * of equivalent basic type of other platforms
          */
-        // uuid(const xuid_t val) { uuid_copy(m_uuid, val); }
+        uuid(const uuid_t val) {
+            ++uuid_constructors_called;
+            std::memcpy(&m_uuid, val, 16);
+        }
 
         /**
          * uuid() - Construct uuid from a string representaition
@@ -54,7 +59,10 @@ namespace xrt {
          * @param rhs
          *   Value to be copied
          */
-        uuid(const uuid& rhs) { std::copy(std::begin(rhs.m_uuid), std::end(rhs.m_uuid), std::begin(m_uuid)); }
+        uuid(const uuid& rhs) {
+            ++uuid_constructors_called;
+            std::copy(std::begin(rhs.m_uuid), std::end(rhs.m_uuid), std::begin(m_uuid));
+        }
 
         /// @cond
         uuid(uuid&&) = default;
@@ -84,7 +92,7 @@ namespace xrt {
          * A basic uuid is either a uuid_t on Linux, or a typedef
          * of equivalent basic type of other platforms
          */
-        const xuid_t& get() const { return m_uuid; }
+        const uuid_t& get() const { return m_uuid; }
 
         /**
          * to_string() - Convert to string
@@ -117,7 +125,7 @@ namespace xrt {
          * A basic uuid is either a uuid_t on Linux, or a typedef
          * of equivalent basic type of other platforms
          */
-        // bool operator==(const xuid_t& xuid) const { return uuid_compare(m_uuid, xuid) == 0; }
+        bool operator==(const unsigned char (&xuid)[16]) const { return std::equal(std::begin(m_uuid), std::end(m_uuid), std::begin(xuid)); }
 
         /**
          * operator!=() - Compare to basic uuid
@@ -130,7 +138,7 @@ namespace xrt {
          * A basic uuid is either a uuid_t on Linux, or a typedef
          * of equivalent basic type of other platforms
          */
-        // bool operator!=(const xuid_t& xuid) const { return uuid_compare(m_uuid, xuid) != 0; }
+        bool operator!=(const unsigned char (&xuid)[16]) const { return !(m_uuid == xuid); }
 
         /**
          * operator==() - Comparison
@@ -140,7 +148,7 @@ namespace xrt {
          * @return
          *  True if equal, false otherwise
          */
-        // bool operator==(const uuid& rhs) const { return uuid_compare(m_uuid, rhs.m_uuid) == 0; }
+        bool operator==(const uuid& rhs) const { return std::equal(std::begin(m_uuid), std::end(m_uuid), std::begin(rhs.m_uuid)); }
 
         /**
          * operator!=() - Comparison
@@ -150,7 +158,7 @@ namespace xrt {
          * @return
          *  False if equal, true otherwise
          */
-        // bool operator!=(const uuid& rhs) const { return uuid_compare(m_uuid, rhs.m_uuid) != 0; }
+        bool operator!=(const uuid& rhs) const { return !(m_uuid == rhs.m_uuid); }
 
         /**
          * operator<() - Comparison

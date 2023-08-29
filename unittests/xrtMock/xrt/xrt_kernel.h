@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <vector>
 
 #include "../experimental/xclbin.h"
 #include "xrt_device.h"
@@ -58,7 +59,9 @@ namespace xrt {
          * other kernels and other process will have shared access to same
          * compute units.
          */
-
+        inline static std::vector<std::string> kernel_name;
+        inline static std::vector<xrt::device> kernel_device;
+        inline static std::vector<xrt::uuid> kernel_uuid;
         kernel(const xrt::device& device, const xrt::uuid& xclbin_id, const std::string& name, cu_access_mode mode = cu_access_mode::shared);
 
 

@@ -20,22 +20,23 @@ namespace Finn {
      */
     template<typename T, typename F>
     class DeviceBuffer {
+        protected:
         std::string name;
         size_t numbers;
         shape_t shape;
+        size_t mapSize;
         xrt::bo internalBo;
         xrt::kernel& associatedKernel;
         T* map;
-        size_t mapSize;
-        RingBuffer<T> ringBuffer;
         logger_type& logger;
+        RingBuffer<T> ringBuffer;
         
         public:
         DeviceBuffer(
             const std::string& pName,
             xrt::device& device,
             xrt::kernel& pAssociatedKernel,
-            const shape_t pShape,
+            const shape_t& pShape,
             unsigned int ringBufferSizeFactor
         ) :
             name(pName),
@@ -108,34 +109,10 @@ namespace Finn {
     class DeviceInputBuffer : DeviceBuffer<T,F> {
         const IO ioMode = IO::INPUT;
         bool executeAutomatically = false;
-
-        using DeviceBuffer<T,F>::DeviceBuffer;
         
-        /*
-        public:
-        DeviceInputBuffer(
-            const std::string& pName,
-            xrt::device& device,
-            xrt::kernel& pAssociatedKernel,
-            const shape_t pShape,
-            unsigned int ringBufferSizeFactor
-        ) {
-            name = pName;
-            numbers = FinnUtils::shapeToElements(pShape);
-            shape = pShape;
-            mapSize = F().template requiredElements<T>();
-            internalBo = xrt::bo(device, mapSize * sizeof(T), 0);
-            associatedKernel = pAssociatedKernel;
-            map = internalBo.template map<T*>();
-            logger = Logger::getLogger();
-            ringBuffer = RingBuffer<T>(ringBufferSizeFactor, mapSize);
-            FINN_LOG(logger, loglevel::info) << "Initialized Input DeviceBuffer " << name << " (SHAPE: " << FinnUtils::shapeToString(pShape) << ", BUFFER SIZE: " << ringBufferSizeFactor << " inputs of the given shape)\n"; 
-        }*/
+        using DeviceBuffer<T,F>::DeviceBuffer;
 
         public:
-        DeviceInputBuffer() {
-            std::cout << "hi" << std::endl; 
-        }
         /**
          * @brief Set the Execute Automatically Flag. If set, as soon as the buffer head pointer reaches the last element, the first one in the buffer (first input) gets loaded and executed on the board, the slot gets invalidated and is thus free'd for the next store operation.
          * 
@@ -151,7 +128,7 @@ namespace Finn {
          * @return true 
          * @return false 
          */
-        bool isExecutedAutomatically() {
+        bool isExecutedAutomatically() const {
             return executeAutomatically;
         }
 
@@ -170,7 +147,7 @@ namespace Finn {
          */
         void execute() {
             // TODO(bwintermann): Add arguments for kernel run!
-            auto run = this->associatedKernel(this->internalBo);
+            auto run = associatedKernel(this->internalBo);
             run.start();
             run.wait();
         }
@@ -312,43 +289,14 @@ namespace Finn {
         const IO ioMode = IO::OUTPUT;
         std::vector<std::vector<T>> longTermStorage;
 
-        using DeviceBuffer<T,F>::name;
-        using DeviceBuffer<T,F>::numbers;
-        using DeviceBuffer<T,F>::shape;
-        using DeviceBuffer<T,F>::map;
-        using DeviceBuffer<T,F>::mapSize;
-        using DeviceBuffer<T,F>::internalBo;
-        using DeviceBuffer<T,F>::associatedKernel;
-        using DeviceBuffer<T,F>::ringBuffer;
-        using DeviceBuffer<T,F>::logger;
-
         public:  
-        DeviceOutputBuffer(
-            const std::string& pName,
-            xrt::device& device,
-            xrt::kernel& pAssociatedKernel,
-            const shape_t pShape,
-            unsigned int ringBufferSizeFactor
-        ) {
-            name = pName;
-            numbers = FinnUtils::shapeToElements(pShape);
-            shape = pShape;
-            mapSize = F().template requiredElements<T>();
-            internalBo = xrt::bo(device, mapSize * sizeof(T), 0);
-            associatedKernel = pAssociatedKernel;
-            map = internalBo.template map<T*>();
-            logger = Logger::getLogger();
-            ringBuffer = RingBuffer<T>(ringBufferSizeFactor, mapSize);
-            FINN_LOG(logger, loglevel::info) << "Initialized Output DeviceBuffer " << name << " (SHAPE: " << FinnUtils::shapeToString(pShape) << ", BUFFER SIZE: " << ringBufferSizeFactor << " outputs of the given shape)\n"; 
-        }
-
         /**
          * @brief Sync data from the FPGA into the memory map 
          * 
          * @return * void 
          */
         void sync() {
-            internalBo.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
+            this->internalBo.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
         }
 
         /**
@@ -358,7 +306,7 @@ namespace Finn {
          */
         void execute() {
             // TODO(bwintermann): Add arguments for kernel run!
-            auto run = associatedKernel(internalBo);
+            auto run = this->associatedKernel(this->internalBo);
             run.start();
             run.wait();
         }
@@ -368,7 +316,7 @@ namespace Finn {
          * 
          */
         void saveMap() {
-            ringBuffer.store(map, mapSize);
+            this->ringBuffer.store(this->map, this->mapSize);
         }
 
         /**
@@ -376,9 +324,9 @@ namespace Finn {
          * 
          */
         void archiveValidBufferParts() {
-            for (index_t i = 0; i < ringBuffer.size(SIZE_SPECIFIER::PARTS); i++) {
-                if (ringBuffer.isPartValid(i)) {
-                    longTermStorage.push_back(ringBuffer.getPart(i, false));
+            for (index_t i = 0; i < this->ringBuffer.size(SIZE_SPECIFIER::PARTS); i++) {
+                if (this->ringBuffer.isPartValid(i)) {
+                    longTermStorage.push_back(this->ringBuffer.getPart(i, false));
                 }
             }
         }
@@ -388,7 +336,7 @@ namespace Finn {
          * 
          * @return std::vector<std::vector<T>> 
          */
-        std::vector<std::vector<T>> retrieveArchive() {
+        std::vector<std::vector<T>> retrieveArchive() const {
             return longTermStorage;
         }
 
@@ -410,7 +358,7 @@ namespace Finn {
                 execute();
                 sync();
                 saveMap();
-                if (ringBuffer.isFull()) {
+                if (this->ringBuffer.isFull()) {
                     archiveValidBufferParts();
                 }
             }

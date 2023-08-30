@@ -45,6 +45,7 @@ Checks:          '*,
                     -cppcoreguidelines-pro-bounds-pointer-arithmetic,
                     -cppcoreguidelines-pro-type-vararg,
                     -cppcoreguidelines-avoid-magic-numbers,
+                    -cppcoreguidelines-non-private-member-variables-in-classes,
                 '
 WarningsAsErrors: ''
 HeaderFilterRegex: 'src/.*$'

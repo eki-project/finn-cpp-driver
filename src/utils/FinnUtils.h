@@ -33,9 +33,9 @@ namespace FinnUtils {
         return static_cast<size_t>(std::accumulate(pShape.begin(), pShape.end(), 1, std::multiplies<>()));
     }
 
-    std::string shapeToString(const shape_t& pShape) {
+    inline std::string shapeToString(const shape_t& pShape) {
         std::string str = "(";
-        int index = 0;
+        unsigned int index = 0;
         for (auto elem : pShape) {
             str.append(std::to_string(elem));
             if (index < pShape.size() - 2) {

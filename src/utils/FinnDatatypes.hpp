@@ -105,7 +105,8 @@ class Datatype {
      */
     template<typename T>
     constexpr unsigned int requiredElements() const {
-        return static_cast<unsigned int>(FinnUtils::ceil(static_cast<float>(bitwidth()) / (sizeof(T) * 8.0)));
+        // NOLINTNEXTLINE(clang-diagnostic-implicit-int-float-conversion)
+        return static_cast<unsigned int>(FinnUtils::ceil(static_cast<float>(bitwidth())) / (static_cast<float>(sizeof(T)) * 8.0F));
     }
 
     /**

@@ -34,9 +34,7 @@ class RingBuffer {
         elementsPerPart(pElementsPerPart),
         logger(Logger::getLogger())
     {
-        for (auto&& validPart : validParts) {
-            validPart = false;
-        }
+        std::fill(validParts.begin(), validParts.end(), false);
         FINN_LOG(logger, loglevel::info) << "Initialized RingBuffer (PARTS: " << parts << ", ELEMENTS: " << buffer.size() << ", ELEMENTS PER PART: " << elementsPerPart << ", BYTES: " << buffer.size() * sizeof(T) << ")\n";
     }
 
@@ -65,15 +63,6 @@ class RingBuffer {
         validParts[partIndex] = validity;
     }
 
-    /**
-     * @brief Return the number of elements that make up a single part 
-     * 
-     * @return size_t 
-     */
-    const size_t getElementsPerPart() const {
-        return elementsPerPart;
-    }
-
     public:
     /**
      * @brief Return the RingBuffer's size, either in elements of T, in bytes or in parts 
@@ -88,8 +77,11 @@ class RingBuffer {
             return buffer.size() * sizeof(T);
         } else if (ss == SIZE_SPECIFIER::PARTS) {
             return parts;
+        } else if (ss == SIZE_SPECIFIER::ELEMENTS_PER_PART) {
+            return elementsPerPart;
         } else {
             FinnUtils::logAndError<std::runtime_error>("Unknown size specifier!");
+            return 0;
         }
     }
 
@@ -99,11 +91,7 @@ class RingBuffer {
      * @return unsigned int 
      */
     unsigned int countValidParts() const {
-        unsigned int tmp = 0;
-        for (auto val : validParts) {
-            if (val) { tmp++; }
-        }
-        return tmp;
+        return static_cast<unsigned int>(std::count_if(validParts.begin(), validParts.end(), [](bool x){return x;}));
     }
 
     /**
@@ -366,12 +354,11 @@ class RingBuffer {
         size_t parts;
 
         public:
-        RingBufferIterator(index_t initialElementIndex, size_t pElementsPerPart, T* pLinearizedBuffer) 
-        :   elementsPerPart(pElementsPerPart),
-            linearizedBuffer(pLinearizedBuffer) {
-                linearizedBuffer += initialElementIndex; // Pointer arithmetic
-                currentPart = initialElementIndex / elementsPerPart;
-        }
+        RingBufferIterator(index_t initialElementIndex, size_t pElementsPerPart, size_t pParts, T* pLinearizedBuffer) 
+        :   linearizedBuffer(pLinearizedBuffer + initialElementIndex), // Pointer arithmetic
+            elementsPerPart(pElementsPerPart),
+            currentPart(initialElementIndex / elementsPerPart), 
+            parts(pParts) {}
 
         std::span<T,std::dynamic_extent> operator*() const { return std::span{linearizedBuffer, elementsPerPart}; }
         

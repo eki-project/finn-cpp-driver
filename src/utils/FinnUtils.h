@@ -2,6 +2,7 @@
 #define FINN_UTILS_H
 
 #include <cstdint>
+#include <numeric>
 #include "Types.h"
 
 #include "Logger.h"
@@ -28,8 +29,22 @@ namespace FinnUtils {
         throw E(msg);
     }
 
-    size_t shapeToElements(const shape_t& pShape) {
+    inline size_t shapeToElements(const shape_t& pShape) {
         return static_cast<size_t>(std::accumulate(pShape.begin(), pShape.end(), 1, std::multiplies<>()));
+    }
+
+    std::string shapeToString(const shape_t& pShape) {
+        std::string str = "(";
+        int index = 0;
+        for (auto elem : pShape) {
+            str.append(std::to_string(elem));
+            if (index < pShape.size() - 2) {
+                str.append(", ");
+            }
+            index++;
+        }
+        str.append(")");
+        return str;
     }
 
 }  // namespace FinnUtils

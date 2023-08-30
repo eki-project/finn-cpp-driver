@@ -1,6 +1,5 @@
 #include <span>
 #include <boost/circular_buffer.hpp>
-#include <magic_enum.hpp>
 
 #include "FinnDatatypes.hpp"
 #include "Types.h"
@@ -19,6 +18,7 @@ class RingBuffer {
     const size_t parts;
     const size_t elementsPerPart;
     index_t headPart = 0;
+    logger_type& logger;
 
     /**
      * @brief Construct a new Ring Buffer object. It's size in terms of values of type T is given by pElementsPerPart * pParts. By default all parts are invalid data to start with.
@@ -26,15 +26,18 @@ class RingBuffer {
      * @param pParts 
      * @param pElementsPerPart 
      */
+    public:
     RingBuffer(const size_t pParts, const size_t pElementsPerPart) : 
         buffer(boost::circular_buffer<T>(pElementsPerPart * pParts)),
-        validParts(std::vector<T>(pParts)),
+        validParts(std::vector<bool>(pParts)),
         parts(pParts),
-        elementsPerPart(pElementsPerPart)
+        elementsPerPart(pElementsPerPart),
+        logger(Logger::getLogger())
     {
         for (auto&& validPart : validParts) {
             validPart = false;
         }
+        FINN_LOG(logger, loglevel::info) << "Initialized RingBuffer (PARTS: " << parts << ", ELEMENTS: " << buffer.size() << ", ELEMENTS PER PART: " << elementsPerPart << ", BYTES: " << buffer.size() * sizeof(T) << ")\n";
     }
 
     private:
@@ -45,7 +48,7 @@ class RingBuffer {
      * @param offset 
      * @return index_t 
      */
-    index_t elementIndex(index_t partIndex, index_t offset) {
+    index_t elementIndex(index_t partIndex, index_t offset) const {
         return (partIndex * elementsPerPart + offset) % buffer.size();
     }
 
@@ -62,6 +65,14 @@ class RingBuffer {
         validParts[partIndex] = validity;
     }
 
+    /**
+     * @brief Return the number of elements that make up a single part 
+     * 
+     * @return size_t 
+     */
+    const size_t getElementsPerPart() const {
+        return elementsPerPart;
+    }
 
     public:
     /**
@@ -70,7 +81,7 @@ class RingBuffer {
      * @param ss 
      * @return size_t 
      */
-    size_t size(SIZE_SPECIFIER ss) {
+    size_t size(SIZE_SPECIFIER ss) const {
         if (ss == SIZE_SPECIFIER::ELEMENTS) {
             return buffer.size();
         } else if (ss == SIZE_SPECIFIER::BYTES) {
@@ -87,7 +98,7 @@ class RingBuffer {
      * 
      * @return unsigned int 
      */
-    unsigned int countValidParts() {
+    unsigned int countValidParts() const {
         unsigned int tmp = 0;
         for (auto val : validParts) {
             if (val) { tmp++; }
@@ -100,7 +111,7 @@ class RingBuffer {
      * When the number of parts is odd, e.g. 13 and the pointer at 3, this would return 10, because the ceil'd half of parts is added onto the head index. 
      * @return index_t 
      */
-    index_t getHeadOpposite() {
+    index_t getHeadOpposite() const {
         return (headPart + FinnUtils::ceil(parts/2.0)) % parts;
     }
 
@@ -131,7 +142,7 @@ class RingBuffer {
      * @return true 
      * @return false 
      */
-    bool isPartValid(index_t partIndex) {
+    bool isPartValid(index_t partIndex) const {
         return partIndex < parts && validParts[partIndex];
     }
 
@@ -141,7 +152,7 @@ class RingBuffer {
      * @return true 
      * @return false 
      */
-    bool isPartValid() {
+    bool isPartValid() const {
         return validParts[headPart];
     }
 
@@ -151,7 +162,7 @@ class RingBuffer {
      * @return true 
      * @return false 
      */
-    bool isFull() {
+    bool isFull() const {
         return countValidParts() == parts;
     }
 
@@ -273,6 +284,23 @@ class RingBuffer {
     }
 
     /**
+     * @brief Read from head pointer returns an std::array. Increments head pointer and invalidates read data. 
+     * 
+     * @tparam S 
+     * @return std::array<T,S> 
+     */
+    template<size_t S>
+    std::array<T,S> read() {
+        std::array<T,S> arr;
+        for (size_t i = 0; i < elementsPerPart; i++) {
+            arr[i] = buffer[elementIndex(headPart, i)];
+        }
+        setPartValidity(headPart, false);
+        cycleHeadPart();
+        return arr;
+    }
+
+    /**
      * @brief Read from the given partIndex, do NOT change the head pointer and set validity as prompted. Returns data as a vector
      * 
      * @param partIndex 
@@ -305,10 +333,29 @@ class RingBuffer {
         }
         setPartValidity(partIndex, validity);
     }
+
+    /**
+     * @brief Read from the given partIndex, do NOT change the head pointer and set validity as prompted.
+     * 
+     * @tparam S 
+     * @param partIndex 
+     * @param validity 
+     * @return std::array<T,S> 
+     */
+    template<size_t S>
+    std::array<T,S> getPart(index_t partIndex, bool validity) {
+        std::array<T,S> arr;
+        for (size_t i = 0; i < elementsPerPart; i++) {
+            arr[i] = buffer[elementIndex(partIndex, i)];
+        }
+        setPartValidity(partIndex, validity);
+        return arr;
+    }
     ///@}
 
     /**
-     * @brief Simple iterator for accessing the ring buffer part-wise. Returns a span<T> when dereferenced. 
+     * @brief Simple iterator for accessing the ring buffer part-wise. Returns a span<T> when dereferenced.
+     * @attention The span that is returned however, represents an _element-wise_ access to a part.   
      * 
      */
     struct RingBufferIterator {
@@ -357,6 +404,7 @@ class RingBuffer {
 
     /**
      * @brief Return an iterator at the beginning of the ring buffer. Iterator returns a std::span<T,std::dynamic_extent> when dereferenced.
+     * @attention The span that is returned however, represents an _element-wise_ access to a part.   
      * 
      * @return RingBufferIterator 
      */
@@ -366,6 +414,7 @@ class RingBuffer {
     
     /**
      * @brief Return an iterator at the current head part of the ring buffer. Iterator returns a std::span<T,std::dynamic_extent> when dereferenced.
+     * @attention The span that is returned however, represents an _element-wise_ access to a part.   
      * 
      * @return RingBufferIterator 
      */
@@ -375,6 +424,7 @@ class RingBuffer {
 
     /**
      * @brief Return an iterator at the end of the ring buffer. Iterator returns a std::span<T,std::dynamic_extent> when dereferenced.
+     * @attention The span that is returned however, represents an _element-wise_ access to a part.   
      * 
      * @return RingBufferIterator 
      */

@@ -1,10 +1,9 @@
 #include <boost/circular_buffer.hpp>
 
 #include "../utils/FinnDatatypes.hpp"
-#include "../utils/Types.h"
 #include "../utils/Logger.h"
 #include "../utils/RingBuffer.hpp"
-
+#include "../utils/Types.h"
 #include "xrt.h"
 #include "xrt/xrt_bo.h"
 
@@ -13,9 +12,9 @@
 
 namespace Finn {
     /**
-     * @brief Parent class for DeviceBuffer objects.  
-     * 
-     * @tparam T Datatype in which the data is stored (e.g. uint8_t) 
+     * @brief Parent class for DeviceBuffer objects.
+     *
+     * @tparam T Datatype in which the data is stored (e.g. uint8_t)
      * @tparam F FINN-Datatype which should be stored as a composition of T values
      */
     template<typename T, typename F>
@@ -54,7 +53,7 @@ namespace Finn {
     };
 
     /**
-     * @brief A wrapper to efficiently put data onto an xrt::bo object. Internally uses a ring buffer to manage large data batches. 
+     * @brief A wrapper to efficiently put data onto an xrt::bo object. Internally uses a ring buffer to manage large data batches.
      * This wrapper can be used in one of two ways: Manually or automatically. In manual mode you would use the methods to target specific ring buffer parts and execute them. This enables more finegrained management over how
      * where and when data is stored and exeuted. An example usage would be:
      * @code {.cpp}
@@ -67,7 +66,7 @@ namespace Finn {
      * }
      * @endcode
      * This example would check that the data at index 0 is invalid and proceed to write data there and execute it.
-     * 
+     *
      * The more automatic approach would be something like this:
      * @code {.cpp}
      * auto myDB = DeviceInputBuffer<uint8_t, DatatypeUint<2>>(...);
@@ -80,10 +79,10 @@ namespace Finn {
      * @code {.cpp}
      * auto myDB = DeviceInputBuffer<uint8_t, DatatypeUint<2>>(...);
      * myDB.setExecuteAutomatically(false);
-     * 
+     *
      * while(true) {
      *      if (!myDB.isHeadValid()) {
-     *          myDB.store(myData[someIndex++]); 
+     *          myDB.store(myData[someIndex++]);
      *      }
      * }
      * @endcode
@@ -99,14 +98,14 @@ namespace Finn {
      * }
      * @endcode
      * This works because loadMap, sync and execute are all read-only.
-     * 
-     * 
-     * 
+     *
+     *
+     *
      * @tparam T The datatype that the buffer uses to represent everything internally. This is the datatype that gets put on the FPGAs
      * @tparam F The FINN-datatype that represent the actual data. It is represented by one or multiple values of type T
      */
     template<typename T, typename F>
-    class DeviceInputBuffer : DeviceBuffer<T,F> {
+    class DeviceInputBuffer : DeviceBuffer<T, F> {
         const IO ioMode = IO::INPUT;
         bool executeAutomatically = false;
         
@@ -114,36 +113,31 @@ namespace Finn {
 
         public:
         /**
-         * @brief Set the Execute Automatically Flag. If set, as soon as the buffer head pointer reaches the last element, the first one in the buffer (first input) gets loaded and executed on the board, the slot gets invalidated and is thus free'd for the next store operation.
-         * 
-         * @param value 
+         * @brief Set the Execute Automatically Flag. If set, as soon as the buffer head pointer reaches the last element, the first one in the buffer (first input) gets loaded and executed on the board, the slot gets invalidated and is
+         * thus free'd for the next store operation.
+         *
+         * @param value
          */
-        void setExecuteAutomatically(bool value) {
-            executeAutomatically = value;
-        }
-        
-        /**
-         * @brief Check whether the Execute Automatically Flag is set. 
-         * 
-         * @return true 
-         * @return false 
-         */
-        bool isExecutedAutomatically() const {
-            return executeAutomatically;
-        }
+        void setExecuteAutomatically(bool value) { executeAutomatically = value; }
 
         /**
-         * @brief Sync data from the map to the device.  
-         * 
+         * @brief Check whether the Execute Automatically Flag is set.
+         *
+         * @return true
+         * @return false
          */
-        void sync() {
-            this->internalBo.sync(XCL_BO_SYNC_BO_TO_DEVICE);
-        }
+        bool isExecutedAutomatically() { return executeAutomatically; }
+
+        /**
+         * @brief Sync data from the map to the device.
+         *
+         */
+        void sync() { this->internalBo.sync(XCL_BO_SYNC_BO_TO_DEVICE); }
 
         /**
          * @brief Start a run on the associated kernel and wait for it's result.
-         * @attention This method is blocking  
-         * 
+         * @attention This method is blocking
+         *
          */
         void execute() {
             // TODO(bwintermann): Add arguments for kernel run!
@@ -153,77 +147,66 @@ namespace Finn {
         }
 
         /**
-         * @brief Loads the head part into the xrt::bo memory map to make it ready for sync. This invalidates the read part and moves the head pointer to the next part. 
-         * 
+         * @brief Loads the head part into the xrt::bo memory map to make it ready for sync. This invalidates the read part and moves the head pointer to the next part.
+         *
          */
-        void loadMap() {
-            this->ringBuffer.read(this->map, this->mapSize);
-        }
+        void loadMap() { this->ringBuffer.read(this->map, this->mapSize); }
 
         /**
          * @brief Loads the passed part into the xrt::bo memory map to make it ready for sync. This does NOT change the head pointer. The validity gets set according to the passed newValidity value.
-         * 
-         * @param partIndex 
+         *
+         * @param partIndex
          * @param newValidity
          */
-        void loadMap(index_t partIndex, bool newValidity) {
-            this->ringBuffer.getPart(this->map, this->mapSize, partIndex, newValidity);
-        }
+        void loadMap(index_t partIndex, bool newValidity) { this->ringBuffer.getPart(this->map, this->mapSize, partIndex, newValidity); }
 
         /**
-         * @brief Check if the head part is valid 
-         * 
-         * @return true 
-         * @return false 
+         * @brief Check if the head part is valid
+         *
+         * @return true
+         * @return false
          */
-        bool isHeadValid() {
-            return this->ringBuffer.isPartValid();
-        }
+        bool isHeadValid() { return this->ringBuffer.isPartValid(); }
 
         /**
-         * @brief Check if the part indexed by partIndex is valid 
-         * 
-         * @param partIndex 
-         * @return true 
-         * @return false 
+         * @brief Check if the part indexed by partIndex is valid
+         *
+         * @param partIndex
+         * @return true
+         * @return false
          */
-        bool isPartValid(index_t partIndex) {
-            return this->ringBuffer.isPartValid(partIndex);
-        }
+        bool isPartValid(index_t partIndex) { return this->ringBuffer.isPartValid(partIndex); }
 
         /**
-         * @brief Checks if the buffer is full (i.e. if all parts are valid - a ring buffer cannot be __full__ technically) 
-         * 
-         * @return true 
-         * @return false 
+         * @brief Checks if the buffer is full (i.e. if all parts are valid - a ring buffer cannot be __full__ technically)
+         *
+         * @return true
+         * @return false
          */
-        bool isBufferFull() {
-            return this->ringBuffer.isFull();
-        }
+        bool isBufferFull() { return this->ringBuffer.isFull(); }
 
         /**
-         * @brief Get the index of the part on the "opposite" side of the ring buffer. The value is always ceil'd, so that the opposite of 3 in a 12-part buffer is 10, not 9. 
-         * 
-         * @return index_t 
+         * @brief Get the index of the part on the "opposite" side of the ring buffer. The value is always ceil'd, so that the opposite of 3 in a 12-part buffer is 10, not 9.
+         *
+         * @return index_t
          */
-        index_t getHeadOpposideIndex() {
-            return this->ringBuffer.getHeadOpposite();
-        }
+        index_t getHeadOpposideIndex() { return this->ringBuffer.getHeadOpposite(); }
 
         /**
-         * @brief Return the size of the buffer as specified by the argument. Bytes returns all bytes the buffer takes up, elements returns the number of T-values, numbers the number of F-values. 
-         * 
-         * @param ss 
-         * @return size_t 
+         * @brief Return the size of the buffer as specified by the argument. Bytes returns all bytes the buffer takes up, elements returns the number of T-values, numbers the number of F-values.
+         *
+         * @param ss
+         * @return size_t
          */
-        size_t size(SIZE_SPECIFIER ss) {
-            return this->ringBuffer.size(ss);
-        }
+        size_t size(SIZE_SPECIFIER ss) { return this->ringBuffer.size(ss); }
 
         /**
-         * @name Store Methods 
-         * The device buffer offers several options to store data inside it's buffer. There is a pair to read from an array, and a pair to read from a vector. 
-         * In both cases, when no further argument is passed, the currently selected head part of the buffer is written to, and the head pointer is incremented, automatically filling up the buffer. If setExecuteAutomatically(true) was set, and the buffer is almost full, the last free element gets written, and the one after it gets executed and invalidated, to free one slot again. If the index_t partIndex was passed, the buffer at that index gets set, without the head pointer being changed. In both cases, the part that was just written gets set to "valid". It is strongly recommended to not break paradigm and use either all automatic storage/execution/reading or manual, but not both simultaneously. 
+         * @name Store Methods
+         * The device buffer offers several options to store data inside it's buffer. There is a pair to read from an array, and a pair to read from a vector.
+         * In both cases, when no further argument is passed, the currently selected head part of the buffer is written to, and the head pointer is incremented, automatically filling up the buffer. If setExecuteAutomatically(true) was set,
+         * and the buffer is almost full, the last free element gets written, and the one after it gets executed and invalidated, to free one slot again. If the index_t partIndex was passed, the buffer at that index gets set, without the
+         * head pointer being changed. In both cases, the part that was just written gets set to "valid". It is strongly recommended to not break paradigm and use either all automatic storage/execution/reading or manual, but not both
+         * simultaneously.
          */
         ///@{
         void store(const std::vector<T>& vec) {
@@ -235,9 +218,7 @@ namespace Finn {
             }
         }
 
-        void store(const std::vector<T>& vec, index_t partIndex) {
-            this->ringBuffer.setPart(vec, partIndex, true);
-        }
+        void store(const std::vector<T>& vec, index_t partIndex) { this->ringBuffer.setPart(vec, partIndex, true); }
 
         void store(const T& arr, const size_t arrSize) {
             this->ringBuffer.store(arr, arrSize);
@@ -248,17 +229,15 @@ namespace Finn {
             }
         }
 
-        void store(const T& arr, const size_t arrSize, index_t partIndex) {
-            this->ringBuffer.setPart(arr, arrSize, partIndex, true);
-        }
+        void store(const T& arr, const size_t arrSize, index_t partIndex) { this->ringBuffer.setPart(arr, arrSize, partIndex, true); }
 
         template<size_t sa>
-        void store(const std::array<T,sa> arr) {
+        void store(const std::array<T, sa> arr) {
             store(arr.data(), arr.size());
         }
 
         template<size_t sa>
-        void store(const std::array<T,sa> arr, index_t partIndex) {
+        void store(const std::array<T, sa> arr, index_t partIndex) {
             store(arr.data(), arr.size(), partIndex);
         }
 
@@ -279,30 +258,28 @@ namespace Finn {
      * @endcode
      * This would read 100 samples at a time, 1000 times. The data gets read from the FPGA and stored in the internal ring buffer.
      * When the ring buffer is full, the data gets placed in the long term storage (archive), from which it can be read or cleared. In order to avoid performance hickups,
-     * it is advised to make the ringBufferSizeFactor of the DeviceOutputBuffer a whole multiple of the batch size of your dataset, so that the longer copying of the ring buffer to the archive does not happen mid-batch-inference. 
-     * 
-     * @tparam T 
-     * @tparam F 
+     * it is advised to make the ringBufferSizeFactor of the DeviceOutputBuffer a whole multiple of the batch size of your dataset, so that the longer copying of the ring buffer to the archive does not happen mid-batch-inference.
+     *
+     * @tparam T
+     * @tparam F
      */
     template<typename T, typename F>
-    class DeviceOutputBuffer : DeviceBuffer<T,F> {
+    class DeviceOutputBuffer : DeviceBuffer<T, F> {
         const IO ioMode = IO::OUTPUT;
         std::vector<std::vector<T>> longTermStorage;
 
         public:  
         /**
-         * @brief Sync data from the FPGA into the memory map 
-         * 
-         * @return * void 
+         * @brief Sync data from the FPGA into the memory map
+         *
+         * @return * void
          */
-        void sync() {
-            this->internalBo.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
-        }
+        void sync() { this->internalBo.sync(XCL_BO_SYNC_BO_FROM_DEVICE); }
 
         /**
          * @brief Execute the kernel and await it's return.
-         * @attention This function is blocking. 
-         * 
+         * @attention This function is blocking.
+         *
          */
         void execute() {
             // TODO(bwintermann): Add arguments for kernel run!
@@ -312,16 +289,14 @@ namespace Finn {
         }
 
         /**
-         * @brief Store the contents of the memory map into the ring buffer. 
-         * 
+         * @brief Store the contents of the memory map into the ring buffer.
+         *
          */
-        void saveMap() {
-            this->ringBuffer.store(this->map, this->mapSize);
-        }
+        void saveMap() { this->ringBuffer.store(this->map, this->mapSize); }
 
         /**
-         * @brief Put every valid read part of the ring buffer into the archive. 
-         * 
+         * @brief Put every valid read part of the ring buffer into the archive.
+         *
          */
         void archiveValidBufferParts() {
             for (index_t i = 0; i < this->ringBuffer.size(SIZE_SPECIFIER::PARTS); i++) {
@@ -332,26 +307,22 @@ namespace Finn {
         }
 
         /**
-         * @brief Return the archive. 
-         * 
-         * @return std::vector<std::vector<T>> 
+         * @brief Return the archive.
+         *
+         * @return std::vector<std::vector<T>>
          */
-        std::vector<std::vector<T>> retrieveArchive() const {
-            return longTermStorage;
-        }
+        std::vector<std::vector<T>> retrieveArchive() { return longTermStorage; }
 
         /**
-         * @brief Clear the archive of all it's entries by resizing it to 0. 
-         * 
+         * @brief Clear the archive of all it's entries by resizing it to 0.
+         *
          */
-        void clearArchive() {
-            longTermStorage.resize(0);
-        }
+        void clearArchive() { longTermStorage.resize(0); }
 
         /**
-         * @brief Read the specified number of samples from the device, only writing data into the archive when the ring buffer is full 
-         * 
-         * @param samples 
+         * @brief Read the specified number of samples from the device, only writing data into the archive when the ring buffer is full
+         *
+         * @param samples
          */
         void read(unsigned int samples) {
             for (unsigned int i = 0; i < samples; i++) {
@@ -363,7 +334,5 @@ namespace Finn {
                 }
             }
         }
-
-
     };
-} // namespace Finn
+}  // namespace Finn

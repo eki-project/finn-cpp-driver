@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "../../src/core/DeviceHandler.h"
+#include "../../src/utils/Logger.h"
 #include "gtest/gtest.h"
 #include "xrt/xrt_device.h"
 #include "xrt/xrt_kernel.h"
@@ -11,6 +12,8 @@
 using namespace Finn;
 
 TEST(DeviceHandlerTest, InitTest) {
+    auto log = Logger::getLogger();
+    FINN_LOG(log, loglevel::info) << "Das hier sollte geloggt werden!";
     auto devicehandler = DeviceHandler("test", "someName", 0, {}, {});
     EXPECT_EQ(xrt::device::device_costum_constructor_called, 1);
     EXPECT_EQ(xrt::device::device_param_didx, 0);

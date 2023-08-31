@@ -6,6 +6,7 @@
 #include "../utils/Types.h"
 #include "xrt.h"
 #include "xrt/xrt_bo.h"
+#include "xrt/xrt_kernel.h"
 
 
 // TODO(bwintermann): Replace ... with using DeviceBuffer<T,F>::...
@@ -126,7 +127,7 @@ namespace Finn {
          * @return true
          * @return false
          */
-        bool isExecutedAutomatically() { return executeAutomatically; }
+        bool isExecutedAutomatically() const { return executeAutomatically; }
 
         /**
          * @brief Sync data from the map to the device.
@@ -311,7 +312,7 @@ namespace Finn {
          *
          * @return std::vector<std::vector<T>>
          */
-        std::vector<std::vector<T>> retrieveArchive() { return longTermStorage; }
+        std::vector<std::vector<T>> retrieveArchive() const { return longTermStorage; }
 
         /**
          * @brief Clear the archive of all it's entries by resizing it to 0.

@@ -245,7 +245,7 @@ namespace Finn {
         }
 
         template<size_t sa>
-        void store(const std::array<T, sa> arr) {
+        void store(const std::array<T, sa>& arr) {
             RingBuffer<T>& rb = this->ringBuffer;
             rb.template store<sa>(arr);
             if (executeAutomatically && this->ringBuffer.isFull()) {
@@ -256,7 +256,7 @@ namespace Finn {
         }
 
         template<size_t sa>
-        void store(const std::array<T, sa> arr, index_t partIndex) {
+        void store(const std::array<T, sa>& arr, index_t partIndex) {
             this->ringBuffer.setPart<sa>(arr, partIndex);
         }
 

@@ -101,7 +101,13 @@ class RingBuffer {
      * @return index_t 
      */
     index_t getHeadOpposite() const {
-        return (headPart + FinnUtils::ceil(parts/2.0)) % parts;
+        return (
+            headPart + static_cast<index_t>(
+                FinnUtils::ceil(
+                    static_cast<float>(parts)/2.0F
+                )
+            )
+        ) % parts;
     }
 
     /**

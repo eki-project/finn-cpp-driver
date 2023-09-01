@@ -104,13 +104,16 @@ class Datatype {
      * @return unsigned int
      */
     template<typename T>
-    unsigned int requiredElements() const {
+    constexpr unsigned int requiredElements() const {
         // If the finn datatype has a lower bitwidth than the underlying machine datatype T, simply use one T per one Finn-Datatype
         if (bitwidth() < sizeof(T) * 8) {
             return 1;
         }
         // NOLINTNEXTLINE(clang-diagnostic-implicit-int-float-conversion)
-        return static_cast<unsigned int>(FinnUtils::ceil(static_cast<float>(bitwidth())) / (static_cast<float>(sizeof(T)) * 8.0F));
+        return static_cast<unsigned int>(
+            FinnUtils::ceil(
+                static_cast<float>(bitwidth()) / (static_cast<float>(sizeof(T)) * 8.0F))
+        );
     }
 
     /**

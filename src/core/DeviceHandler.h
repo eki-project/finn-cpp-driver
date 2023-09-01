@@ -26,7 +26,7 @@ namespace Finn {
          * @param inputNames Names of idmas
          * @param outputNames Names of odmas
          */
-        DeviceHandler(const std::filesystem::path& xclbinPath, const std::string& name, std::size_t deviceIndex, const std::vector<std::string>& inputNames, const std::vector<std::string>& outputNames);
+        DeviceHandler(const std::filesystem::path& xclbinPath, const std::string& pName, std::size_t deviceIndex, const std::vector<std::string>& inputNames, const std::vector<std::string>& outputNames);
         /**
          * @brief Default move constructor
          *

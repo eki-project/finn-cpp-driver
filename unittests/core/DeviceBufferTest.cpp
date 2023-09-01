@@ -67,14 +67,15 @@ TEST(DeviceBufferTest, DBWriteReadTest) {
 
     for (auto &arr : randomData) {
         // NOLINTNEXTLINE
-        std::transform(arr.begin(), arr.end(), arr.begin(), [&sampler, &engine](uint8_t value){ return sampler(engine); });
+        std::transform(arr.begin(), arr.end(), arr.begin(), [&sampler, &engine](uint8_t x){ return (x-x) + sampler(engine); });
     }
 
     for (size_t i = 0; i < parts-1; i++) {
+        EXPECT_EQ(inputDB.getHeadIndex(), i);
         inputDB.store<elementsPerPart>(randomData[i]);
         EXPECT_FALSE(inputDB.isHeadValid());
-        EXPECT_EQ(inputDB.getHeadIndex(), i);
     }
+    EXPECT_EQ(inputDB.getHeadIndex(), parts-1);
 
     inputDB.store<elementsPerPart>(randomData[9]);
     EXPECT_TRUE(inputDB.isHeadValid());

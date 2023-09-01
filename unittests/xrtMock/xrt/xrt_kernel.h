@@ -8,9 +8,18 @@
 #include "../experimental/xclbin.h"
 #include "xrt_device.h"
 #include "xrt_uuid.h"
+#include "xrt_bo.h"
 
 
 namespace xrt {
+
+    class run {
+        public:
+        run() = default;
+        void start();
+        void wait();
+    };
+
     /*!
      * @class kernel
      *
@@ -119,6 +128,10 @@ namespace xrt {
         /// @cond
         // const std::shared_ptr<kernel_impl>& get_handle() const { return handle; }
         /// @endcond
+        run operator()(xrt::bo&) {
+            return run();
+        }
+
     };
 
 }  // namespace xrt

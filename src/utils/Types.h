@@ -26,8 +26,8 @@ using shape_t = std::vector<unsigned int>;
 using shape_list_t = std::vector<shape_t>;
 using bytewidth_list_t = std::vector<unsigned int>;
 
-using size_bytes_t = size_t;
-using index_t = unsigned int;
+using size_bytes_t = std::size_t;
+using index_t = long unsigned int;
 
 /**
  * @brief Describes a list (initializer_list) of types shape_t OR MemoryMap<T>. In the first case a buffer with the appropiate byte size is simply created, with the latter, an existing memory mapped is taken as input for chaining FPGAs

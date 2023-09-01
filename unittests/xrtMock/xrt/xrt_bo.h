@@ -22,7 +22,7 @@ namespace xrt {
         byteSize(pBytesize),
         group(pGroup),
         logger(Logger::getLogger()) {
-            //FINN_LOG(logger, loglevel::debug) << "(xrtMock) xrt::bo object created!\n";
+            FINN_LOG(logger, loglevel::debug) << "(xrtMock) xrt::bo object created!\n";
         }
         
 
@@ -38,7 +38,7 @@ namespace xrt {
          */
         template<typename T>
         T map() {
-            //FINN_LOG(logger, loglevel::debug) << "(xrtMock) Map created from xrt::bo with byte size " << byteSize << "!\n";
+            FINN_LOG(logger, loglevel::debug) << "(xrtMock) Map created from xrt::bo with byte size " << byteSize << "!\n";
             T createdMap = static_cast<T>(malloc(byteSize));
             memmap = createdMap;
             return createdMap;

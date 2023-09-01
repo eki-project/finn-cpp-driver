@@ -35,7 +35,8 @@ class RingBuffer {
         logger(Logger::getLogger())
     {
         std::fill(validParts.begin(), validParts.end(), false);
-        FINN_LOG(logger, loglevel::info) << "Initialized RingBuffer (PARTS: " << parts << ", ELEMENTS: " << buffer.size() << ", ELEMENTS PER PART: " << elementsPerPart << ", BYTES: " << buffer.size() * sizeof(T) << ")\n";
+        buffer.resize(pElementsPerPart * pParts);
+        FINN_LOG(logger, loglevel::info) << "Initialized RingBuffer (PARTS: " << parts << ", ELEMENTS: " << buffer.size() << ", ELEMENTS PER PART: " << elementsPerPart << ", BYTES: " << buffer.size() / sizeof(T) << ")\n";
     }
 
     private:
@@ -102,6 +103,16 @@ class RingBuffer {
     index_t getHeadOpposite() const {
         return (headPart + FinnUtils::ceil(parts/2.0)) % parts;
     }
+
+    /**
+     * @brief Get the head part index
+     * 
+     * @return * index_t 
+     */
+    index_t getHeadIndex() const {
+        return headPart;
+    }
+
 
     /**
      * @brief Increment the head pointer by one part. Loops around when the highest index is met. 
@@ -180,6 +191,24 @@ class RingBuffer {
     /**
      * @brief Insert an array at the head pointer part, set the part valid, increase the pointer.
      * 
+     * @tparam size
+     * @param arr 
+     */
+    template<size_t sizetem>
+    void store(std::array<T,sizetem> arr) {
+        if (arr.size() != elementsPerPart) {
+            FinnUtils::logAndError<std::length_error>("Size mismatch when storing array in Ring Buffer!");
+        }
+        for (index_t i = 0; i < arr.size(); i++) {
+            buffer[elementIndex(headPart, i)] = arr[i];
+        }
+        setPartValidity(headPart, true);
+        cycleHeadPart();
+    }
+
+    /**
+     * @brief Insert an array at the head pointer part, set the part valid, increase the pointer.
+     * 
      * @param arr 
      * @param arrSize 
      */
@@ -207,6 +236,25 @@ class RingBuffer {
         }
         for (size_t i = 0; i < vec.size(); i++) {
             buffer[elementIndex(partIndex, i)] = vec[i];
+        }
+        setPartValidity(partIndex, validity);
+    }
+
+    /**
+     * @brief Set the given partIndex to the passed array values, do NOT increment the head pointer, and set the validity to the passed value
+     * 
+     * @tparam size
+     * @param arr 
+     * @param partIndex 
+     * @param validity 
+     */
+    template<size_t size>
+    void setPart(const std::array<T,size>& arr, index_t partIndex, bool validity) {
+        if (arr.size() != elementsPerPart) {
+            FinnUtils::logAndError<std::length_error>("Size mismatch when storing vector in Ring Buffer!");
+        }
+        for (size_t i = 0; i < arr.size(); i++) {
+            buffer[elementIndex(partIndex, i)] = arr[i];
         }
         setPartValidity(partIndex, validity);
     }
@@ -260,7 +308,7 @@ class RingBuffer {
      * @param targetArr 
      * @param arrSize 
      */
-    void read(T& targetArr, size_t arrSize) {
+    void read(T* targetArr, size_t& arrSize) {
         if (arrSize != elementsPerPart) {
             FinnUtils::logAndError<std::length_error>("Size mismatching when trying to read ring buffer data into an array!");
         }
@@ -312,7 +360,7 @@ class RingBuffer {
      * @param partIndex 
      * @param validity 
      */
-    void getPart(T& arr, const size_t arrSize, index_t partIndex, bool validity) {
+    void getPart(T* arr, const size_t arrSize, index_t partIndex, bool validity) {
         if (arrSize != elementsPerPart) {
             FinnUtils::logAndError<std::length_error>("Size mismatching when trying to read ring buffer data into an array!");
         }

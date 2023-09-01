@@ -42,14 +42,14 @@ namespace Finn {
             name(pName),
             numbers(FinnUtils::shapeToElements(pShape)),
             shape(pShape),
-            mapSize(F().template requiredElements<T>()),
+            mapSize(F().template requiredElements<T>() * numbers),
             internalBo(xrt::bo(device, mapSize * sizeof(T), 0)),
             associatedKernel(pAssociatedKernel),
             map(internalBo.template map<T*>()),
             logger(Logger::getLogger()),
             ringBuffer(RingBuffer<T>(ringBufferSizeFactor, mapSize))
         {
-            FINN_LOG(logger, loglevel::info) << "Initialized DeviceBuffer " << name << " (SHAPE: " << FinnUtils::shapeToString(pShape) << ", BUFFER SIZE: " << ringBufferSizeFactor << " inputs of the given shape)\n"; 
+            FINN_LOG(logger, loglevel::info) << "Initialized DeviceBuffer " << name << " (SHAPE: " << FinnUtils::shapeToString(pShape) << ", BUFFER SIZE: " << ringBufferSizeFactor << " inputs of the given shape, MAP SIZE: " << mapSize << ")\n"; 
         }
     };
 
@@ -142,7 +142,7 @@ namespace Finn {
          */
         void execute() {
             // TODO(bwintermann): Add arguments for kernel run!
-            auto run = associatedKernel(this->internalBo);
+            auto run = this->associatedKernel(this->internalBo);
             run.start();
             run.wait();
         }
@@ -191,7 +191,15 @@ namespace Finn {
          *
          * @return index_t
          */
-        index_t getHeadOpposideIndex() { return this->ringBuffer.getHeadOpposite(); }
+        index_t getHeadOpposideIndex() const { return this->ringBuffer.getHeadOpposite(); }
+
+        /**
+         * @brief Get the head part index.
+         * @attention This should not be needed by the user. Only use this information if you know what to do with it.
+         * 
+         * @return index_t 
+         */
+        index_t getHeadIndex() const { return this->ringBuffer.getHeadIndex(); }
 
         /**
          * @brief Return the size of the buffer as specified by the argument. Bytes returns all bytes the buffer takes up, elements returns the number of T-values, numbers the number of F-values.
@@ -219,7 +227,9 @@ namespace Finn {
             }
         }
 
-        void store(const std::vector<T>& vec, index_t partIndex) { this->ringBuffer.setPart(vec, partIndex, true); }
+        void store(const std::vector<T>& vec, index_t partIndex) {
+            this->ringBuffer.setPart(vec, partIndex, true);
+        }
 
         void store(const T& arr, const size_t arrSize) {
             this->ringBuffer.store(arr, arrSize);
@@ -230,16 +240,24 @@ namespace Finn {
             }
         }
 
-        void store(const T& arr, const size_t arrSize, index_t partIndex) { this->ringBuffer.setPart(arr, arrSize, partIndex, true); }
+        void store(const T& arr, const size_t arrSize, index_t partIndex) {
+            this->ringBuffer.setPart(arr, arrSize, partIndex, true); 
+        }
 
         template<size_t sa>
         void store(const std::array<T, sa> arr) {
-            store(arr.data(), arr.size());
+            RingBuffer<T>& rb = this->ringBuffer;
+            rb.template store<sa>(arr);
+            if (executeAutomatically && this->ringBuffer.isFull()) {
+                loadMap();
+                sync();
+                execute();
+            }
         }
 
         template<size_t sa>
         void store(const std::array<T, sa> arr, index_t partIndex) {
-            store(arr.data(), arr.size(), partIndex);
+            this->ringBuffer.setPart<sa>(arr, partIndex);
         }
 
         ///@}

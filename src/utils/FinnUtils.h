@@ -38,7 +38,7 @@ namespace FinnUtils {
         unsigned int index = 0;
         for (auto elem : pShape) {
             str.append(std::to_string(elem));
-            if (index < pShape.size() - 2) {
+            if (index < pShape.size() - 1) {
                 str.append(", ");
             }
             index++;

@@ -17,6 +17,10 @@ namespace FinnUtils {
      */
     constexpr int32_t ceil(float num) { return (static_cast<float>(static_cast<int32_t>(num)) == num) ? static_cast<int32_t>(num) : static_cast<int32_t>(num) + ((num > 0) ? 1 : 0); }
 
+    inline unsigned int innermostDimension(const shape_t& shape) {
+        return shape.back();
+    }
+
     /**
      * @brief First log the message as an error into the logger, then throw the passed error!
      *

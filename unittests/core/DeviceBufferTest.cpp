@@ -1,4 +1,5 @@
 #include <random>
+#include <span>
 
 #include "../../src/core/DeviceBuffer.hpp"
 #include "../../src/utils/FinnDatatypes.hpp"
@@ -9,6 +10,8 @@
 
 #include "../../src/utils/Logger.h"
 //using namespace Finn;
+
+
 
 constexpr std::array<unsigned int, 4> myShapeArray = std::array<unsigned int, 4>{1,28,28,3};
 constexpr size_t elementsPerPart = 1*28*28*3;
@@ -86,6 +89,16 @@ TEST(DeviceBufferTest, DBWriteReadTest) {
     EXPECT_TRUE(inputDB.isHeadValid());
     EXPECT_EQ(inputDB.getHeadIndex(), 1);
     EXPECT_TRUE(inputDB.isPartValid(0));
+
+    inputDB.setExecuteAutomatically(true);
+    EXPECT_TRUE(inputDB.isExecutedAutomatically());
+
+    inputDB.store<elementsPerPart>(randomData[9]);
+    EXPECT_FALSE(inputDB.isHeadValid());
+    EXPECT_TRUE(inputDB.isPartValid(1));
+    EXPECT_EQ(inputDB.get<elementsPerPart>(1), randomData[9]);
+    EXPECT_EQ(inputDB.get<elementsPerPart>(2), randomData[2]);
+    EXPECT_FALSE(inputDB.isPartValid(2));
 
 }
 

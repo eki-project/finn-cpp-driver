@@ -51,6 +51,7 @@ class RingBuffer {
         return (partIndex * elementsPerPart + offset) % buffer.size();
     }
 
+    public:
     /**
      * @brief Set the validity of a part given by it's index
      * 
@@ -64,8 +65,8 @@ class RingBuffer {
         validParts[partIndex] = validity;
     }
 
-    public:
     /**
+     * 
      * @brief Return the RingBuffer's size, either in elements of T, in bytes or in parts 
      * 
      * @param ss 
@@ -314,7 +315,7 @@ class RingBuffer {
      * @param targetArr 
      * @param arrSize 
      */
-    void read(T* targetArr, size_t& arrSize) {
+    void read(T* targetArr, const size_t& arrSize) {
         if (arrSize != elementsPerPart) {
             FinnUtils::logAndError<std::length_error>("Size mismatching when trying to read ring buffer data into an array!");
         }

@@ -22,9 +22,11 @@ namespace Finn {
     class DeviceBuffer {
         protected:
         std::string name;
-        size_t numbers;
-        shape_t shape;
-        size_t mapSize;
+        size_t numbers;             // Numbers of type F: in a shape (1,20) this would be 20 
+        shape_t shapeNormal;        // Input shape (Type F): (1,20)
+        shape_t shapeFolded;        // Folded shape (Type F): (1,2,10)
+        shape_t shapePacked;        // Packed shape (Type T): (1,2,3)
+        size_t mapSize;             // Numbers of type T: When F has bitwidth 2, and T has bitwidth 8, the folded shape would be (1,2,10) and the packed (1,2,3) and thus 6
         xrt::bo internalBo;
         xrt::kernel& associatedKernel;
         T* map;
@@ -36,20 +38,28 @@ namespace Finn {
             const std::string& pName,
             xrt::device& device,
             xrt::kernel& pAssociatedKernel,
-            const shape_t& pShape,
+            const shape_t& pShapeNormal,
+            const shape_t& pShapeFolded,
+            const shape_t& pShapePacked,
             unsigned int ringBufferSizeFactor
         ) :
             name(pName),
-            numbers(FinnUtils::shapeToElements(pShape)),
-            shape(pShape),
-            mapSize(F().template requiredElements<T>() * numbers),
+            numbers(FinnUtils::shapeToElements(pShapeNormal)),
+            shapeNormal(pShapeNormal),
+            shapeFolded(pShapeFolded),
+            shapePacked(pShapePacked),
+            mapSize(FinnUtils::shapeToElements(pShapePacked)),
             internalBo(xrt::bo(device, mapSize * sizeof(T), 0)),
             associatedKernel(pAssociatedKernel),
             map(internalBo.template map<T*>()),
             logger(Logger::getLogger()),
             ringBuffer(RingBuffer<T>(ringBufferSizeFactor, mapSize))
         {
-            FINN_LOG(logger, loglevel::info) << "Initialized DeviceBuffer " << name << " (SHAPE: " << FinnUtils::shapeToString(pShape) << ", BUFFER SIZE: " << ringBufferSizeFactor << " inputs of the given shape, MAP SIZE: " << mapSize << ")\n"; 
+            unsigned int calculatedInnermostDimension = static_cast<unsigned int>(F().bitwidth() * FinnUtils::innermostDimension(pShapeFolded)/8) + 1;
+            if ((FinnUtils::shapeToElements(pShapeNormal) != FinnUtils::shapeToElements(pShapeFolded)) || (FinnUtils::innermostDimension(pShapePacked) != calculatedInnermostDimension)) {
+                FinnUtils::logAndError<std::runtime_error>("Mismatches in shapes!");
+            }
+            FINN_LOG(logger, loglevel::info) << "Initialized DeviceBuffer " << name << " (SHAPE: " << FinnUtils::shapeToString(pShapeNormal) << ", SHAPE FOLDED: " << FinnUtils::shapeToString(pShapeFolded) << ", SHAPE PACKED: " << FinnUtils::shapeToString(pShapePacked) << ", BUFFER SIZE: " << ringBufferSizeFactor << " inputs of the given shape, MAP SIZE: " << mapSize << ")\n"; 
         }
     };
 
@@ -224,6 +234,7 @@ namespace Finn {
                 loadMap();
                 sync();
                 execute();
+                this->ringBuffer.setPartValidity(getHeadIndex(), false);
             }
         }
 
@@ -231,27 +242,14 @@ namespace Finn {
             this->ringBuffer.setPart(vec, partIndex, true);
         }
 
-        void store(const T& arr, const size_t arrSize) {
-            this->ringBuffer.store(arr, arrSize);
-            if (executeAutomatically && this->ringBuffer.isFull()) {
-                loadMap();
-                sync();
-                execute();
-            }
-        }
-
-        void store(const T& arr, const size_t arrSize, index_t partIndex) {
-            this->ringBuffer.setPart(arr, arrSize, partIndex, true); 
-        }
-
         template<size_t sa>
         void store(const std::array<T, sa>& arr) {
-            RingBuffer<T>& rb = this->ringBuffer;
-            rb.template store<sa>(arr);
+            this->ringBuffer.template store<sa>(arr);
             if (executeAutomatically && this->ringBuffer.isFull()) {
                 loadMap();
                 sync();
                 execute();
+                this->ringBuffer.setPartValidity(getHeadIndex(), false);
             }
         }
 
@@ -259,8 +257,21 @@ namespace Finn {
         void store(const std::array<T, sa>& arr, index_t partIndex) {
             this->ringBuffer.setPart<sa>(arr, partIndex);
         }
-
         ///@}
+
+        // TODO(bwintermann): Exchange this for the operator[] at some time
+        /**
+         * @brief Get the selected part as an array. 
+         * @attention To be replaced by the operator[] 
+         * @attention Should not be used directly by the user
+         * 
+         * @param partIndex 
+         * @return * template<size_t S> 
+         */
+        template<size_t S>
+        std::array<T,S> get(index_t partIndex) {
+            return this->ringBuffer.template getPart<S>(partIndex, isPartValid(partIndex));
+        }
     };
 
 
@@ -314,7 +325,9 @@ namespace Finn {
         void saveMap() { this->ringBuffer.store(this->map, this->mapSize); }
 
         /**
-         * @brief Put every valid read part of the ring buffer into the archive.
+         * @brief Put every valid read part of the ring buffer into the archive. This invalides them so that they are not put into the archive again.
+         * @note After the function is executed, all parts are invalid.
+         * @note This function can be executed manually instead of wait for it to be called by read() when the ring buffer is full. 
          *
          */
         void archiveValidBufferParts() {

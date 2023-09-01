@@ -43,11 +43,13 @@ int main() {
 
 
     auto myDevice = xrt::device();
-    shape_t myShape = std::vector<unsigned int>{1, 2, 3};
+    shape_t myShape = std::vector<unsigned int>{1, 20};
+    shape_t myShapeFolded = std::vector<unsigned int>{1, 2, 10};
+    shape_t myShapePacked = std::vector<unsigned int>{1, 2, 3};
     auto myKernel = xrt::kernel();
     // Finn::DeviceBuffer<uint8_t, DatatypeInt<2>> dbuffer = Finn::DeviceBuffer<uint8_t, DatatypeInt<2>>("MyDeviceBuffer", myDevice, myShape, 100, IO::INPUT);
 
-    auto mydb = Finn::DeviceInputBuffer<uint8_t,DatatypeUInt<2>>("My Buffer", myDevice, myKernel, myShape, 100);
+    auto mydb = Finn::DeviceInputBuffer<uint8_t,DatatypeUInt<2>>("My Buffer", myDevice, myKernel, myShape, myShapeFolded, myShapePacked, 100);
     std::cout << mydb.isBufferFull() << std::endl;
 
     //auto mydb = Finn::DeviceInputBuffer<uint8_t, DatatypeInt<2>>();

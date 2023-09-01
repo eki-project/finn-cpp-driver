@@ -123,6 +123,15 @@ namespace Finn {
         using DeviceBuffer<T,F>::DeviceBuffer;
 
         public:
+        
+
+        void FOLDED_TO_PACKED() {
+            // TODO: Implement
+            // TODO(bwintermann): Implement function that takes innermost shapeFolded F values and converts them into innermost shapePacked T values (and puts them in the ring buffer)
+        }
+
+
+
         /**
          * @brief Set the Execute Automatically Flag. If set, as soon as the buffer head pointer reaches the last element, the first one in the buffer (first input) gets loaded and executed on the board, the slot gets invalidated and is
          * thus free'd for the next store operation.

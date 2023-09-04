@@ -18,6 +18,8 @@ enum class IO { INPUT = 0, OUTPUT = 1, INOUT = 2, UNSPECIFIED = -1 };  // Genera
 
 enum class SIZE_SPECIFIER { BYTES = 0, ELEMENTS = 1, NUMBERS = 2, SAMPLES = 3, PARTS = 4, ELEMENTS_PER_PART = 5, INVALID = -1 };
 
+enum class ENDIAN { LITTLE = 0, BIG = 1, UNSPECIFIED = -1 };
+
 // Forward Declarations
 template<typename T>
 struct MemoryMap;

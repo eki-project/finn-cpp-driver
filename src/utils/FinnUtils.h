@@ -3,6 +3,8 @@
 
 #include <cstdint>
 #include <numeric>
+#include <algorithm>
+#include <limits>
 #include "Types.h"
 
 #include "Logger.h"
@@ -22,6 +24,41 @@ namespace FinnUtils {
     }
 
     /**
+     * @brief Get the number of elements required to represent S elements of FINN datatype F in C++ datatypes DT in the datatype T.
+     * Example:
+     * F = DatatypeUint<14>
+     * T = uint8_t
+     * DT = uint16_t
+     * S = 10
+     * 
+     * This would require 2 T per one F. 
+     * 
+     * @tparam T 
+     * @tparam F 
+     * @tparam DT 
+     * @tparam S 
+     * @return constexpr size_t 
+     */
+    template<typename T, typename F, typename DT, size_t S>
+    constexpr size_t getPackedElementSize() {
+        return S * static_cast<size_t>(ceil(F().bitwidth() / (sizeof(T) * 8.0F))); 
+    }
+
+    /**
+     * @brief Returns the number of sizeof(T) iterations needed to scan all the data of the F value. This value may differ if sizeof(DT) is much larger than sizeof(F).
+     * For example if the Finn datatype is DatatypeUint<4> but DT is a 256 bit uint, one would only need to scan one 8-bit sector of the 256 bit variable to get the necessary data 
+     * 
+     * @tparam T 
+     * @tparam F 
+     * @tparam DT 
+     * @return constexpr size_t 
+     */
+    template<typename T, typename F, typename DT>
+    constexpr size_t iterationsNeededPerDT() {
+        return std::min(ceil(F().bitwidth() / sizeof(T) * 8.0F), ceil(static_cast<float>(sizeof(DT)) / static_cast<float>(sizeof(T)))); // Can leave out * 8 on both sides of division
+    }
+
+    /**
      * @brief First log the message as an error into the logger, then throw the passed error!
      *
      * @tparam E
@@ -34,6 +71,11 @@ namespace FinnUtils {
     }
 
     inline size_t shapeToElements(const shape_t& pShape) {
+        return static_cast<size_t>(std::accumulate(pShape.begin(), pShape.end(), 1, std::multiplies<>()));
+    }
+
+    template<typename T, size_t S>
+    constexpr size_t shapeToElementsConstexpr(std::array<T,S> pShape) {
         return static_cast<size_t>(std::accumulate(pShape.begin(), pShape.end(), 1, std::multiplies<>()));
     }
 

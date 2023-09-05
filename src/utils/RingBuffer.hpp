@@ -16,7 +16,7 @@ template<typename T>
 class RingBuffer {
     boost::circular_buffer<T> buffer;
     std::vector<bool> validParts;
-    std::vector<std::mutex> partMutexes;
+    std::vector<std::unique_ptr<std::mutex>> partMutexes;
     const size_t parts;
     const size_t elementsPerPart;
     index_t headPart = 0;
@@ -37,7 +37,7 @@ class RingBuffer {
         logger(Logger::getLogger())
     {
         for (size_t i = 0; i < parts; i++) {
-            partMutexes.push_back(std::mutex());
+            partMutexes.emplace_back(std::make_unique<std::mutex>());
         }
         std::fill(validParts.begin(), validParts.end(), false);
         buffer.resize(pElementsPerPart * pParts);
@@ -194,7 +194,7 @@ class RingBuffer {
             FinnUtils::logAndError<std::length_error>("Size mismatch when storing vector in Ring Buffer!");
         }
 
-        std::lock_guard<std::mutex> guard(partMutexes[headPart]);
+        std::lock_guard<std::mutex> guard(*partMutexes[headPart]);
         for (size_t i = 0; i < vec.size(); i++) {
             buffer[elementIndex(headPart, i)] = vec[i];
         }
@@ -214,7 +214,7 @@ class RingBuffer {
             FinnUtils::logAndError<std::length_error>("Size mismatch when storing array in Ring Buffer!");
         }
 
-        std::lock_guard<std::mutex> guard(partMutexes[headPart]);
+        std::lock_guard<std::mutex> guard(*partMutexes[headPart]);
         for (index_t i = 0; i < arr.size(); i++) {
             buffer[elementIndex(headPart, i)] = arr[i];
         }
@@ -234,7 +234,7 @@ class RingBuffer {
             FinnUtils::logAndError<std::length_error>("Size mismatch when storing vector in Ring Buffer!");
         }
 
-        std::lock_guard<std::mutex> guard(partMutexes[partIndex]);
+        std::lock_guard<std::mutex> guard(*partMutexes[partIndex]);
         for (size_t i = 0; i < vec.size(); i++) {
             buffer[elementIndex(partIndex, i)] = vec[i];
         }
@@ -255,7 +255,7 @@ class RingBuffer {
             FinnUtils::logAndError<std::length_error>("Size mismatch when storing vector in Ring Buffer!");
         }
 
-        std::lock_guard<std::mutex> guard(partMutexes[partIndex]);
+        std::lock_guard<std::mutex> guard(*partMutexes[partIndex]);
         for (size_t i = 0; i < arr.size(); i++) {
             buffer[elementIndex(partIndex, i)] = arr[i];
         }
@@ -278,7 +278,7 @@ class RingBuffer {
      * @return std::vector<T> 
      */
     std::vector<T> read() {
-        std::lock_guard<std::mutex> guard(partMutexes[headPart]);
+        std::lock_guard<std::mutex> guard(*partMutexes[headPart]);
         std::vector<T> temp;
         for (size_t i = 0; i < elementsPerPart; i++) {
             temp.push_back(buffer[elementIndex(headPart, i)]);
@@ -296,7 +296,7 @@ class RingBuffer {
      */
     template<size_t S>
     std::array<T,S> read() {
-        std::lock_guard<std::mutex> guard(partMutexes[headPart]);
+        std::lock_guard<std::mutex> guard(*partMutexes[headPart]);
         std::array<T,S> arr;
         for (size_t i = 0; i < elementsPerPart; i++) {
             arr[i] = buffer[elementIndex(headPart, i)];
@@ -307,6 +307,25 @@ class RingBuffer {
     }
 
     /**
+     * @brief Read from head pointer into the referenes array. Increments head pointer and invalidates read data. 
+     * 
+     * @param targetArr 
+     * @param arrSize 
+     */
+    void read(T* targetArr, const size_t& arrSize) {
+        if (arrSize != elementsPerPart) {
+            FinnUtils::logAndError<std::length_error>("Size mismatching when trying to read ring buffer data into an array!");
+        }
+
+        std::lock_guard<std::mutex> guard(*partMutexes[headPart]);
+        for (size_t i = 0; i < elementsPerPart; i++) {
+            targetArr[i] = buffer[elementIndex(headPart, i)];
+        }
+        setPartValidity(headPart, false);
+        cycleHeadPart();
+    }
+
+    /**
      * @brief Read from the given partIndex, do NOT change the head pointer and set validity as prompted. Returns data as a vector
      * 
      * @param partIndex 
@@ -314,7 +333,7 @@ class RingBuffer {
      * @return std::vector<T> 
      */
     std::vector<T> getPart(const index_t partIndex, const bool validity) {
-        std::lock_guard<std::mutex> guard(partMutexes[partIndex]);
+        std::lock_guard<std::mutex> guard(*partMutexes[partIndex]);
         std::vector<T> temp;
         for (size_t i = 0; i < elementsPerPart; i++) {
             temp.push_back(buffer[elementIndex(partIndex, i)]);
@@ -333,13 +352,33 @@ class RingBuffer {
      */
     template<size_t S>
     std::array<T,S> getPart(index_t partIndex, bool validity) {
-        std::lock_guard<std::mutex> guard(partMutexes[partIndex]);
+        std::lock_guard<std::mutex> guard(*partMutexes[partIndex]);
         std::array<T,S> arr;
         for (size_t i = 0; i < elementsPerPart; i++) {
             arr[i] = buffer[elementIndex(partIndex, i)];
         }
         setPartValidity(partIndex, validity);
         return arr;
+    }
+
+    /**
+     * @brief Read from the given partIndex, do NOT change the head pointer and set validity as prompted. Writes data into referenced array
+     * 
+     * @param arr 
+     * @param arrSize 
+     * @param partIndex 
+     * @param validity 
+     */
+    void getPart(T* arr, const size_t arrSize, index_t partIndex, bool validity) {
+        if (arrSize != elementsPerPart) {
+            FinnUtils::logAndError<std::length_error>("Size mismatching when trying to read ring buffer data into an array!");
+        }
+        
+        std::lock_guard<std::mutex> guard(*partMutexes[partIndex]);
+        for (size_t i = 0; i < elementsPerPart; i++) {
+            arr[i] = buffer[elementIndex(partIndex, i)];
+        }
+        setPartValidity(partIndex, validity);
     }
     ///@}
 };

@@ -131,8 +131,9 @@ macro(check_include)
 endmacro()
 
 #Enable all checks in debug mode
-
-if (CMAKE_BUILD_TYPE EQUAL "Release")
+#message(STATUS "Build mode ${CMAKE_BUILD_TYPE}")
+if (CMAKE_BUILD_TYPE STREQUAL "Release")
+    #message(WARNING "Analysers are off for Release build!")
     set(CLANG_FORMAT OFF)
     set(CLANG_TIDY OFF)
     set(CPP_CHECK OFF)
@@ -162,6 +163,5 @@ check_include(CLANG_TIDY   "clang-tidy"   ClangTidy.cmake)
 check_include(CPP_CHECK    "cppcheck"     CppCheck.cmake)
 check_include(IWYU         "iwyu"         IWYU.cmake)
 list(POP_BACK CMAKE_MESSAGE_INDENT)    #indent -1
-
 
 add_subdirectory(src)

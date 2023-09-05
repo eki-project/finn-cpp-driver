@@ -128,7 +128,11 @@ namespace xrt {
         /// @cond
         // const std::shared_ptr<kernel_impl>& get_handle() const { return handle; }
         /// @endcond
-        run operator()(xrt::bo&) {
+        run operator()(xrt::bo& buffer) {
+            return run();
+        }
+
+        run operator()(xrt::bo& buffer, int batchsize) {
             return run();
         }
 

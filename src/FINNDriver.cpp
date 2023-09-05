@@ -33,6 +33,7 @@ int main() {
     FINN_LOG(logger, loglevel::info) << "C++ Driver started";
     FINN_LOG_DEBUG(logger, loglevel::info) << "Test";
 
+/*
     Finn::DeviceWrapper devWrap;
     devWrap.xclbin = "design.xclbin";
     devWrap.name = "SomeName";
@@ -40,17 +41,30 @@ int main() {
     devWrap.odmas = Config::odmaNames;
 
     Finn::Accelerator acc(devWrap);
+*/
+    auto xclbin = xrt::xclbin("bitfile/finn-accel.xclbin");
+    auto device = xrt::device(0);
+    auto uuid = device.load_xclbin("bitfile/finn-accel.xclbin");
+    auto kern = xrt::kernel(device, uuid, "idma0", xrt::kernel::cu_access_mode::shared);
 
-
-    auto myDevice = xrt::device();
-    shape_t myShape = std::vector<unsigned int>{1, 20};
-    shape_t myShapeFolded = std::vector<unsigned int>{1, 2, 10};
-    shape_t myShapePacked = std::vector<unsigned int>{1, 2, 3};
-    auto myKernel = xrt::kernel();
+    shape_t myShape = std::vector<unsigned int>{1, 300};
+    shape_t myShapeFolded = std::vector<unsigned int>{1, 10, 30};
+    shape_t myShapePacked = std::vector<unsigned int>{1, 10, 8};
     // Finn::DeviceBuffer<uint8_t, DatatypeInt<2>> dbuffer = Finn::DeviceBuffer<uint8_t, DatatypeInt<2>>("MyDeviceBuffer", myDevice, myShape, 100, IO::INPUT);
 
-    auto mydb = Finn::DeviceInputBuffer<uint8_t,DatatypeUInt<2>>("My Buffer", myDevice, myKernel, myShape, myShapeFolded, myShapePacked, 100);
+    auto mydb = Finn::DeviceInputBuffer<uint8_t,DatatypeInt<2>>("My Buffer", device, kern, myShape, myShapeFolded, myShapePacked, 100);
     std::cout << mydb.isBufferFull() << std::endl;
+
+    auto data =  std::vector<uint8_t>(mydb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
+    std::fill(data.begin(), data.end(), 12);
+
+    mydb.store(data, 0);
+    FINN_LOG(logger, loglevel::info) << "Storing data";
+    mydb.loadMap(0, true);
+    FINN_LOG(logger, loglevel::info) << "Syncing data";
+    mydb.sync();
+    FINN_LOG(logger, loglevel::info) << "Executing data";
+    mydb.execute();
 
     //auto mydb = Finn::DeviceInputBuffer<uint8_t, DatatypeInt<2>>();
 

@@ -61,10 +61,15 @@ namespace Finn {
                 F().bitwidth() * FinnUtils::innermostDimension(pShapeFolded) / (sizeof(T) * 8)
             ) + 1;
             
-            if ((FinnUtils::shapeToElements(pShapeNormal) != FinnUtils::shapeToElements(pShapeFolded)) || (FinnUtils::innermostDimension(pShapePacked) != calculatedInnermostDimension)) {
-                FinnUtils::logAndError<std::runtime_error>("Mismatches in shapes!");
+            FINN_LOG(logger, loglevel::info) << "Initializing DeviceBuffer " << name << " (SHAPE: " << FinnUtils::shapeToString(pShapeNormal) << ", SHAPE FOLDED: " << FinnUtils::shapeToString(pShapeFolded) << ", SHAPE PACKED: " << FinnUtils::shapeToString(pShapePacked) << ", BUFFER SIZE: " << ringBufferSizeFactor << " inputs of the given shape, MAP SIZE: " << mapSize << ")\n"; 
+
+            if (FinnUtils::shapeToElements(pShapeNormal) != FinnUtils::shapeToElements(pShapeFolded)) {
+                FinnUtils::logAndError<std::runtime_error>("Mismatches in shapes! shape_normal and shape_folded should amount to the same number of elements!");
             }
-            FINN_LOG(logger, loglevel::info) << "Initialized DeviceBuffer " << name << " (SHAPE: " << FinnUtils::shapeToString(pShapeNormal) << ", SHAPE FOLDED: " << FinnUtils::shapeToString(pShapeFolded) << ", SHAPE PACKED: " << FinnUtils::shapeToString(pShapePacked) << ", BUFFER SIZE: " << ringBufferSizeFactor << " inputs of the given shape, MAP SIZE: " << mapSize << ")\n"; 
+
+            if (FinnUtils::innermostDimension(pShapePacked) != calculatedInnermostDimension) {
+                FinnUtils::logAndError<std::runtime_error>("Mismatches in shapes! shape_packed's innermost dimension in " + FinnUtils::shapeToString(pShapePacked) + " does not equal the calculated innermost dimension " + std::to_string(calculatedInnermostDimension));
+            }
         }
     };
 
@@ -128,58 +133,6 @@ namespace Finn {
         using DeviceBuffer<T,F>::DeviceBuffer;
 
         public:
-        
-        /**
-         * @brief Create the necessary array of type T with mapSize as size from the given data array, which may be of an unspecific type DT in an array of size S.
-         *  
-         * 
-         * @tparam DT The datatype that the data arrives in (e.g. int32_t). Should be unsigned. 
-         * @tparam S The size of the array containing the data. Must match the number of elements specified by shape_normal
-         * @param data 
-         * @param useUnsafe If true, the input array is converted in a way that assumes that there is no whole element of padding. So it assumes that sizeof(DT)/sizeof(F) <= 1. If this does not hold, a value of type DT might contain only one value of type F, but there would be space for multiple F-size slots, which would be read as valid data. Only use this option when you know that nowhere in the data is a whole F-sized empty section.
-         * @param useCast If useUnsafe is true, this decides whether the conversion takes place as a reinterprete_cast<T*> or using pointer arithmetic
-         * @return std::array<T, FinnUtils::getPackedElementSize<T, F, DT, S>()> 
-         */
-        template <typename DT, size_t S>
-        std::array<T, FinnUtils::getPackedElementSize<T, F, DT, S>()> packed(std::array<DT,S> data, bool useUnsafe, bool useCast, ENDIAN endian) {
-            if ((FinnUtils::getPackedElementSize<T, F, DT, S>() != this->mapSize) || (S != this->numbers)) {
-                FinnUtils::logAndError<std::length_error>("Packing size mismatch!");
-            }
-            
-            std::array<T, FinnUtils::getPackedElementSize<T, F, DT, S>()> packedData;
-
-            // TODO(bwintermann): Use endian variable to differentiate between endian types
-
-            if (!useUnsafe) {
-                /*
-                size_t iterationsPerDT = FinnUtils::iterationsNeededPerDT<T, F, DT>();
-                // Read one DT
-                for (size_t dataIndex = 0; dataIndex < data.size(); dataIndex++) {
-                    // One DT read requires this many T length reads:
-                    for (size_t sectorIndex = 0; sectorIndex < iterationsPerDT; sectorIndex++) {
-                        packedData[dataIndex * iterationsPerDT + sectorIndex] = data[dataIndex] & (std::numeric_limits<T>::max);
-                        data >>= sizeof(T) * 8;
-                    }
-                }*/
-            } else {
-                // UNSAFE METHOD (If there are empty spaces in the read in memory this would interprete them as valid data, creating a larger array than would be required!)
-                if (useCast) {
-                    // NOLINTNEXTLINE (cppcoreguidelines-pro-type-reinterprete-cast)
-                    T* casted = reinterpret_cast<T*>(data.data());
-                    for (size_t i = 0; i < this->mapSize; i++) {
-                        packedData = casted[i];
-                    }
-                } else {
-                    T* readPointer = &(data.data()[0]);
-                    for (size_t i = 0; i < this->mapSize; i++) {
-                        packedData[i] = (*readPointer);
-                        readPointer++;
-                    }
-                }
-            }
-            return packedData;
-        }
-
         /**
          * @brief Set the Execute Automatically Flag. If set, as soon as the buffer head pointer reaches the last element, the first one in the buffer (first input) gets loaded and executed on the board, the slot gets invalidated and is
          * thus free'd for the next store operation.
@@ -209,7 +162,8 @@ namespace Finn {
          */
         void execute() {
             // TODO(bwintermann): Add arguments for kernel run!
-            auto run = this->associatedKernel(this->internalBo);
+            // TODO(bwintermann): Make batch_size changeable from 1
+            auto run = this->associatedKernel(this->internalBo, 1);
             run.start();
             run.wait();
         }
@@ -328,6 +282,10 @@ namespace Finn {
         template<size_t S>
         std::array<T,S> get(index_t partIndex) {
             return this->ringBuffer.template getPart<S>(partIndex, isPartValid(partIndex));
+        }
+
+        std::vector<T> get(index_t partIndex) {
+            return this->ringBuffer.template getPart(partIndex, isPartValid(partIndex));
         }
     };
 

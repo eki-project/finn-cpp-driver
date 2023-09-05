@@ -1,4 +1,5 @@
 #include <span>
+#include <mutex>
 #include <boost/circular_buffer.hpp>
 
 #include "FinnDatatypes.hpp"
@@ -15,6 +16,7 @@ template<typename T>
 class RingBuffer {
     boost::circular_buffer<T> buffer;
     std::vector<bool> validParts;
+    std::vector<std::unique_ptr<std::mutex>> partMutexes;
     const size_t parts;
     const size_t elementsPerPart;
     index_t headPart = 0;
@@ -34,6 +36,9 @@ class RingBuffer {
         elementsPerPart(pElementsPerPart),
         logger(Logger::getLogger())
     {
+        for (size_t i = 0; i < parts; i++) {
+            partMutexes.emplace_back(std::make_unique<std::mutex>());
+        }
         std::fill(validParts.begin(), validParts.end(), false);
         buffer.resize(pElementsPerPart * pParts);
         FINN_LOG(logger, loglevel::info) << "Initialized RingBuffer (PARTS: " << parts << ", ELEMENTS: " << buffer.size() << ", ELEMENTS PER PART: " << elementsPerPart << ", BYTES: " << buffer.size() / sizeof(T) << ")\n";
@@ -51,10 +56,9 @@ class RingBuffer {
         return (partIndex * elementsPerPart + offset) % buffer.size();
     }
 
-    public:
     /**
      * @brief Set the validity of a part given by it's index
-     * 
+     * @attention Must be private to guarantee thread safety. The corresponding mutex is managed by the store/read methods
      * @param partIndex 
      * @param validity 
      */
@@ -65,6 +69,7 @@ class RingBuffer {
         validParts[partIndex] = validity;
     }
 
+    public:
     /**
      * 
      * @brief Return the RingBuffer's size, either in elements of T, in bytes or in parts 
@@ -188,6 +193,8 @@ class RingBuffer {
         if (vec.size() != elementsPerPart) {
             FinnUtils::logAndError<std::length_error>("Size mismatch when storing vector in Ring Buffer!");
         }
+
+        std::lock_guard<std::mutex> guard(*partMutexes[headPart]);
         for (size_t i = 0; i < vec.size(); i++) {
             buffer[elementIndex(headPart, i)] = vec[i];
         }
@@ -206,24 +213,9 @@ class RingBuffer {
         if (arr.size() != elementsPerPart) {
             FinnUtils::logAndError<std::length_error>("Size mismatch when storing array in Ring Buffer!");
         }
-        for (index_t i = 0; i < arr.size(); i++) {
-            buffer[elementIndex(headPart, i)] = arr[i];
-        }
-        setPartValidity(headPart, true);
-        cycleHeadPart();
-    }
 
-    /**
-     * @brief Insert an array at the head pointer part, set the part valid, increase the pointer.
-     * 
-     * @param arr 
-     * @param arrSize 
-     */
-    void store(const T& arr, const size_t arrSize) {
-        if (arrSize != elementsPerPart) {
-            FinnUtils::logAndError<std::length_error>("Size mismatch when storing array in Ring Buffer!");
-        }
-        for (size_t i = 0; i < arrSize; i++) {
+        std::lock_guard<std::mutex> guard(*partMutexes[headPart]);
+        for (index_t i = 0; i < arr.size(); i++) {
             buffer[elementIndex(headPart, i)] = arr[i];
         }
         setPartValidity(headPart, true);
@@ -241,6 +233,8 @@ class RingBuffer {
         if (vec.size() != elementsPerPart) {
             FinnUtils::logAndError<std::length_error>("Size mismatch when storing vector in Ring Buffer!");
         }
+
+        std::lock_guard<std::mutex> guard(*partMutexes[partIndex]);
         for (size_t i = 0; i < vec.size(); i++) {
             buffer[elementIndex(partIndex, i)] = vec[i];
         }
@@ -260,25 +254,9 @@ class RingBuffer {
         if (arr.size() != elementsPerPart) {
             FinnUtils::logAndError<std::length_error>("Size mismatch when storing vector in Ring Buffer!");
         }
-        for (size_t i = 0; i < arr.size(); i++) {
-            buffer[elementIndex(partIndex, i)] = arr[i];
-        }
-        setPartValidity(partIndex, validity);
-    }
 
-    /**
-     * @brief Set the given partIndex to the passed array values, do NOT increment the head pointer, and set the validity to the passed value
-     * 
-     * @param arr 
-     * @param arrSize 
-     * @param partIndex 
-     * @param validity 
-     */
-    void setPart(const T& arr, const size_t arrSize, index_t partIndex, bool validity) {
-        if (arrSize != elementsPerPart) {
-            FinnUtils::logAndError<std::length_error>("Size mismatch when storing array in Ring Buffer!");
-        }
-        for (size_t i = 0; i < arrSize; i++) {
+        std::lock_guard<std::mutex> guard(*partMutexes[partIndex]);
+        for (size_t i = 0; i < arr.size(); i++) {
             buffer[elementIndex(partIndex, i)] = arr[i];
         }
         setPartValidity(partIndex, validity);
@@ -300,6 +278,7 @@ class RingBuffer {
      * @return std::vector<T> 
      */
     std::vector<T> read() {
+        std::lock_guard<std::mutex> guard(*partMutexes[headPart]);
         std::vector<T> temp;
         for (size_t i = 0; i < elementsPerPart; i++) {
             temp.push_back(buffer[elementIndex(headPart, i)]);
@@ -307,6 +286,24 @@ class RingBuffer {
         setPartValidity(headPart, false);
         cycleHeadPart();
         return temp;
+    }
+
+    /**
+     * @brief Read from head pointer returns an std::array. Increments head pointer and invalidates read data. 
+     * 
+     * @tparam S 
+     * @return std::array<T,S> 
+     */
+    template<size_t S>
+    std::array<T,S> read() {
+        std::lock_guard<std::mutex> guard(*partMutexes[headPart]);
+        std::array<T,S> arr;
+        for (size_t i = 0; i < elementsPerPart; i++) {
+            arr[i] = buffer[elementIndex(headPart, i)];
+        }
+        setPartValidity(headPart, false);
+        cycleHeadPart();
+        return arr;
     }
 
     /**
@@ -319,28 +316,13 @@ class RingBuffer {
         if (arrSize != elementsPerPart) {
             FinnUtils::logAndError<std::length_error>("Size mismatching when trying to read ring buffer data into an array!");
         }
+
+        std::lock_guard<std::mutex> guard(*partMutexes[headPart]);
         for (size_t i = 0; i < elementsPerPart; i++) {
             targetArr[i] = buffer[elementIndex(headPart, i)];
         }
         setPartValidity(headPart, false);
         cycleHeadPart();
-    }
-
-    /**
-     * @brief Read from head pointer returns an std::array. Increments head pointer and invalidates read data. 
-     * 
-     * @tparam S 
-     * @return std::array<T,S> 
-     */
-    template<size_t S>
-    std::array<T,S> read() {
-        std::array<T,S> arr;
-        for (size_t i = 0; i < elementsPerPart; i++) {
-            arr[i] = buffer[elementIndex(headPart, i)];
-        }
-        setPartValidity(headPart, false);
-        cycleHeadPart();
-        return arr;
     }
 
     /**
@@ -351,12 +333,32 @@ class RingBuffer {
      * @return std::vector<T> 
      */
     std::vector<T> getPart(const index_t partIndex, const bool validity) {
+        std::lock_guard<std::mutex> guard(*partMutexes[partIndex]);
         std::vector<T> temp;
         for (size_t i = 0; i < elementsPerPart; i++) {
             temp.push_back(buffer[elementIndex(partIndex, i)]);
         }
         setPartValidity(partIndex, validity);
         return temp;
+    }
+
+    /**
+     * @brief Read from the given partIndex, do NOT change the head pointer and set validity as prompted.
+     * 
+     * @tparam S 
+     * @param partIndex 
+     * @param validity 
+     * @return std::array<T,S> 
+     */
+    template<size_t S>
+    std::array<T,S> getPart(index_t partIndex, bool validity) {
+        std::lock_guard<std::mutex> guard(*partMutexes[partIndex]);
+        std::array<T,S> arr;
+        for (size_t i = 0; i < elementsPerPart; i++) {
+            arr[i] = buffer[elementIndex(partIndex, i)];
+        }
+        setPartValidity(partIndex, validity);
+        return arr;
     }
 
     /**
@@ -371,106 +373,12 @@ class RingBuffer {
         if (arrSize != elementsPerPart) {
             FinnUtils::logAndError<std::length_error>("Size mismatching when trying to read ring buffer data into an array!");
         }
+        
+        std::lock_guard<std::mutex> guard(*partMutexes[partIndex]);
         for (size_t i = 0; i < elementsPerPart; i++) {
             arr[i] = buffer[elementIndex(partIndex, i)];
         }
         setPartValidity(partIndex, validity);
-    }
-
-    /**
-     * @brief Read from the given partIndex, do NOT change the head pointer and set validity as prompted.
-     * 
-     * @tparam S 
-     * @param partIndex 
-     * @param validity 
-     * @return std::array<T,S> 
-     */
-    template<size_t S>
-    std::array<T,S> getPart(index_t partIndex, bool validity) {
-        std::array<T,S> arr;
-        for (size_t i = 0; i < elementsPerPart; i++) {
-            arr[i] = buffer[elementIndex(partIndex, i)];
-        }
-        setPartValidity(partIndex, validity);
-        return arr;
     }
     ///@}
-
-    /**
-     * @brief Simple iterator for accessing the ring buffer part-wise. Returns a span<T> when dereferenced.
-     * @attention The span that is returned however, represents an _element-wise_ access to a part.   
-     * 
-     */
-    struct RingBufferIterator {
-        private:
-        T* linearizedBuffer;        
-        size_t elementsPerPart;
-        index_t currentPart;
-        size_t parts;
-
-        public:
-        RingBufferIterator(index_t initialElementIndex, size_t pElementsPerPart, size_t pParts, T* pLinearizedBuffer) 
-        :   linearizedBuffer(pLinearizedBuffer + initialElementIndex), // Pointer arithmetic
-            elementsPerPart(pElementsPerPart),
-            currentPart(initialElementIndex / elementsPerPart), 
-            parts(pParts) {}
-
-        std::span<T,std::dynamic_extent> operator*() const { return std::span{linearizedBuffer, elementsPerPart}; }
-        
-        RingBufferIterator& operator++() { 
-            if (currentPart == parts-1) {
-                linearizedBuffer -= elementsPerPart * (parts-1);
-                currentPart = 0;
-            } else {
-                linearizedBuffer += elementsPerPart;
-                currentPart++;
-            }
-            return *this; 
-        }  
-
-        RingBufferIterator& operator--() { 
-            if (currentPart == 0) {
-                linearizedBuffer += elementsPerPart * (parts-1);
-                currentPart = parts - 1;
-            } else {
-                linearizedBuffer -= elementsPerPart;
-                currentPart--;
-            }
-            return *this; 
-        }
-
-        friend bool operator== (const RingBufferIterator& a, const RingBufferIterator& b) { return a.currentPart == b.currentPart; };
-        friend bool operator!= (const RingBufferIterator& a, const RingBufferIterator& b) { return a.currentPart == b.currentPart; };   
-
-    };
-
-    /**
-     * @brief Return an iterator at the beginning of the ring buffer. Iterator returns a std::span<T,std::dynamic_extent> when dereferenced.
-     * @attention The span that is returned however, represents an _element-wise_ access to a part.   
-     * 
-     * @return RingBufferIterator 
-     */
-    RingBufferIterator begin() {
-        return RingBufferIterator {0, elementsPerPart, buffer.linearize()};
-    }
-    
-    /**
-     * @brief Return an iterator at the current head part of the ring buffer. Iterator returns a std::span<T,std::dynamic_extent> when dereferenced.
-     * @attention The span that is returned however, represents an _element-wise_ access to a part.   
-     * 
-     * @return RingBufferIterator 
-     */
-    RingBufferIterator head() {
-        return RingBufferIterator {headPart * elementsPerPart, elementsPerPart, buffer.linearize()};
-    }
-
-    /**
-     * @brief Return an iterator at the end of the ring buffer. Iterator returns a std::span<T,std::dynamic_extent> when dereferenced.
-     * @attention The span that is returned however, represents an _element-wise_ access to a part.   
-     * 
-     * @return RingBufferIterator 
-     */
-    RingBufferIterator end() {
-        return RingBufferIterator {buffer.size()-1, elementsPerPart, buffer.linearize()};
-    }
 };

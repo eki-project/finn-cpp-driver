@@ -245,7 +245,7 @@ namespace Finn {
                 loadMap();
                 sync();
                 execute();
-                this->ringBuffer.setPartValidity(getHeadIndex(), false);
+                this->ringBuffer.setPartValidityMutexed(getHeadIndex(), false);
             }
         }
 
@@ -260,7 +260,7 @@ namespace Finn {
                 loadMap();
                 sync();
                 execute();
-                this->ringBuffer.setPartValidity(getHeadIndex(), false);
+                this->ringBuffer.setPartValidityMutexed(getHeadIndex(), false);
             }
         }
 

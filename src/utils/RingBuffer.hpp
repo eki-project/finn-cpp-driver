@@ -71,6 +71,22 @@ class RingBuffer {
 
     public:
     /**
+     * @brief Thread safe version of the internal setValidity method.
+     * @attention Dev: This should NOT be used in a store/read method which also already locks the part mutex!
+     * 
+     * @param partIndex 
+     * @param validity 
+     */
+    void setPartValidityMutexed(index_t partIndex, bool validity) {
+        if (partIndex > parts) {
+            FinnUtils::logAndError<std::length_error>("Tried setting validity for an index that is too large.");
+        }
+
+        std::lock_guard<std::mutex> guard(*partMutexes[partIndex]);
+        validParts[partIndex] = validity;
+    }
+
+    /**
      * 
      * @brief Return the RingBuffer's size, either in elements of T, in bytes or in parts 
      * 

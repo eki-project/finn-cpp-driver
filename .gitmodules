@@ -4,3 +4,6 @@
 [submodule "external/magic_enum"]
 	path = external/magic_enum
 	url = https://github.com/Neargye/magic_enum.git
+[submodule "external/NumCpp"]
+	path = external/NumCpp
+	url = https://github.com/dpilger26/NumCpp.git

@@ -89,6 +89,9 @@ include_directories(SYSTEM external/mdspan/include)
 #Magic Enums
 include_directories(SYSTEM external/magic_enum/include)
 
+#NumCpp
+include_directories(SYSTEM external/NumCpp/include)
+
 #Compiler Options
 add_library(finnc_options INTERFACE)
 add_library(finnc::finnc_options ALIAS finnc_options)

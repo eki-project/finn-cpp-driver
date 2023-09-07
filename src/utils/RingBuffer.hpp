@@ -79,9 +79,9 @@ class RingBuffer {
      * @return false 
      */
     bool isPreviousHalfValid() const {
-        auto point1 = (validParts.begin() + headPart - FinnUtils::ceil(parts/2.0F)) % parts;
-        auto point2 = (validParts.begin() + headPart) % parts;
-        return std::all_of(std::min(point1, point2), std::max(point1, point2), std::identity);
+        auto point1 = validParts.begin() + ((headPart - FinnUtils::ceil(parts/2.0F)) % parts);
+        auto point2 = validParts.begin() + (headPart % parts);
+        return std::all_of(std::min(point1, point2), std::max(point1, point2), [](bool i){return i;});
     }
 
     /**

@@ -129,7 +129,8 @@ namespace Finn {
     class DeviceInputBuffer : DeviceBuffer<T, F> {
         const IO ioMode = IO::INPUT;
         bool executeAutomatically = false;
-        
+        bool executeAutomaticallyHalfway = false;
+
         using DeviceBuffer<T,F>::DeviceBuffer;
 
         public:
@@ -142,12 +143,27 @@ namespace Finn {
         void setExecuteAutomatically(bool value) { executeAutomatically = value; }
 
         /**
+         * @brief Set the Execute Automatically Halfway flag. When set, the buffer automatically starts executing on the buffer, as soon as the previous parts/2 parts are valid data 
+         * 
+         * @param value 
+         */
+        void setExecuteAutomaticallyHalfway(bool value) { executeAutomaticallyHalfway = value; }
+
+        /**
          * @brief Check whether the Execute Automatically Flag is set.
          *
          * @return true
          * @return false
          */
         bool isExecutedAutomatically() const { return executeAutomatically; }
+
+        /**
+         * @brief Check whether the Execute Automatically Halfway Flag is set.
+         * 
+         * @return true 
+         * @return false 
+         */
+        bool isExecutedAutomaticallyHalfway() const { return executeAutomaticallyHalfway; }
 
         /**
          * @brief Sync data from the map to the device.
@@ -165,7 +181,25 @@ namespace Finn {
             // TODO(bwintermann): Make batch_size changeable from 1
             auto run = this->associatedKernel(this->internalBo, 1);
             run.start();
-            run.wait();
+            
+            //FIXME: TODO(bwintermann): Wait needed? Pynq driver doesnt wait
+            //run.wait();
+        }
+
+        /**
+         * @brief This function takes a partIndex and loads it into the memory map, syncs it to the device and executes it.
+         * 
+         * @param partIndex 
+         * @param failOnInvalidData If set, the function errors if the part that was tried to be executed was invalid
+         * @param invalidateDataAfterExecute Whether or not to invalidate data after using it. Default true.
+         */
+        void loadAndExecute(index_t partIndex, bool failOnInvalidData, bool invalidateDataAfterExecute = true) {
+            if (failOnInvalidData && !this->ringBuffer.isPartValid(partIndex)) {
+                FinnUtils::logAndError<std::runtime_error>("Tried loading and executing a buffer part which was marked as invalid data (not written yet or already used)!");
+            }
+            loadMap(partIndex, invalidateDataAfterExecute);
+            sync();
+            execute();
         }
 
         /**
@@ -242,11 +276,11 @@ namespace Finn {
         void store(const std::vector<T>& vec) {
             this->ringBuffer.store(vec);
             if (executeAutomatically && this->ringBuffer.isFull()) {
-                loadMap();
-                sync();
-                execute();
-                this->ringBuffer.setPartValidityMutexed(getHeadIndex(), false);
+                loadAndExecute(getHeadIndex(), true, true);
+            } else if (executeAutomaticallyHalfway && this->ringBuffer.isPreviousHalfValid()) {
+                loadAndExecute(getHeadOpposideIndex(), true, true);
             }
+
         }
 
         void store(const std::vector<T>& vec, index_t partIndex) {
@@ -257,10 +291,9 @@ namespace Finn {
         void store(const std::array<T, sa>& arr) {
             this->ringBuffer.template store<sa>(arr);
             if (executeAutomatically && this->ringBuffer.isFull()) {
-                loadMap();
-                sync();
-                execute();
-                this->ringBuffer.setPartValidityMutexed(getHeadIndex(), false);
+                loadAndExecute(getHeadIndex(), true, true);
+            } else if (executeAutomaticallyHalfway && this->ringBuffer.isPreviousHalfValid()) {
+                loadAndExecute(getHeadOpposideIndex(), true, true);
             }
         }
 
@@ -382,4 +415,20 @@ namespace Finn {
             }
         }
     };
+
+    template<typename T, typename F>
+    DeviceInputBuffer<T,F> makeAutomaticInputBuffer(const std::string& name, const xrt::device& device, const xrt::kernel& kern, const shape_t& shapeNormal, const shape_t& shapeFolded, const shape_t& shapePacked, unsigned int bufferSize) {
+        auto tmp = DeviceInputBuffer<T,F>(name, device, kern, shapeNormal, shapeFolded, shapePacked, bufferSize);
+        tmp.setExecuteAutomatically(true);
+        tmp.setExecuteAutomaticallyHalfway(true);
+        return tmp;
+    }
+
+    template<typename T, typename F>
+    DeviceInputBuffer<T,F> makeManualInputBuffer(const std::string& name, const xrt::device& device, const xrt::kernel& kern, const shape_t& shapeNormal, const shape_t& shapeFolded, const shape_t& shapePacked, unsigned int bufferSize) {
+        auto tmp = DeviceInputBuffer<T,F>(name, device, kern, shapeNormal, shapeFolded, shapePacked, bufferSize);
+        tmp.setExecuteAutomatically(false);
+        tmp.setExecuteAutomaticallyHalfway(false);
+        return tmp;
+    }
 }  // namespace Finn

@@ -1,6 +1,8 @@
 #include <span>
 #include <mutex>
 #include <boost/circular_buffer.hpp>
+#include <algorithm>
+#include <functional>
 
 #include "FinnDatatypes.hpp"
 #include "Types.h"
@@ -70,6 +72,18 @@ class RingBuffer {
     }
 
     public:
+    /**
+     * @brief Returns whether the previous half of the ring buffer contains only valid parts (wraps around) 
+     * 
+     * @return true 
+     * @return false 
+     */
+    bool isPreviousHalfValid() const {
+        auto point1 = (validParts.begin() + headPart - FinnUtils::ceil(parts/2.0F)) % parts;
+        auto point2 = (validParts.begin() + headPart) % parts;
+        return std::all_of(std::min(point1, point2), std::max(point1, point2), std::identity);
+    }
+
     /**
      * @brief Thread safe version of the internal setValidity method.
      * @attention Dev: This should NOT be used in a store/read method which also already locks the part mutex!

@@ -184,6 +184,7 @@ class RingBuffer {
      * @return false 
      */
     bool isPartValid(index_t partIndex) const {
+        std::lock_guard<std::mutex> guard(*partMutexes[partIndex]);
         return partIndex < parts && validParts[partIndex];
     }
 

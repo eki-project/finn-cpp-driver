@@ -243,6 +243,7 @@ namespace Finn {
 
         /**
          * @brief Get the index of the part on the "opposite" side of the ring buffer. The value is always ceil'd, so that the opposite of 3 in a 12-part buffer is 10, not 9.
+         * @attention This should not be needed by the user. Only use this information if you know what to do with it.
          *
          * @return index_t
          */
@@ -273,33 +274,58 @@ namespace Finn {
          * simultaneously.
          */
         ///@{
-        void store(const std::vector<T>& vec) {
+        
+        /**
+         * @brief Store the passed data in the ring buffer. Advance the head pointer. Set the newly written data part to valid. 
+         * @note This operation is thread safe. 
+         * 
+         * @param vec The data to write
+         * @param overwriteValidData If true, the data only gets written at the head index, if the currently marked head part is invalid data.
+         * @return true 
+         * @return false 
+         */
+        bool store(const std::vector<T>& vec, bool overwriteValidData) {
+            if (!overwriteValidData && this->ringBuffer.isPartValid(getHeadIndex())) {
+                return false;
+            }
             this->ringBuffer.store(vec);
             if (executeAutomatically && this->ringBuffer.isFull()) {
                 loadAndExecute(getHeadIndex(), true, true);
             } else if (executeAutomaticallyHalfway && this->ringBuffer.isPreviousHalfValid()) {
                 loadAndExecute(getHeadOpposideIndex(), true, true);
             }
-
+            return true;
         }
 
-        void store(const std::vector<T>& vec, index_t partIndex) {
+        bool store(const std::vector<T>& vec, index_t partIndex, bool overwriteValidData) {
+            if (!overwriteValidData && this->ringBuffer.isPartValid(getHeadIndex())) {
+                return false;
+            }
             this->ringBuffer.setPart(vec, partIndex, true);
+            return true;
         }
 
         template<size_t sa>
-        void store(const std::array<T, sa>& arr) {
+        bool store(const std::array<T, sa>& arr, bool overwriteValidData) {
+            if (!overwriteValidData && this->ringBuffer.isPartValid(getHeadIndex())) {
+                return false;
+            }
             this->ringBuffer.template store<sa>(arr);
             if (executeAutomatically && this->ringBuffer.isFull()) {
                 loadAndExecute(getHeadIndex(), true, true);
             } else if (executeAutomaticallyHalfway && this->ringBuffer.isPreviousHalfValid()) {
                 loadAndExecute(getHeadOpposideIndex(), true, true);
             }
+            return true;
         }
 
         template<size_t sa>
-        void store(const std::array<T, sa>& arr, index_t partIndex) {
+        bool store(const std::array<T, sa>& arr, index_t partIndex, bool overwriteValidData) {
+            if (!overwriteValidData && this->ringBuffer.isPartValid(getHeadIndex())) {
+                return false;
+            }
             this->ringBuffer.setPart<sa>(arr, partIndex);
+            return true;
         }
         ///@}
 

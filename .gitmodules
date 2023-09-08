@@ -7,3 +7,7 @@
 [submodule "external/NumCpp"]
 	path = external/NumCpp
 	url = https://github.com/dpilger26/NumCpp.git
+[submodule "external/boost"]
+	path = external/boost
+	url = https://github.com/boostorg/boost.git
+	ignore = dirty

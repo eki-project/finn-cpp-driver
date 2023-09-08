@@ -52,21 +52,9 @@ if(FINNC_BUILD_DOC)
   endif()
 endif()
 
-
-# Build Unit tests
-# Include before clang-tidy inclusion to exclude folder from clang-tidy
-
-set(FINNC_ENABLE_TESTING "Build all tests (default is ON)" ON)
-FetchContent_MakeAvailable(googletest)
-include(cmake/AddUnittest.cmake)
-enable_testing()
-
-if (FINNC_ENABLE_TESTING)
-  message(STATUS "Finn C++ unittests:")
-  add_subdirectory(unittests)
-endif()
-
 #INCLUDES
+
+#set(Boost_USE_STATIC_LIBS   ON)
 
 #Threads
 set(THREADS_PREFER_PTHREAD_FLAG ON)
@@ -80,7 +68,13 @@ find_package(XRT REQUIRED)
 find_package(OpenMP)
 
 #Boost
-find_package(Boost 1.72.0 COMPONENTS system log log_setup program_options ${BOOST_THREAD} REQUIRED)
+set(Boost_DEBUG OFF)
+set(Boost_NO_SYSTEM_PATHS ON)
+set(BOOST_ROOT "${CMAKE_SOURCE_DIR}/deps/finn_boost")
+set(BOOST_INCLUDEDIR "${CMAKE_SOURCE_DIR}/deps/finn_boost")
+set(BOOST_LIBRARYDIR "${CMAKE_SOURCE_DIR}/deps/finn_boost/stage/lib/boost")
+set(Boost_NAMESPACE "finnBoost")
+find_package(Boost 1.80.0 COMPONENTS system log log_setup program_options filesystem ${BOOST_THREAD} REQUIRED)
 include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
 
 #mdspan
@@ -91,6 +85,19 @@ include_directories(SYSTEM external/magic_enum/include)
 
 #NumCpp
 include_directories(SYSTEM external/NumCpp/include)
+
+# Build Unit tests
+# Include before clang-tidy inclusion to exclude folder from clang-tidy
+
+set(FINNC_ENABLE_TESTING "Build all tests (default is ON)" ON)
+FetchContent_MakeAvailable(googletest)
+include(cmake/AddUnittest.cmake)
+enable_testing()
+
+if (FINNC_ENABLE_TESTING)
+  message(STATUS "Finn C++ unittests:")
+  add_subdirectory(unittests)
+endif()
 
 #Compiler Options
 add_library(finnc_options INTERFACE)

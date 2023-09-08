@@ -12,8 +12,7 @@ Getting Started
 
 ```bash
 git clone git@github.com:eki-project/finn-cpp-driver.git
-git submodule init
-git submodule update
+./buildDependencies.sh
 mkdir build && cd build
 cmake ..
 make -j $(nprocs)
@@ -23,10 +22,11 @@ make -j $(nprocs)
 You will first have to load a few dependencies before being able to build the project:
 
 ```bash
-ml devel/Boost/1.81.0-GCC-12.2.0
 ml fpga
-ml xilinx/xrt/2.14
+ml xilinx/xrt/2.15
+ml devel/Doxygen/1.9.5-GCCcore-12.2.0
 ml compiler/GCC/12.2.0
+ml devel/CMake/3.24.3-GCCcore-12.2.0
 ```
 
 

@@ -1,6 +1,8 @@
 #ifndef LOGGING_H
 #define LOGGING_H
 
+#define BOOST_LOG_DYN_LINK 1
+
 #include <boost/log/attributes/scoped_attribute.hpp>
 #include <boost/log/expressions.hpp>
 #include <boost/log/sinks.hpp>
@@ -13,7 +15,7 @@
 #include <fstream>
 #include <string>
 
-namespace bl = boost::log;
+namespace bl = finnBoost::log;
 namespace loglevel = bl::trivial;
 
 using logger_type = bl::sources::severity_logger<bl::trivial::severity_level>;

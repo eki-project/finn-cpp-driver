@@ -1,4 +1,7 @@
 build
+build.sh
+external/boost/libs
+deps
 CMakeFiles
 CMakeCache.txt
 Makefile

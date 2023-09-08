@@ -14,7 +14,7 @@
  */
 template<typename T>
 class RingBuffer {
-    boost::circular_buffer<T> buffer;
+    finnBoost::circular_buffer<T> buffer;
     std::vector<bool> validParts;
     std::vector<std::unique_ptr<std::mutex>> partMutexes;
     const size_t parts;
@@ -30,7 +30,7 @@ class RingBuffer {
      */
     public:
     RingBuffer(const size_t pParts, const size_t pElementsPerPart) : 
-        buffer(boost::circular_buffer<T>(pElementsPerPart * pParts)),
+        buffer(finnBoost::circular_buffer<T>(pElementsPerPart * pParts)),
         validParts(std::vector<bool>(pParts)),
         parts(pParts),
         elementsPerPart(pElementsPerPart),

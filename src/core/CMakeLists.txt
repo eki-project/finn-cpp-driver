@@ -4,7 +4,7 @@ add_library(finnc_core ${UTILS_SRC})
 target_include_directories(finnc_core SYSTEM PUBLIC ${XRT_INCLUDE_DIRS})
 target_link_directories(finnc_core PUBLIC ${XRT_LIB_CORE_LOCATION})
 target_link_directories(finnc_core PUBLIC ${XRT_LIB_OCL_LOCATION})
-target_link_libraries(finnc_core PUBLIC ${Boost_LIBRARIES} finnc_options finnc_utils Threads::Threads OpenCL xrt_coreutil uuid)
+target_link_libraries(finnc_core PUBLIC finnc_options finnc_utils Threads::Threads OpenCL xrt_coreutil rt uuid ${Boost_LIBRARIES})
 
 add_library(finnc_core_test ${UTILS_SRC})
 target_include_directories(finnc_core_test SYSTEM PUBLIC ${XRT_MOCK_INCLUDE})

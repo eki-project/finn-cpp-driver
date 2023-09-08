@@ -1,17 +1,17 @@
-#include <concepts>
-#include <iostream>
-#include <numeric>
-#include <stdexcept>
-#include <string>
+// #include <concepts>
+// #include <iostream>
+// #include <numeric>
+// #include <stdexcept>
+// #include <string>
 
 // Helper
-#include "core/Accelerator.h"
-#include "core/DeviceBuffer.hpp"
-#include "utils/FinnDatatypes.hpp"
+// #include "core/Accelerator.h"
+// #include "core/DeviceBuffer.hpp"
+// #include "utils/FinnDatatypes.hpp"
 #include "utils/Logger.h"
 
 // Created by FINN during compilation
-#include "config/config.h"
+//#include "config/config.h"
 
 // XRT
 #include "xrt/xrt_device.h"
@@ -19,14 +19,14 @@
 using std::string;
 
 
-template<typename T>
+/* template<typename T>
 BOMemoryDefinitionArguments<T> toVariant(const shape_list_t& inp) {
     std::vector<std::variant<shape_t, MemoryMap<T>>> ret;
     ret.reserve(inp.size());
 
     std::transform(inp.begin(), inp.end(), std::back_inserter(ret), [](const shape_t& shape) { return std::variant<shape_t, MemoryMap<T>>(shape); });
     return ret;
-}
+} */
 
 int main() {
     auto logger = Logger::getLogger();
@@ -42,10 +42,15 @@ int main() {
 
     Finn::Accelerator acc(devWrap);
 */
-    auto xclbin = xrt::xclbin("bitfile/finn-accel.xclbin");
+    //auto xclbin = xrt::xclbin("bitfile/finn-accel.xclbin");
+    //FINN_LOG(logger, loglevel::info) << "xclbin loaded.";
+    //auto device = xrt::device(0);
     auto device = xrt::device(0);
+    FINN_LOG(logger, loglevel::info) << "Device found.";
+    
     auto uuid = device.load_xclbin("bitfile/finn-accel.xclbin");
-    auto kern = xrt::kernel(device, uuid, "idma0", xrt::kernel::cu_access_mode::shared);
+    FINN_LOG(logger, loglevel::info) << "Device successfully programmed!";
+    /*auto kern = xrt::kernel(device, uuid, "idma0", xrt::kernel::cu_access_mode::shared);
 
     shape_t myShape = std::vector<unsigned int>{1, 300};
     shape_t myShapeFolded = std::vector<unsigned int>{1, 10, 30};
@@ -64,7 +69,7 @@ int main() {
     FINN_LOG(logger, loglevel::info) << "Syncing data";
     mydb.sync();
     FINN_LOG(logger, loglevel::info) << "Executing data";
-    mydb.execute();
+    mydb.execute(); */
 
     //auto mydb = Finn::DeviceInputBuffer<uint8_t, DatatypeInt<2>>();
 

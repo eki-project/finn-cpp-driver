@@ -19,6 +19,17 @@ cmake ..
 make -j $(nprocs)
 ```
 
+### Getting Started on the N2 Cluster
+You will first have to load a few dependencies before being able to build the project:
+
+```bash
+ml devel/Boost/1.81.0-GCC-12.2.0
+ml fpga
+ml xilinx/xrt/2.14
+ml compiler/GCC/12.2.0
+```
+
+
 ## TODO
 * Check if XRT frees the memory map itself
 * Does XRT ALWAYS take uint8? Even if not should we do it all the same?

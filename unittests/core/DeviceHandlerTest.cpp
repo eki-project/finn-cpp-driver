@@ -41,8 +41,8 @@ TEST(DeviceHandlerTest, InitTest) {
         FAIL();
     }
 
-    const uuid_t id = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
-    auto uuid = xrt::uuid(id);
+    // const uuid_t id = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
+    // auto uuid = xrt::uuid(id);
 
     ASSERT_EQ(kernel_devices.size(), 2);
 

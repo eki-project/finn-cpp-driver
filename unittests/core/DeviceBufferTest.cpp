@@ -82,17 +82,17 @@ TEST(DeviceBufferTest, DBWriteReadTest) {
 
     for (size_t i = 0; i < parts-1; i++) {
         EXPECT_EQ(inputDB.getHeadIndex(), i);
-        inputDB.store<elementsPerPart>(randomData[i]);
+        inputDB.store<elementsPerPart>(randomData[i], false);
         EXPECT_FALSE(inputDB.isHeadValid());
     }
     EXPECT_EQ(inputDB.getHeadIndex(), parts-1);
 
-    inputDB.store<elementsPerPart>(randomData[9]);
+    inputDB.store<elementsPerPart>(randomData[9], false);
     EXPECT_TRUE(inputDB.isHeadValid());
     EXPECT_EQ(inputDB.getHeadIndex(), 0);
     
 
-    inputDB.store<elementsPerPart>(randomData[9]);
+    inputDB.store<elementsPerPart>(randomData[9], false);
     EXPECT_TRUE(inputDB.isHeadValid());
     EXPECT_EQ(inputDB.getHeadIndex(), 1);
     EXPECT_TRUE(inputDB.isPartValid(0));
@@ -100,39 +100,13 @@ TEST(DeviceBufferTest, DBWriteReadTest) {
     inputDB.setExecuteAutomatically(true);
     EXPECT_TRUE(inputDB.isExecutedAutomatically());
 
-    inputDB.store<elementsPerPart>(randomData[9]);
+    inputDB.store<elementsPerPart>(randomData[9], false);
     EXPECT_FALSE(inputDB.isHeadValid());
     EXPECT_TRUE(inputDB.isPartValid(1));
     EXPECT_EQ(inputDB.get<elementsPerPart>(1), randomData[9]);
     EXPECT_EQ(inputDB.get<elementsPerPart>(2), randomData[2]);
     EXPECT_FALSE(inputDB.isPartValid(2));
 
-}
-
-TEST(DeviceBufferTest, PackingTest) {
-    /*
-    auto log = Logger::getLogger();
-    FINN_LOG(log, loglevel::debug) << "Starting packing test";
-    auto device = xrt::device();
-    auto kernel = xrt::kernel();
-    shape_t myShapeNormal = std::vector<unsigned int>(myShapeArrayNormal.begin(), myShapeArrayNormal.end());
-    shape_t myShapeFolded = std::vector<unsigned int>(myShapeArrayFolded.begin(), myShapeArrayFolded.end());
-    shape_t myShapePacked = std::vector<unsigned int>(myShapeArrayPacked2.begin(), myShapeArrayPacked2.end());
-    std::string myname = "abcd";
-    FINN_LOG(log, loglevel::debug) << "Creating DeviceInputBuffer\n";
-    auto inputDB = Finn::DeviceInputBuffer<uint8_t, DatatypeUInt<14>>(myname, device, kernel, myShapeNormal, myShapeFolded, myShapePacked, parts);
-
-    std::array<uint16_t, FinnUtils::innermostDimension(myShapeFolded)> inputData;
-    std::fill(inputData.begin(), inputData.end(), 0xA9B1);
-
-    std::array<uint8_t, FinnUtils::shapeToElementsConstexpr<unsigned int, 3>(myShapeArrayPacked2)> outputData;
-    outputData = inputDB.template packSingleDimension<uint16_t, inputData.size(), outputData.size()>(inputData, true, false, ENDIAN::LITTLE);
-
-    for (size_t i = 0; i < outputData.size(); i+=2) {
-        EXPECT_EQ(outputData[i], 0xB1);
-        EXPECT_EQ(outputData[i+1], 0xA9);
-    }
-*/
 }
 
 int main(int argc, char** argv) {

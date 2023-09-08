@@ -1,6 +1,8 @@
 #include <span>
 #include <mutex>
 #include <boost/circular_buffer.hpp>
+#include <algorithm>
+#include <functional>
 
 #include "FinnDatatypes.hpp"
 #include "Types.h"
@@ -70,6 +72,34 @@ class RingBuffer {
     }
 
     public:
+    /**
+     * @brief Returns whether the previous half of the ring buffer contains only valid parts (wraps around) 
+     * 
+     * @return true 
+     * @return false 
+     */
+    bool isPreviousHalfValid() const {
+        auto point1 = validParts.begin() + static_cast<long int>((headPart - static_cast<size_t>(FinnUtils::ceil(static_cast<float>(parts) / 2.0F))) % parts);
+        auto point2 = validParts.begin() + static_cast<long int>((headPart % parts));
+        return std::all_of(std::min(point1, point2), std::max(point1, point2), [](bool i){return i;});
+    }
+
+    /**
+     * @brief Thread safe version of the internal setValidity method.
+     * @attention Dev: This should NOT be used in a store/read method which also already locks the part mutex!
+     * 
+     * @param partIndex 
+     * @param validity 
+     */
+    void setPartValidityMutexed(index_t partIndex, bool validity) {
+        if (partIndex > parts) {
+            FinnUtils::logAndError<std::length_error>("Tried setting validity for an index that is too large.");
+        }
+
+        std::lock_guard<std::mutex> guard(*partMutexes[partIndex]);
+        validParts[partIndex] = validity;
+    }
+
     /**
      * 
      * @brief Return the RingBuffer's size, either in elements of T, in bytes or in parts 
@@ -154,6 +184,7 @@ class RingBuffer {
      * @return false 
      */
     bool isPartValid(index_t partIndex) const {
+        std::lock_guard<std::mutex> guard(*partMutexes[partIndex]);
         return partIndex < parts && validParts[partIndex];
     }
 

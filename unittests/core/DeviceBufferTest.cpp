@@ -80,6 +80,7 @@ TEST(DeviceBufferTest, DBWriteReadTest) {
         std::transform(arr.begin(), arr.end(), arr.begin(), [&sampler, &engine](uint8_t x){ return (x-x) + sampler(engine); });
     }
 
+    // Fill Buffer completely
     for (size_t i = 0; i < parts-1; i++) {
         EXPECT_EQ(inputDB.getHeadIndex(), i);
         inputDB.store<elementsPerPart>(randomData[i], false);
@@ -87,26 +88,29 @@ TEST(DeviceBufferTest, DBWriteReadTest) {
     }
     EXPECT_EQ(inputDB.getHeadIndex(), parts-1);
 
-    inputDB.store<elementsPerPart>(randomData[9], false);
+    // Store the last element and check that the head now points to the beginning again
+    EXPECT_TRUE(inputDB.store<elementsPerPart>(randomData[9], true));
     EXPECT_TRUE(inputDB.isHeadValid());
     EXPECT_EQ(inputDB.getHeadIndex(), 0);
     
-
-    inputDB.store<elementsPerPart>(randomData[9], false);
+    // Store one more element and check that the old one was overwritten and both head 
+    // and the element before are still valid
+    EXPECT_TRUE(inputDB.store<elementsPerPart>(randomData[9], true));
     EXPECT_TRUE(inputDB.isHeadValid());
     EXPECT_EQ(inputDB.getHeadIndex(), 1);
     EXPECT_TRUE(inputDB.isPartValid(0));
 
+    // From now on replace the next datablock if the buffer is about to be full
     inputDB.setExecuteAutomatically(true);
     EXPECT_TRUE(inputDB.isExecutedAutomatically());
 
-    inputDB.store<elementsPerPart>(randomData[9], false);
+    // Write another element and check that the old one was overwritten
+    EXPECT_TRUE(inputDB.store<elementsPerPart>(randomData[9], true));
     EXPECT_FALSE(inputDB.isHeadValid());
     EXPECT_TRUE(inputDB.isPartValid(1));
     EXPECT_EQ(inputDB.get<elementsPerPart>(1), randomData[9]);
     EXPECT_EQ(inputDB.get<elementsPerPart>(2), randomData[2]);
     EXPECT_FALSE(inputDB.isPartValid(2));
-
 }
 
 int main(int argc, char** argv) {

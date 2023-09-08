@@ -76,6 +76,7 @@ TEST(RingBufferTest, InitTest) {
 
 
     // Test threading safety
+    // TODO(bwintermann): Do proper tests here
     std::vector<std::thread> threadsVector;
     for (unsigned int i = 0; i < 1000; i++) {
         threadsVector.push_back(std::thread(randomizeAndFill, std::ref(data), std::ref(rb)));

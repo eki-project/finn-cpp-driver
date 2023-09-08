@@ -254,6 +254,25 @@ class RingBuffer {
     }
 
     /**
+     * @brief Insert an array at the head pointer part, set the part valid, increase the pointer.
+     * 
+     * @param arr 
+     * @param arrSize 
+     */
+    void store(const T* arr, const size_t& arrSize) {
+        if (arrSize != elementsPerPart) {
+            FinnUtils::logAndError<std::length_error>("Size mismatch when storing array in Ring Buffer!");
+        }
+
+        std::lock_guard<std::mutex> guard(*partMutexes[headPart]);
+        for (index_t i = 0; i < arrSize; i++) {
+            buffer[elementIndex(headPart, i)] = arr[i];
+        }
+        setPartValidity(headPart, true);
+        cycleHeadPart();
+    }
+
+    /**
      * @brief Set the given partIndex to the passed vector values, do NOT increment the head pointer, and set the validity to the passed value
      * 
      * @param vec 

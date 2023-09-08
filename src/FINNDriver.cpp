@@ -2,12 +2,12 @@
 // #include <iostream>
 // #include <numeric>
 // #include <stdexcept>
-// #include <string>
+#include <string>
 
 // Helper
-// #include "core/Accelerator.h"
-// #include "core/DeviceBuffer.hpp"
-// #include "utils/FinnDatatypes.hpp"
+//#include "core/Accelerator.h"
+#include "core/DeviceBuffer.hpp"
+#include "utils/FinnDatatypes.hpp"
 #include "utils/Logger.h"
 
 // Created by FINN during compilation
@@ -15,6 +15,8 @@
 
 // XRT
 #include "xrt/xrt_device.h"
+#include "xrt/xrt_bo.h"
+#include "xrt/xrt_kernel.h"
 
 using std::string;
 
@@ -49,27 +51,38 @@ int main() {
     FINN_LOG(logger, loglevel::info) << "Device found.";
     
     auto uuid = device.load_xclbin("bitfile/finn-accel.xclbin");
-    FINN_LOG(logger, loglevel::info) << "Device successfully programmed!";
-    /*auto kern = xrt::kernel(device, uuid, "idma0", xrt::kernel::cu_access_mode::shared);
+    FINN_LOG(logger, loglevel::info) << "Device successfully programmed! UUID: " << uuid;
+    auto kern = xrt::kernel(device, uuid, "idma0", xrt::kernel::cu_access_mode::shared);
 
     shape_t myShape = std::vector<unsigned int>{1, 300};
     shape_t myShapeFolded = std::vector<unsigned int>{1, 10, 30};
     shape_t myShapePacked = std::vector<unsigned int>{1, 10, 8};
     // Finn::DeviceBuffer<uint8_t, DatatypeInt<2>> dbuffer = Finn::DeviceBuffer<uint8_t, DatatypeInt<2>>("MyDeviceBuffer", myDevice, myShape, 100, IO::INPUT);
 
-    auto mydb = Finn::DeviceInputBuffer<uint8_t,DatatypeInt<2>>("My Buffer", device, kern, myShape, myShapeFolded, myShapePacked, 100);
+    auto mydb = Finn::DeviceInputBuffer<uint8_t, DatatypeInt<2>>("My Buffer", device, kern, myShape, myShapeFolded, myShapePacked, 100);
     std::cout << mydb.isBufferFull() << std::endl;
 
     auto data =  std::vector<uint8_t>(mydb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
     std::fill(data.begin(), data.end(), 12);
 
-    mydb.store(data, 0);
+    mydb.store(data, 0, false);
     FINN_LOG(logger, loglevel::info) << "Storing data";
     mydb.loadMap(0, true);
     FINN_LOG(logger, loglevel::info) << "Syncing data";
     mydb.sync();
     FINN_LOG(logger, loglevel::info) << "Executing data";
-    mydb.execute(); */
+    mydb.execute();
+
+    FINN_LOG(logger, loglevel::info) << "Creating output buffer";
+    auto myodb = Finn::DeviceOutputBuffer<uint8_t, DatatypeInt<2>>("Output Buffer", device, kern, myShape, myShapeFolded, myShapePacked, 100);
+
+    myodb.read(1);
+    myodb.archiveValidBufferParts();
+    auto res = myodb.retrieveArchive();
+    FINN_LOG(logger, loglevel::info) << "Reading output!";
+    for (auto& resv : res[0]) {
+        FINN_LOG(logger, loglevel::info) << resv;
+    }
 
     //auto mydb = Finn::DeviceInputBuffer<uint8_t, DatatypeInt<2>>();
 

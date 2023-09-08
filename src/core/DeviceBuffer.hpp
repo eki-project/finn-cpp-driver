@@ -373,6 +373,8 @@ namespace Finn {
         const IO ioMode = IO::OUTPUT;
         std::vector<std::vector<T>> longTermStorage;
 
+        using DeviceBuffer<T,F>::DeviceBuffer;
+        
         public:  
         /**
          * @brief Sync data from the FPGA into the memory map

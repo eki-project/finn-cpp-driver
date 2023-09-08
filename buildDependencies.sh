@@ -38,7 +38,8 @@ cd ../../deps/finn_boost
 
 #Build new finnBoost Version
 ./bootstrap.sh || exit 1  #bootstrap b2 build system for finnBoost
-./b2 || exit 1 
+./b2 --without-python || exit 1 
+mv stage/lib/boost-* stage/lib/boost 2>/dev/null || true
 
 echo "Dependecies successfully build!"
 echo "You can now build the finn-cpp-driver."

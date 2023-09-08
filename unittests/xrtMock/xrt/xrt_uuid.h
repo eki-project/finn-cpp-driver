@@ -138,7 +138,7 @@ namespace xrt {
          * A basic uuid is either a uuid_t on Linux, or a typedef
          * of equivalent basic type of other platforms
          */
-        bool operator!=(const unsigned char (&xuid)[16]) const { return !(m_uuid == xuid); }
+        bool operator!=(const unsigned char (&xuid)[16]) const { return !std::equal(std::begin(m_uuid), std::end(m_uuid), std::begin(xuid)); }
 
         /**
          * operator==() - Comparison
@@ -158,7 +158,7 @@ namespace xrt {
          * @return
          *  False if equal, true otherwise
          */
-        bool operator!=(const uuid& rhs) const { return !(m_uuid == rhs.m_uuid); }
+        bool operator!=(const uuid& rhs) const { return !std::equal(std::begin(m_uuid), std::end(m_uuid), std::begin(rhs.m_uuid)); }
 
         /**
          * operator<() - Comparison

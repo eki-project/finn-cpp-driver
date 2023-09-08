@@ -49,11 +49,14 @@ int main() {
     //auto device = xrt::device(0);
     auto device = xrt::device(0);
     FINN_LOG(logger, loglevel::info) << "Device found.";
+    auto bdfInfo = device.get_info<xrt::info::device::bdf>();
+    FINN_LOG(logger, loglevel::info) << "BDF: " << bdfInfo;
     
+
     auto uuid = device.load_xclbin("bitfile/finn-accel.xclbin");
-    FINN_LOG(logger, loglevel::info) << "Device successfully programmed! UUID: " << uuid;
     auto kern = xrt::kernel(device, uuid, "idma0", xrt::kernel::cu_access_mode::shared);
 
+    FINN_LOG(logger, loglevel::info) << "Device successfully programmed! UUID: " << uuid;
     shape_t myShape = std::vector<unsigned int>{1, 300};
     shape_t myShapeFolded = std::vector<unsigned int>{1, 10, 30};
     shape_t myShapePacked = std::vector<unsigned int>{1, 10, 8};

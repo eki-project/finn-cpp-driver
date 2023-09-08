@@ -74,8 +74,11 @@ set(BOOST_ROOT "${CMAKE_SOURCE_DIR}/deps/finn_boost")
 set(BOOST_INCLUDEDIR "${CMAKE_SOURCE_DIR}/deps/finn_boost")
 set(BOOST_LIBRARYDIR "${CMAKE_SOURCE_DIR}/deps/finn_boost/stage/lib/boost")
 set(Boost_NAMESPACE "finnBoost")
+set(FINNC_SAVE_BOOST_ROOT $ENV{BOOST_ROOT})
+set(ENV{BOOST_ROOT} "")
 find_package(Boost 1.80.0 COMPONENTS system log log_setup program_options filesystem ${BOOST_THREAD} REQUIRED)
 include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
+set(ENV{BOOST_ROOT} ${FINNC_SAVE_BOOST_ROOT})
 
 #mdspan
 include_directories(SYSTEM external/mdspan/include)

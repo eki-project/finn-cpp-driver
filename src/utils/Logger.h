@@ -24,7 +24,7 @@ using logger_type = bl::sources::severity_logger<bl::trivial::severity_level>;
 // NOLINTBEGIN
 #define FINN_LOG(LOGGER, SEV) BOOST_LOG_SEV(LOGGER, SEV)
 #ifdef NDEBUG
-static class DevNull {
+static class [[maybe_unused]] DevNull {
 } dev_null;
 
 template<typename T>

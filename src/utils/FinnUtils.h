@@ -5,8 +5,9 @@
 #include <numeric>
 #include <algorithm>
 #include <limits>
-#include "Types.h"
+#include <random>
 
+#include "Types.h"
 #include "Logger.h"
 
 namespace FinnUtils {

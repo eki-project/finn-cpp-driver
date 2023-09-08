@@ -197,7 +197,7 @@ namespace Finn {
             if (failOnInvalidData && !this->ringBuffer.isPartValid(partIndex)) {
                 FinnUtils::logAndError<std::runtime_error>("Tried loading and executing a buffer part which was marked as invalid data (not written yet or already used)!");
             }
-            loadMap(partIndex, invalidateDataAfterExecute);
+            loadMap(partIndex, !invalidateDataAfterExecute);
             sync();
             execute();
         }
@@ -265,6 +265,7 @@ namespace Finn {
          */
         size_t size(SIZE_SPECIFIER ss) { return this->ringBuffer.size(ss); }
 
+        // TODO: Update docs
         /**
          * @name Store Methods
          * The device buffer offers several options to store data inside it's buffer. There is a pair to read from an array, and a pair to read from a vector.
@@ -289,7 +290,7 @@ namespace Finn {
                 return false;
             }
             this->ringBuffer.store(vec);
-            if (executeAutomatically && this->ringBuffer.isFull()) {
+            if (executeAutomatically && (this->ringBuffer.isFull() || this->ringBuffer.isPartValid(getHeadIndex()))) {
                 loadAndExecute(getHeadIndex(), true, true);
             } else if (executeAutomaticallyHalfway && this->ringBuffer.isPreviousHalfValid()) {
                 loadAndExecute(getHeadOpposideIndex(), true, true);
@@ -311,7 +312,7 @@ namespace Finn {
                 return false;
             }
             this->ringBuffer.template store<sa>(arr);
-            if (executeAutomatically && this->ringBuffer.isFull()) {
+            if (executeAutomatically && (this->ringBuffer.isFull() || this->ringBuffer.isPartValid(getHeadIndex()))) {
                 loadAndExecute(getHeadIndex(), true, true);
             } else if (executeAutomaticallyHalfway && this->ringBuffer.isPreviousHalfValid()) {
                 loadAndExecute(getHeadOpposideIndex(), true, true);

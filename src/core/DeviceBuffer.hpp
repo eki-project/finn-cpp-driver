@@ -71,6 +71,14 @@ namespace Finn {
                 FinnUtils::logAndError<std::runtime_error>("Mismatches in shapes! shape_packed's innermost dimension in " + FinnUtils::shapeToString(pShapePacked) + " does not equal the calculated innermost dimension " + std::to_string(calculatedInnermostDimension));
             }
         }
+
+        protected:
+        std::string loggerPrefix() {
+            std::string s = "[";
+            s += this->name;
+            s += "] ";
+            return s;
+        }
     };
 
     /**
@@ -132,6 +140,20 @@ namespace Finn {
         bool executeAutomaticallyHalfway = false;
 
         using DeviceBuffer<T,F>::DeviceBuffer;
+        using DeviceBuffer<T,F>::logger;
+
+        private:
+        /**
+         * @brief Returns a device prefix for logging 
+         * 
+         * @return std::string 
+         */
+        std::string loggerPrefix() {
+            std::string s = "[INPUT - ";
+            s += this->name;
+            s += "] ";
+            return s;
+        }
 
         public:
         /**
@@ -140,14 +162,21 @@ namespace Finn {
          *
          * @param value
          */
-        void setExecuteAutomatically(bool value) { executeAutomatically = value; }
+        void setExecuteAutomatically(bool value) {
+            executeAutomatically = value; 
+            FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "Set Execute-Automatically flag to  " << value;
+        }
 
         /**
          * @brief Set the Execute Automatically Halfway flag. When set, the buffer automatically starts executing on the buffer, as soon as the previous parts/2 parts are valid data 
          * 
          * @param value 
          */
-        void setExecuteAutomaticallyHalfway(bool value) { executeAutomaticallyHalfway = value; }
+        void setExecuteAutomaticallyHalfway(bool value) { 
+            executeAutomaticallyHalfway = value; 
+            FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "Set Execute-Automatically-Halfway flag to  " << value;
+        }
+
 
         /**
          * @brief Check whether the Execute Automatically Flag is set.
@@ -169,7 +198,10 @@ namespace Finn {
          * @brief Sync data from the map to the device.
          *
          */
-        void sync() { this->internalBo.sync(XCL_BO_SYNC_BO_TO_DEVICE); }
+        void sync() { 
+            this->internalBo.sync(XCL_BO_SYNC_BO_TO_DEVICE); 
+            FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "Syncing to device";
+        }
 
         /**
          * @brief Start a run on the associated kernel and wait for it's result.
@@ -177,6 +209,7 @@ namespace Finn {
          *
          */
         void execute() {
+            FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "Executing the kernel " << this->associatedKernel.get_name();
             // TODO(bwintermann): Add arguments for kernel run!
             // TODO(bwintermann): Make batch_size changeable from 1
             auto run = this->associatedKernel(this->internalBo, 1);
@@ -207,7 +240,10 @@ namespace Finn {
          * @brief Loads the head part into the xrt::bo memory map to make it ready for sync. This invalidates the read part and moves the head pointer to the next part.
          *
          */
-        void loadMap() { this->ringBuffer.read(this->map, this->mapSize); }
+        void loadMap() { 
+            FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "Loading data to device buffer map";
+            this->ringBuffer.read(this->map, this->mapSize); 
+        }
 
         /**
          * @brief Loads the passed part into the xrt::bo memory map to make it ready for sync. This does NOT change the head pointer. The validity gets set according to the passed newValidity value.
@@ -215,7 +251,10 @@ namespace Finn {
          * @param partIndex
          * @param newValidity
          */
-        void loadMap(index_t partIndex, bool newValidity) { this->ringBuffer.getPart(this->map, this->mapSize, partIndex, newValidity); }
+        void loadMap(index_t partIndex, bool newValidity) { 
+            FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "Loading device buffer map with part with index " << partIndex << " leaving it with validity: " << newValidity;
+            this->ringBuffer.getPart(this->map, this->mapSize, partIndex, newValidity); 
+        }
 
         /**
          * @brief Check if the head part is valid
@@ -287,7 +326,9 @@ namespace Finn {
          * @return false 
          */
         bool store(const std::vector<T>& vec, bool overwriteValidData) {
+            FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "Storing data at head index. Overwrite valid data? " << overwriteValidData;
             if (!overwriteValidData && this->ringBuffer.isPartValid(getHeadIndex())) {
+                FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "Failed to write data because the original data was still valid!";
                 return false;
             }
             this->ringBuffer.store(vec);
@@ -300,13 +341,25 @@ namespace Finn {
         }
 
         bool store(const std::vector<T>& vec, index_t partIndex, bool overwriteValidData) {
+            FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "Storing data at index " << partIndex << ". Overwrite valid data? " << overwriteValidData;
             if (!overwriteValidData && this->ringBuffer.isPartValid(getHeadIndex())) {
+                FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "Failed to write data because the original data was still valid!";
                 return false;
             }
             this->ringBuffer.setPart(vec, partIndex, true);
             return true;
         }
 
+        /**
+         * @brief Same as store() with vector or C-array as argument
+         * @deprecated
+         * 
+         * @tparam sa 
+         * @param arr 
+         * @param overwriteValidData 
+         * @return true 
+         * @return false 
+         */
         template<size_t sa>
         bool store(const std::array<T, sa>& arr, bool overwriteValidData) {
             if (!overwriteValidData && this->ringBuffer.isPartValid(getHeadIndex())) {
@@ -321,6 +374,17 @@ namespace Finn {
             return true;
         }
 
+        /**
+         * @brief Same as store() with vector or C-array as argument
+         * @deprecated
+         * 
+         * @tparam sa 
+         * @param arr 
+         * @param partIndex 
+         * @param overwriteValidData 
+         * @return true 
+         * @return false 
+         */
         template<size_t sa>
         bool store(const std::array<T, sa>& arr, index_t partIndex, bool overwriteValidData) {
             if (!overwriteValidData && this->ringBuffer.isPartValid(getHeadIndex())) {
@@ -375,14 +439,31 @@ namespace Finn {
         std::vector<std::vector<T>> longTermStorage;
 
         using DeviceBuffer<T,F>::DeviceBuffer;
+        using DeviceBuffer<T,F>::logger;
         
+        private:
+        /**
+         * @brief Returns a device prefix for logging 
+         * 
+         * @return std::string 
+         */
+        std::string loggerPrefix() {
+            std::string s = "[OUTPUT - ";
+            s += this->name;
+            s += "] ";
+            return s;
+        }
+
         public:  
         /**
          * @brief Sync data from the FPGA into the memory map
          *
          * @return * void
          */
-        void sync() { this->internalBo.sync(XCL_BO_SYNC_BO_FROM_DEVICE); }
+        void sync() { 
+            FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "Syncing data from device";
+            this->internalBo.sync(XCL_BO_SYNC_BO_FROM_DEVICE); 
+        }
 
         /**
          * @brief Execute the kernel and await it's return.
@@ -390,6 +471,7 @@ namespace Finn {
          *
          */
         void execute() {
+            FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "Executing on device";
             // TODO(bwintermann): Add arguments for kernel run!
             auto run = this->associatedKernel(this->internalBo);
             run.wait();
@@ -399,7 +481,10 @@ namespace Finn {
          * @brief Store the contents of the memory map into the ring buffer.
          *
          */
-        void saveMap() { this->ringBuffer.store(this->map, this->mapSize); }
+        void saveMap() { 
+            FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "Saving data from device map into ring buffer";
+            this->ringBuffer.store(this->map, this->mapSize); 
+        }
 
         /**
          * @brief Put every valid read part of the ring buffer into the archive. This invalides them so that they are not put into the archive again.
@@ -408,6 +493,7 @@ namespace Finn {
          *
          */
         void archiveValidBufferParts() {
+            FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "Archiving data from ring buffer to long term storage";
             for (index_t i = 0; i < this->ringBuffer.size(SIZE_SPECIFIER::PARTS); i++) {
                 if (this->ringBuffer.isPartValid(i)) {
                     longTermStorage.push_back(this->ringBuffer.getPart(i, false));
@@ -434,6 +520,7 @@ namespace Finn {
          * @param samples
          */
         void read(unsigned int samples) {
+            FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "Reading " << samples << " samples from the device";
             for (unsigned int i = 0; i < samples; i++) {
                 execute();
                 sync();

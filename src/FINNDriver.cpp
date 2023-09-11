@@ -20,17 +20,12 @@
 
 using std::string;
 
-
-/* template<typename T>
-BOMemoryDefinitionArguments<T> toVariant(const shape_list_t& inp) {
-    std::vector<std::variant<shape_t, MemoryMap<T>>> ret;
-    ret.reserve(inp.size());
-
-    std::transform(inp.begin(), inp.end(), std::back_inserter(ret), [](const shape_t& shape) { return std::variant<shape_t, MemoryMap<T>>(shape); });
-    return ret;
-} */
-
 int main() {
+
+    #undef NDEBUG
+
+
+
     auto logger = Logger::getLogger();
     FINN_LOG(logger, loglevel::info) << "C++ Driver started";
     FINN_LOG_DEBUG(logger, loglevel::info) << "Test";
@@ -45,9 +40,14 @@ int main() {
     Finn::Accelerator acc(devWrap);
 */
 
+    // Preparation for throughput test
+    std::random_device rd;
+    std::mt19937 engine{rd()};
+    std::uniform_int_distribution<uint8_t> sampler(0, 0xFF);
+
     // Set parameters
     const std::string FILENAME = "bitfile/finn-accel.xclbin";
-    
+    const unsigned int RUNS = 20;
 
     // Load the device
     auto device = xrt::device(0);
@@ -76,82 +76,55 @@ int main() {
     auto kern = xrt::kernel(device, uuid, "StreamingDataflowPartition_0:{idma0}", xrt::kernel::cu_access_mode::shared);
     FINN_LOG(logger, loglevel::info) << "Device successfully programmed! UUID: " << uuid;
 
-
-
-
-    // Execution
+    // Shape data
     shape_t myShape = std::vector<unsigned int>{1, 300};
     shape_t myShapeFolded = std::vector<unsigned int>{1, 10, 30};
     shape_t myShapePacked = std::vector<unsigned int>{1, 10, 8};
-    // Finn::DeviceBuffer<uint8_t, DatatypeInt<2>> dbuffer = Finn::DeviceBuffer<uint8_t, DatatypeInt<2>>("MyDeviceBuffer", myDevice, myShape, 100, IO::INPUT);
+    
+    shape_t oMyShape = std::vector<unsigned int>{1, 10};
+    shape_t oMyShapeFolded = std::vector<unsigned int>{1, 10, 1};
+    shape_t oMyShapePacked = std::vector<unsigned int>{1, 10, 1};
 
+    // Creating the devicebuffers
     auto mydb = Finn::DeviceInputBuffer<uint8_t, DatatypeInt<2>>("My Buffer", device, kern, myShape, myShapeFolded, myShapePacked, 100);
     std::cout << mydb.isBufferFull() << std::endl;
 
+    auto myodb = Finn::DeviceOutputBuffer<uint8_t, DatatypeBinary>("Output Buffer", device, kern, oMyShape, oMyShapeFolded, oMyShapePacked, RUNS);
+    
     auto data =  std::vector<uint8_t>(mydb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
-    std::fill(data.begin(), data.end(), 12);
 
-    mydb.store(data, 0, false);
-    FINN_LOG(logger, loglevel::info) << "Storing data";
-    mydb.loadMap(0, true);
-    FINN_LOG(logger, loglevel::info) << "Syncing data";
-    mydb.sync();
-    FINN_LOG(logger, loglevel::info) << "Executing data";
-    mydb.execute();
+    // Multithreaded writing to the ring buffer and executing
+    // TODO: Multithread into store - execute? Instead of threading _together_ store-execute, which dont necessarily regard the same data then?
+    // Visualize it
+    std::vector<std::thread> writeThreads;
+    for (size_t i = 0; i < RUNS; i++) { 
+        writeThreads.push_back(
+            std::thread([&sampler, &engine, &data, &mydb](){
+                std::transform(data.begin(), data.end(), data.begin(), [&sampler, &engine](uint8_t x){ return sampler(engine); });
+                while (!mydb.store(data, false));
+                mydb.loadMap();
+                mydb.sync();
+                mydb.execute();
+            })
+        );
+    }
 
-    FINN_LOG(logger, loglevel::info) << "Creating output buffer";
-    auto myodb = Finn::DeviceOutputBuffer<uint8_t, DatatypeInt<2>>("Output Buffer", device, kern, myShape, myShapeFolded, myShapePacked, 100);
+    // Wait for all write threads to finish
+    for (auto& t : writeThreads) {
+        t.join();
+    }
 
-    myodb.read(1);
+    // Read results out
+    myodb.read(RUNS);
     myodb.archiveValidBufferParts();
     auto res = myodb.retrieveArchive();
     FINN_LOG(logger, loglevel::info) << "Reading output!";
-    for (auto& resv : res[0]) {
-        FINN_LOG(logger, loglevel::info) << resv;
+    
+    for (size_t i = 0; i < RUNS; i++) {
+        FINN_LOG(logger, loglevel::info) << "Reading output of run " << i;
+        for (auto& resvalue : res[i]) {
+            FINN_LOG(logger, loglevel::info) << static_cast<int>(resvalue);
+        }
     }
-
-    //auto mydb = Finn::DeviceInputBuffer<uint8_t, DatatypeInt<2>>();
-
-
-    // Example usage 1
-    /*
-    dbuffer[1] = myData;
-    print(dbuffer[1])
-    dbuffer.loadToMemory(1);
-    dbuffer.syncToDevice(1)
-    dbuffer.startRun(1, times=10)
-    results = dbuffer.awaitRun()
-    */
-
-    // Example usage 2
-    /*
-    int index = 0;
-    while (!dbuffer.isFull()) {
-        dbuffer << myData[index];
-        index++;
-    }
-    for (;;) {
-        dbuffer.loadToMemory();
-        dbuffer.syncToDevice();
-        dbuffer.startRun();
-        results += dbuffer.awaitRun();
-        myData[index] >> dbuffer;
-        index++;
-    }
-    */
-
-
-    // Example usage 3
-    // The buffer automatically executes data when the ring buffer is full, to use the first batch and then instatnly replace the last one with the new data
-    /*
-    dbuffer.setAutoExecute(true);
-    for (auto dat : myData) {
-        myData >> dbuffer;
-    }
-    results = dbuffer.fetchStoredResults();
-    */
-    // Common operation in usage 2 AND 3: Internal pointer gets increased by one part for ever << operation.
-
-
     return 0;
 }

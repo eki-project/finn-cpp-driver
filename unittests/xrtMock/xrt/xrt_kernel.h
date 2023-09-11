@@ -116,7 +116,7 @@ namespace xrt {
         /**
          * get_name() - Return the name of the kernel
          */
-        // std::string get_name() const;
+        std::string get_name() const;
 
         /**
          * get_xclbin() - Return the xclbin containing the kernel

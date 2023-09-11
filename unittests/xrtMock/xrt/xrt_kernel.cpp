@@ -14,4 +14,8 @@ namespace xrt {
     void run::wait() {
         
     }
+
+    std::string kernel::get_name() const {
+        return "testkernel";
+    }
 }  // namespace xrt

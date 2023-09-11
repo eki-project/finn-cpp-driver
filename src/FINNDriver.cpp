@@ -44,19 +44,35 @@ int main() {
 
     Finn::Accelerator acc(devWrap);
 */
-    //auto xclbin = xrt::xclbin("bitfile/finn-accel.xclbin");
-    //FINN_LOG(logger, loglevel::info) << "xclbin loaded.";
-    //auto device = xrt::device(0);
+
+    // Set parameters
+    const std::string FILENAME = "bitfile/finn-accel.xclbin";
+    
+
+    // Load the device
     auto device = xrt::device(0);
     FINN_LOG(logger, loglevel::info) << "Device found.";
+    
+    // Debug print the BDF of the device
     auto bdfInfo = device.get_info<xrt::info::device::bdf>();
     FINN_LOG(logger, loglevel::info) << "BDF: " << bdfInfo;
     
+    // Load xclbin for debug info on kernels
+    auto xclbin = xrt::xclbin(FILENAME);
+    auto kernels = xclbin.get_kernels();
+    for (auto knl : kernels) {
+        FINN_LOG(logger, loglevel::info) << "Kernel: " << knl.get_name() << "\n";
+    }
 
+    // Connect and load kernel
     auto uuid = device.load_xclbin("bitfile/finn-accel.xclbin");
     auto kern = xrt::kernel(device, uuid, "idma0", xrt::kernel::cu_access_mode::shared);
-
     FINN_LOG(logger, loglevel::info) << "Device successfully programmed! UUID: " << uuid;
+
+
+
+
+    // Execution
     shape_t myShape = std::vector<unsigned int>{1, 300};
     shape_t myShapeFolded = std::vector<unsigned int>{1, 10, 30};
     shape_t myShapePacked = std::vector<unsigned int>{1, 10, 8};

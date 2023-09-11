@@ -1,6 +1,7 @@
 #ifndef LOGGING_H
 #define LOGGING_H
 
+// NOLINTNEXTLINE
 #define BOOST_LOG_DYN_LINK 1
 
 #include <boost/log/attributes/scoped_attribute.hpp>

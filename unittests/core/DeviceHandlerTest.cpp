@@ -1,6 +1,8 @@
 #include <array>
 #include <cstring>
+#include <fstream>
 #include <numeric>
+#include <stdexcept>
 #include <vector>
 
 #include "../../src/core/DeviceHandler.h"
@@ -11,27 +13,37 @@
 
 using namespace Finn;
 
-TEST(DeviceHandlerTest, InitTest) {
-    auto log = Logger::getLogger();
-    FINN_LOG(log, loglevel::info) << "Das hier sollte geloggt werden!";
-    auto devicehandler = DeviceHandler("test", "someName", 0, {}, {});
+class DeviceHandlerSetup : public ::testing::Test {
+     protected:
+    std::string fn = "somefile.xclbin";
+    void SetUp() override {
+        std::fstream tmpfile(fn, std::fstream::out);
+        tmpfile << "some stuff\n";
+        tmpfile.close();
+    }
+
+    // void TearDown() override { std::filesystem::remove(fn); }
+};
+
+TEST_F(DeviceHandlerSetup, InitTest) {
+    auto devicehandler = DeviceHandler("somefile.xclbin", "someName", 0, {"a"}, {"b"});
     EXPECT_EQ(xrt::device::device_costum_constructor_called, 1);
     EXPECT_EQ(xrt::device::device_param_didx, 0);
 
-    auto kernel_names = xrt::kernel::kernel_name;
-    auto kernel_devices = xrt::kernel::kernel_device;
-    auto kernel_uuids = xrt::kernel::kernel_uuid;
+    auto& kernel_names = xrt::kernel::kernel_name;
+    auto& kernel_devices = xrt::kernel::kernel_device;
+    auto& kernel_uuids = xrt::kernel::kernel_uuid;
 
-    EXPECT_TRUE(kernel_names.empty());
-    EXPECT_TRUE(kernel_devices.empty());
-    EXPECT_TRUE(kernel_uuids.empty());
+    ASSERT_EQ(kernel_names.size(), 2);
+    ASSERT_EQ(kernel_devices.size(), 2);
+    ASSERT_EQ(kernel_uuids.size(), 2);
 
-    auto devicehandler2 = DeviceHandler("test", "someName", 4, {"inpName"}, {"outName"});
+    kernel_names.clear();
+    kernel_devices.clear();
+    kernel_uuids.clear();
+
+    auto devicehandler2 = DeviceHandler("somefile.xclbin", "someName", 4, {"inpName"}, {"outName"});
     EXPECT_EQ(xrt::device::device_costum_constructor_called, 2);
-
-    kernel_names = xrt::kernel::kernel_name;
-    kernel_devices = xrt::kernel::kernel_device;
-    kernel_uuids = xrt::kernel::kernel_uuid;
 
     std::vector<std::string> ionames = {"inpName", "outName"};
     for (auto&& name : ionames) {
@@ -41,14 +53,18 @@ TEST(DeviceHandlerTest, InitTest) {
         FAIL();
     }
 
-    // const uuid_t id = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
-    // auto uuid = xrt::uuid(id);
-
     ASSERT_EQ(kernel_devices.size(), 2);
 
     EXPECT_EQ(kernel_devices[0].loadedUUID, kernel_devices[1].loadedUUID);
-    // EXPECT_EQ(kernel_devices[0].loadedUUID, xrt::uuid(id));
     EXPECT_EQ(kernel_uuids[0], kernel_uuids[1]);
+}
+
+TEST_F(DeviceHandlerSetup, ArgumentTest) {
+    EXPECT_THROW(DeviceHandler("", "name", 0, {"a"}, {"b"}), std::filesystem::filesystem_error);
+    EXPECT_THROW(DeviceHandler("somefile.xclbin", "", 0, {"a"}, {"b"}), std::invalid_argument);
+    EXPECT_THROW(DeviceHandler("somefile.xclbin", "name", 0, {}, {"b"}), std::invalid_argument);
+    EXPECT_THROW(DeviceHandler("somefile.xclbin", "name", 0, {"a"}, {}), std::invalid_argument);
+    EXPECT_NO_THROW(DeviceHandler("somefile.xclbin", "name", 0, {"a"}, {"b"}));
 }
 
 

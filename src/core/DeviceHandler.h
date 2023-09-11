@@ -55,6 +55,7 @@ namespace Finn {
          */
         ~DeviceHandler() = default;
 
+         protected:
         /**
          * @brief Program and initialize the managed device
          *

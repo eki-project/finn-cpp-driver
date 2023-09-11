@@ -49,7 +49,7 @@ namespace Finn {
             shapeNormal(pShapeNormal),
             shapeFolded(pShapeFolded),
             shapePacked(pShapePacked),
-            mapSize(FinnUtils::shapeToElements(pShapePacked)),
+            mapSize(FinnUtils::getActualBufferSize(FinnUtils::shapeToElements(pShapePacked))),
             internalBo(xrt::bo(device, mapSize * sizeof(T), 0)),
             associatedKernel(pAssociatedKernel),
             map(internalBo.template map<T*>()),

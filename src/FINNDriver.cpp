@@ -5,17 +5,17 @@
 #include <string>
 
 // Helper
-//#include "core/Accelerator.h"
+// #include "core/Accelerator.h"
 #include "core/DeviceBuffer.hpp"
 #include "utils/FinnDatatypes.hpp"
 #include "utils/Logger.h"
 
 // Created by FINN during compilation
-//#include "config/config.h"
+// #include "config/config.h"
 
 // XRT
-#include "xrt/xrt_device.h"
 #include "xrt/xrt_bo.h"
+#include "xrt/xrt_device.h"
 #include "xrt/xrt_kernel.h"
 
 using std::string;
@@ -35,39 +35,39 @@ int main() {
     FINN_LOG(logger, loglevel::info) << "C++ Driver started";
     FINN_LOG_DEBUG(logger, loglevel::info) << "Test";
 
-/*
-    Finn::DeviceWrapper devWrap;
-    devWrap.xclbin = "design.xclbin";
-    devWrap.name = "SomeName";
-    devWrap.idmas = Config::idmaNames;
-    devWrap.odmas = Config::odmaNames;
+    /*
+        Finn::DeviceWrapper devWrap;
+        devWrap.xclbin = "design.xclbin";
+        devWrap.name = "SomeName";
+        devWrap.idmas = Config::idmaNames;
+        devWrap.odmas = Config::odmaNames;
 
-    Finn::Accelerator acc(devWrap);
-*/
+        Finn::Accelerator acc(devWrap);
+    */
 
     // Set parameters
-    const std::string FILENAME = "bitfile/finn-accel.xclbin";
-    
+    const std::string filename = "bitfile/finn-accel.xclbin";
+
 
     // Load the device
     auto device = xrt::device(0);
     FINN_LOG(logger, loglevel::info) << "Device found.";
-    
+
     // Debug print the BDF of the device
     auto bdfInfo = device.get_info<xrt::info::device::bdf>();
     FINN_LOG(logger, loglevel::info) << "BDF: " << bdfInfo;
-    
+
     // Load xclbin for debug info on kernels
-    auto xclbin = xrt::xclbin(FILENAME);
+    auto xclbin = xrt::xclbin(filename);
     auto kernels = xclbin.get_kernels();
-    for (auto knl : kernels) {
+    for (auto&& knl : kernels) {
         FINN_LOG(logger, loglevel::info) << "Kernel: " << knl.get_name() << "\n";
-        for (auto arg : knl.get_args()) {
+        for (auto&& arg : knl.get_args()) {
             FINN_LOG(logger, loglevel::info) << "\t\t\tArg: " << arg.get_name() << " Size: " << arg.get_size() << "\n";
         }
 
-        for (auto cu : knl.get_cus()) {
-            FINN_LOG(logger, loglevel::info) << " \t\t\tCU: " << cu.get_name() << " Size: " << cu.get_size() << "\n"; 
+        for (auto&& compUnit : knl.get_cus()) {
+            FINN_LOG(logger, loglevel::info) << " \t\t\tCU: " << compUnit.get_name() << " Size: " << compUnit.get_size() << "\n";
         }
     }
 
@@ -75,8 +75,6 @@ int main() {
     auto uuid = device.load_xclbin("bitfile/finn-accel.xclbin");
     auto kern = xrt::kernel(device, uuid, "StreamingDataflowPartition_0:{idma0}", xrt::kernel::cu_access_mode::shared);
     FINN_LOG(logger, loglevel::info) << "Device successfully programmed! UUID: " << uuid;
-
-
 
 
     // Execution
@@ -88,7 +86,7 @@ int main() {
     auto mydb = Finn::DeviceInputBuffer<uint8_t, DatatypeInt<2>>("My Buffer", device, kern, myShape, myShapeFolded, myShapePacked, 100);
     std::cout << mydb.isBufferFull() << std::endl;
 
-    auto data =  std::vector<uint8_t>(mydb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
+    auto data = std::vector<uint8_t>(mydb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
     std::fill(data.begin(), data.end(), 12);
 
     mydb.store(data, 0, false);
@@ -110,7 +108,7 @@ int main() {
         FINN_LOG(logger, loglevel::info) << resv;
     }
 
-    //auto mydb = Finn::DeviceInputBuffer<uint8_t, DatatypeInt<2>>();
+    // auto mydb = Finn::DeviceInputBuffer<uint8_t, DatatypeInt<2>>();
 
 
     // Example usage 1

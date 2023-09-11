@@ -180,10 +180,11 @@ namespace Finn {
             // TODO(bwintermann): Add arguments for kernel run!
             // TODO(bwintermann): Make batch_size changeable from 1
             auto run = this->associatedKernel(this->internalBo, 1);
-            run.start();
             
-            //FIXME: TODO(bwintermann): Wait needed? Pynq driver doesnt wait
-            //run.wait();
+            // run.start() only necessary on 2nd run. Producing  a new run every time might cost cycles?
+            //run.start();
+            
+            run.wait();
         }
 
         /**
@@ -391,7 +392,6 @@ namespace Finn {
         void execute() {
             // TODO(bwintermann): Add arguments for kernel run!
             auto run = this->associatedKernel(this->internalBo);
-            run.start();
             run.wait();
         }
 

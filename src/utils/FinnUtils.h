@@ -31,8 +31,8 @@ namespace FinnUtils {
      * @param requiredBytes The number of bytes that are needed. The return value will be greater or equal than this 
      * @return unsigned int 
      */
-    inline unsigned int getActualBufferSize(unsigned int requiredBytes) {
-        return static_cast<unsigned int>(std::max(4096.0, pow(2, log2(static_cast<double>(requiredBytes)))));
+    inline size_t getActualBufferSize(size_t requiredBytes) {
+        return static_cast<size_t>(std::max(4096.0, pow(2, log2(static_cast<double>(requiredBytes)))));
     }
 
     /**

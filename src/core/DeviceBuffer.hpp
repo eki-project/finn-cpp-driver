@@ -237,7 +237,7 @@ namespace Finn {
         }
 
         /**
-         * @brief Loads the head part into the xrt::bo memory map to make it ready for sync. This invalidates the read part and moves the head pointer to the next part.
+         * @brief Loads the read  part into the xrt::bo memory map to make it ready for sync. This invalidates the read part and moves the read pointer to the next part.
          *
          */
         void loadMap() { 
@@ -307,93 +307,61 @@ namespace Finn {
 
         // TODO: Update docs
         /**
-         * @name Store Methods
-         * The device buffer offers several options to store data inside it's buffer. There is a pair to read from an array, and a pair to read from a vector.
-         * In both cases, when no further argument is passed, the currently selected head part of the buffer is written to, and the head pointer is incremented, automatically filling up the buffer. If setExecuteAutomatically(true) was set,
-         * and the buffer is almost full, the last free element gets written, and the one after it gets executed and invalidated, to free one slot again. If the index_t partIndex was passed, the buffer at that index gets set, without the
-         * head pointer being changed. In both cases, the part that was just written gets set to "valid". It is strongly recommended to not break paradigm and use either all automatic storage/execution/reading or manual, but not both
-         * simultaneously.
-         */
-        ///@{
-        
-        /**
-         * @brief Store the passed data in the ring buffer. Advance the head pointer. Set the newly written data part to valid. 
-         * @note This operation is thread safe. 
+         * @brief Write the given vector data into the ringBuffer. If overwriteValidData is set, the validity of the previous data is ignored. If it is not set and the previous data is marked as valid, it is not overwritten and false is returned. 
+         * @note This does increment the headpointer by 1
+         * @note If executeAutomatically is set, and headpointer = readpointer and the data is valid, it is executed to free up space for the next store. If this is the case, the readpointer is incremented by 1
          * 
-         * @param vec The data to write
-         * @param overwriteValidData If true, the data only gets written at the head index, if the currently marked head part is invalid data.
-         * @return true 
-         * @return false 
+         * @param vec 
+         * @param overwriteValidData 
+         * @return true If the write was successfull
+         * @return false If a size mismatch or a forbidden overwrite was about to happen. Data is NOT written
          */
         bool store(const std::vector<T>& vec, bool overwriteValidData) {
-            FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "Storing data at head index. Overwrite valid data? " << overwriteValidData;
-            if (!overwriteValidData && this->ringBuffer.isPartValid(getHeadIndex())) {
-                FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "Failed to write data because the original data was still valid!";
+            FINN_LOG_DEBUG(logger, loglevel::debug) << loggerPrefix() << "Storing data at read index";
+            if (vec.size() != this->ringBuffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART)) {
+                FINN_LOG_DEBUG(logger, loglevel::debug) << loggerPrefix() << "Failed to store data because of size mismatch (got " << vec.size() << ", expected " << this->ringBuffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART); 
+                return false;
+            } 
+            if (!overwriteValidData && this->ringBuffer.isPartValid(this->ringBuffer.getHeadIndex())) {
+                FINN_LOG_DEBUG(logger, loglevel::debug) << loggerPrefix() << "Failed to store data because previous data was still valid";
                 return false;
             }
+
             this->ringBuffer.store(vec);
-            if (executeAutomatically && (this->ringBuffer.isFull() || this->ringBuffer.isPartValid(getHeadIndex()))) {
-                loadAndExecute(getHeadIndex(), true, true);
-            } else if (executeAutomaticallyHalfway && this->ringBuffer.isPreviousHalfValid()) {
-                loadAndExecute(getHeadOpposideIndex(), true, true);
-            }
-            return true;
-        }
 
-        bool store(const std::vector<T>& vec, index_t partIndex, bool overwriteValidData) {
-            FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "Storing data at index " << partIndex << ". Overwrite valid data? " << overwriteValidData;
-            if (!overwriteValidData && this->ringBuffer.isPartValid(getHeadIndex())) {
-                FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "Failed to write data because the original data was still valid!";
-                return false;
-            }
-            this->ringBuffer.setPart(vec, partIndex, true);
-            return true;
-        }
-
-        /**
-         * @brief Same as store() with vector or C-array as argument
-         * @deprecated
-         * 
-         * @tparam sa 
-         * @param arr 
-         * @param overwriteValidData 
-         * @return true 
-         * @return false 
-         */
-        template<size_t sa>
-        bool store(const std::array<T, sa>& arr, bool overwriteValidData) {
-            if (!overwriteValidData && this->ringBuffer.isPartValid(getHeadIndex())) {
-                return false;
-            }
-            this->ringBuffer.template store<sa>(arr);
-            if (executeAutomatically && (this->ringBuffer.isFull() || this->ringBuffer.isPartValid(getHeadIndex()))) {
-                loadAndExecute(getHeadIndex(), true, true);
-            } else if (executeAutomaticallyHalfway && this->ringBuffer.isPreviousHalfValid()) {
-                loadAndExecute(getHeadOpposideIndex(), true, true);
+            if (executeAutomatically && this->ringBuffer.getHeadIndex() == this->ringBuffer.getReadIndex() && this->ringBuffer.isPartValid(this->ringBuffer.getHeadIndex())) {
+                loadMap();
+                sync();
+                execute();
             }
             return true;
         }
 
         /**
-         * @brief Same as store() with vector or C-array as argument
-         * @deprecated
+         * @brief Writes data to the ringBuffer but at a certain index. The same error checking applies.
+         * @note This does NOT move the headpointer OR the readpointer.
          * 
-         * @tparam sa 
-         * @param arr 
+         * @param vec 
          * @param partIndex 
          * @param overwriteValidData 
+         * @param newValidity 
          * @return true 
          * @return false 
          */
-        template<size_t sa>
-        bool store(const std::array<T, sa>& arr, index_t partIndex, bool overwriteValidData) {
-            if (!overwriteValidData && this->ringBuffer.isPartValid(getHeadIndex())) {
+        bool store(const std::vector<T>& vec, index_t partIndex, bool overwriteValidData, bool newValidity) {
+            FINN_LOG_DEBUG(logger, loglevel::debug) << loggerPrefix() << "Storing data at index " << partIndex;
+            if (vec.size() != this->ringBuffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART)) {
+                FINN_LOG_DEBUG(logger, loglevel::debug) << loggerPrefix() << "Failed to store data because of size mismatch (got " << vec.size() << ", expected " << this->ringBuffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART); 
+                return false;
+            } 
+            if (!overwriteValidData && this->ringBuffer.isPartValid(this->ringBuffer.getHeadIndex())) {
+                FINN_LOG_DEBUG(logger, loglevel::debug) << loggerPrefix() << "Failed to store data because previous data was still valid";
                 return false;
             }
-            this->ringBuffer.setPart<sa>(arr, partIndex);
+
+            this->ringBuffer.setPart(vec, partIndex, newValidity);
             return true;
         }
-        ///@}
 
         // TODO(bwintermann): Exchange this for the operator[] at some time
         /**
@@ -412,6 +380,19 @@ namespace Finn {
         std::vector<T> get(index_t partIndex) {
             return this->ringBuffer.template getPart(partIndex, isPartValid(partIndex));
         }
+
+// FIXME:
+// TODO: Implement this
+/*
+        void run(const std::vector<T>& data, bool waitUntilSuccessfullWrite) {
+            while (!store(data, false));
+            loadMap();
+            
+        }
+
+        std::vector<std::thread> runThreaded(std::vector<std::vector<T>>& data, bool waitUntilSuccessfullWrite)
+
+*/
     };
 
 

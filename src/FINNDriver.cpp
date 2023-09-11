@@ -3,6 +3,7 @@
 // #include <numeric>
 // #include <stdexcept>
 #include <string>
+#include <thread>
 
 // Helper
 // #include "core/Accelerator.h"
@@ -76,6 +77,7 @@ int main() {
     auto uuid = device.load_xclbin("bitfile/finn-accel.xclbin");
     auto kern = xrt::kernel(device, uuid, "StreamingDataflowPartition_0:{idma0}", xrt::kernel::cu_access_mode::shared);
     FINN_LOG(logger, loglevel::info) << "Device successfully programmed! UUID: " << uuid;
+    auto kernOut = xrt::kernel(device, uuid, "StreamingDataflowPartition_2:{odma0}", xrt::kernel::cu_access_mode::shared);
 
     // Shape data
     shape_t myShape = std::vector<unsigned int>{1, 300};
@@ -90,7 +92,7 @@ int main() {
     auto mydb = Finn::DeviceInputBuffer<uint8_t, DatatypeInt<2>>("My Buffer", device, kern, myShape, myShapeFolded, myShapePacked, 100);
     std::cout << mydb.isBufferFull() << std::endl;
 
-    auto myodb = Finn::DeviceOutputBuffer<uint8_t, DatatypeBinary>("Output Buffer", device, kern, oMyShape, oMyShapeFolded, oMyShapePacked, runs);
+    auto myodb = Finn::DeviceOutputBuffer<uint8_t, DatatypeBinary>("Output Buffer", device, kernOut, oMyShape, oMyShapeFolded, oMyShapePacked, runs);
     
     auto data =  std::vector<uint8_t>(mydb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
 
@@ -103,7 +105,7 @@ int main() {
             std::thread([&sampler, &engine, &data, &mydb](){
                 std::transform(data.begin(), data.end(), data.begin(), [&sampler, &engine](uint8_t x){ return (x-x) + sampler(engine); });
                 while (!mydb.store(data, false));
-                mydb.loadMap();
+                mydb.loadMap((mydb.getHeadIndex()-1) % mydb.size(SIZE_SPECIFIER::PARTS), false);
                 mydb.sync();
                 mydb.execute();
             })

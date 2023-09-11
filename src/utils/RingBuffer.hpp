@@ -22,6 +22,7 @@ class RingBuffer {
     const size_t parts;
     const size_t elementsPerPart;
     index_t headPart = 0;
+    index_t readPart = 0;
     logger_type& logger;
 
     /**
@@ -155,6 +156,14 @@ class RingBuffer {
         return headPart;
     }
 
+    /**
+     * @brief Get the read part index
+     * 
+     * @return * index_t 
+     */
+    index_t getReadIndex() const {
+        return readPart;
+    }
 
     /**
      * @brief Increment the head pointer by one part. Loops around when the highest index is met. 
@@ -162,6 +171,14 @@ class RingBuffer {
      */
     void cycleHeadPart() {
         headPart = (headPart + 1) % parts;
+    }
+
+    /**
+     * @brief Increment the read pointer by one part. Loops around when the highest index is met. 
+     * 
+     */
+    void cycleReadPart() {
+        readPart = (readPart + 1) % parts;
     }
 
     /**
@@ -328,13 +345,13 @@ class RingBuffer {
      * @return std::vector<T> 
      */
     std::vector<T> read() {
-        std::lock_guard<std::mutex> guard(*partMutexes[headPart]);
+        std::lock_guard<std::mutex> guard(*partMutexes[readPart]);
         std::vector<T> temp;
         for (size_t i = 0; i < elementsPerPart; i++) {
-            temp.push_back(buffer[elementIndex(headPart, i)]);
+            temp.push_back(buffer[elementIndex(readPart, i)]);
         }
-        setPartValidity(headPart, false);
-        cycleHeadPart();
+        setPartValidity(readPart, false);
+        cycleReadPart();
         return temp;
     }
 
@@ -346,13 +363,13 @@ class RingBuffer {
      */
     template<size_t S>
     std::array<T,S> read() {
-        std::lock_guard<std::mutex> guard(*partMutexes[headPart]);
+        std::lock_guard<std::mutex> guard(*partMutexes[readPart]);
         std::array<T,S> arr;
         for (size_t i = 0; i < elementsPerPart; i++) {
-            arr[i] = buffer[elementIndex(headPart, i)];
+            arr[i] = buffer[elementIndex(readPart, i)];
         }
-        setPartValidity(headPart, false);
-        cycleHeadPart();
+        setPartValidity(readPart, false);
+        cycleReadPart();
         return arr;
     }
 
@@ -367,12 +384,12 @@ class RingBuffer {
             FinnUtils::logAndError<std::length_error>("Size mismatching when trying to read ring buffer data into an array!");
         }
 
-        std::lock_guard<std::mutex> guard(*partMutexes[headPart]);
+        std::lock_guard<std::mutex> guard(*partMutexes[readPart]);
         for (size_t i = 0; i < elementsPerPart; i++) {
-            targetArr[i] = buffer[elementIndex(headPart, i)];
+            targetArr[i] = buffer[elementIndex(readPart, i)];
         }
-        setPartValidity(headPart, false);
-        cycleHeadPart();
+        setPartValidity(readPart, false);
+        cycleReadPart();
     }
 
     /**

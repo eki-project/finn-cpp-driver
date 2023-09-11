@@ -12,6 +12,7 @@ Getting Started
 
 ```bash
 git clone git@github.com:eki-project/finn-cpp-driver.git
+(git checkout <branch>)
 ./buildDependencies.sh
 mkdir build && cd build
 cmake ..
@@ -29,6 +30,28 @@ ml compiler/GCC/12.2.0
 ml devel/CMake/3.24.3-GCCcore-12.2.0
 ```
 
+To execute the driver on the boards, write a job script. The job script should look something like this:
+```bash
+#!/bin/bash
+#SBATCH -t 0:07:00
+#SBATCH -A hpc-prf-ekiapp
+#SBATCH -p fpga
+#SBATCH --gres=fpga:u280:3
+#SBATCH -o cpp-finn_out_%j.out
+#SBATCH --constraint=xilinx_u280_xrt2.14
+
+ml fpga &> /dev/null
+ml xilinx/xrt/2.14 &> /dev/null
+ml lang/Python/3.10.4-GCCcore-11.3.0-bare &> /dev/null
+ml devel/Boost/1.81.0-GCC-12.2.0
+ml compiler/GCC/12.2.0
+
+./finn
+```
+Execute it with ```sbatch write.sh```.
+Use ```xbutil``` to get information about the cards and configure them manually if necessary. 
+
+(Project name, resource usage, output filename, xrt version etc. are all examples and to bet set by the user themselves).
 
 ## TODO
 * Check if XRT frees the memory map itself

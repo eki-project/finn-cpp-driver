@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <limits>
 #include <random>
+#include <cmath>
 
 #include "Types.h"
 #include "Logger.h"
@@ -22,6 +23,16 @@ namespace FinnUtils {
 
     inline unsigned int innermostDimension(const shape_t& shape) {
         return shape.back();
+    }
+
+    /**
+     * @brief The XRT buffers have to be of a certain size and alignment. The size needs to be a power of 2, depending on the platform >=4096 and page-aligned. This returns the correct size
+     * 
+     * @param requiredBytes The number of bytes that are needed. The return value will be greater or equal than this 
+     * @return unsigned int 
+     */
+    inline size_t getActualBufferSize(size_t requiredBytes) {
+        return static_cast<size_t>(std::max(4096.0, pow(2, log2(static_cast<double>(requiredBytes)))));
     }
 
     /**

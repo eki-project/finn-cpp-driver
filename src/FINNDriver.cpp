@@ -5,17 +5,17 @@
 #include <string>
 
 // Helper
-//#include "core/Accelerator.h"
+// #include "core/Accelerator.h"
 #include "core/DeviceBuffer.hpp"
 #include "utils/FinnDatatypes.hpp"
 #include "utils/Logger.h"
 
 // Created by FINN during compilation
-//#include "config/config.h"
+// #include "config/config.h"
 
 // XRT
-#include "xrt/xrt_device.h"
 #include "xrt/xrt_bo.h"
+#include "xrt/xrt_device.h"
 #include "xrt/xrt_kernel.h"
 
 using std::string;
@@ -30,15 +30,15 @@ int main() {
     FINN_LOG(logger, loglevel::info) << "C++ Driver started";
     FINN_LOG_DEBUG(logger, loglevel::info) << "Test";
 
-/*
-    Finn::DeviceWrapper devWrap;
-    devWrap.xclbin = "design.xclbin";
-    devWrap.name = "SomeName";
-    devWrap.idmas = Config::idmaNames;
-    devWrap.odmas = Config::odmaNames;
+    /*
+        Finn::DeviceWrapper devWrap;
+        devWrap.xclbin = "design.xclbin";
+        devWrap.name = "SomeName";
+        devWrap.idmas = Config::idmaNames;
+        devWrap.odmas = Config::odmaNames;
 
-    Finn::Accelerator acc(devWrap);
-*/
+        Finn::Accelerator acc(devWrap);
+    */
 
     // Preparation for throughput test
     std::random_device rd;
@@ -46,28 +46,29 @@ int main() {
     std::uniform_int_distribution<uint8_t> sampler(0, 0xFF);
 
     // Set parameters
-    const std::string FILENAME = "bitfile/finn-accel.xclbin";
-    const unsigned int RUNS = 20;
+    const std::string filename = "bitfile/finn-accel.xclbin";
+    const unsigned int runs = 20;
+
 
     // Load the device
     auto device = xrt::device(0);
     FINN_LOG(logger, loglevel::info) << "Device found.";
-    
+
     // Debug print the BDF of the device
     auto bdfInfo = device.get_info<xrt::info::device::bdf>();
     FINN_LOG(logger, loglevel::info) << "BDF: " << bdfInfo;
-    
+
     // Load xclbin for debug info on kernels
-    auto xclbin = xrt::xclbin(FILENAME);
+    auto xclbin = xrt::xclbin(filename);
     auto kernels = xclbin.get_kernels();
-    for (auto knl : kernels) {
+    for (auto&& knl : kernels) {
         FINN_LOG(logger, loglevel::info) << "Kernel: " << knl.get_name() << "\n";
-        for (auto arg : knl.get_args()) {
+        for (auto&& arg : knl.get_args()) {
             FINN_LOG(logger, loglevel::info) << "\t\t\tArg: " << arg.get_name() << " Size: " << arg.get_size() << "\n";
         }
 
-        for (auto cu : knl.get_cus()) {
-            FINN_LOG(logger, loglevel::info) << " \t\t\tCU: " << cu.get_name() << " Size: " << cu.get_size() << "\n"; 
+        for (auto&& compUnit : knl.get_cus()) {
+            FINN_LOG(logger, loglevel::info) << " \t\t\tCU: " << compUnit.get_name() << " Size: " << compUnit.get_size() << "\n";
         }
     }
 
@@ -89,7 +90,7 @@ int main() {
     auto mydb = Finn::DeviceInputBuffer<uint8_t, DatatypeInt<2>>("My Buffer", device, kern, myShape, myShapeFolded, myShapePacked, 100);
     std::cout << mydb.isBufferFull() << std::endl;
 
-    auto myodb = Finn::DeviceOutputBuffer<uint8_t, DatatypeBinary>("Output Buffer", device, kern, oMyShape, oMyShapeFolded, oMyShapePacked, RUNS);
+    auto myodb = Finn::DeviceOutputBuffer<uint8_t, DatatypeBinary>("Output Buffer", device, kern, oMyShape, oMyShapeFolded, oMyShapePacked, runs);
     
     auto data =  std::vector<uint8_t>(mydb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
 
@@ -97,7 +98,7 @@ int main() {
     // TODO: Multithread into store - execute? Instead of threading _together_ store-execute, which dont necessarily regard the same data then?
     // Visualize it
     std::vector<std::thread> writeThreads;
-    for (size_t i = 0; i < RUNS; i++) { 
+    for (size_t i = 0; i < runs; i++) { 
         writeThreads.push_back(
             std::thread([&sampler, &engine, &data, &mydb](){
                 std::transform(data.begin(), data.end(), data.begin(), [&sampler, &engine](uint8_t x){ return sampler(engine); });
@@ -115,7 +116,7 @@ int main() {
     }
 
     // Read results out
-    myodb.read(RUNS);
+    myodb.read(runs);
     myodb.archiveValidBufferParts();
     auto res = myodb.retrieveArchive();
     FINN_LOG(logger, loglevel::info) << "Reading output!";

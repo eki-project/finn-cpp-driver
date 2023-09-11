@@ -101,7 +101,7 @@ int main() {
     for (size_t i = 0; i < runs; i++) { 
         writeThreads.push_back(
             std::thread([&sampler, &engine, &data, &mydb](){
-                std::transform(data.begin(), data.end(), data.begin(), [&sampler, &engine](uint8_t x){ return sampler(engine); });
+                std::transform(data.begin(), data.end(), data.begin(), [&sampler, &engine](uint8_t x){ return (x-x) + sampler(engine); });
                 while (!mydb.store(data, false));
                 mydb.loadMap();
                 mydb.sync();
@@ -121,7 +121,7 @@ int main() {
     auto res = myodb.retrieveArchive();
     FINN_LOG(logger, loglevel::info) << "Reading output!";
     
-    for (size_t i = 0; i < RUNS; i++) {
+    for (size_t i = 0; i < runs; i++) {
         FINN_LOG(logger, loglevel::info) << "Reading output of run " << i;
         for (auto& resvalue : res[i]) {
             FINN_LOG(logger, loglevel::info) << static_cast<int>(resvalue);

@@ -44,7 +44,7 @@ int main() {
     // Preparation for throughput test
     std::random_device rd;
     std::mt19937 engine{rd()};
-    std::uniform_int_distribution<uint8_t> sampler(0, 0xFF);
+    std::uniform_int_distribution<uint8_t> sampler(0, 2);
 
     // Set parameters
     const std::string filename = "bitfile/finn-accel.xclbin";
@@ -92,6 +92,24 @@ int main() {
     auto mydb = Finn::DeviceInputBuffer<uint8_t, DatatypeInt<2>>("My Buffer", device, kern, myShape, myShapeFolded, myShapePacked, 100);
     auto myodb = Finn::DeviceOutputBuffer<uint8_t, DatatypeBinary>("Output Buffer", device, kernOut, oMyShape, oMyShapeFolded, oMyShapePacked, runs);
     auto data =  std::vector<uint8_t>(mydb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
+
+
+    std::transform(data.begin(), data.end(), data.begin(), [&sampler, &engine](uint8_t x){ return (x-x) + sampler(engine); });
+    auto x = xrt::bo(device, 4096, 0);
+    x.write(data.data());
+    x.sync(xclBOSyncDirection::XCL_BO_SYNC_BO_TO_DEVICE);
+    auto myres = kern(x, 1);
+    myres.wait();
+    x.sync(xclBOSyncDirection::XCL_BO_SYNC_BO_FROM_DEVICE);
+    uint8_t* buf = new uint8_t[4096];
+    x.read(buf);
+
+    for (unsigned int i = 0; i < 100; i++) {
+        FINN_LOG(logger, loglevel::info) << "TEST: " << static_cast<unsigned int>(buf[i]);
+    }
+    delete[] buf;
+
+
 
     FINN_LOG(logger, loglevel::info) << "Starting write thread";
     auto writeThread = std::thread([&sampler, &engine, &data, &mydb]() {

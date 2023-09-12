@@ -270,7 +270,7 @@ namespace Finn {
         void execute() {
             FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "Executing on device";
             // TODO(bwintermann): Add arguments for kernel run!
-            auto run = this->associatedKernel(this->internalBo);
+            auto run = this->associatedKernel(this->internalBo, 1);
             run.wait();
         }
 

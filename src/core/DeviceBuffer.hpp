@@ -84,7 +84,7 @@ namespace Finn {
 
 
 
-    
+
     template<typename T, typename F>
     class DeviceInputBuffer : DeviceBuffer<T, F> {
         const IO ioMode = IO::INPUT;
@@ -109,6 +109,28 @@ namespace Finn {
             return s;
         }
 
+#ifdef INSPECTION_TEST
+        public:
+        std::vector<T> testGetMap() {
+            std::vector<T> temp;
+            for (size_t i = 0; i < this->mapSize; i++) {
+                temp.push_back(this->map[i]);
+            }
+            return temp;
+        }
+
+        void testSyncBackFromDevice() {
+            this->internalBo.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
+        }
+
+        xrt::bo& testGetInternalBO() {
+            return this->internalBo;
+        }
+        
+        RingBuffer<T>& testGetRingBuffer() {
+            return this->ringBuffer;
+        }
+#endif
 
         public:
         /**
@@ -202,6 +224,29 @@ namespace Finn {
             s += "] ";
             return s;
         }
+
+#ifdef INSPECTION_TEST
+        public:
+        std::vector<T> testGetMap() {
+            std::vector<T> temp;
+            for (size_t i = 0; i < this->map_size; i++) {
+                temp.push_back(this->map[i]);
+            }
+            return temp;
+        }
+
+        unsigned int testGetLongTermStorageSize() {
+            return longTermStorage.size();
+        }
+        
+        xrt::bo& testGetInternalBO() {
+            return this->interalBo;
+        }
+
+        RingBuffer<T>& testGetRingBuffer() {
+            return this->ringBuffer;
+        }
+#endif
 
         public:  
         /**

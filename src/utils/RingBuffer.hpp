@@ -63,6 +63,29 @@ class RingBuffer {
         return (partIndex * elementsPerPart + offset) % buffer.size();
     }
 
+#ifdef INSPECTION_TEST
+    public:
+    std::vector<T> testGetAsVector(index_t partIndex) {
+        std::vector<T> temp;
+        for (size_t i = 0; i < elementsPerPart; i++) {
+            temp.push_back(buffer[elementIndex(partIndex, i)]);
+        }
+        return temp;
+    }
+
+    bool testGetValidity(index_t partIndex) {
+        return validParts[partIndex];
+    }
+
+    void testSetHeadPointer(index_t i) {
+        headPart = i;
+    }
+
+    void testSetReadPointer(index_t i) {
+        readPart = i;
+    }
+#endif
+
     public:
     /**
      * @brief Thread safe version of the internal setValidity method.
@@ -133,7 +156,7 @@ class RingBuffer {
     bool store(const C data, size_t datasize) {
         if constexpr (std::is_same<C,T*>::value || std::is_same<C,std::vector<T>>::value) {
             if (datasize != elementsPerPart) {
-                FinnUtils::logAndError<std::length_error>("Size mismatch when storing vector in Ring Buffer!");
+                FinnUtils::logAndError<std::length_error>("Size mismatch when storing vector in Ring Buffer (got " + std::to_string(datasize) + ", expected " + std::to_string(elementsPerPart) + ")!");
             }
             index_t p;
             for (unsigned int i = 0; i < parts; i++) {
@@ -168,7 +191,7 @@ class RingBuffer {
     bool read(C outData, size_t datasize) {
         if constexpr (std::is_same<C,T*>::value || std::is_same<C,std::vector<T>>::value) {
             if (datasize != elementsPerPart) {
-                FinnUtils::logAndError<std::length_error>("Size mismatch when storing vector in Ring Buffer!");
+                FinnUtils::logAndError<std::length_error>("Size mismatch when reading vector from Ring Buffer (got " + std::to_string(datasize) + ", expected " + std::to_string(elementsPerPart) + ")!");
             }
             index_t p;
             for (unsigned int i = 0; i < parts; i++) {
@@ -178,7 +201,7 @@ class RingBuffer {
                     std::lock_guard<std::mutex> guardPartMutex(*partMutexes[p]);
                     std::lock_guard<std::mutex> guardHeadMutex(headPartMutex);
                     for (size_t j = 0; j < elementsPerPart; j++) {
-                        outData[i] = buffer[elementIndex(p, j)];
+                        outData[j] = buffer[elementIndex(p, j)];
                     }
                     validParts[p] = true;
                     readPart = (p + 1) % parts;

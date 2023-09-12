@@ -3,6 +3,7 @@
 #include <boost/circular_buffer.hpp>
 #include <algorithm>
 #include <functional>
+#include <type_traits>
 
 #include "FinnDatatypes.hpp"
 #include "Types.h"
@@ -18,11 +19,14 @@ template<typename T>
 class RingBuffer {
     finnBoost::circular_buffer<T> buffer;
     std::vector<bool> validParts;
+    std::mutex validPartMutex;
     std::vector<std::unique_ptr<std::mutex>> partMutexes;
     const size_t parts;
     const size_t elementsPerPart;
     index_t headPart = 0;
+    std::mutex headPartMutex;
     index_t readPart = 0;
+    std::mutex readPartMutex;
     logger_type& logger;
 
     /**
@@ -59,32 +63,7 @@ class RingBuffer {
         return (partIndex * elementsPerPart + offset) % buffer.size();
     }
 
-    /**
-     * @brief Set the validity of a part given by it's index
-     * @attention Must be private to guarantee thread safety. The corresponding mutex is managed by the store/read methods
-     * @param partIndex 
-     * @param validity 
-     */
-    void setPartValidity(index_t partIndex, bool validity) {
-        if (partIndex > parts) {
-            FinnUtils::logAndError<std::length_error>("Tried setting validity for an index that is too large.");
-        }
-        validParts[partIndex] = validity;
-    }
-
     public:
-    /**
-     * @brief Returns whether the previous half of the ring buffer contains only valid parts (wraps around) 
-     * 
-     * @return true 
-     * @return false 
-     */
-    bool isPreviousHalfValid() const {
-        auto point1 = validParts.begin() + static_cast<long int>((headPart - static_cast<size_t>(FinnUtils::ceil(static_cast<float>(parts) / 2.0F))) % parts);
-        auto point2 = validParts.begin() + static_cast<long int>((headPart % parts));
-        return std::all_of(std::min(point1, point2), std::max(point1, point2), [](bool i){return i;});
-    }
-
     /**
      * @brief Thread safe version of the internal setValidity method.
      * @attention Dev: This should NOT be used in a store/read method which also already locks the part mutex!
@@ -128,91 +107,9 @@ class RingBuffer {
      * 
      * @return unsigned int 
      */
-    unsigned int countValidParts() const {
+    unsigned int countValidParts() {
+        std::lock_guard<std::mutex> guard(validPartMutex);
         return static_cast<unsigned int>(std::count_if(validParts.begin(), validParts.end(), [](bool x){return x;}));
-    }
-
-    /**
-     * @brief Get the opposite index from the current head index.
-     * When the number of parts is odd, e.g. 13 and the pointer at 3, this would return 10, because the ceil'd half of parts is added onto the head index. 
-     * @return index_t 
-     */
-    index_t getHeadOpposite() const {
-        return (
-            headPart + static_cast<index_t>(
-                FinnUtils::ceil(
-                    static_cast<float>(parts)/2.0F
-                )
-            )
-        ) % parts;
-    }
-
-    /**
-     * @brief Get the head part index
-     * 
-     * @return * index_t 
-     */
-    index_t getHeadIndex() const {
-        return headPart;
-    }
-
-    /**
-     * @brief Get the read part index
-     * 
-     * @return * index_t 
-     */
-    index_t getReadIndex() const {
-        return readPart;
-    }
-
-    /**
-     * @brief Increment the head pointer by one part. Loops around when the highest index is met. 
-     * 
-     */
-    void cycleHeadPart() {
-        headPart = (headPart + 1) % parts;
-    }
-
-    /**
-     * @brief Increment the read pointer by one part. Loops around when the highest index is met. 
-     * 
-     */
-    void cycleReadPart() {
-        readPart = (readPart + 1) % parts;
-    }
-
-    /**
-     * @brief Set the head pointer to a given index
-     *       
-     * @param partIndex 
-     */
-    void setHeadPart(index_t partIndex) {
-        if (partIndex >= parts) {
-            FinnUtils::logAndError<std::length_error>("Couldnt set head index manually, value too high!");
-        }
-        headPart = partIndex;
-    }
-
-    /**
-     * @brief Check the validity of a given partIndex 
-     * 
-     * @param partIndex 
-     * @return true 
-     * @return false 
-     */
-    bool isPartValid(index_t partIndex) const {
-        std::lock_guard<std::mutex> guard(*partMutexes[partIndex]);
-        return partIndex < parts && validParts[partIndex];
-    }
-
-    /**
-     * @brief Check the validity of the head pointer part 
-     * 
-     * @return true 
-     * @return false 
-     */
-    bool isPartValid() const {
-        return validParts[headPart];
     }
 
     /**
@@ -221,231 +118,73 @@ class RingBuffer {
      * @return true 
      * @return false 
      */
-    bool isFull() const {
+    bool isFull() {
         return countValidParts() == parts;
     }
 
     /**
-     * @name Storage / Input methods
-     * These methods are used to insert data into the buffer in various ways. The store-methods increment the head pointer, while setting the part that was just written to valid.
-     * The setPart-methods operate on a given index instead of the head index, they do not change the head pointer, and you can choose whether the validity of the newly inserted part should be set to true or false. 
+     * @brief Searches from the position of the head pointer to the first free (invalid data) spot and stores the data, setting the head pointer to this point+1. If no free spot is found, fase is returned
      * 
+     * @param data 
+     * @return true 
+     * @return false 
      */
-    ///@{
-    /**
-     * @brief Insert a vector at the head pointer part, set the part valid, increase the pointer.
-     * 
-     * @param vec 
-     */
-    void store(const std::vector<T>& vec) {
-        if (vec.size() != elementsPerPart) {
-            FinnUtils::logAndError<std::length_error>("Size mismatch when storing vector in Ring Buffer!");
+    template<typename C>
+    bool store(const C data, size_t datasize) {
+        if constexpr (std::is_same<C,T*>::value || std::is_same<C,std::vector<T>>::value) {
+            if (datasize != elementsPerPart) {
+                FinnUtils::logAndError<std::length_error>("Size mismatch when storing vector in Ring Buffer!");
+            }
+            index_t p;
+            for (unsigned int i = 0; i < parts; i++) {
+                p = (headPart + i) % parts;
+                if (!validParts[p]) {
+                    // Only now set mutex. Even if the spot just became free during the loop we'll take it, but now data has to be preserved.
+                    std::lock_guard<std::mutex> guardPartMutex(*partMutexes[p]);
+                    std::lock_guard<std::mutex> guardHeadMutex(headPartMutex);
+                    for (size_t j = 0; j < datasize; j++) {
+                        buffer[elementIndex(p, j)] = data[j];
+                    }
+                    validParts[p] = true;
+                    headPart = (p + 1) % parts;
+                    return true;
+                }
+            }
         }
-
-        std::lock_guard<std::mutex> guard(*partMutexes[headPart]);
-        for (size_t i = 0; i < vec.size(); i++) {
-            buffer[elementIndex(headPart, i)] = vec[i];
-        }
-        setPartValidity(headPart, true);
-        cycleHeadPart();
+        return false;
     }
 
     /**
-     * @brief Insert an array at the head pointer part, set the part valid, increase the pointer.
+     * @brief Searches from thep position of the read pointer to the first valid data part, and returns it into outData. This sets the read pointer to that point+1 and invalidates the read part.
      * 
-     * @tparam size
-     * @param arr 
+     * @tparam C 
+     * @param outData 
+     * @param datasize 
+     * @return true 
+     * @return false 
      */
-    template<size_t sizetem>
-    void store(std::array<T,sizetem> arr) {
-        if (arr.size() != elementsPerPart) {
-            FinnUtils::logAndError<std::length_error>("Size mismatch when storing array in Ring Buffer!");
+    template<typename C>
+    bool read(C outData, size_t datasize) {
+        if constexpr (std::is_same<C,T*>::value || std::is_same<C,std::vector<T>>::value) {
+            if (datasize != elementsPerPart) {
+                FinnUtils::logAndError<std::length_error>("Size mismatch when storing vector in Ring Buffer!");
+            }
+            index_t p;
+            for (unsigned int i = 0; i < parts; i++) {
+                p = (readPart + i) % parts;
+                if (validParts[p]) {
+                    // Only now set mutex. Even if the spot just became free during the loop we'll take it, but now data has to be preserved.
+                    std::lock_guard<std::mutex> guardPartMutex(*partMutexes[p]);
+                    std::lock_guard<std::mutex> guardHeadMutex(headPartMutex);
+                    for (size_t j = 0; j < elementsPerPart; j++) {
+                        outData[i] = buffer[elementIndex(p, j)];
+                    }
+                    validParts[p] = true;
+                    readPart = (p + 1) % parts;
+                    return true;
+                }
+            }
         }
-
-        std::lock_guard<std::mutex> guard(*partMutexes[headPart]);
-        for (index_t i = 0; i < arr.size(); i++) {
-            buffer[elementIndex(headPart, i)] = arr[i];
-        }
-        setPartValidity(headPart, true);
-        cycleHeadPart();
+        return false;
     }
-
-    /**
-     * @brief Insert an array at the head pointer part, set the part valid, increase the pointer.
-     * 
-     * @param arr 
-     * @param arrSize 
-     */
-    void store(const T* arr, const size_t& arrSize) {
-        if (arrSize != elementsPerPart) {
-            FinnUtils::logAndError<std::length_error>("Size mismatch when storing array in Ring Buffer!");
-        }
-
-        std::lock_guard<std::mutex> guard(*partMutexes[headPart]);
-        for (index_t i = 0; i < arrSize; i++) {
-            buffer[elementIndex(headPart, i)] = arr[i];
-        }
-        setPartValidity(headPart, true);
-        cycleHeadPart();
-    }
-
-    /**
-     * @brief Set the given partIndex to the passed vector values, do NOT increment the head pointer, and set the validity to the passed value
-     * 
-     * @param vec 
-     * @param partIndex 
-     * @param validity 
-     */
-    void setPart(const std::vector<T>& vec, index_t partIndex, bool validity) {
-        if (vec.size() != elementsPerPart) {
-            FinnUtils::logAndError<std::length_error>("Size mismatch when storing vector in Ring Buffer!");
-        }
-
-        std::lock_guard<std::mutex> guard(*partMutexes[partIndex]);
-        for (size_t i = 0; i < vec.size(); i++) {
-            buffer[elementIndex(partIndex, i)] = vec[i];
-        }
-        setPartValidity(partIndex, validity);
-    }
-
-    /**
-     * @brief Set the given partIndex to the passed array values, do NOT increment the head pointer, and set the validity to the passed value
-     * 
-     * @tparam size
-     * @param arr 
-     * @param partIndex 
-     * @param validity 
-     */
-    template<size_t size>
-    void setPart(const std::array<T,size>& arr, index_t partIndex, bool validity) {
-        if (arr.size() != elementsPerPart) {
-            FinnUtils::logAndError<std::length_error>("Size mismatch when storing vector in Ring Buffer!");
-        }
-
-        std::lock_guard<std::mutex> guard(*partMutexes[partIndex]);
-        for (size_t i = 0; i < arr.size(); i++) {
-            buffer[elementIndex(partIndex, i)] = arr[i];
-        }
-        setPartValidity(partIndex, validity);
-    }
-    ///@}
-
-
-
-    /**
-     * @name Read / Output methods
-     * Just as with the store- and setPart methods, read and getPart read a part from the buffer. In similar fashion, read() reads from the head pointer, increments the head pointer and invalidates the just read part. The
-     * getPart methods read from the given partIndex, do NOT increase the head pointer and set the validity of the just read part as wished. 
-     */
-    ///@{
-
-    /**
-     * @brief Read from the head pointer and return as a vector. Increments head pointer and invalidates read data. 
-     * 
-     * @return std::vector<T> 
-     */
-    std::vector<T> read() {
-        std::lock_guard<std::mutex> guard(*partMutexes[readPart]);
-        std::vector<T> temp;
-        for (size_t i = 0; i < elementsPerPart; i++) {
-            temp.push_back(buffer[elementIndex(readPart, i)]);
-        }
-        setPartValidity(readPart, false);
-        cycleReadPart();
-        return temp;
-    }
-
-    /**
-     * @brief Read from head pointer returns an std::array. Increments head pointer and invalidates read data. 
-     * 
-     * @tparam S 
-     * @return std::array<T,S> 
-     */
-    template<size_t S>
-    std::array<T,S> read() {
-        std::lock_guard<std::mutex> guard(*partMutexes[readPart]);
-        std::array<T,S> arr;
-        for (size_t i = 0; i < elementsPerPart; i++) {
-            arr[i] = buffer[elementIndex(readPart, i)];
-        }
-        setPartValidity(readPart, false);
-        cycleReadPart();
-        return arr;
-    }
-
-    /**
-     * @brief Read from head pointer into the referenes array. Increments head pointer and invalidates read data. 
-     * 
-     * @param targetArr 
-     * @param arrSize 
-     */
-    void read(T* targetArr, const size_t& arrSize) {
-        if (arrSize != elementsPerPart) {
-            FinnUtils::logAndError<std::length_error>("Size mismatching when trying to read ring buffer data into an array!");
-        }
-
-        std::lock_guard<std::mutex> guard(*partMutexes[readPart]);
-        for (size_t i = 0; i < elementsPerPart; i++) {
-            targetArr[i] = buffer[elementIndex(readPart, i)];
-        }
-        setPartValidity(readPart, false);
-        cycleReadPart();
-    }
-
-    /**
-     * @brief Read from the given partIndex, do NOT change the head pointer and set validity as prompted. Returns data as a vector
-     * 
-     * @param partIndex 
-     * @param validity 
-     * @return std::vector<T> 
-     */
-    std::vector<T> getPart(const index_t partIndex, const bool validity) {
-        std::lock_guard<std::mutex> guard(*partMutexes[partIndex]);
-        std::vector<T> temp;
-        for (size_t i = 0; i < elementsPerPart; i++) {
-            temp.push_back(buffer[elementIndex(partIndex, i)]);
-        }
-        setPartValidity(partIndex, validity);
-        return temp;
-    }
-
-    /**
-     * @brief Read from the given partIndex, do NOT change the head pointer and set validity as prompted.
-     * 
-     * @tparam S 
-     * @param partIndex 
-     * @param validity 
-     * @return std::array<T,S> 
-     */
-    template<size_t S>
-    std::array<T,S> getPart(index_t partIndex, bool validity) {
-        std::lock_guard<std::mutex> guard(*partMutexes[partIndex]);
-        std::array<T,S> arr;
-        for (size_t i = 0; i < elementsPerPart; i++) {
-            arr[i] = buffer[elementIndex(partIndex, i)];
-        }
-        setPartValidity(partIndex, validity);
-        return arr;
-    }
-
-    /**
-     * @brief Read from the given partIndex, do NOT change the head pointer and set validity as prompted. Writes data into referenced array
-     * 
-     * @param arr 
-     * @param arrSize 
-     * @param partIndex 
-     * @param validity 
-     */
-    void getPart(T* arr, const size_t arrSize, index_t partIndex, bool validity) {
-        if (arrSize != elementsPerPart) {
-            FinnUtils::logAndError<std::length_error>("Size mismatching when trying to read ring buffer data into an array!");
-        }
-        
-        std::lock_guard<std::mutex> guard(*partMutexes[partIndex]);
-        for (size_t i = 0; i < elementsPerPart; i++) {
-            arr[i] = buffer[elementIndex(partIndex, i)];
-        }
-        setPartValidity(partIndex, validity);
-    }
-    ///@}
 };

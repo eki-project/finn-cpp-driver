@@ -90,36 +90,35 @@ int main() {
 
     // Creating the devicebuffers
     auto mydb = Finn::DeviceInputBuffer<uint8_t, DatatypeInt<2>>("My Buffer", device, kern, myShape, myShapeFolded, myShapePacked, 100);
-    std::cout << mydb.isBufferFull() << std::endl;
-
     auto myodb = Finn::DeviceOutputBuffer<uint8_t, DatatypeBinary>("Output Buffer", device, kernOut, oMyShape, oMyShapeFolded, oMyShapePacked, runs);
-    
     auto data =  std::vector<uint8_t>(mydb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
 
-    // Multithreaded writing to the ring buffer and executing
-    // TODO: Multithread into store - execute? Instead of threading _together_ store-execute, which dont necessarily regard the same data then?
-    // Visualize it
-    std::vector<std::thread> writeThreads;
-    for (size_t i = 0; i < runs; i++) { 
-        writeThreads.push_back(
-            std::thread([&sampler, &engine, &data, &mydb](){
-                std::transform(data.begin(), data.end(), data.begin(), [&sampler, &engine](uint8_t x){ return (x-x) + sampler(engine); });
-                while (!mydb.store(data, false));
-                mydb.loadMap((mydb.getHeadIndex()-1) % mydb.size(SIZE_SPECIFIER::PARTS), false);
-                mydb.sync();
-                mydb.execute();
-            })
-        );
-    }
+    FINN_LOG(logger, loglevel::info) << "Starting write thread";
+    auto writeThread = std::thread([&sampler, &engine, &data, &mydb]() {
+        for (size_t i = 0; i < 100; i++) {
+            std::transform(data.begin(), data.end(), data.begin(), [&sampler, &engine](uint8_t x){ return (x-x) + sampler(engine); });
+            while (!mydb.store(data));
+        }
+    });
 
-    // Wait for all write threads to finish
-    for (auto& t : writeThreads) {
-        t.join();
-    }
+    FINN_LOG(logger, loglevel::info) << "Starting execute thread";
+    auto executeThread = std::thread([&mydb]() {
+        for (size_t j = 0; j < 100; j++) {
+            while(!mydb.run());
+        }
+    });
 
-    // Read results out
-    myodb.read(runs);
-    myodb.archiveValidBufferParts();
+    FINN_LOG(logger, loglevel::info) << "Starting read thread";
+    auto readThread = std::thread([&myodb]() {
+        for (size_t k = 0; k < 100; k++) {
+            myodb.read(1);
+        }
+    });
+
+    writeThread.join();
+    executeThread.join();
+    readThread.join();
+
     auto res = myodb.retrieveArchive();
     FINN_LOG(logger, loglevel::info) << "Reading output!";
     

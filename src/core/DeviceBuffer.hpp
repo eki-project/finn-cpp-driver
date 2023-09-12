@@ -80,59 +80,11 @@ namespace Finn {
             return s;
         }
     };
+    
 
-    /**
-     * @brief A wrapper to efficiently put data onto an xrt::bo object. Internally uses a ring buffer to manage large data batches.
-     * This wrapper can be used in one of two ways: Manually or automatically. In manual mode you would use the methods to target specific ring buffer parts and execute them. This enables more finegrained management over how
-     * where and when data is stored and exeuted. An example usage would be:
-     * @code {.cpp}
-     * auto myDB = DeviceInputBuffer<uint8_t, DatatypeUint<2>>(...);
-     * if (!myDB.isPartValid(0)) {
-     *      myDB.store(myData, 0);
-     *      myDB.loadMap(0);
-     *      myDB.sync();
-     *      myDB.execute();
-     * }
-     * @endcode
-     * This example would check that the data at index 0 is invalid and proceed to write data there and execute it.
-     *
-     * The more automatic approach would be something like this:
-     * @code {.cpp}
-     * auto myDB = DeviceInputBuffer<uint8_t, DatatypeUint<2>>(...);
-     * myDB.setExecuteAutomatically(true);
-     * while (true) {
-     *      myDB.store(myData[someIndex++]);
-     * }
-     * @endcode
-     * This would store more and more data until the buffer is full, at which point the next part would always be executed and invalidated to make space for a new entry. Alternatively you could do something like this:
-     * @code {.cpp}
-     * auto myDB = DeviceInputBuffer<uint8_t, DatatypeUint<2>>(...);
-     * myDB.setExecuteAutomatically(false);
-     *
-     * while(true) {
-     *      if (!myDB.isHeadValid()) {
-     *          myDB.store(myData[someIndex++]);
-     *      }
-     * }
-     * @endcode
-     * and in another thread
-     * @code {.cpp}
-     * while(true) {
-     *      index_t opposite = myDB.getHeadOppositeIndex();
-     *      if(myDB.isPartValid(opposite)) {
-     *          myDB.loadMap(opposite);
-     *          myDB.sync();
-     *          myDB.execute();
-     *      }
-     * }
-     * @endcode
-     * This works because loadMap, sync and execute are all read-only.
-     *
-     *
-     *
-     * @tparam T The datatype that the buffer uses to represent everything internally. This is the datatype that gets put on the FPGAs
-     * @tparam F The FINN-datatype that represent the actual data. It is represented by one or multiple values of type T
-     */
+
+
+    
     template<typename T, typename F>
     class DeviceInputBuffer : DeviceBuffer<T, F> {
         const IO ioMode = IO::INPUT;

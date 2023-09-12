@@ -147,6 +147,7 @@ class RingBuffer {
                     }
                     validParts[p] = true;
                     headPart = (p + 1) % parts;
+                    assert((buffer[p * elementsPerPart + 0] == data[0]));
                     return true;
                 }
             }
@@ -181,6 +182,7 @@ class RingBuffer {
                     }
                     validParts[p] = true;
                     readPart = (p + 1) % parts;
+                    assert((outData[0] == buffer[p * elementsPerPart + 0]));
                     return true;
                 }
             }

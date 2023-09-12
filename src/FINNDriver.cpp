@@ -96,18 +96,31 @@ int main() {
 
     std::transform(data.begin(), data.end(), data.begin(), [&sampler, &engine](uint8_t x){ return (x-x) + sampler(engine); });
     auto x = xrt::bo(device, 4096, 0);
+    auto y = xrt::bo(device, 4096, 0);
     x.write(data.data());
     x.sync(xclBOSyncDirection::XCL_BO_SYNC_BO_TO_DEVICE);
     auto myres = kern(x, 1);
     myres.wait();
-    x.sync(xclBOSyncDirection::XCL_BO_SYNC_BO_FROM_DEVICE);
+    auto myresout = kernOut(y, 1);
+    myresout.wait();
+    y.sync(xclBOSyncDirection::XCL_BO_SYNC_BO_FROM_DEVICE);
     uint8_t* buf = new uint8_t[4096];
-    x.read(buf);
+    y.read(buf);
 
     for (unsigned int i = 0; i < 100; i++) {
         FINN_LOG(logger, loglevel::info) << "TEST: " << static_cast<unsigned int>(buf[i]);
     }
     delete[] buf;
+
+
+    mydb.store(data);
+    mydb.run();
+    myodb.read(1);
+    myodb.archiveValidBufferParts();
+    auto rr = myodb.retrieveArchive();
+    for (auto rrval : rr[0]) {
+        FINN_LOG(logger, loglevel::info) << "TEST 2:  " << static_cast<unsigned int>(rrval);
+    }
 
 
 

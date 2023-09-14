@@ -2,6 +2,8 @@
 
 #include <algorithm>
 
+#include "DeviceHandler.h"
+
 namespace Finn {
     Accelerator::Accelerator(const std::vector<DeviceWrapper>& deviceDefinitions) {
         std::size_t deviceIndex = 0;  // For now just set deviceIndex to zero.

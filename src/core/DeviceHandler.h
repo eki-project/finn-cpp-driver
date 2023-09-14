@@ -10,7 +10,18 @@
 #include "xrt/xrt_device.h"
 #include "xrt/xrt_kernel.h"
 
+// Finn
+#include "DeviceBuffer.hpp"
+
 namespace Finn {
+    /**
+     * @brief A small storage struct to manage the description of Buffers
+     *
+     */
+    struct BufferDescriptor {
+        std::string kernelName;
+        shape_t elementShape;
+    };
     /**
      * @brief Object of DeviceHandler is responsible to handle a programming of a Device and communication to it
      *
@@ -23,10 +34,12 @@ namespace Finn {
          * @param xclbinPath Path to xclbin used for programming
          * @param name Name of device used in logs
          * @param deviceIndex Index of device
-         * @param inputNames Names of idmas
-         * @param outputNames Names of odmas
+         * @param inputBufDescr List of descriptions of all input buffers
+         * @param outputBufDescr List of descriptions of all output buffers
+         * @param hostBufferSize Size of input/output buffers in elements
          */
-        DeviceHandler(const std::filesystem::path& xclbinPath, const std::string& pName, std::size_t deviceIndex, const std::vector<std::string>& inputNames, const std::vector<std::string>& outputNames);
+        DeviceHandler(const std::filesystem::path& xclbinPath, const std::string& pName, std::size_t deviceIndex, const std::vector<BufferDescriptor>& inputBufDescr, const std::vector<BufferDescriptor>& outputBufDescr,
+                      std::size_t hostBufferSize = 64);
         /**
          * @brief Default move constructor
          *
@@ -61,11 +74,16 @@ namespace Finn {
          *
          * @param deviceIndex Index of device
          * @param xclbinPath Path to file used for programming
-         * @param inputKernelNames Names of idma
-         * @param outputKernelNames Names of odma
          */
-        void initializeDevice(std::size_t deviceIndex, const std::filesystem::path& xclbinPath, const std::vector<std::string>& inputKernelNames, const std::vector<std::string>& outputKernelNames);
-        void initializeBufferObjects() const;
+        void initializeDevice(std::size_t deviceIndex, const std::filesystem::path& xclbinPath);
+        /**
+         * @brief Initializes input and output buffers of the loaded design
+         *
+         * @param inputBufDescr Descriptions of buffer configurations for the input buffers
+         * @param outputBufDescr Descriptions of buffer configurations for the output buffers
+         * @param hostBufferSize Size of host buffers in number of elements
+         */
+        void initializeBufferObjects(const std::vector<BufferDescriptor>& inputBufDescr, const std::vector<BufferDescriptor>& outputBufDescr, std::size_t hostBufferSize);
 
          private:
         /**
@@ -89,11 +107,13 @@ namespace Finn {
          *
          */
         std::vector<xrt::kernel> inputKernels;
+        std::vector<DeviceInputBuffer<uint8_t>> inputBuffer;
         /**
          * @brief Names of odmas
          *
          */
         std::vector<xrt::kernel> outputKernels;
+        std::vector<DeviceOutputBuffer<uint8_t>> outputBuffer;
     };
 }  // namespace Finn
 

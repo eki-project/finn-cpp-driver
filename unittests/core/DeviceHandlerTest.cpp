@@ -26,7 +26,7 @@ class DeviceHandlerSetup : public ::testing::Test {
 };
 
 TEST_F(DeviceHandlerSetup, InitTest) {
-    auto devicehandler = DeviceHandler("somefile.xclbin", "someName", 0, {"a"}, {"b"});
+    auto devicehandler = DeviceHandler("somefile.xclbin", "someName", 0, {{"a", {}}}, {{"b", {}}});
     EXPECT_EQ(xrt::device::device_costum_constructor_called, 1);
     EXPECT_EQ(xrt::device::device_param_didx, 0);
 
@@ -42,7 +42,7 @@ TEST_F(DeviceHandlerSetup, InitTest) {
     kernel_devices.clear();
     kernel_uuids.clear();
 
-    auto devicehandler2 = DeviceHandler("somefile.xclbin", "someName", 4, {"inpName"}, {"outName"});
+    auto devicehandler2 = DeviceHandler("somefile.xclbin", "someName", 4, {{"inpName", {}}}, {{"outName", {}}});
     EXPECT_EQ(xrt::device::device_costum_constructor_called, 2);
 
     std::vector<std::string> ionames = {"inpName", "outName"};
@@ -60,11 +60,11 @@ TEST_F(DeviceHandlerSetup, InitTest) {
 }
 
 TEST_F(DeviceHandlerSetup, ArgumentTest) {
-    EXPECT_THROW(DeviceHandler("", "name", 0, {"a"}, {"b"}), std::filesystem::filesystem_error);
-    EXPECT_THROW(DeviceHandler("somefile.xclbin", "", 0, {"a"}, {"b"}), std::invalid_argument);
-    EXPECT_THROW(DeviceHandler("somefile.xclbin", "name", 0, {}, {"b"}), std::invalid_argument);
-    EXPECT_THROW(DeviceHandler("somefile.xclbin", "name", 0, {"a"}, {}), std::invalid_argument);
-    EXPECT_NO_THROW(DeviceHandler("somefile.xclbin", "name", 0, {"a"}, {"b"}));
+    EXPECT_THROW(DeviceHandler("", "name", 0, {{"a", {}}}, {{"b", {}}}), std::filesystem::filesystem_error);
+    EXPECT_THROW(DeviceHandler("somefile.xclbin", "", 0, {{"a", {}}}, {{"b", {}}}), std::invalid_argument);
+    EXPECT_THROW(DeviceHandler("somefile.xclbin", "name", 0, {}, {{"b", {}}}), std::invalid_argument);
+    EXPECT_THROW(DeviceHandler("somefile.xclbin", "name", 0, {{"a", {}}}, {}), std::invalid_argument);
+    EXPECT_NO_THROW(DeviceHandler("somefile.xclbin", "name", 0, {{"a", {}}}, {{"b", {}}}));
 }
 
 

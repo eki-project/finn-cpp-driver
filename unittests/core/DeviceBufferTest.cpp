@@ -2,23 +2,19 @@
 #include <span>
 
 #include "../../src/utils/FinnDatatypes.hpp"
-
-#include "gtest/gtest.h"
-#include "xrt/xrt_kernel.h"
-#include "xrt/xrt_device.h"
-
 #include "../../src/utils/Logger.h"
-//using namespace Finn;
+#include "gtest/gtest.h"
+#include "xrt/xrt_device.h"
+#include "xrt/xrt_kernel.h"
+// using namespace Finn;
 
-TEST(DummyTestDB, DTDB) {
-    EXPECT_TRUE(true);
-}
+TEST(DummyTestDB, DTDB) { EXPECT_TRUE(true); }
 
 
-constexpr std::array<unsigned int, 2> myShapeArrayNormal = std::array<unsigned int, 2>{1,300};
-constexpr std::array<unsigned int, 3> myShapeArrayFolded = std::array<unsigned int, 3>{1,10,30};
-constexpr std::array<unsigned int, 3> myShapeArrayPacked = std::array<unsigned int, 3>{1,10,8};     // This packing assumes Uint2 as finn datatype
-constexpr std::array<unsigned int, 3> myShapeArrayPacked2 = std::array<unsigned int, 3>{1,10,53};     // This packing assumes Uint14 as finn datatype
+constexpr std::array<unsigned int, 2> myShapeArrayNormal = std::array<unsigned int, 2>{1, 300};
+constexpr std::array<unsigned int, 3> myShapeArrayFolded = std::array<unsigned int, 3>{1, 10, 30};
+constexpr std::array<unsigned int, 3> myShapeArrayPacked = std::array<unsigned int, 3>{1, 10, 8};    // This packing assumes Uint2 as finn datatype
+constexpr std::array<unsigned int, 3> myShapeArrayPacked2 = std::array<unsigned int, 3>{1, 10, 53};  // This packing assumes Uint14 as finn datatype
 constexpr size_t elementsPerPart = FinnUtils::shapeToElementsConstexpr<unsigned int, 3>(myShapeArrayPacked);
 constexpr size_t parts = 10;
 
@@ -88,7 +84,7 @@ TEST(DeviceBufferTest, DBWriteReadTest) {
 
     // Fill Buffer completely
     // TODO: Fix tests for new deviceBuffer version
-    
+
     for (size_t i = 0; i < parts-1; i++) {
         EXPECT_EQ(inputDB.getHeadIndex(), i);
         inputDB.store<elementsPerPart>(randomData[i], false);
@@ -100,8 +96,8 @@ TEST(DeviceBufferTest, DBWriteReadTest) {
     EXPECT_TRUE(inputDB.store<elementsPerPart>(randomData[9], true));
     EXPECT_TRUE(inputDB.isHeadValid());
     EXPECT_EQ(inputDB.getHeadIndex(), 0);
-    
-    // Store one more element and check that the old one was overwritten and both head 
+
+    // Store one more element and check that the old one was overwritten and both head
     // and the element before are still valid
     EXPECT_TRUE(inputDB.store<elementsPerPart>(randomData[9], true));
     EXPECT_TRUE(inputDB.isHeadValid());
@@ -124,7 +120,7 @@ TEST(DeviceBufferTest, DBWriteReadTest) {
 }
 */
 
-#define INSPECTION_TEST                         // Defines testing methods in deviceBuffer, thus needs to be defined before the inclue
+#define INSPECTION_TEST  // Defines testing methods in deviceBuffer, thus needs to be defined before the inclue
 #include "../../src/core/DeviceBuffer.hpp"
 
 
@@ -136,25 +132,22 @@ TEST(DeviceBufferTest, BasicFunctionalityTest) {
 
     auto device = xrt::device();
     auto kernel = xrt::kernel();
-    auto inputDB = Finn::DeviceInputBuffer<uint8_t, DatatypeUInt<2>>("test", device, kernel, myShapeNormal, myShapeFolded, myShapePacked, parts);
+    auto inputDB = Finn::DeviceInputBuffer<uint8_t /*, DatatypeUInt<2>*/>("test", device, kernel, /*myShapeNormal, myShapeFolded,*/ myShapePacked, parts);
     std::vector<uint8_t> data(inputDB.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
 
     auto initialMapData = inputDB.testGetMap();
 
-    // Func to fill data with random values 
-    auto fillRandomData = [&sampler, &engine, &data]() {
-        std::transform(data.begin(), data.end(), data.begin(), [&sampler, &engine](uint8_t _) { return sampler(engine); });
-    };
+    // Func to fill data with random values
+    auto fillRandomData = [&sampler, &engine, &data]() { std::transform(data.begin(), data.end(), data.begin(), [&sampler, &engine]([[maybe_unused]] uint8_t _) { return sampler(engine); }); };
 
     // Test basic functions
     fillRandomData();
     inputDB.store(data);
     EXPECT_EQ(inputDB.testGetRingBuffer().testGetAsVector(0), data);
-    
+
     inputDB.loadMap();
     EXPECT_NE(initialMapData, inputDB.testGetMap());
     EXPECT_EQ(inputDB.testGetMap(), data);
-
 }
 
 int main(int argc, char** argv) {

@@ -4,9 +4,12 @@
 #include <filesystem>
 #include <vector>
 
-#include "DeviceHandler.h"
 
 namespace Finn {
+
+    // Fwd declarations
+    class DeviceHandler;
+    struct BufferDescriptor;
 
     /**
      * @brief Helper struct to structure input data for DeviceHandler creation
@@ -15,8 +18,8 @@ namespace Finn {
     struct DeviceWrapper {
         std::filesystem::path xclbin;
         std::string name;
-        std::vector<std::string> idmas;
-        std::vector<std::string> odmas;
+        std::vector<BufferDescriptor> idmas;
+        std::vector<BufferDescriptor> odmas;
     };
 
 

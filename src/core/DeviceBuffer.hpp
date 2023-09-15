@@ -187,8 +187,8 @@ namespace Finn {
         void execute() {
             FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "Executing the kernel " << this->associatedKernel.get_name();
             // TODO(bwintermann): Make batch_size changeable from 1
-            auto run = this->associatedKernel(this->internalBo, 1);
-            run.wait();
+            auto runCall = this->associatedKernel(this->internalBo, 1);
+            runCall.wait();
         }
 
         bool loadMap() {

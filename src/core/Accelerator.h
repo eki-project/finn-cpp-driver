@@ -1,6 +1,7 @@
 #ifndef ACCELERATOR_H
 #define ACCELERATOR_H
 
+#include <cinttypes>
 #include <filesystem>
 #include <vector>
 
@@ -68,6 +69,15 @@ namespace Finn {
          *
          */
         ~Accelerator() = default;
+
+        /**
+         * @brief Fast and dirty implementation that only supports a single FPGA with a single input
+         *
+         * @param inputVec
+         * @return true
+         * @return false
+         */
+        bool write(const std::vector<uint8_t>& inputVec);
 
          private:
         /**

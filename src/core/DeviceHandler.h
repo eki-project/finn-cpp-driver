@@ -2,6 +2,7 @@
 #define DEVICEHANDLER_H
 #include <filesystem>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 // XRT
@@ -10,10 +11,19 @@
 #include "xrt/xrt_device.h"
 #include "xrt/xrt_kernel.h"
 
-// Finn
+// FINN
+#include "../utils/Types.h"
 #include "DeviceBuffer.hpp"
 
+
 namespace Finn {
+    // // FWD declarations
+    // template<typename T>
+    // class DeviceInputBuffer;
+    // template<typename T>
+    // class DeviceOutputBuffer;
+
+
     /**
      * @brief A small storage struct to manage the description of Buffers
      *
@@ -68,6 +78,63 @@ namespace Finn {
          */
         ~DeviceHandler() = default;
 
+        /**
+         * @brief Write the data provided using the begin and end iterators to the device input buffer. This version of the write function works iff the FPGA has only one input!
+         * @attention Dev: At the moment this member function performs an additional copy of the data and should therefore not be used in realtime situations.
+         *
+         * @tparam InputIt Type of the input iterator (In general this template parameter is automatically infered)
+         * @param first Iterator to the first element to be transfered
+         * @param last Iterator to the last element to be transfered
+         * @return true Write to Buffer was successful
+         * @return false Write to Buffer did not succeed
+         */
+        template<class InputIt>
+        bool write(InputIt first, InputIt last) {
+            static_assert(std::is_same<typename std::iterator_traits<InputIt>::value_type, uint8_t>::value);
+            // TODO(linusjun): rewrite to just forward iterators to DeviceBuffer
+            std::vector<uint8_t> vec(first, last);
+            return write(vec);
+        }
+
+        /**
+         * @brief Write the data provided using the vector reference to the device input buffer. This version of the write function works iff the FPGA has only one input!
+         * @attention Dev: This member function is real time safe, iff the initialization of the buffer object does not report hash conflicts and the underlying device buffer is realtime safe
+         *
+         * @param inputVec Vector of data to be transfered
+         * @return true Write to Buffer was successful
+         * @return false Write to Buffer did not succeed
+         */
+        bool write(const std::vector<uint8_t>& inputVec);
+
+        /**
+         * @brief Write the data provided using the begin and end iterators to the device input buffer.
+         * @attention Dev: At the moment this member function performs an additional copy of the data and should therefore not be used in realtime situations.
+         *
+         * @tparam InputIt Type of the input iterator (In general this template parameter is automatically infered)
+         * @param first Iterator to the first element to be transfered
+         * @param last Iterator to the last element to be transfered
+         * @param inputBufferName Name of the buffer to which the data should be written
+         * @return true Write to Buffer was successful
+         * @return false Write to Buffer did not succeed
+         */
+        template<class InputIt>
+        bool write(InputIt first, InputIt last, std::string& inputBufferName) {
+            static_assert(std::is_same<typename std::iterator_traits<InputIt>::value_type, uint8_t>::value);
+            // TODO(linusjun): rewrite to just forward iterators to DeviceBuffer
+            std::vector<uint8_t> vec(first, last);
+            return write(vec, inputBufferName);
+        }
+
+        /**
+         * @brief Write the data provided using the vector reference to the device input buffer.
+         *
+         * @param inputVec Write the data provided using the vector reference to the device input buffer.
+         * @param inputBufferName Name of the buffer to which the data should be written
+         * @return true Write to Buffer was successful
+         * @return false Write to Buffer did not succeed
+         */
+        bool write(const std::vector<uint8_t>& inputVec, const std::string& inputBufferName);
+
          protected:
         /**
          * @brief Program and initialize the managed device
@@ -103,17 +170,15 @@ namespace Finn {
          */
         xrt::uuid uuid;
         /**
-         * @brief Names of idmas
+         * @brief InputBuffers used for data input
          *
          */
-        std::vector<xrt::kernel> inputKernels;
-        std::vector<DeviceInputBuffer<uint8_t>> inputBuffer;
+        std::unordered_map<std::string, DeviceInputBuffer<uint8_t>> inputBufferMap;
         /**
-         * @brief Names of odmas
+         * @brief OutputBuffers used for data retrieval
          *
          */
-        std::vector<xrt::kernel> outputKernels;
-        std::vector<DeviceOutputBuffer<uint8_t>> outputBuffer;
+        std::unordered_map<std::string, DeviceOutputBuffer<uint8_t>> outputBufferMap;
     };
 }  // namespace Finn
 

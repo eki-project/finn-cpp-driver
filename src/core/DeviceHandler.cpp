@@ -1,6 +1,7 @@
 #include "DeviceHandler.h"
 
 #include <stdexcept>
+#include <utility>
 
 #include "../utils/Logger.h"
 
@@ -22,8 +23,24 @@ namespace Finn {
         if (inputBufDescr.empty()) {
             throw std::invalid_argument("Empty input kernel list. Abort.");
         }
+        for (auto&& bufDesc : inputBufDescr) {
+            if (bufDesc.kernelName.empty()) {
+                throw std::invalid_argument("Empty kernel name. Abort.");
+            }
+            if (bufDesc.elementShape.empty()) {
+                throw std::invalid_argument("Empty buffer shape. Abort.");
+            }
+        }
         if (outputBufDescr.empty()) {
             throw std::invalid_argument("Empty output kernel list. Abort.");
+        }
+        for (auto&& bufDesc : outputBufDescr) {
+            if (bufDesc.kernelName.empty()) {
+                throw std::invalid_argument("Empty kernel name. Abort.");
+            }
+            if (bufDesc.elementShape.empty()) {
+                throw std::invalid_argument("Empty buffer shape. Abort.");
+            }
         }
         initializeDevice(deviceIndex, xclbinPath);
         initializeBufferObjects(inputBufDescr, outputBufDescr, hostBufferSize);
@@ -43,15 +60,40 @@ namespace Finn {
         auto log = Logger::getLogger();
         FINN_LOG_DEBUG(log, loglevel::info) << "(" << name << ") "
                                             << "Initializing buffer objects\n";
-        // std::transform(inputKernelDescr.begin(), inputKernelDescr.end(), std::back_inserter(inputKernels), [this](const BufferDescriptor& descr) { return xrt::kernel(device, uuid, descr.kernelName); });
-        // std::transform(outputKernelDescr.begin(), outputKernelDescr.end(), std::back_inserter(outputKernels), [this](const BufferDescriptor& descr) { return xrt::kernel(device, uuid, descr.kernelName); });
+        std::size_t index = 0;
         for (auto&& bufDesc : inputBufDescr) {
             auto tmpKern = xrt::kernel(device, uuid, bufDesc.kernelName);
-            inputBuffer.emplace_back(Finn::DeviceInputBuffer<uint8_t>("buffer1", device, tmpKern, bufDesc.elementShape, static_cast<unsigned int>(hostBufferSize)));
+            inputBufferMap.emplace(std::make_pair(bufDesc.kernelName, Finn::DeviceInputBuffer<uint8_t>(name + "_InputBuffer_" + std::to_string(index++), device, tmpKern, bufDesc.elementShape, static_cast<unsigned int>(hostBufferSize))));
         }
+        index = 0;
         for (auto&& bufDesc : outputBufDescr) {
             auto tmpKern = xrt::kernel(device, uuid, bufDesc.kernelName);
-            outputBuffer.emplace_back(Finn::DeviceOutputBuffer<uint8_t>("buffer1", device, tmpKern, bufDesc.elementShape, static_cast<unsigned int>(hostBufferSize)));
+            outputBufferMap.emplace(std::make_pair(bufDesc.kernelName, Finn::DeviceOutputBuffer<uint8_t>(name + "_OutputBuffer_" + std::to_string(index++), device, tmpKern, bufDesc.elementShape, static_cast<unsigned int>(hostBufferSize))));
         }
+
+#ifndef NDEBUG
+        for (index = 0; index < inputBufferMap.bucket_count(); ++index) {
+            if (inputBufferMap.bucket_size(index) > 1) {
+                FINN_LOG_DEBUG(log, loglevel::error) << "(" << name << ") "
+                                                     << "Hash collision in inputBufferMap. This access to the inputBufferMap is no longer constant time!";
+            }
+        }
+        for (index = 0; index < outputBufferMap.bucket_count(); ++index) {
+            if (outputBufferMap.bucket_size(index) > 1) {
+                FINN_LOG_DEBUG(log, loglevel::error) << "(" << name << ") "
+                                                     << "Hash collision in outputBufferMap. This access to the outputBufferMap is no longer constant time!";
+            }
+        }
+#endif
+
+        FINN_LOG_DEBUG(log, loglevel::info) << "(" << name << ") "
+                                            << "Device Buffers successfully initialised\n";
+    }
+
+    bool DeviceHandler::write(const std::vector<uint8_t>& inputVec) { return inputBufferMap.begin()->second.store(inputVec) && inputBufferMap.begin()->second.run(); }
+
+    bool DeviceHandler::write(const std::vector<uint8_t>& inputVec, const std::string& inputBufferName) {
+        // Access using at is important, because operator[] may modify Map
+        return inputBufferMap.at(inputBufferName).store(inputVec) && inputBufferMap.at(inputBufferName).run();
     }
 }  // namespace Finn

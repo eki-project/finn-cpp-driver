@@ -30,7 +30,7 @@ namespace Finn {
         // size_t numbers;  // Numbers of type F: in a shape (1,20) this would be 20
         //  shape_t shapeNormal;  // Input shape (Type F): (1,20)
         //  shape_t shapeFolded;  // Folded shape (Type F): (1,2,10)
-        shape_t shapePacked;  // Packed shape (Type T): (1,2,3)
+        shapePacked_t shapePacked;  // Packed shape (Type T): (1,2,3)
         size_t mapSize;       // Numbers of type T: When F has bitwidth 2, and T has bitwidth 8, the folded shape would be (1,2,10) and the packed (1,2,3) and thus 6
         xrt::bo internalBo;
         xrt::kernel& associatedKernel;
@@ -39,7 +39,7 @@ namespace Finn {
         RingBuffer<T> ringBuffer;
 
          public:
-        DeviceBuffer(const std::string& pName, xrt::device& device, xrt::kernel& pAssociatedKernel, /*const shape_t& pShapeNormal, const shape_t& pShapeFolded,*/ const shape_t& pShapePacked, unsigned int ringBufferSizeFactor)
+        DeviceBuffer(const std::string& pName, xrt::device& device, xrt::kernel& pAssociatedKernel, /*const shape_t& pShapeNormal, const shape_t& pShapeFolded,*/ const shapePacked_t& pShapePacked, unsigned int ringBufferSizeFactor)
             : name(pName),
               // numbers(FinnUtils::shapeToElements(pShapeNormal)),
               //  shapeNormal(pShapeNormal),
@@ -203,6 +203,10 @@ namespace Finn {
         bool store(const std::vector<T>& data) {
             // TODO(bjarne): Enable support to write multiple parts from one vector, which has then to be a multiple of elementsPerPart large
             return this->ringBuffer.template store<std::vector<T>>(data, data.size());
+        }
+
+        bool store(VecUintIt beginning, VecUintIt end) {
+            return this->ringBuffer.store(beginning, end);
         }
 
         bool run() {

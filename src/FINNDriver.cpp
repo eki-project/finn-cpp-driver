@@ -79,13 +79,13 @@ int main() {
     auto kernOut = xrt::kernel(device, uuid, "StreamingDataflowPartition_2:{odma0}", xrt::kernel::cu_access_mode::shared);
 
     // Shape data
-    shape_t myShape = std::vector<unsigned int>{1, 300};
-    shape_t myShapeFolded = std::vector<unsigned int>{1, 10, 30};
-    shape_t myShapePacked = std::vector<unsigned int>{1, 10, 8};
+    shapeNormal_t myShape = std::vector<unsigned int>{1, 300};
+    shapeFolded_t myShapeFolded = std::vector<unsigned int>{1, 10, 30};
+    shapePacked_t myShapePacked = std::vector<unsigned int>{1, 10, 8};
 
-    shape_t oMyShape = std::vector<unsigned int>{1, 10};
-    shape_t oMyShapeFolded = std::vector<unsigned int>{1, 10, 1};
-    shape_t oMyShapePacked = std::vector<unsigned int>{1, 10, 1};
+    shapeNormal_t oMyShape = std::vector<unsigned int>{1, 10};
+    shapeFolded_t oMyShapeFolded = std::vector<unsigned int>{1, 10, 1};
+    shapePacked_t oMyShapePacked = std::vector<unsigned int>{1, 10, 1};
 
     // Creating the devicebuffers
     // auto mydb = Finn::DeviceInputBuffer<uint8_t, DatatypeInt<2>>("My Buffer", device, kern, myShape, myShapeFolded, myShapePacked, 100);
@@ -93,7 +93,6 @@ int main() {
     auto mydb = Finn::DeviceInputBuffer<uint8_t>("My Buffer", device, kern, myShapePacked, 100);
     auto myodb = Finn::DeviceOutputBuffer<uint8_t>("Output Buffer", device, kernOut, oMyShapePacked, runs);
     auto data = std::vector<uint8_t>(mydb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
-
 
     std::transform(data.begin(), data.end(), data.begin(), [&sampler, &engine](uint8_t x) { return (x - x) + sampler(engine); });
     auto x = xrt::bo(device, 4096, 0);
@@ -127,7 +126,7 @@ int main() {
     FINN_LOG(logger, loglevel::info) << "Starting write thread";
     auto writeThread = std::thread([&sampler, &engine, &data, &mydb]() {
         for (size_t i = 0; i < 100; i++) {
-            std::transform(data.begin(), data.end(), data.begin(), [&sampler, &engine](uint8_t x) { return (x - x) + sampler(engine); });
+            std::transform(data.begin(), data.end(), data.begin(), [&sampler, &engine](uint8_t o) { return (o - o) + sampler(engine); });
             while (!mydb.store(data))
                 ;
         }

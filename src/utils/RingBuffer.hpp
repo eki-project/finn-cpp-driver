@@ -5,6 +5,7 @@
 #include <boost/circular_buffer.hpp>
 #include <functional>
 #include <mutex>
+#include <iterator>
 #include <span>
 #include <type_traits>
 
@@ -183,6 +184,39 @@ class RingBuffer {
         }
         return false;
     }
+
+    /**
+     * @brief Searches from the position of the head pointer to the first free (invalid data) spot and stores the data, setting the head pointer to this point+1. If no free spot is found, fase is returned
+     *
+     * @param data
+     * @return true
+     * @return false
+     */
+    bool store(VecUintIt beginning, VecUintIt end) {
+        if (std::distance(beginning, end) != elementsPerPart) {
+            FinnUtils::logAndError<std::length_error>("Size mismatch when storing vector in Ring Buffer (got " + std::to_string(std::distance(beginning, end)) + ", expected " + std::to_string(elementsPerPart) + ")!");
+        }
+        index_t indexP = 0;
+        for (unsigned int i = 0; i < parts; i++) {
+            indexP = (headPart + i) % parts;
+            if (!validParts[indexP]) {
+                // Only now set mutex. Even if the spot just became free during the loop we'll take it, but now data has to be preserved.
+                std::lock_guard<std::mutex> guardPartMutex(*partMutexes[indexP]);
+                std::lock_guard<std::mutex> guardHeadMutex(headPartMutex);
+                unsigned int j = 0;
+                for (auto it = beginning; it != end; it++) {
+                    buffer[elementIndex(indexP, j)] = *it;
+                    j++;
+                }
+                validParts[indexP] = true;
+                headPart = (indexP + 1) % parts;
+                assert((buffer[indexP * elementsPerPart + 0] == data[0]));
+                return true;
+            }
+        }
+        return false;
+    }
+
 
     /**
      * @brief Searches from thep position of the read pointer to the first valid data part, and returns it into outData. This sets the read pointer to that point+1 and invalidates the read part.

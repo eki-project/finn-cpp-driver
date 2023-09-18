@@ -201,7 +201,7 @@ class RingBuffer {
     template<typename VecUintIt>
     bool store(VecUintIt beginning, VecUintIt end) {
         static_assert(std::is_same<typename std::iterator_traits<VecUintIt>::value_type, T>::value);
-        if (std::distance(beginning, end) != elementsPerPart) {
+        if (static_cast<unsigned long>(std::distance(beginning, end)) != elementsPerPart) {
             FinnUtils::logAndError<std::length_error>("Size mismatch when storing vector in Ring Buffer (got " + std::to_string(std::distance(beginning, end)) + ", expected " + std::to_string(elementsPerPart) + ")!");
         }
         index_t indexP = 0;

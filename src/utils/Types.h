@@ -4,6 +4,8 @@
 #include <cctype>
 #include <variant>
 #include <vector>
+#include <string>
+#include <unordered_map>
 
 enum class PLATFORM { ALVEO = 0, INVALID = -1 };
 
@@ -35,4 +37,41 @@ using bytewidth_list_t = std::vector<unsigned int>;
 
 using size_bytes_t = std::size_t;
 using index_t = long unsigned int;
+
+/**
+ * @brief A small storage struct to manage the description of Buffers
+ *
+ */
+struct BufferDescriptor {
+    std::string kernelName;  // Kernel Name (e.g. vadd / idma0)
+    std::string cuName;      // CU Name (e.g. vadd:{inst0} / idma0:{inst0})
+    shape_t packedShape;
+    IO ioMode;
+
+    // TODO(bwintermann): Currently unused, reserved for multi-fpga usage
+    unsigned int fpgaIndex = 0;
+    unsigned int slrIndex = 0;
+
+    BufferDescriptor(const std::string& pKernelName, const std::string& pCuName, const shape_t& pPackedShape, IO pIoMode) : kernelName(pKernelName), cuName(pCuName), packedShape(pPackedShape), ioMode(pIoMode) {};
+};
+
+struct ExtendedBufferDescriptor : public BufferDescriptor {
+    ExtendedBufferDescriptor(const std::string& pKernelName, const std::string& pCuName, const shape_t& pPackedShape, const shape_t& pNormalShape, const shape_t& pFoldedShape, IO pIoMode)
+        : BufferDescriptor(pKernelName, pCuName, pPackedShape, pIoMode), normalShape(pNormalShape), foldedShape(pFoldedShape) {};
+    shape_t normalShape;
+    shape_t foldedShape;
+};
+
+class FinnConfiguration {
+    private:
+    std::string xclbinPath;
+    std::unordered_map<std::string, ExtendedBufferDescriptor> ebds;
+
+    public:
+    FinnConfiguration(/* std::string configJsonPath */) {
+        // TODO(bwintermann): Fill with data / read from json file
+    }
+};
+
+
 #endif  // TYPES_H

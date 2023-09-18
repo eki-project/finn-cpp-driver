@@ -49,10 +49,35 @@ TEST(RBTest, RBInitTest) {
     EXPECT_FALSE(rb.isFull());
 }
 
-TEST(RBTest, RBStoreTest) {
+TEST(RBTest, RBStoreReadTest) {
     auto rb = RB(parts, elementsPerPart);
 
-    
+    // Store data
+    std::vector<uint8_t> data;
+    data.resize(elementsPerPart);
+
+    // FIll until all spots are valid
+    for (size_t i = 0; i < parts; i++) {
+        filler.fillRandom(data);
+        EXPECT_TRUE(rb.store(data.begin(), data.end()));
+    }
+
+    // Confirm that the head pointer wrapped around
+    EXPECT_EQ(rb.testGetHeadPointer(), 0);
+    EXPECT_EQ(rb.testGetReadPointer(), 0);
+
+    // Confirm that no new data can be stored until some data is read
+    filler.fillRandom(data);
+    EXPECT_FALSE(rb.store(data.begin(), data.end()));
+
+    // Read two entries
+    uint8_t buf[elementsPerPart];
+    EXPECT_TRUE(rb.read(buf, elementsPerPart));
+    EXPECT_TRUE(rb.read(buf, elementsPerPart));
+
+    // Check pointer positions
+    EXPECT_EQ(rb.testGetHeadPointer(), 0);
+    EXPECT_EQ(rb.testGetReadPointer(), 2);
 }
 
 

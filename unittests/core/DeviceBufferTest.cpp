@@ -18,9 +18,9 @@ constexpr std::array<unsigned int, 3> myShapeArrayPacked2 = std::array<unsigned 
 constexpr size_t elementsPerPart = FinnUtils::shapeToElementsConstexpr<unsigned int, 3>(myShapeArrayPacked);
 constexpr size_t parts = 10;
 
-shape_t myShapeNormal = std::vector<unsigned int>(myShapeArrayNormal.begin(), myShapeArrayNormal.end());
-shape_t myShapeFolded = std::vector<unsigned int>(myShapeArrayFolded.begin(), myShapeArrayFolded.end());
-shape_t myShapePacked = std::vector<unsigned int>(myShapeArrayPacked.begin(), myShapeArrayPacked.end());
+Finn::shape_t myShapeNormal = std::vector<unsigned int>(myShapeArrayNormal.begin(), myShapeArrayNormal.end());
+Finn::shape_t myShapeFolded = std::vector<unsigned int>(myShapeArrayFolded.begin(), myShapeArrayFolded.end());
+Finn::shape_t myShapePacked = std::vector<unsigned int>(myShapeArrayPacked.begin(), myShapeArrayPacked.end());
 
 
 #define INSPECTION_TEST  // Defines testing methods in deviceBuffer, thus needs to be defined before the inclue
@@ -34,7 +34,7 @@ TEST(DeviceBufferTest, BasicFunctionalityTest) {
     auto device = xrt::device();
     auto kernel = xrt::kernel();
     auto inputDB = Finn::DeviceInputBuffer<uint8_t /*, DatatypeUInt<2>*/>("test", device, kernel, /*myShapeNormal, myShapeFolded,*/ myShapePacked, parts);
-    std::vector<uint8_t> data(inputDB.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
+    std::vector<uint8_t> data(inputDB.size(Finn::SIZE_SPECIFIER::ELEMENTS_PER_PART));
 
     auto initialMapData = inputDB.testGetMap();
 

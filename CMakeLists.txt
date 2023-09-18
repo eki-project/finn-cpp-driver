@@ -89,8 +89,12 @@ include_directories(SYSTEM external/magic_enum/include)
 #NumCpp
 include_directories(SYSTEM external/NumCpp/include)
 
-# Build Unit tests
-# Include before clang-tidy inclusion to exclude folder from clang-tidy
+#Nlohmann
+set(JSON_BuildTests OFF CACHE INTERNAL "")
+
+add_subdirectory(external/json)
+include_directories(SYSTEM external/json/include/)
+
 
 set(FINNC_ENABLE_TESTING "Build all tests (default is ON)" ON)
 FetchContent_MakeAvailable(googletest)

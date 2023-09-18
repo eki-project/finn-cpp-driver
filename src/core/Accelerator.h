@@ -6,24 +6,11 @@
 #include <string>      // for string
 #include <vector>      // for vector
 
+#include "../utils/Types.h"
 #include "DeviceHandler.h"  // for BufferDescriptor, DeviceHandler
 
 
 namespace Finn {
-    // Fwd declarations
-    // class DeviceHandler;
-    // struct BufferDescriptor;
-
-    /**
-     * @brief Helper struct to structure input data for DeviceHandler creation
-     *
-     */
-    struct DeviceWrapper {
-        std::filesystem::path xclbin;
-        std::string name;
-        std::vector<BufferDescriptor> idmas;
-        std::vector<BufferDescriptor> odmas;
-    };
 
 
     /**
@@ -32,6 +19,11 @@ namespace Finn {
      */
     class Accelerator {
          public:
+        /**
+         * @brief Default Constructor
+         *
+         */
+        Accelerator() = default;
         /**
          * @brief Construct a new Accelerator object using a list of DeviceWrappers
          *

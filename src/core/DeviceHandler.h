@@ -32,15 +32,6 @@
 
 
 namespace Finn {
-
-    /**
-     * @brief A small storage struct to manage the description of Buffers
-     *
-     */
-    struct BufferDescriptor {
-        std::string kernelName;
-        shape_t elementShape;
-    };
     /**
      * @brief Object of DeviceHandler is responsible to handle a programming of a Device and communication to it
      *

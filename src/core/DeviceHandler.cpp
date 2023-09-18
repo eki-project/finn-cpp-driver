@@ -35,7 +35,7 @@ namespace Finn {
             if (bufDesc.kernelName.empty()) {
                 throw std::invalid_argument("Empty kernel name. Abort.");
             }
-            if (bufDesc.elementShape.empty()) {
+            if (bufDesc.packedShape.empty()) {
                 throw std::invalid_argument("Empty buffer shape. Abort.");
             }
         }
@@ -46,7 +46,7 @@ namespace Finn {
             if (bufDesc.kernelName.empty()) {
                 throw std::invalid_argument("Empty kernel name. Abort.");
             }
-            if (bufDesc.elementShape.empty()) {
+            if (bufDesc.packedShape.empty()) {
                 throw std::invalid_argument("Empty buffer shape. Abort.");
             }
         }
@@ -71,12 +71,12 @@ namespace Finn {
         std::size_t index = 0;
         for (auto&& bufDesc : inputBufDescr) {
             auto tmpKern = xrt::kernel(device, uuid, bufDesc.kernelName);
-            inputBufferMap.emplace(std::make_pair(bufDesc.kernelName, Finn::DeviceInputBuffer<uint8_t>(name + "_InputBuffer_" + std::to_string(index++), device, tmpKern, bufDesc.elementShape, static_cast<unsigned int>(hostBufferSize))));
+            inputBufferMap.emplace(std::make_pair(bufDesc.kernelName, Finn::DeviceInputBuffer<uint8_t>(name + "_InputBuffer_" + std::to_string(index++), device, tmpKern, bufDesc.packedShape, static_cast<unsigned int>(hostBufferSize))));
         }
         index = 0;
         for (auto&& bufDesc : outputBufDescr) {
             auto tmpKern = xrt::kernel(device, uuid, bufDesc.kernelName);
-            outputBufferMap.emplace(std::make_pair(bufDesc.kernelName, Finn::DeviceOutputBuffer<uint8_t>(name + "_OutputBuffer_" + std::to_string(index++), device, tmpKern, bufDesc.elementShape, static_cast<unsigned int>(hostBufferSize))));
+            outputBufferMap.emplace(std::make_pair(bufDesc.kernelName, Finn::DeviceOutputBuffer<uint8_t>(name + "_OutputBuffer_" + std::to_string(index++), device, tmpKern, bufDesc.packedShape, static_cast<unsigned int>(hostBufferSize))));
         }
 
 #ifndef NDEBUG

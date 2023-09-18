@@ -2,6 +2,7 @@
 #define BASEDRIVER_HPP
 
 #include <cinttypes>  // for uint8_t
+#include <vector>     // for vector
 
 #include "Accelerator.h"
 
@@ -17,7 +18,8 @@ namespace Finn {
     template<typename F, typename S, typename T = uint8_t>
     class BaseDriver {
          public:
-        BaseDriver() : accelerator(std::vector<DeviceWrapper>()) {
+        BaseDriver() {
+            accelerator = Accelerator(std::vector<DeviceWrapper>());
             readConfigAndInit();  // After this shapeNormal, shapeFolded and shapePacked should be filled.
         };
         BaseDriver(BaseDriver&&) noexcept = default;
@@ -39,8 +41,11 @@ namespace Finn {
         }
 
          protected:
-        void readConfigAndInit() {
+        std::vector<DeviceWrapper> readConfigAndInit() {
             // TODO(linusjun): Read values from config file and initialize variables
+            ExtendedBufferDescriptor ext = {"", {}, {}, {}};
+            DeviceWrapper devWrap = {.xclbin = "", .name = "", .idmas = {static_cast<BufferDescriptor>(ext)}, .odmas = {}};
+            return {devWrap};
         }
 
         void fold() {

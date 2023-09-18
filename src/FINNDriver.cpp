@@ -6,7 +6,7 @@
 #include <thread>
 
 // Helper
-// #include "core/Accelerator.h"
+#include "core/BaseDriver.hpp"
 #include "core/DeviceBuffer.hpp"
 #include "utils/FinnDatatypes.hpp"
 #include "utils/Logger.h"
@@ -28,6 +28,7 @@ int main() {
     auto logger = Logger::getLogger();
     FINN_LOG(logger, loglevel::info) << "C++ Driver started";
     FINN_LOG_DEBUG(logger, loglevel::info) << "Test";
+
 
     /*
         Finn::DeviceWrapper devWrap;

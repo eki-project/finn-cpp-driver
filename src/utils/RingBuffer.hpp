@@ -1,3 +1,6 @@
+#ifndef RINGBUFFER_H
+#define RINGBUFFER_H
+
 #include <algorithm>
 #include <boost/circular_buffer.hpp>
 #include <functional>
@@ -216,3 +219,5 @@ class RingBuffer {
         return false;
     }
 };
+
+#endif  // RINGBUFFER_H

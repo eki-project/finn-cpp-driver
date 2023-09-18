@@ -1,3 +1,7 @@
+#ifndef DEVICEBUFFER_H
+#define DEVICEBUFFER_H
+
+
 #include <boost/circular_buffer.hpp>
 #include <limits>
 
@@ -374,3 +378,5 @@ namespace Finn {
         return tmp;
     }
 }  // namespace Finn
+
+#endif  // DEVICEBUFFER_H

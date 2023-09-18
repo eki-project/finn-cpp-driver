@@ -1,12 +1,12 @@
-#include <array>
-#include <cstring>
+#include <algorithm>
+#include <filesystem>
 #include <fstream>
-#include <numeric>
+#include <memory>
 #include <stdexcept>
+#include <string>
 #include <vector>
 
 #include "../../src/core/DeviceHandler.h"
-#include "../../src/utils/Logger.h"
 #include "gtest/gtest.h"
 #include "xrt/xrt_device.h"
 #include "xrt/xrt_kernel.h"

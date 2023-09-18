@@ -4,17 +4,25 @@
 // NOLINTNEXTLINE
 #define BOOST_LOG_DYN_LINK 1
 
-#include <boost/log/attributes/scoped_attribute.hpp>
-#include <boost/log/expressions.hpp>
-#include <boost/log/sinks.hpp>
-#include <boost/log/sources/severity_channel_logger.hpp>
-#include <boost/log/trivial.hpp>
-#include <boost/log/utility/setup/common_attributes.hpp>
-#include <boost/log/utility/setup/console.hpp>
-#include <boost/log/utility/setup/file.hpp>
-#include <boost/log/utility/setup/formatter_parser.hpp>
-#include <fstream>
-#include <string>
+// #include <boost/log/detail/config.hpp>
+// #include <boost/log/sinks.hpp>
+// #include <boost/log/sources/severity_feature.hpp>
+// #include <boost/log/sources/severity_logger.hpp>
+// #include <boost/log/trivial.hpp>
+// #include <boost/log/utility/setup/common_attributes.hpp>
+// #include <boost/log/utility/setup/console.hpp>
+// #include <boost/log/utility/setup/formatter_parser.hpp>
+// #include <boost/smart_ptr/intrusive_ptr.hpp>
+// #include <boost/smart_ptr/intrusive_ref_counter.hpp>
+// #include <string>
+
+#include <boost/log/detail/config.hpp>                // for log
+#include <boost/log/sources/severity_feature.hpp>     // for BOOST_LOG_SEV
+#include <boost/log/sources/severity_logger.hpp>      // for severity_logger
+#include <boost/log/trivial.hpp>                      // for severity_level
+#include <boost/smart_ptr/intrusive_ptr.hpp>          // for intrusive_ptr
+#include <boost/smart_ptr/intrusive_ref_counter.hpp>  // for intrusive_ptr_a...
+#include <string>                                     // for allocator, string
 
 namespace bl = finnBoost::log;
 namespace loglevel = bl::trivial;

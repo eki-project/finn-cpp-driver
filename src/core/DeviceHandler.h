@@ -1,28 +1,37 @@
 #ifndef DEVICEHANDLER_H
 #define DEVICEHANDLER_H
-#include <filesystem>
-#include <string>
-#include <unordered_map>
-#include <vector>
+// #include <filesystem>
+// #include <string>
+// #include <unordered_map>
+// #include <vector>
 
-// XRT
-#include "xrt.h"
-#include "xrt/xrt_bo.h"
-#include "xrt/xrt_device.h"
-#include "xrt/xrt_kernel.h"
+// // XRT
+// #include "xrt.h"
+// #include "xrt/xrt_bo.h"
+// #include "xrt/xrt_device.h"
+// #include "xrt/xrt_kernel.h"
 
-// FINN
-#include "../utils/Types.h"
-#include "DeviceBuffer.hpp"
+// // FINN
+// #include "../utils/Types.h"
+// #include "DeviceBuffer.hpp"
+
+#include <xrt/xrt_uuid.h>  // for uuid
+
+#include <cstddef>        // for size_t
+#include <cstdint>        // for uint8_t
+#include <filesystem>     // for path
+#include <iterator>       // for iterator_traits
+#include <string>         // for string
+#include <type_traits>    // for is_same
+#include <unordered_map>  // for unordered_map
+#include <vector>         // for vector
+
+#include "../utils/Types.h"  // for shape_t
+#include "DeviceBuffer.hpp"  // for DeviceInputBuffer, DeviceOutputBuffer
+#include "xrt/xrt_device.h"  // for device
 
 
 namespace Finn {
-    // // FWD declarations
-    // template<typename T>
-    // class DeviceInputBuffer;
-    // template<typename T>
-    // class DeviceOutputBuffer;
-
 
     /**
      * @brief A small storage struct to manage the description of Buffers

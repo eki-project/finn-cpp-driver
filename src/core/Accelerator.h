@@ -1,12 +1,16 @@
 #ifndef ACCELERATOR_H
 #define ACCELERATOR_H
 
+#include <cinttypes>
 #include <filesystem>
 #include <vector>
 
-#include "DeviceHandler.h"
 
 namespace Finn {
+
+    // Fwd declarations
+    class DeviceHandler;
+    struct BufferDescriptor;
 
     /**
      * @brief Helper struct to structure input data for DeviceHandler creation
@@ -15,8 +19,8 @@ namespace Finn {
     struct DeviceWrapper {
         std::filesystem::path xclbin;
         std::string name;
-        std::vector<std::string> idmas;
-        std::vector<std::string> odmas;
+        std::vector<BufferDescriptor> idmas;
+        std::vector<BufferDescriptor> odmas;
     };
 
 
@@ -65,6 +69,15 @@ namespace Finn {
          *
          */
         ~Accelerator() = default;
+
+        /**
+         * @brief Fast and dirty implementation that only supports a single FPGA with a single input
+         *
+         * @param inputVec
+         * @return true
+         * @return false
+         */
+        bool write(const std::vector<uint8_t>& inputVec);
 
          private:
         /**

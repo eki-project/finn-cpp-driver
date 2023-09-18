@@ -22,9 +22,7 @@
 using std::string;
 
 int main() {
-
-    #undef NDEBUG
-
+#undef NDEBUG
 
 
     auto logger = Logger::getLogger();
@@ -83,18 +81,20 @@ int main() {
     shape_t myShape = std::vector<unsigned int>{1, 300};
     shape_t myShapeFolded = std::vector<unsigned int>{1, 10, 30};
     shape_t myShapePacked = std::vector<unsigned int>{1, 10, 8};
-    
+
     shape_t oMyShape = std::vector<unsigned int>{1, 10};
     shape_t oMyShapeFolded = std::vector<unsigned int>{1, 10, 1};
     shape_t oMyShapePacked = std::vector<unsigned int>{1, 10, 1};
 
     // Creating the devicebuffers
-    auto mydb = Finn::DeviceInputBuffer<uint8_t, DatatypeInt<2>>("My Buffer", device, kern, myShape, myShapeFolded, myShapePacked, 100);
-    auto myodb = Finn::DeviceOutputBuffer<uint8_t, DatatypeBinary>("Output Buffer", device, kernOut, oMyShape, oMyShapeFolded, oMyShapePacked, runs);
-    auto data =  std::vector<uint8_t>(mydb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
+    // auto mydb = Finn::DeviceInputBuffer<uint8_t, DatatypeInt<2>>("My Buffer", device, kern, myShape, myShapeFolded, myShapePacked, 100);
+    // auto myodb = Finn::DeviceOutputBuffer<uint8_t, DatatypeBinary>("Output Buffer", device, kernOut, oMyShape, oMyShapeFolded, oMyShapePacked, runs);
+    auto mydb = Finn::DeviceInputBuffer<uint8_t>("My Buffer", device, kern, myShapePacked, 100);
+    auto myodb = Finn::DeviceOutputBuffer<uint8_t>("Output Buffer", device, kernOut, oMyShapePacked, runs);
+    auto data = std::vector<uint8_t>(mydb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
 
 
-    std::transform(data.begin(), data.end(), data.begin(), [&sampler, &engine](uint8_t x){ return (x-x) + sampler(engine); });
+    std::transform(data.begin(), data.end(), data.begin(), [&sampler, &engine](uint8_t x) { return (x - x) + sampler(engine); });
     auto x = xrt::bo(device, 4096, 0);
     auto y = xrt::bo(device, 4096, 0);
     x.write(data.data());
@@ -123,19 +123,20 @@ int main() {
     }
 
 
-
     FINN_LOG(logger, loglevel::info) << "Starting write thread";
     auto writeThread = std::thread([&sampler, &engine, &data, &mydb]() {
         for (size_t i = 0; i < 100; i++) {
-            std::transform(data.begin(), data.end(), data.begin(), [&sampler, &engine](uint8_t x){ return (x-x) + sampler(engine); });
-            while (!mydb.store(data));
+            std::transform(data.begin(), data.end(), data.begin(), [&sampler, &engine](uint8_t x) { return (x - x) + sampler(engine); });
+            while (!mydb.store(data))
+                ;
         }
     });
 
     FINN_LOG(logger, loglevel::info) << "Starting execute thread";
     auto executeThread = std::thread([&mydb]() {
         for (size_t j = 0; j < 100; j++) {
-            while(!mydb.run());
+            while (!mydb.run())
+                ;
         }
     });
 
@@ -152,7 +153,7 @@ int main() {
 
     auto res = myodb.retrieveArchive();
     FINN_LOG(logger, loglevel::info) << "Reading output!";
-    
+
     for (size_t i = 0; i < runs; i++) {
         FINN_LOG(logger, loglevel::info) << "Reading output of run " << i;
         for (auto& resvalue : res[i]) {

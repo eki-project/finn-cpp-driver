@@ -1,16 +1,18 @@
 #ifndef ACCELERATOR_H
 #define ACCELERATOR_H
 
-#include <cinttypes>
-#include <filesystem>
-#include <vector>
+#include <cinttypes>   // for uint8_t
+#include <filesystem>  // for path
+#include <string>      // for string
+#include <vector>      // for vector
+
+#include "DeviceHandler.h"  // for BufferDescriptor, DeviceHandler
 
 
 namespace Finn {
-
     // Fwd declarations
-    class DeviceHandler;
-    struct BufferDescriptor;
+    // class DeviceHandler;
+    // struct BufferDescriptor;
 
     /**
      * @brief Helper struct to structure input data for DeviceHandler creation
@@ -59,7 +61,7 @@ namespace Finn {
          */
         Accelerator& operator=(Accelerator&&) = default;
         /**
-         * @brief Deleted move assignment operator. Copying the Accelerator can result in multiple Accelerators managing the same Device
+         * @brief Deleted copy assignment operator. Copying the Accelerator can result in multiple Accelerators managing the same Device
          *
          * @return Accelerator&
          */

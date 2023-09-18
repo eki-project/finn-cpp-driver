@@ -6,7 +6,7 @@
 #include <thread>
 
 // Helper
-// #include "core/Accelerator.h"
+#include "core/BaseDriver.hpp"
 #include "core/DeviceBuffer.hpp"
 #include "utils/FinnDatatypes.hpp"
 #include "utils/Logger.h"

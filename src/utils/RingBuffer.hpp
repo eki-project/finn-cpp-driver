@@ -1,9 +1,13 @@
+#ifndef RINGBUFFER_H
+#define RINGBUFFER_H
+
 #include <algorithm>
 #include <boost/circular_buffer.hpp>
 #include <functional>
-#include <mutex>
 #include <iterator>
+#include <mutex>
 #include <span>
+#include <tuple>
 #include <type_traits>
 
 #include "FinnDatatypes.hpp"
@@ -54,7 +58,7 @@ class RingBuffer {
      */
     RingBuffer(RingBuffer&& other) noexcept
         : buffer(std::move(other.buffer)), validParts(std::move(other.validParts)), parts(other.parts), elementsPerPart(other.elementsPerPart), headPart(other.headPart), readPart(other.readPart), logger(Logger::getLogger()) {
-        for (size_t i = 0; i < parts; i++) {
+        for (size_t i = 0; i < parts; ++i) {
             partMutexes.emplace_back(std::make_unique<std::mutex>());
         }
     }
@@ -163,13 +167,13 @@ class RingBuffer {
                 FinnUtils::logAndError<std::length_error>("Size mismatch when storing vector in Ring Buffer (got " + std::to_string(datasize) + ", expected " + std::to_string(elementsPerPart) + ")!");
             }
             index_t indexP = 0;
-            for (unsigned int i = 0; i < parts; i++) {
+            for (unsigned int i = 0; i < parts; ++i) {
                 indexP = (headPart + i) % parts;
                 if (!validParts[indexP]) {
                     // Only now set mutex. Even if the spot just became free during the loop we'll take it, but now data has to be preserved.
                     std::lock_guard<std::mutex> guardPartMutex(*partMutexes[indexP]);
                     std::lock_guard<std::mutex> guardHeadMutex(headPartMutex);
-                    for (size_t j = 0; j < datasize; j++) {
+                    for (size_t j = 0; j < datasize; ++j) {
                         buffer[elementIndex(indexP, j)] = data[j];
                     }
                     validParts[indexP] = true;
@@ -189,21 +193,21 @@ class RingBuffer {
      * @return true
      * @return false
      */
+    template<typename VecUintIt>
     bool store(VecUintIt beginning, VecUintIt end) {
+        static_assert(std::is_same<typename std::iterator_traits<VecUintIt>::value_type, T>::value);
         if (std::distance(beginning, end) != elementsPerPart) {
             FinnUtils::logAndError<std::length_error>("Size mismatch when storing vector in Ring Buffer (got " + std::to_string(std::distance(beginning, end)) + ", expected " + std::to_string(elementsPerPart) + ")!");
         }
         index_t indexP = 0;
-        for (unsigned int i = 0; i < parts; i++) {
+        for (unsigned int i = 0; i < parts; ++i) {
             indexP = (headPart + i) % parts;
             if (!validParts[indexP]) {
                 // Only now set mutex. Even if the spot just became free during the loop we'll take it, but now data has to be preserved.
                 std::lock_guard<std::mutex> guardPartMutex(*partMutexes[indexP]);
                 std::lock_guard<std::mutex> guardHeadMutex(headPartMutex);
-                unsigned int j = 0;
-                for (auto it = beginning; it != end; it++) {
+                for (auto [it, j] = std::tuple(beginning, 0); it != end; ++it, ++j) {
                     buffer[elementIndex(indexP, j)] = *it;
-                    j++;
                 }
                 validParts[indexP] = true;
                 headPart = (indexP + 1) % parts;
@@ -231,13 +235,13 @@ class RingBuffer {
                 FinnUtils::logAndError<std::length_error>("Size mismatch when reading vector from Ring Buffer (got " + std::to_string(datasize) + ", expected " + std::to_string(elementsPerPart) + ")!");
             }
             index_t indexP = 0;
-            for (unsigned int i = 0; i < parts; i++) {
+            for (unsigned int i = 0; i < parts; ++i) {
                 indexP = (readPart + i) % parts;
                 if (validParts[indexP]) {
                     // Only now set mutex. Even if the spot just became free during the loop we'll take it, but now data has to be preserved.
                     std::lock_guard<std::mutex> guardPartMutex(*partMutexes[indexP]);
                     std::lock_guard<std::mutex> guardHeadMutex(headPartMutex);
-                    for (size_t j = 0; j < elementsPerPart; j++) {
+                    for (size_t j = 0; j < elementsPerPart; ++j) {
                         outData[j] = buffer[elementIndex(indexP, j)];
                     }
                     validParts[indexP] = true;
@@ -250,3 +254,5 @@ class RingBuffer {
         return false;
     }
 };
+
+#endif  // RINGBUFFER_H

@@ -1,9 +1,17 @@
 #include "DeviceHandler.h"
 
+#include <xrt/xrt_device.h>  // for device
+#include <xrt/xrt_kernel.h>  // for kernel
+
+#include <boost/cstdint.hpp>  // for uint8_t
+#include <chrono>
+#include <iosfwd>
 #include <stdexcept>
+#include <system_error>
 #include <utility>
 
-#include "../utils/Logger.h"
+#include "../utils/Logger.h"  // for operator<<, FINN_LOG, FINN_DEBUG_LOG
+#include "../utils/Types.h"   // for shape_t
 
 namespace fs = std::filesystem;
 

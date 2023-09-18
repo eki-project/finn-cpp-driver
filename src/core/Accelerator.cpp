@@ -1,6 +1,9 @@
 #include "Accelerator.h"
 
-#include <algorithm>
+#include <algorithm>  // for transform
+#include <cstddef>    // for size_t
+#include <iterator>   // for back_insert_iterator, back_inserter
+#include <memory>     // for allocator_traits<>::value_type
 
 #include "DeviceHandler.h"
 

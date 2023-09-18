@@ -100,9 +100,7 @@ namespace Finn {
         template<class InputIt>
         bool write(InputIt first, InputIt last) {
             static_assert(std::is_same<typename std::iterator_traits<InputIt>::value_type, uint8_t>::value);
-            // TODO(linusjun): rewrite to just forward iterators to DeviceBuffer
-            std::vector<uint8_t> vec(first, last);
-            return write(vec);
+            return inputBufferMap.begin()->second.store(first, last) && inputBufferMap.begin()->second.run();
         }
 
         /**
@@ -129,9 +127,7 @@ namespace Finn {
         template<class InputIt>
         bool write(InputIt first, InputIt last, std::string& inputBufferName) {
             static_assert(std::is_same<typename std::iterator_traits<InputIt>::value_type, uint8_t>::value);
-            // TODO(linusjun): rewrite to just forward iterators to DeviceBuffer
-            std::vector<uint8_t> vec(first, last);
-            return write(vec, inputBufferName);
+            return inputBufferMap.at(inputBufferName).store(first, last) && inputBufferMap.at(inputBufferName).run();
         }
 
         /**

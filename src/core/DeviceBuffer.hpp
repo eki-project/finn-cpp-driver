@@ -31,7 +31,7 @@ namespace Finn {
         //  shape_t shapeNormal;  // Input shape (Type F): (1,20)
         //  shape_t shapeFolded;  // Folded shape (Type F): (1,2,10)
         shapePacked_t shapePacked;  // Packed shape (Type T): (1,2,3)
-        size_t mapSize;       // Numbers of type T: When F has bitwidth 2, and T has bitwidth 8, the folded shape would be (1,2,10) and the packed (1,2,3) and thus 6
+        size_t mapSize;             // Numbers of type T: When F has bitwidth 2, and T has bitwidth 8, the folded shape would be (1,2,10) and the packed (1,2,3) and thus 6
         xrt::bo internalBo;
         xrt::kernel& associatedKernel;
         T* map;
@@ -205,7 +205,9 @@ namespace Finn {
             return this->ringBuffer.template store<std::vector<T>>(data, data.size());
         }
 
+        template<typename VecUintIt>
         bool store(VecUintIt beginning, VecUintIt end) {
+            static_assert(std::is_same<typename std::iterator_traits<VecUintIt>::value_type, T>::value);
             return this->ringBuffer.store(beginning, end);
         }
 

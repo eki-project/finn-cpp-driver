@@ -1,9 +1,9 @@
 #ifndef TYPES_H
 #define TYPES_H
 
+#include <cctype>
 #include <variant>
 #include <vector>
-#include <ctype.h>
 
 enum class PLATFORM { ALVEO = 0, INVALID = -1 };
 
@@ -29,8 +29,6 @@ using shapeNormal_t = std::vector<unsigned int>;
 using shapeFolded_t = std::vector<unsigned int>;
 using shapePacked_t = std::vector<unsigned int>;
 using shape_t = std::vector<unsigned int>;
-
-using VecUintIt = std::vector<uint8_t>::iterator;
 
 // using shape_list_t = std::vector<shape_t>;
 using bytewidth_list_t = std::vector<unsigned int>;

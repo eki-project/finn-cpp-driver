@@ -4,6 +4,7 @@
 #include <cinttypes>  // for uint8_t
 
 #include "Accelerator.h"
+#include "../utils/FinnUtils.h"
 
 namespace Finn {
 
@@ -19,6 +20,19 @@ namespace Finn {
          public:
         BaseDriver() : accelerator(std::vector<DeviceWrapper>()) {
             readConfigAndInit();  // After this shapeNormal, shapeFolded and shapePacked should be filled.
+
+            // The following line calculates the new innermost dimension needed to represent the previous innermost dimension as type T's
+            // It can be expressed as floor(d * b / 8) + 1
+            unsigned int calculatedInnermostDimension = static_cast<unsigned int>(F().bitwidth() * FinnUtils::innermostDimension(shapeFolded) / (sizeof(T) * 8)) + 1;
+
+            if (FinnUtils::shapeToElements(shapeNormal) != FinnUtils::shapeToElements(shapeFolded)) {
+                FinnUtils::logAndError<std::runtime_error>("Mismatches in shapes! shape_normal and shape_folded should amount to the same number of elements!");
+            }
+
+            if (FinnUtils::innermostDimension(shapePacked) != calculatedInnermostDimension) {
+                FinnUtils::logAndError<std::runtime_error>("Mismatches in shapes! shape_packed's innermost dimension in " + FinnUtils::shapeToString(shapePacked) + " does not equal the calculated innermost dimension " +
+                                                           std::to_string(calculatedInnermostDimension));
+            }
         };
         BaseDriver(BaseDriver&&) noexcept = default;
         BaseDriver(const BaseDriver&) noexcept = delete;
@@ -60,6 +74,7 @@ namespace Finn {
         }
 
         Accelerator accelerator;
+        // TODO(bwintermann): Only one input buffer expected? Make list out of these
         // TODO(linusjun): For multi FPGA support these should probably be packed into objects?
         size_t numbers;       // Numbers of type F: in a shape (1,20) this would be 20
         shape_t shapeNormal;  // Input shape (Type F): (1,20)

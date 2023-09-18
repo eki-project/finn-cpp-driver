@@ -53,22 +53,6 @@ namespace Finn {
               ringBuffer(RingBuffer<T>(ringBufferSizeFactor, mapSize)) {
             FINN_LOG(logger, loglevel::info) << "Initializing DeviceBuffer " << name << " (SHAPE PACKED: " << FinnUtils::shapeToString(pShapePacked) << ", BUFFER SIZE: " << ringBufferSizeFactor
                                              << " inputs of the given shape, MAP SIZE: " << mapSize << ")\n";
-
-            /* The checking should be at a higher layer
-            // The following line calculates the new innermost dimension needed to represent the previous innermost dimension as type T's
-            unsigned int calculatedInnermostDimension = static_cast<unsigned int>(F().bitwidth() * FinnUtils::innermostDimension(pShapeFolded) / (sizeof(T) * 8)) + 1;
-
-
-
-            if (FinnUtils::shapeToElements(pShapeNormal) != FinnUtils::shapeToElements(pShapeFolded)) {
-                FinnUtils::logAndError<std::runtime_error>("Mismatches in shapes! shape_normal and shape_folded should amount to the same number of elements!");
-            }
-
-            if (FinnUtils::innermostDimension(pShapePacked) != calculatedInnermostDimension) {
-                FinnUtils::logAndError<std::runtime_error>("Mismatches in shapes! shape_packed's innermost dimension in " + FinnUtils::shapeToString(pShapePacked) + " does not equal the calculated innermost dimension " +
-                                                           std::to_string(calculatedInnermostDimension));
-            }
-            */
         }
 
         DeviceBuffer(DeviceBuffer&& buf) noexcept

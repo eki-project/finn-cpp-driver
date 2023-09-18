@@ -7,9 +7,11 @@
 #include <limits>
 #include <random>
 #include <cmath>
+#include <unordered_map>
 
 #include "Types.h"
 #include "Logger.h"
+#include "FinnDatatypes.hpp"
 
 namespace FinnUtils {
 

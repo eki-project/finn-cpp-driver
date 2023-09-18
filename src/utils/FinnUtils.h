@@ -13,6 +13,24 @@
 
 namespace FinnUtils {
 
+    class BufferFiller {
+        private: 
+        std::random_device rd;
+        std::mt19937 engine{rd()};
+        std::uniform_int_distribution<uint8_t> sampler;
+
+        public:
+        BufferFiller(uint8_t min, uint8_t max) {
+            sampler = std::uniform_int_distribution<uint8_t>(min, max);
+        }        
+
+        void fillRandom(std::vector<uint8_t>& vec) {
+            std::transform(vec.begin(), vec.end(), vec.begin(), [this](uint8_t x){
+                return (x-x) + sampler(engine);
+            });
+        }
+    };
+
     /**
      * @brief Return the ceil of a float as in integer type
      *

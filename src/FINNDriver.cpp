@@ -23,35 +23,27 @@ using std::string;
 
 int main() {
 #undef NDEBUG
-
-
     auto logger = Logger::getLogger();
     FINN_LOG(logger, loglevel::info) << "C++ Driver started";
     FINN_LOG_DEBUG(logger, loglevel::info) << "Test";
 
-    /*
-        Finn::DeviceWrapper devWrap;
-        devWrap.xclbin = "design.xclbin";
-        devWrap.name = "SomeName";
-        devWrap.idmas = Config::idmaNames;
-        devWrap.odmas = Config::odmaNames;
-
-        Finn::Accelerator acc(devWrap);
-    */
-
-    // Preparation for throughput test
-    std::random_device rd;
-    std::mt19937 engine{rd()};
-    std::uniform_int_distribution<uint8_t> sampler(0, 2);
+    // For random number generation
+    auto filler = FinnUtils::BufferFiller(0, 2);
 
     // Set parameters
     const std::string filename = "bitfile/finn-accel.xclbin";
     const unsigned int runs = 20;
 
+    // Shape
+    shapeNormal_t myShape = std::vector<unsigned int>{1, 300};
+    shapeFolded_t myShapeFolded = std::vector<unsigned int>{1, 10, 30};
+    shapePacked_t myShapePacked = std::vector<unsigned int>{1, 10, 8};
+    shapeNormal_t oMyShape = std::vector<unsigned int>{1, 10};
+    shapeFolded_t oMyShapeFolded = std::vector<unsigned int>{1, 10, 1};
+    shapePacked_t oMyShapePacked = std::vector<unsigned int>{1, 10, 1};
 
     // Load the device
     auto device = xrt::device(0);
-    FINN_LOG(logger, loglevel::info) << "Device found.";
 
     // Debug print the BDF of the device
     auto bdfInfo = device.get_info<xrt::info::device::bdf>();
@@ -77,34 +69,24 @@ int main() {
     FINN_LOG(logger, loglevel::info) << "Device successfully programmed! UUID: " << uuid;
     auto kernOut = xrt::kernel(device, uuid, "StreamingDataflowPartition_2:{odma0}", xrt::kernel::cu_access_mode::shared);
 
-    // Shape data
-    shapeNormal_t myShape = std::vector<unsigned int>{1, 300};
-    shapeFolded_t myShapeFolded = std::vector<unsigned int>{1, 10, 30};
-    shapePacked_t myShapePacked = std::vector<unsigned int>{1, 10, 8};
-
-    shapeNormal_t oMyShape = std::vector<unsigned int>{1, 10};
-    shapeFolded_t oMyShapeFolded = std::vector<unsigned int>{1, 10, 1};
-    shapePacked_t oMyShapePacked = std::vector<unsigned int>{1, 10, 1};
-
     // Creating the devicebuffers
-    // auto mydb = Finn::DeviceInputBuffer<uint8_t, DatatypeInt<2>>("My Buffer", device, kern, myShape, myShapeFolded, myShapePacked, 100);
-    // auto myodb = Finn::DeviceOutputBuffer<uint8_t, DatatypeBinary>("Output Buffer", device, kernOut, oMyShape, oMyShapeFolded, oMyShapePacked, runs);
     auto mydb = Finn::DeviceInputBuffer<uint8_t>("My Buffer", device, kern, myShapePacked, 100);
     auto myodb = Finn::DeviceOutputBuffer<uint8_t>("Output Buffer", device, kernOut, oMyShapePacked, runs);
     auto data = std::vector<uint8_t>(mydb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
 
-    std::transform(data.begin(), data.end(), data.begin(), [&sampler, &engine](uint8_t x) { return (x - x) + sampler(engine); });
-    auto x = xrt::bo(device, 4096, 0);
-    auto y = xrt::bo(device, 4096, 0);
-    x.write(data.data());
-    x.sync(xclBOSyncDirection::XCL_BO_SYNC_BO_TO_DEVICE);
-    auto myres = kern(x, 1);
-    myres.wait();
-    auto myresout = kernOut(y, 1);
-    myresout.wait();
-    y.sync(xclBOSyncDirection::XCL_BO_SYNC_BO_FROM_DEVICE);
-    uint8_t* buf = new uint8_t[4096];
-    y.read(buf);
+    /***** MANUAL TEST ****/
+    filler.fillRandom(data);                                     // Fill input buffer data
+    auto x = xrt::bo(device, 4096, 0);                  // Create input buffer
+    auto y = xrt::bo(device, 4096, 0);                  // Create output buffer
+    x.write(data.data());                                       // Write test data into input buffer
+    x.sync(xclBOSyncDirection::XCL_BO_SYNC_BO_TO_DEVICE);       // Sync test data to device
+    auto myres = kern(x, 1);                            // Run the data into the kernel
+    myres.wait();                                               // Wait for the kernel results
+    auto myresout = kernOut(y, 1);                      // Run the output kernel
+    myresout.wait();                                            // Wait for the output
+    y.sync(xclBOSyncDirection::XCL_BO_SYNC_BO_FROM_DEVICE);     // Sync data from device back
+    uint8_t* buf = new uint8_t[4096];                           // Create temporary buffer
+    y.read(buf);                                                // Read data from output buffer into memory
 
     for (unsigned int i = 0; i < 100; i++) {
         FINN_LOG(logger, loglevel::info) << "TEST: " << static_cast<unsigned int>(buf[i]);
@@ -112,6 +94,7 @@ int main() {
     delete[] buf;
 
 
+    /***** MANUAL TEST 2 ****/
     mydb.store(data);
     mydb.run();
     myodb.read(1);
@@ -121,11 +104,11 @@ int main() {
         FINN_LOG(logger, loglevel::info) << "TEST 2:  " << static_cast<unsigned int>(rrval);
     }
 
-
+    /***** REAL TEST ****/
     FINN_LOG(logger, loglevel::info) << "Starting write thread";
-    auto writeThread = std::thread([&sampler, &engine, &data, &mydb]() {
+    auto writeThread = std::thread([&filler, &data, &mydb]() {
         for (size_t i = 0; i < 100; i++) {
-            std::transform(data.begin(), data.end(), data.begin(), [&sampler, &engine](uint8_t o) { return (o - o) + sampler(engine); });
+            filler.fillRandom(data);
             while (!mydb.store(data))
                 ;
         }

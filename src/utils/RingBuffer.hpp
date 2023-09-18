@@ -94,6 +94,11 @@ class RingBuffer {
     void testSetHeadPointer(index_t i) { headPart = i; }
 
     void testSetReadPointer(index_t i) { readPart = i; }
+
+    index_t testGetHeadPointer() { return headPart; }
+
+    index_t testGetReadPointer() { return readPart; }
+
 #endif
 
      public:

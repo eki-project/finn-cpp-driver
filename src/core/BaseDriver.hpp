@@ -3,8 +3,8 @@
 
 #include <cinttypes>  // for uint8_t
 
-#include "Accelerator.h"
 #include "../utils/FinnUtils.h"
+#include "Accelerator.h"
 
 namespace Finn {
 
@@ -18,8 +18,9 @@ namespace Finn {
     template<typename F, typename S, typename T = uint8_t>
     class BaseDriver {
          public:
-        BaseDriver() : accelerator(std::vector<DeviceWrapper>()) {
-            readConfigAndInit();  // After this shapeNormal, shapeFolded and shapePacked should be filled.
+        BaseDriver() {
+            auto devWrappers = readConfigAndInit();  // After this shapeNormal, shapeFolded and shapePacked should be filled.
+            accelerator = Accelerator(devWrappers);
 
             // The following line calculates the new innermost dimension needed to represent the previous innermost dimension as type T's
             // It can be expressed as floor(d * b / 8) + 1
@@ -36,7 +37,7 @@ namespace Finn {
         };
         BaseDriver(BaseDriver&&) noexcept = default;
         BaseDriver(const BaseDriver&) noexcept = delete;
-        BaseDriver& operator=(BaseDriver&&) = default;
+        BaseDriver& operator=(BaseDriver&&) noexcept = default;
         BaseDriver& operator=(const BaseDriver&) = delete;
         virtual ~BaseDriver() = default;
 
@@ -46,6 +47,8 @@ namespace Finn {
             fold();
             pack();
             // write to accelerators
+            // this should somehow work for multi fpga accelerators
+            accelerator.write(first, last);
             // read from accelerators
             unpack();
             unfold();
@@ -53,8 +56,11 @@ namespace Finn {
         }
 
          protected:
-        void readConfigAndInit() {
+        std::vector<DeviceWrapper> readConfigAndInit() {
             // TODO(linusjun): Read values from config file and initialize variables
+            ExtendedBufferDescriptor ext = {"", {}, {}, {}};
+            DeviceWrapper devWrap = {"", "", {std::make_shared<BufferDescriptor>(ext)}, {}};
+            return {devWrap};
         }
 
         void fold() {

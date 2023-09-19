@@ -14,17 +14,6 @@ namespace Finn {
     // class DeviceHandler;
     // struct BufferDescriptor;
 
-    /**
-     * @brief Helper struct to structure input data for DeviceHandler creation
-     *
-     */
-    struct DeviceWrapper {
-        std::filesystem::path xclbin;
-        std::string name;
-        std::vector<BufferDescriptor> idmas;
-        std::vector<BufferDescriptor> odmas;
-    };
-
 
     /**
      * @brief The Accelerator class wraps one or more Devices into a single Accelerator
@@ -32,6 +21,7 @@ namespace Finn {
      */
     class Accelerator {
          public:
+        Accelerator() = default;
         /**
          * @brief Construct a new Accelerator object using a list of DeviceWrappers
          *

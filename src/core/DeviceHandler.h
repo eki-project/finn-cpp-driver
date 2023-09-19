@@ -24,6 +24,7 @@
 #include <string>         // for string
 #include <type_traits>    // for is_same
 #include <unordered_map>  // for unordered_map
+#include <utility>        // for shared_ptr
 #include <vector>         // for vector
 
 #include "../utils/Types.h"  // for shape_t
@@ -32,15 +33,6 @@
 
 
 namespace Finn {
-
-    /**
-     * @brief A small storage struct to manage the description of Buffers
-     *
-     */
-    struct BufferDescriptor {
-        std::string kernelName;
-        shape_t elementShape;
-    };
     /**
      * @brief Object of DeviceHandler is responsible to handle a programming of a Device and communication to it
      *
@@ -57,8 +49,8 @@ namespace Finn {
          * @param outputBufDescr List of descriptions of all output buffers
          * @param hostBufferSize Size of input/output buffers in elements
          */
-        DeviceHandler(const std::filesystem::path& xclbinPath, const std::string& pName, std::size_t deviceIndex, const std::vector<BufferDescriptor>& inputBufDescr, const std::vector<BufferDescriptor>& outputBufDescr,
-                      std::size_t hostBufferSize = 64);
+        DeviceHandler(const std::filesystem::path& xclbinPath, const std::string& pName, std::size_t deviceIndex, const std::vector<std::shared_ptr<BufferDescriptor>>& inputBufDescr,
+                      const std::vector<std::shared_ptr<BufferDescriptor>>& outputBufDescr, std::size_t hostBufferSize = 64);
         /**
          * @brief Default move constructor
          *
@@ -155,7 +147,7 @@ namespace Finn {
          * @param outputBufDescr Descriptions of buffer configurations for the output buffers
          * @param hostBufferSize Size of host buffers in number of elements
          */
-        void initializeBufferObjects(const std::vector<BufferDescriptor>& inputBufDescr, const std::vector<BufferDescriptor>& outputBufDescr, std::size_t hostBufferSize);
+        void initializeBufferObjects(const std::vector<std::shared_ptr<BufferDescriptor>>& inputBufDescr, const std::vector<std::shared_ptr<BufferDescriptor>>& outputBufDescr, std::size_t hostBufferSize);
 
          private:
         /**

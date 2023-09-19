@@ -89,6 +89,12 @@ include_directories(SYSTEM external/magic_enum/include)
 #NumCpp
 include_directories(SYSTEM external/NumCpp/include)
 
+#Nlohmann json
+
+set(JSON_BuildTests OFF)
+add_subdirectory(external/json)
+include_directories(SYSTEM external/json/include/)
+
 # Build Unit tests
 # Include before clang-tidy inclusion to exclude folder from clang-tidy
 

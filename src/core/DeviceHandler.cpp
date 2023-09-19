@@ -6,9 +6,9 @@
 #include <boost/cstdint.hpp>  // for uint8_t
 #include <chrono>
 #include <iosfwd>
+#include <memory>
 #include <stdexcept>
 #include <system_error>
-#include <utility>
 
 #include "../utils/Logger.h"  // for operator<<, FINN_LOG, FINN_DEBUG_LOG
 #include "../utils/Types.h"   // for shape_t
@@ -16,8 +16,8 @@
 namespace fs = std::filesystem;
 
 namespace Finn {
-    DeviceHandler::DeviceHandler(const fs::path& xclbinPath, const std::string& pName, const std::size_t deviceIndex, const std::vector<BufferDescriptor>& inputBufDescr, const std::vector<BufferDescriptor>& outputBufDescr,
-                                 const std::size_t hostBufferSize)
+    DeviceHandler::DeviceHandler(const fs::path& xclbinPath, const std::string& pName, const std::size_t deviceIndex, const std::vector<std::shared_ptr<BufferDescriptor>>& inputBufDescr,
+                                 const std::vector<std::shared_ptr<BufferDescriptor>>& outputBufDescr, const std::size_t hostBufferSize)
         : name(pName) {
         if (xclbinPath.empty()) {
             throw fs::filesystem_error("Empty filepath to xclbin. Abort.", std::error_code());
@@ -32,10 +32,10 @@ namespace Finn {
             throw std::invalid_argument("Empty input kernel list. Abort.");
         }
         for (auto&& bufDesc : inputBufDescr) {
-            if (bufDesc.kernelName.empty()) {
+            if (bufDesc->kernelName.empty()) {
                 throw std::invalid_argument("Empty kernel name. Abort.");
             }
-            if (bufDesc.elementShape.empty()) {
+            if (bufDesc->packedShape.empty()) {
                 throw std::invalid_argument("Empty buffer shape. Abort.");
             }
         }
@@ -43,10 +43,10 @@ namespace Finn {
             throw std::invalid_argument("Empty output kernel list. Abort.");
         }
         for (auto&& bufDesc : outputBufDescr) {
-            if (bufDesc.kernelName.empty()) {
+            if (bufDesc->kernelName.empty()) {
                 throw std::invalid_argument("Empty kernel name. Abort.");
             }
-            if (bufDesc.elementShape.empty()) {
+            if (bufDesc->packedShape.empty()) {
                 throw std::invalid_argument("Empty buffer shape. Abort.");
             }
         }
@@ -64,19 +64,20 @@ namespace Finn {
                                       << "Successfully initialized device programmed device.\n";
     }
 
-    void DeviceHandler::initializeBufferObjects(const std::vector<BufferDescriptor>& inputBufDescr, const std::vector<BufferDescriptor>& outputBufDescr, const std::size_t hostBufferSize) {
+    void DeviceHandler::initializeBufferObjects(const std::vector<std::shared_ptr<BufferDescriptor>>& inputBufDescr, const std::vector<std::shared_ptr<BufferDescriptor>>& outputBufDescr, const std::size_t hostBufferSize) {
         auto log = Logger::getLogger();
         FINN_LOG_DEBUG(log, loglevel::info) << "(" << name << ") "
                                             << "Initializing buffer objects\n";
         std::size_t index = 0;
         for (auto&& bufDesc : inputBufDescr) {
-            auto tmpKern = xrt::kernel(device, uuid, bufDesc.kernelName);
-            inputBufferMap.emplace(std::make_pair(bufDesc.kernelName, Finn::DeviceInputBuffer<uint8_t>(name + "_InputBuffer_" + std::to_string(index++), device, tmpKern, bufDesc.elementShape, static_cast<unsigned int>(hostBufferSize))));
+            auto tmpKern = xrt::kernel(device, uuid, bufDesc->kernelName);
+            inputBufferMap.emplace(std::make_pair(bufDesc->kernelName, Finn::DeviceInputBuffer<uint8_t>(name + "_InputBuffer_" + std::to_string(index++), device, tmpKern, bufDesc->packedShape, static_cast<unsigned int>(hostBufferSize))));
         }
         index = 0;
         for (auto&& bufDesc : outputBufDescr) {
-            auto tmpKern = xrt::kernel(device, uuid, bufDesc.kernelName);
-            outputBufferMap.emplace(std::make_pair(bufDesc.kernelName, Finn::DeviceOutputBuffer<uint8_t>(name + "_OutputBuffer_" + std::to_string(index++), device, tmpKern, bufDesc.elementShape, static_cast<unsigned int>(hostBufferSize))));
+            auto tmpKern = xrt::kernel(device, uuid, bufDesc->kernelName);
+            outputBufferMap.emplace(
+                std::make_pair(bufDesc->kernelName, Finn::DeviceOutputBuffer<uint8_t>(name + "_OutputBuffer_" + std::to_string(index++), device, tmpKern, bufDesc->packedShape, static_cast<unsigned int>(hostBufferSize))));
         }
 
 #ifndef NDEBUG

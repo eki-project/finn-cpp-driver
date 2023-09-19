@@ -2,10 +2,11 @@
 #define TYPES_H
 
 #include <cctype>
+#include <memory>
+#include <nlohmann/json.hpp>
+#include <string>
 #include <variant>
 #include <vector>
-#include <string>
-#include <unordered_map>
 
 enum class PLATFORM { ALVEO = 0, INVALID = -1 };
 
@@ -38,40 +39,87 @@ using bytewidth_list_t = std::vector<unsigned int>;
 using size_bytes_t = std::size_t;
 using index_t = long unsigned int;
 
+using json = nlohmann::json;
+
+namespace nlohmann {
+    template<typename T>
+    struct adl_serializer<std::shared_ptr<T>> {
+        // NOLINTNEXTLINE
+        static void to_json(json& j, const std::shared_ptr<T>& opt) {
+            if (opt) {
+                j = *opt;
+            } else {
+                j = nullptr;
+            }
+        }
+        // NOLINTNEXTLINE
+        static void from_json(const json& j, std::shared_ptr<T>& opt) {
+            if (j.is_null()) {
+                opt = nullptr;
+            } else {
+                opt.reset(new T(j.get<T>()));
+            }
+        }
+    };
+}  // namespace nlohmann
+
 /**
  * @brief A small storage struct to manage the description of Buffers
  *
  */
-struct BufferDescriptor {
-    std::string kernelName;  // Kernel Name (e.g. vadd / idma0)
-    std::string cuName;      // CU Name (e.g. vadd:{inst0} / idma0:{inst0})
+struct BufferDescriptor : public std::enable_shared_from_this<BufferDescriptor> {
+    std::string kernelName;  // Kernel Name (e.g. vadd:{inst0} / idma0:{inst0})
+    // std::string cuName;      // CU Name (e.g. vadd:{inst0} / idma0:{inst0})
     shape_t packedShape;
-    IO ioMode;
+    // IO ioMode;
 
     // TODO(bwintermann): Currently unused, reserved for multi-fpga usage
     unsigned int fpgaIndex = 0;
     unsigned int slrIndex = 0;
 
-    BufferDescriptor(const std::string& pKernelName, const std::string& pCuName, const shape_t& pPackedShape, IO pIoMode) : kernelName(pKernelName), cuName(pCuName), packedShape(pPackedShape), ioMode(pIoMode) {};
+    BufferDescriptor() = default;
+    BufferDescriptor(const std::string& pKernelName, const shape_t& pPackedShape) : kernelName(pKernelName), packedShape(pPackedShape){};
 };
 
 struct ExtendedBufferDescriptor : public BufferDescriptor {
-    ExtendedBufferDescriptor(const std::string& pKernelName, const std::string& pCuName, const shape_t& pPackedShape, const shape_t& pNormalShape, const shape_t& pFoldedShape, IO pIoMode)
-        : BufferDescriptor(pKernelName, pCuName, pPackedShape, pIoMode), normalShape(pNormalShape), foldedShape(pFoldedShape) {};
+    ExtendedBufferDescriptor() = default;
+    ExtendedBufferDescriptor(const std::string& pKernelName, const shape_t& pPackedShape, const shape_t& pNormalShape, const shape_t& pFoldedShape)
+        : BufferDescriptor(pKernelName, pPackedShape), normalShape(pNormalShape), foldedShape(pFoldedShape){};
     shape_t normalShape;
     shape_t foldedShape;
 };
 
-class FinnConfiguration {
-    private:
-    std::string xclbinPath;
-    std::unordered_map<std::string, ExtendedBufferDescriptor> ebds;
+// NOLINTNEXTLINE
+void inline to_json(json& j, const ExtendedBufferDescriptor& ebd) { j = json{{"kernelName", ebd.kernelName}, {"packedShape", ebd.packedShape}, {"normalShape", ebd.normalShape}, {"foldedShape", ebd.foldedShape}}; }
 
-    public:
-    FinnConfiguration(/* std::string configJsonPath */) {
-        // TODO(bwintermann): Fill with data / read from json file
-    }
+// NOLINTNEXTLINE
+void inline from_json(const json& j, ExtendedBufferDescriptor& ebd) {
+    j.at("kernelName").get_to(ebd.kernelName);
+    j.at("packedShape").get_to(ebd.packedShape);
+    j.at("normalShape").get_to(ebd.normalShape);
+    j.at("foldedShape").get_to(ebd.foldedShape);
+}
+
+/**
+ * @brief Helper struct to structure input data for DeviceHandler creation
+ *
+ */
+struct DeviceWrapper {
+    std::filesystem::path xclbin;
+    std::string name;
+    std::vector<std::shared_ptr<BufferDescriptor>> idmas;
+    std::vector<std::shared_ptr<BufferDescriptor>> odmas;
 };
+
+// NOLINTNEXTLINE
+void inline from_json(const json& j, DeviceWrapper& devWrap) {
+    j.at("xclbinPath").get_to(devWrap.xclbin);
+    j.at("name").get_to(devWrap.name);
+    auto vec = j.at("idmas").get<std::vector<std::shared_ptr<ExtendedBufferDescriptor>>>();
+    devWrap.idmas = std::vector<std::shared_ptr<BufferDescriptor>>(vec.begin(), vec.end());
+    vec = j.at("odmas").get<std::vector<std::shared_ptr<ExtendedBufferDescriptor>>>();
+    devWrap.odmas = std::vector<std::shared_ptr<BufferDescriptor>>(vec.begin(), vec.end());
+}
 
 
 #endif  // TYPES_H

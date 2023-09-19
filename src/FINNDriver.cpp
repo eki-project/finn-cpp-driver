@@ -15,7 +15,7 @@
 #include <boost/program_options.hpp>
 
 // Created by FINN during compilation
-// #include "config/config.h"
+#include "config/FinnDriverUsedDatatypes.h"
 
 // XRT
 #include "xrt/xrt_bo.h"
@@ -243,7 +243,8 @@ int main(int argc, char* argv[]) {
             FinnUtils::logAndError<std::invalid_argument>("No input file specified for file execution mode!");
         }
 
-        std::string inputFile = vm["input"].as<std::string>();
+        auto inputFilePath = std::filesystem::path(vm["input"].as<std::string>());
+        Finn::BaseDriver baseDriver = Finn::BaseDriver<InputFinnType, OutputFinnType, uint8_t>(inputFilePath);
 
     } else {
         FinnUtils::logAndError<std::invalid_argument>("Unknown driver mode: " + vm["mode"].as<std::string>());

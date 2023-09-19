@@ -69,12 +69,9 @@ namespace nlohmann {
  */
 struct BufferDescriptor : public std::enable_shared_from_this<BufferDescriptor> {
     std::string kernelName;  // Kernel Name (e.g. vadd:{inst0} / idma0:{inst0})
-    // std::string cuName;      // CU Name (e.g. vadd:{inst0} / idma0:{inst0})
     shape_t packedShape;
-    // IO ioMode;
 
     // TODO(bwintermann): Currently unused, reserved for multi-fpga usage
-    unsigned int fpgaIndex = 0;
     unsigned int slrIndex = 0;
 
     BufferDescriptor() = default;
@@ -107,6 +104,7 @@ void inline from_json(const json& j, ExtendedBufferDescriptor& ebd) {
 struct DeviceWrapper {
     std::filesystem::path xclbin;
     std::string name;
+    unsigned int fpgaIndex;
     std::vector<std::shared_ptr<BufferDescriptor>> idmas;
     std::vector<std::shared_ptr<BufferDescriptor>> odmas;
 };
@@ -115,6 +113,7 @@ struct DeviceWrapper {
 void inline from_json(const json& j, DeviceWrapper& devWrap) {
     j.at("xclbinPath").get_to(devWrap.xclbin);
     j.at("name").get_to(devWrap.name);
+    j.at("fpgaIndex").get_to(devWrap.fpgaIndex);
     auto vec = j.at("idmas").get<std::vector<std::shared_ptr<ExtendedBufferDescriptor>>>();
     devWrap.idmas = std::vector<std::shared_ptr<BufferDescriptor>>(vec.begin(), vec.end());
     vec = j.at("odmas").get<std::vector<std::shared_ptr<ExtendedBufferDescriptor>>>();

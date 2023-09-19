@@ -105,4 +105,13 @@ namespace Finn {
         // Access using at is important, because operator[] may modify Map
         return inputBufferMap.at(inputBufferName).store(inputVec) && inputBufferMap.at(inputBufferName).run();
     }
+
+
+    // TODO(linusjun): Implement execute and read methods
+
+    /*
+    std::vector<std::vector<T>> DeviceHandler::read(const std::string& outputBufferName) {
+        outputBufferMap.at(outputBufferName).read
+    }
+    */
 }  // namespace Finn

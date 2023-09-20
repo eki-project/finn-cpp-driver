@@ -63,16 +63,24 @@ namespace Finn {
 
          public:
         template<typename InputIt>
-        void infer(InputIt first, InputIt last) {
-            // TODO(linusjun): Do inference here
-            fold();
-            pack();
-            // write to accelerators
-            // this should somehow work for multi fpga accelerators
-            accelerator.write(first, last);
+        void infer(size_t inputDeviceIndex, size_t outputDeviceIndex, const std::string& inputBufferName, const std::string& outputBufferName, InputIt first, InputIt last, bool doFold, bool doPack) {
+            // TODO(bwintermann): Later on enable user to do multiple inputs at the same time (external weights?)
+            // TODO: Make this functional style (folded = fold(data); packed = pack(folded); ...)
+            if (doFold) {
+                fold();
+            }
+            if (doPack) {
+                pack();
+            }
+            // TODO(bwintermann): Trivial if input and output on same host, if not other solution is needed.
+            // accelerator.write(first, last, inputDeviceIndex, "")
             // read from accelerators
-            unpack();
-            unfold();
+            if (doFold) {
+                unfold();
+            }
+            if (doPack) {
+                unpack();
+            }
             // return nullptr;
         }
 

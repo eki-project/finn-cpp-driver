@@ -2,7 +2,7 @@
     {
         "fpgaIndex": 0,
         "xclbinPath": "finn-accel.xclbin",
-        "name": "Main Device",
+        "name": "MainDevice",
         "idmas": [
             {
                 "kernelName": "StreamingDataflowPartition_0:{idma0}",

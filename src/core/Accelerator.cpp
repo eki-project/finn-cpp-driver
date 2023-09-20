@@ -9,8 +9,8 @@
 
 namespace Finn {
     Accelerator::Accelerator(const std::vector<DeviceWrapper>& deviceDefinitions) {
-        std::size_t deviceIndex = 0;  // For now just set deviceIndex to zero.
-        std::transform(deviceDefinitions.begin(), deviceDefinitions.end(), std::back_inserter(devices), [&deviceIndex](const DeviceWrapper& dew) { return DeviceHandler(dew.xclbin, dew.name, deviceIndex, dew.idmas, dew.odmas); });
+        // TODO(linusjun): Currently, the fpgaIndex is given in the config, to enable the user to assign the topology themselves. Okay like this? (-bwintermann)
+        std::transform(deviceDefinitions.begin(), deviceDefinitions.end(), std::back_inserter(devices), [](const DeviceWrapper& dew) { return DeviceHandler(dew.xclbin, dew.name, dew.fpgaIndex, dew.idmas, dew.odmas); });
     }
 
     Accelerator::Accelerator(const DeviceWrapper& deviceWrapper) {

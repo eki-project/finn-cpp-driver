@@ -242,10 +242,29 @@ int main(int argc, char* argv[]) {
         if (!vm.count("input")) {
             FinnUtils::logAndError<std::invalid_argument>("No input file specified for file execution mode!");
         }
-
         auto inputFilePath = std::filesystem::path(vm["input"].as<std::string>());
         Finn::BaseDriver baseDriver = Finn::BaseDriver<InputFinnType, OutputFinnType, uint8_t>(inputFilePath, 100);
 
+
+    } else if (vm["mode"].as<std::string>() == "filetest") {
+        if (!vm.count("input")) {
+            FinnUtils::logAndError<std::invalid_argument>("No input file specified for file execution mode!");
+        }
+        auto inputFilePath = std::filesystem::path(vm["input"].as<std::string>());
+        Finn::BaseDriver baseDriver = Finn::BaseDriver<InputFinnType, OutputFinnType, uint8_t>(inputFilePath, 10);
+
+        auto filler = FinnUtils::BufferFiller(0,2);
+        std::vector<uint8_t> data;
+        data.resize(baseDriver.size(SIZE_SPECIFIER::ELEMENTS_PER_PART, 0, "StreamingDataflowPartition_0:{idma0}"));
+
+        filler.fillRandom(data);
+        auto results = baseDriver.inferRaw(data, 0, "StreamingDataflowPartition_0:{idma0}", 0, "StreamingDataflowPartition_2:{odma0}", 9); 
+
+        for (auto& resultVector : results) {
+            for (auto& val : resultVector) {
+                FINN_LOG(logger, loglevel::info) << "VALUE: " << static_cast<unsigned int>(val) << "\n";
+            }
+        }
 
     } else {
         FinnUtils::logAndError<std::invalid_argument>("Unknown driver mode: " + vm["mode"].as<std::string>());

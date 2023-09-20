@@ -137,4 +137,14 @@ namespace Finn {
         }
         return outputBufferMap.at(outputBufferKernelName).retrieveArchive();
     }
+
+
+    size_t DeviceHandler::size(SIZE_SPECIFIER ss, const std::string& bufferName) {
+        if (inputBufferMap.contains(bufferName)) {
+            return static_cast<size_t>(inputBufferMap.at(bufferName).size(ss));
+        }
+        if (outputBufferMap.contains(bufferName)) {
+            return static_cast<size_t>(outputBufferMap.at(bufferName).size(ss));
+        }
+    }
 }  // namespace Finn

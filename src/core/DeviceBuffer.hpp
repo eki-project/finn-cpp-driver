@@ -351,6 +351,15 @@ namespace Finn {
                 }
             }
         }
+        
+        
+        /**
+         * @brief Return the size of the buffer as specified by the argument. Bytes returns all bytes the buffer takes up, elements returns the number of T-values, numbers the number of F-values.
+         *
+         * @param ss
+         * @return size_t
+         */
+        size_t size(SIZE_SPECIFIER ss) { return this->ringBuffer.size(ss); }
     };
 
     template<typename T /*, typename F*/>

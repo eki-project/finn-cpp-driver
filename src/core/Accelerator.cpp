@@ -80,4 +80,9 @@ namespace Finn {
         FinnUtils::logAndError<std::runtime_error>("NOT IMPLEMENTED YET.");
     }
 
+
+    size_t Accelerator::size(SIZE_SPECIFIER ss, unsigned int deviceIndex, const std::string& bufferName) {
+        return getDeviceHandlerByDeviceIndex(deviceIndex).size(ss, bufferName);
+    }
+
 }  // namespace Finn

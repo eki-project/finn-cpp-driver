@@ -100,6 +100,16 @@ namespace Finn {
          * @param forceArchive 
          */
         void read(const unsigned int deviceIndex, const std::string& outputBufferKernelName, unsigned int samples, bool forceArchive);
+    
+        /**
+         * @brief Get the size of the buffer with the specified device index and buffer name 
+         * 
+         * @param ss 
+         * @param deviceIndex 
+         * @param bufferName 
+         * @return size_t 
+         */
+        size_t size(SIZE_SPECIFIER ss, unsigned int deviceIndex, const std::string& bufferName);
     };
 
 

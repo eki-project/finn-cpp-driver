@@ -149,6 +149,14 @@ namespace Finn {
          */
         std::vector<std::vector<uint8_t>> read(const std::string& outputBufferKernelName, unsigned int samples, bool forceArchive);
 
+        /**
+         * @brief Return the buffer sizes 
+         * 
+         * @param ss 
+         * @param bufferName 
+         * @return size_t 
+         */
+        size_t size(SIZE_SPECIFIER ss, const std::string& bufferName);
 
          protected:
         /**

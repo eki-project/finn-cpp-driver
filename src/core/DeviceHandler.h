@@ -130,6 +130,25 @@ namespace Finn {
          */
         bool store(const std::vector<uint8_t>& data, const std::string& inputBufferKernelName);
 
+        /**
+         * @brief Run the kernel of the given name. Returns true if successfull, returns false if no valid data to write was found 
+         * 
+         * @param inputBufferKernelName 
+         * @return true 
+         * @return false 
+         */
+        bool run(const std::string& inputBufferKernelName);
+
+        /**
+         * @brief Read from the output buffer. 
+         * 
+         * @param outputBufferKernelName 
+         * @param forceArchive If true, the data gets copied from the buffer to the long term storage immediately. If false, the newest read data might not actually be returned by this function
+         * @param samples Number of samples to read
+         * @return std::vector<std::vector<uint8_t>> 
+         */
+        std::vector<std::vector<uint8_t>> read(const std::string& outputBufferKernelName, unsigned int samples, bool forceArchive);
+
 
          protected:
         /**

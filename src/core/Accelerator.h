@@ -69,6 +69,37 @@ namespace Finn {
          * @return false 
          */
         bool store(const std::vector<uint8_t>& data, const unsigned int deviceIndex, const std::string& inputBufferKernelName);
+
+        /**
+         * @brief Run the given buffer. Returns false if no valid data was found to execute on. 
+         * 
+         * @param deviceIndex 
+         * @param inputBufferKernelName 
+         * @return true 
+         * @return false 
+         */
+        bool run(const unsigned int deviceIndex, const std::string& inputBufferKernelName);
+
+        /**
+         * @brief Return a vector of output samples.  
+         * 
+         * @param deviceIndex 
+         * @param outputBufferKernelName 
+         * @param samples The number of samples to read
+         * @param forceArchive Whether or not to force a readout into archive. Necessary to get new data
+         * @return std::vector<std::vector<uint8_t>> 
+         */
+        std::vector<std::vector<uint8_t>> readOut(const unsigned int deviceIndex, const std::string& outputBufferKernelName, unsigned int samples, bool forceArchive);
+
+        /**
+         * @brief Read data from device but dont return it for performance reasons 
+         * 
+         * @param deviceIndex 
+         * @param outputBufferKernelName 
+         * @param samples 
+         * @param forceArchive 
+         */
+        void read(const unsigned int deviceIndex, const std::string& outputBufferKernelName, unsigned int samples, bool forceArchive);
     };
 
 

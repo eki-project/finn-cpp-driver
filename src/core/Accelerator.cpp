@@ -41,14 +41,43 @@ namespace Finn {
     // TODO(bwintermann): Make this either a factory or do the checks before calling store to save performance
     bool Accelerator::store(const std::vector<uint8_t>& data, const unsigned int deviceIndex, const std::string& inputBufferKernelName) {
         if (containsDeviceHandlerWithDeviceIndex(deviceIndex)) {
-            getDeviceHandlerByDeviceIndex(deviceIndex).store(data, inputBufferKernelName);
+            return getDeviceHandlerByDeviceIndex(deviceIndex).store(data, inputBufferKernelName);
         } else {
             if (containsDeviceHandlerWithDeviceIndex(0)) {
-                getDeviceHandlerByDeviceIndex(deviceIndex).store(data, inputBufferKernelName);
+                return getDeviceHandlerByDeviceIndex(0).store(data, inputBufferKernelName);
             } else {
                 FinnUtils::logAndError<std::runtime_error>("Tried storing data in a devicehandler with an invalid deviceIndex!");
             }
         }
+    }
+
+    bool Accelerator::run(const unsigned int deviceIndex, const std::string& inputBufferKernelName) {
+        if (containsDeviceHandlerWithDeviceIndex(deviceIndex)) {
+            return getDeviceHandlerByDeviceIndex(deviceIndex).run(inputBufferKernelName);
+        } else {
+            if (containsDeviceHandlerWithDeviceIndex(0)) {
+                return getDeviceHandlerByDeviceIndex(0).run(inputBufferKernelName);
+            } else {
+                FinnUtils::logAndError<std::runtime_error>("Tried running data in a devicehandler with an invalid deviceIndex!");
+            }
+        }
+    }
+
+    std::vector<std::vector<uint8_t>> Accelerator::readOut(const unsigned int deviceIndex, const std::string& outputBufferKernelName, unsigned int samples, bool forceArchive) {
+        if (containsDeviceHandlerWithDeviceIndex(deviceIndex)) {
+            return getDeviceHandlerByDeviceIndex(deviceIndex).read(outputBufferKernelName, samples, forceArchive);
+        } else {
+            if (containsDeviceHandlerWithDeviceIndex(0)) {
+            return getDeviceHandlerByDeviceIndex(0).read(outputBufferKernelName, samples, forceArchive);
+            } else {
+                FinnUtils::logAndError<std::runtime_error>("Tried reading data in a devicehandler with an invalid deviceIndex!");
+            }
+        }
+    }
+
+
+    void Accelerator::read(const unsigned int deviceIndex, const std::string& outputBufferKernelName, unsigned int samples, bool forceArchive) {
+        FinnUtils::logAndError<std::runtime_error>("NOT IMPLEMENTED YET.");
     }
 
 }  // namespace Finn

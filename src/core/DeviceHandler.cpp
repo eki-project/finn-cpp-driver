@@ -118,4 +118,23 @@ namespace Finn {
     unsigned int DeviceHandler::getDeviceIndex() {
         return xrtDeviceIndex;
     }
+
+    bool DeviceHandler::run(const std::string& inputBufferKernelName) {
+        if (!inputBufferMap.contains(inputBufferKernelName)) {
+            FinnUtils::logAndError<std::runtime_error>("Tried accessing kernel/buffer with name " + inputBufferKernelName + " but this kernel / buffer does not exist!");
+        }
+        return inputBufferMap.at(inputBufferKernelName).run();
+    }
+
+    std::vector<std::vector<uint8_t>> DeviceHandler::read(const std::string& outputBufferKernelName, unsigned int samples, bool forceArchive) {
+        if (!outputBufferMap.contains(outputBufferKernelName)) {
+            FinnUtils::logAndError<std::runtime_error>("Tried accessing kernel/buffer with name " + outputBufferKernelName + " but this kernel / buffer does not exist!");
+        }
+        // TODO: Avoid triple map access
+        outputBufferMap.at(outputBufferKernelName).read(samples);
+        if (forceArchive) {
+            outputBufferMap.at(outputBufferKernelName).retrieveArchive();
+        }
+        return outputBufferMap.at(outputBufferKernelName).retrieveArchive();
+    }
 }  // namespace Finn

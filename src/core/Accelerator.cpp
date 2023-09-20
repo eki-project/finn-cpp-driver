@@ -6,6 +6,7 @@
 #include <memory>     // for allocator_traits<>::value_type
 
 #include "DeviceHandler.h"
+#include "../utils/ConfigurationStructs.h"
 
 namespace Finn {
     Accelerator::Accelerator(const std::vector<DeviceWrapper>& deviceDefinitions, unsigned int hostBufferSize) {
@@ -18,4 +19,36 @@ namespace Finn {
             }
         );
     }
+
+    // FIXME: Shorten names!!!
+
+    DeviceHandler& Accelerator::getDeviceHandlerByDeviceIndex(unsigned int deviceIndex) {
+        if (!containsDeviceHandlerWithDeviceIndex(deviceIndex)) {
+            FinnUtils::logAndError<std::runtime_error>("Tried retrieving a deviceHandler with an unknown index");
+        }
+        for (auto& dh : devices) {
+            if (dh.getDeviceIndex() == deviceIndex) {
+                return dh;
+            }
+        }
+    }
+
+    bool Accelerator::containsDeviceHandlerWithDeviceIndex(unsigned int deviceIndex) {
+        return std::count_if(devices.begin(), devices.end(), [deviceIndex](DeviceHandler& dh) { return dh.getDeviceIndex() == deviceIndex; }) > 0;
+    }
+
+    // FIXME:
+    // TODO(bwintermann): Make this either a factory or do the checks before calling store to save performance
+    bool Accelerator::store(const std::vector<uint8_t>& data, const unsigned int deviceIndex, const std::string& inputBufferKernelName) {
+        if (containsDeviceHandlerWithDeviceIndex(deviceIndex)) {
+            getDeviceHandlerByDeviceIndex(deviceIndex).store(data, inputBufferKernelName);
+        } else {
+            if (containsDeviceHandlerWithDeviceIndex(0)) {
+                getDeviceHandlerByDeviceIndex(deviceIndex).store(data, inputBufferKernelName);
+            } else {
+                FinnUtils::logAndError<std::runtime_error>("Tried storing data in a devicehandler with an invalid deviceIndex!");
+            }
+        }
+    }
+
 }  // namespace Finn

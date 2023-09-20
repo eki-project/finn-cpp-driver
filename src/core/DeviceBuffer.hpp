@@ -53,6 +53,9 @@ namespace Finn {
               ringBuffer(RingBuffer<T>(ringBufferSizeFactor, mapSize)) {
             FINN_LOG(logger, loglevel::info) << "Initializing DeviceBuffer " << name << " (SHAPE PACKED: " << FinnUtils::shapeToString(pShapePacked) << ", BUFFER SIZE: " << ringBufferSizeFactor
                                              << " inputs of the given shape, MAP SIZE: " << mapSize << ")\n";
+            if (ringBufferSizeFactor == 0) {
+                FinnUtils::logAndError<std::runtime_error>("DeviceBuffer of size 0 cannot be constructed currently!");
+            }
         }
 
         DeviceBuffer(DeviceBuffer&& buf) noexcept

@@ -7,6 +7,7 @@
 #include <vector>      // for vector
 
 #include "DeviceHandler.h"  // for BufferDescriptor, DeviceHandler
+#include "../utils/ConfigurationStructs.h"
 
 
 namespace Finn {
@@ -21,6 +22,10 @@ namespace Finn {
      */
     class Accelerator {
          private:
+        /**
+         * @brief A vector of DeviceHandler instances that belong to this accelerator 
+         * 
+         */
         std::vector<DeviceHandler> devices;
 
          public:
@@ -36,6 +41,34 @@ namespace Finn {
         Accelerator& operator=(Accelerator&&) = default;
         Accelerator& operator=(const Accelerator&) = delete;
         ~Accelerator() = default;
+
+        /**
+         * @brief Return a reference to the deviceHandler with the given index. Crashes the driver if the index is invalid
+         * 
+         * @param deviceIndex 
+         * @return DeviceHandler& 
+         */
+        DeviceHandler& getDeviceHandlerByDeviceIndex(unsigned int deviceIndex);
+
+        /**
+         * @brief Checks whether a device handler with the given device index exists
+         * 
+         * @param deviceIndex 
+         * @return true 
+         * @return false 
+         */
+        bool containsDeviceHandlerWithDeviceIndex(unsigned int deviceIndex);
+
+        /**
+         * @brief Store data in the device handler with the given deviceIndex, and in the buffer with the given inputBufferKernelName.
+         * 
+         * @param data 
+         * @param deviceIndex If such a deviceIndex does not exist, use the first (0) device handler. If it doesnt exist, crash.
+         * @param inputBufferKernelName 
+         * @return true 
+         * @return false 
+         */
+        bool store(const std::vector<uint8_t>& data, const unsigned int deviceIndex, const std::string& inputBufferKernelName);
     };
 
 

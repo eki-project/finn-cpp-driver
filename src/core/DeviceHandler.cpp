@@ -12,6 +12,8 @@
 
 #include "../utils/Logger.h"  // for operator<<, FINN_LOG, FINN_DEBUG_LOG
 #include "../utils/Types.h"   // for shape_t
+#include "../utils/ConfigurationStructs.h"
+
 
 namespace fs = std::filesystem;
 
@@ -103,5 +105,17 @@ namespace Finn {
             }
         }
 #endif
+    }
+
+
+    bool DeviceHandler::store(const std::vector<uint8_t>& data, const std::string& inputBufferKernelName) {
+        if (!inputBufferMap.contains(inputBufferKernelName)) {
+            FinnUtils::logAndError<std::runtime_error>("Tried accessing kernel/buffer with name " + inputBufferKernelName + " but this kernel / buffer does not exist!");
+        }
+        return inputBufferMap.at(inputBufferKernelName).store(data);
+    }
+
+    unsigned int DeviceHandler::getDeviceIndex() {
+        return xrtDeviceIndex;
     }
 }  // namespace Finn

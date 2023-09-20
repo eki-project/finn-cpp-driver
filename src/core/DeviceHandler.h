@@ -31,6 +31,7 @@
 #include "DeviceBuffer.hpp"  // for DeviceInputBuffer, DeviceOutputBuffer
 #include "xrt/xrt_device.h"  // for device
 #include "../utils/Logger.h" // for logging
+#include "../utils/ConfigurationStructs.h"
 
 
 namespace Finn {
@@ -41,12 +42,39 @@ namespace Finn {
     class DeviceHandler {
          private:
         logger_type& log = Logger::getLogger();
+        
+        /**
+         * @brief The xrt device itself 
+         * 
+         */
         xrt::device device;
+        
+        /**
+         * @brief The local device index. This is used to create the xrt::device. TODO(bwintermann): Fix for multiple nodes (fpgas are always only numbered 0-2, not 0-2, 3-5, etc.)
+         * 
+         */
         unsigned int xrtDeviceIndex;
+
+        /**
+         * @brief Path to this devices bitstream file. TODO(linusjun,bwintermann): Change to std::fs::path 
+         * 
+         */
         std::string xclbinPath;
         xrt::uuid uuid;
+
+        /**
+         * @brief Map containing all DeviceInputBuffers for this device 
+         * 
+         */
         std::unordered_map<std::string, DeviceInputBuffer<uint8_t>> inputBufferMap;
+        
+        /**
+         * @brief Map containing all DeviceOutputBuffers for this device 
+         * 
+         */
         std::unordered_map<std::string, DeviceOutputBuffer<uint8_t>> outputBufferMap;
+
+
 
          public:
         DeviceHandler(const DeviceWrapper&, unsigned int);
@@ -78,13 +106,53 @@ namespace Finn {
          */
         ~DeviceHandler() = default;
 
-
+        /**
+         * @brief Check if a correct DeviceWrapper configuration was given 
+         * 
+         * @param devWrap 
+         */
         void checkDeviceWrapper(const DeviceWrapper& devWrap); 
 
+        /**
+         * @brief Get the Device Index of this device handler
+         * 
+         * @return unsigned int 
+         */
+        unsigned int getDeviceIndex();
+
+        /**
+         * @brief Store the given vector data in the corresponding buffer. 
+         * 
+         * @param data The data to store 
+         * @param inputBufferKernelName The kernelName which specifies the buffer
+         * @return true 
+         * @return false 
+         */
+        bool store(const std::vector<uint8_t>& data, const std::string& inputBufferKernelName);
+
+
          protected:
+        /**
+         * @brief Initialize the device by it's given xrtDeviceIndex, initializing the "device" member variable 
+         * 
+         */
         void initializeDevice();
+        
+        /**
+         * @brief Loading the given xclbin by it's path. Sets the "uuid" member variable 
+         * 
+         */
         void loadXclbinSetUUID(); 
+
+        /**
+         * @brief Create DeviceBuffers for every idma/odma in the DeviceWrapper. 
+         * 
+         * @param devWrap 
+         * @param hostBufferSize How many multiples of one sample should be store-able in the buffer
+         */
         void initializeBufferObjects(const DeviceWrapper& devWrap, unsigned int hostBufferSize); 
+
+
 
     };
 }  // namespace Finn

@@ -76,6 +76,7 @@ struct BufferDescriptor : public std::enable_shared_from_this<BufferDescriptor> 
 
     BufferDescriptor() = default;
     BufferDescriptor(const std::string& pKernelName, const shape_t& pPackedShape) : kernelName(pKernelName), packedShape(pPackedShape){};
+    virtual ~BufferDescriptor() = default;  // Needed for dynamic cast
 };
 
 struct ExtendedBufferDescriptor : public BufferDescriptor {

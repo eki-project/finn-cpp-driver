@@ -244,7 +244,8 @@ int main(int argc, char* argv[]) {
         }
 
         auto inputFilePath = std::filesystem::path(vm["input"].as<std::string>());
-        Finn::BaseDriver baseDriver = Finn::BaseDriver<InputFinnType, OutputFinnType, uint8_t>(inputFilePath);
+        Finn::BaseDriver baseDriver = Finn::BaseDriver<InputFinnType, OutputFinnType, uint8_t>(inputFilePath, 100);
+
 
     } else {
         FinnUtils::logAndError<std::invalid_argument>("Unknown driver mode: " + vm["mode"].as<std::string>());

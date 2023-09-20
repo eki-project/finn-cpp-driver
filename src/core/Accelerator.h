@@ -20,6 +20,9 @@ namespace Finn {
      *
      */
     class Accelerator {
+         private:
+        std::vector<DeviceHandler> devices;
+
          public:
         Accelerator() = default;
         /**
@@ -27,56 +30,12 @@ namespace Finn {
          *
          * @param deviceDefinitions Vector of @ref DeviceWrapper
          */
-        explicit Accelerator(const std::vector<DeviceWrapper>& deviceDefinitions);
-        /**
-         * @brief Construct a new Accelerator object using a single DeviceWrapper
-         *
-         * @param deviceWrapper
-         */
-        explicit Accelerator(const DeviceWrapper& deviceWrapper);
-        /**
-         * @brief Default move Constructor
-         *
-         */
+        explicit Accelerator(const std::vector<DeviceWrapper>& deviceDefinitions, unsigned int hostBufferSize);
         Accelerator(Accelerator&&) = default;
-        /**
-         * @brief Deleted copy constructor. Copying the Accelerator can result in multiple Accelerators managing the same Device
-         *
-         */
         Accelerator(const Accelerator&) = delete;
-        /**
-         * @brief Default move assignment operator
-         *
-         * @return Accelerator& other
-         */
         Accelerator& operator=(Accelerator&&) = default;
-        /**
-         * @brief Deleted copy assignment operator. Copying the Accelerator can result in multiple Accelerators managing the same Device
-         *
-         * @return Accelerator&
-         */
         Accelerator& operator=(const Accelerator&) = delete;
-        /**
-         * @brief Destroy the Accelerator object. Default Implementation.
-         *
-         */
         ~Accelerator() = default;
-
-        /**
-         * @brief Fast and dirty implementation that only supports a single FPGA with a single input
-         *
-         * @param inputVec
-         * @return true
-         * @return false
-         */
-        bool write(const std::vector<uint8_t>& inputVec);
-
-         private:
-        /**
-         * @brief Vector of Devices managed by the Accelerator object.
-         *
-         */
-        std::vector<DeviceHandler> devices;
     };
 
 

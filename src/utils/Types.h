@@ -7,6 +7,7 @@
 #include <string>
 #include <variant>
 #include <vector>
+#include <fstream>
 
 enum class PLATFORM { ALVEO = 0, INVALID = -1 };
 
@@ -104,8 +105,7 @@ void inline from_json(const json& j, ExtendedBufferDescriptor& ebd) {
  */
 struct DeviceWrapper {
     std::filesystem::path xclbin;
-    std::string name;
-    unsigned int fpgaIndex;
+    unsigned int xrtDeviceIndex;
     std::vector<std::shared_ptr<BufferDescriptor>> idmas;
     std::vector<std::shared_ptr<BufferDescriptor>> odmas;
 };
@@ -113,13 +113,29 @@ struct DeviceWrapper {
 // NOLINTNEXTLINE
 void inline from_json(const json& j, DeviceWrapper& devWrap) {
     j.at("xclbinPath").get_to(devWrap.xclbin);
-    j.at("name").get_to(devWrap.name);
-    j.at("fpgaIndex").get_to(devWrap.fpgaIndex);
+    j.at("xrtDeviceIndex").get_to(devWrap.xrtDeviceIndex);
     auto vec = j.at("idmas").get<std::vector<std::shared_ptr<ExtendedBufferDescriptor>>>();
     devWrap.idmas = std::vector<std::shared_ptr<BufferDescriptor>>(vec.begin(), vec.end());
     vec = j.at("odmas").get<std::vector<std::shared_ptr<ExtendedBufferDescriptor>>>();
     devWrap.odmas = std::vector<std::shared_ptr<BufferDescriptor>>(vec.begin(), vec.end());
 }
 
+namespace Finn {
+    struct Config {
+        std::vector<DeviceWrapper> deviceWrappers;
+    };
+
+    inline Config createConfigFromPath(const std::filesystem::path& configPath) {
+        std::ifstream f(configPath.string());
+        json dataJson = json::parse(f);
+        Config config;
+        for (auto& fpgaDevice : dataJson) {
+            DeviceWrapper devWrap;
+            from_json(fpgaDevice, devWrap);
+            config.deviceWrappers.emplace_back(devWrap);
+        }
+        return config;
+    }
+}
 
 #endif  // TYPES_H

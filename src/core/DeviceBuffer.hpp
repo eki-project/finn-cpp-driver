@@ -33,13 +33,13 @@ namespace Finn {
         shapePacked_t shapePacked;  // Packed shape (Type T): (1,2,3)
         size_t mapSize;             // Numbers of type T: When F has bitwidth 2, and T has bitwidth 8, the folded shape would be (1,2,10) and the packed (1,2,3) and thus 6
         xrt::bo internalBo;
-        xrt::kernel& associatedKernel;
+        xrt::kernel associatedKernel;
         T* map;
         logger_type& logger;
         RingBuffer<T> ringBuffer;
 
          public:
-        DeviceBuffer(const std::string& pName, xrt::device& device, xrt::kernel& pAssociatedKernel, /*const shape_t& pShapeNormal, const shape_t& pShapeFolded,*/ const shapePacked_t& pShapePacked, unsigned int ringBufferSizeFactor)
+        DeviceBuffer(const std::string& pName, xrt::device& device, xrt::kernel pAssociatedKernel, /*const shape_t& pShapeNormal, const shape_t& pShapeFolded,*/ const shapePacked_t& pShapePacked, unsigned int ringBufferSizeFactor)
             : name(pName),
               // numbers(FinnUtils::shapeToElements(pShapeNormal)),
               //  shapeNormal(pShapeNormal),

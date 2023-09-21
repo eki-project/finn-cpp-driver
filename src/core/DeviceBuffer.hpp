@@ -12,7 +12,7 @@
 #include "xrt.h"
 #include "xrt/xrt_bo.h"
 #include "xrt/xrt_kernel.h"
-
+#include "ert.h"
 
 // TODO(bwintermann): Replace ... with using DeviceBuffer<T,F>::...
 
@@ -47,7 +47,7 @@ namespace Finn {
               shapePacked(pShapePacked),
               mapSize(FinnUtils::getActualBufferSize(FinnUtils::shapeToElements(pShapePacked))),
               internalBo(xrt::bo(device, mapSize * sizeof(T), 0)),
-              associatedKernel(pAssociatedKernel),
+              associatedKernel(std::move(pAssociatedKernel)),
               map(internalBo.template map<T*>()),
               logger(Logger::getLogger()),
               ringBuffer(RingBuffer<T>(ringBufferSizeFactor, mapSize)) {
@@ -63,7 +63,7 @@ namespace Finn {
               shapePacked(std::move(buf.shapePacked)),
               mapSize(buf.mapSize),
               internalBo(std::move(buf.internalBo)),
-              associatedKernel(buf.associatedKernel),
+              associatedKernel(std::move(buf.associatedKernel)),
               map(std::move(buf.map)),
               logger(Logger::getLogger()),
               ringBuffer(std::move(buf.ringBuffer)) {}
@@ -188,8 +188,8 @@ namespace Finn {
         }
 
         bool store(const std::vector<T>& data) {
-            // TODO(bjarne): Enable support to write multiple parts from one vector, which has then to be a multiple of elementsPerPart large
-            // TODO: Remove FINN_LOG
+            // TODO(bwintermann): Enable support to write multiple parts from one vector, which has then to be a multiple of elementsPerPart large
+            // TODO(bwintermann): Remove FINN_LOG
             FINN_LOG(logger, loglevel::info) << "DeviceBuffer (" << this->name << ") storing data...";
             return this->ringBuffer.template store<std::vector<T>>(data, data.size());
         }
@@ -201,7 +201,7 @@ namespace Finn {
         }
 
         bool run() {
-            // TODO: Remove FINN_LOG
+            // TODO(bwintermann): Remove FINN_LOG
             FINN_LOG(logger, loglevel::info) << "DeviceBuffer (" << this->name << ") executing...";
             std::lock_guard<std::mutex> guard(runMutex);
             if (!loadMap()) {
@@ -249,6 +249,8 @@ namespace Finn {
         using DeviceBuffer<T /*, F*/>::DeviceBuffer;
         using DeviceBuffer<T /*, F*/>::logger;
 
+        unsigned int msExecuteTimeout = 1000;
+
          private:
         /**
          * @brief Returns a device prefix for logging
@@ -261,6 +263,7 @@ namespace Finn {
             str += "] ";
             return str;
         }
+
 
 #ifdef INSPECTION_TEST
          public:
@@ -280,6 +283,15 @@ namespace Finn {
 #endif
 
          public:
+
+        unsigned int getMsExecuteTimeout() const {
+            return msExecuteTimeout;
+        }
+
+        void setMsExecuteTimeout(unsigned int val) {
+            msExecuteTimeout = val;
+        }
+
         /**
          * @brief Sync data from the FPGA into the memory map
          *
@@ -295,13 +307,13 @@ namespace Finn {
          * @attention This function is blocking.
          *
          */
-        void execute() {
+        ert_cmd_state execute() {
             FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "Executing on device";
             // TODO(bwintermann): Add arguments for kernel run!
             auto run = this->associatedKernel(this->internalBo, 1);
-            run.wait();
+            run.wait(msExecuteTimeout);
+            return run.state();
         }
-
         /**
          * @brief Store the contents of the memory map into the ring buffer.
          *
@@ -340,20 +352,26 @@ namespace Finn {
         void clearArchive() { longTermStorage.resize(0); }
 
         /**
-         * @brief Read the specified number of samples from the device, only writing data into the archive when the ring buffer is full
-         *
-         * @param samples
+         * @brief Read the specified number of samples. If a read fails, immediately return. If all are successfull, the kernel state of the last run is returned 
+         * 
+         * @param samples 
+         * @return ert_cmd_state 
          */
-        void read(unsigned int samples) {
+        ert_cmd_state read(unsigned int samples) {
             FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "Reading " << samples << " samples from the device";
+            ert_cmd_state outExecuteResult = ERT_CMD_STATE_ERROR;   // Return error if samples == 0
             for (unsigned int i = 0; i < samples; i++) {
-                execute();
+                 outExecuteResult = execute();
+                if (outExecuteResult == ERT_CMD_STATE_ERROR || outExecuteResult == ERT_CMD_STATE_ABORT) {
+                    return outExecuteResult;
+                }
                 sync();
                 saveMap();
                 if (this->ringBuffer.isFull()) {
                     archiveValidBufferParts();
                 }
             }
+            return outExecuteResult;
         }
         
         
@@ -365,24 +383,6 @@ namespace Finn {
          */
         size_t size(SIZE_SPECIFIER ss) { return this->ringBuffer.size(ss); }
     };
-
-    template<typename T /*, typename F*/>
-    DeviceInputBuffer<T /*, F*/> makeAutomaticInputBuffer(const std::string& name, const xrt::device& device, const xrt::kernel& kern, /*const shape_t& shapeNormal, const shape_t& shapeFolded,*/ const shape_t& shapePacked,
-                                                          unsigned int bufferSize) {
-        auto tmp = DeviceInputBuffer<T /*, F*/>(name, device, kern, /*shapeNormal, shapeFolded,*/ shapePacked, bufferSize);
-        tmp.setExecuteAutomatically(true);
-        tmp.setExecuteAutomaticallyHalfway(true);
-        return tmp;
-    }
-
-    template<typename T /*, typename F*/>
-    DeviceInputBuffer<T /*, F*/> makeManualInputBuffer(const std::string& name, const xrt::device& device, const xrt::kernel& kern, /*const shape_t& shapeNormal, const shape_t& shapeFolded,*/ const shape_t& shapePacked,
-                                                       unsigned int bufferSize) {
-        auto tmp = DeviceInputBuffer<T /*, F*/>(name, device, kern, /*shapeNormal, shapeFolded,*/ shapePacked, bufferSize);
-        tmp.setExecuteAutomatically(false);
-        tmp.setExecuteAutomaticallyHalfway(false);
-        return tmp;
-    }
 }  // namespace Finn
 
 #endif  // DEVICEBUFFER_H

@@ -32,7 +32,7 @@
 #include "xrt/xrt_device.h"  // for device
 #include "../utils/Logger.h" // for logging
 #include "../utils/ConfigurationStructs.h"
-
+#include "ert.h"
 
 namespace Finn {
     /**
@@ -77,7 +77,7 @@ namespace Finn {
 
 
          public:
-        DeviceHandler(const DeviceWrapper&, unsigned int);
+        DeviceHandler(const DeviceWrapper& devWrap, unsigned int hostBufferSize);
         /**
          * @brief Default move constructor
          *
@@ -111,14 +111,14 @@ namespace Finn {
          * 
          * @param devWrap 
          */
-        void checkDeviceWrapper(const DeviceWrapper& devWrap); 
+        static void checkDeviceWrapper(const DeviceWrapper& devWrap); 
 
         /**
          * @brief Get the Device Index of this device handler
          * 
          * @return unsigned int 
          */
-        unsigned int getDeviceIndex();
+        unsigned int getDeviceIndex() const;
 
         /**
          * @brief Store the given vector data in the corresponding buffer. 
@@ -140,14 +140,23 @@ namespace Finn {
         bool run(const std::string& inputBufferKernelName);
 
         /**
-         * @brief Read from the output buffer. 
+         * @brief Read from the output buffer on the host. This does NOT execute the output kernel 
          * 
          * @param outputBufferKernelName 
          * @param forceArchive If true, the data gets copied from the buffer to the long term storage immediately. If false, the newest read data might not actually be returned by this function
          * @param samples Number of samples to read
          * @return std::vector<std::vector<uint8_t>> 
          */
-        std::vector<std::vector<uint8_t>> read(const std::string& outputBufferKernelName, unsigned int samples, bool forceArchive);
+        std::vector<std::vector<uint8_t>> retrieveResults(const std::string& outputBufferKernelName);
+
+        /**
+         * @brief Execute the output kernel and return it's result. If a run fails, the function returns early. 
+         * 
+         * @param outputBufferKernelName 
+         * @param samples 
+         * @return ert_cmd_state 
+         */
+        ert_cmd_state read(const std::string& outputBufferKernelName, unsigned int samples);
 
         /**
          * @brief Return the buffer sizes 

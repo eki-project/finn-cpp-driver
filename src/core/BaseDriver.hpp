@@ -12,6 +12,7 @@
 #include "../utils/Logger.h"
 #include "../utils/ConfigurationStructs.h"
 #include "../utils/FinnDatatypes.hpp"
+#include "ert.h"
 
 #include <fstream>
 #include <nlohmann/json.hpp>
@@ -69,7 +70,12 @@ namespace Finn {
             bool ran = accelerator.run(inputDeviceIndex, inputBufferKernelName);
             if (stored && ran) {
                 FINN_LOG(logger, loglevel::info) << "Reading out buffers";
-                return accelerator.readOut(outputDeviceIndex, outputBufferKernelName, samples, true);
+                ert_cmd_state resultState = accelerator.read(outputDeviceIndex, outputBufferKernelName, samples);
+                if (resultState == ERT_CMD_STATE_COMPLETED) {
+                    return accelerator.retrieveResults(outputDeviceIndex, outputBufferKernelName);
+                } else {
+                    FinnUtils::logAndError<std::runtime_error>("Unspecifiable error during inference");
+                }
             } else {
                 FinnUtils::logAndError<std::runtime_error>("Data either couldnt be stored or there was no data to execute!");
             }

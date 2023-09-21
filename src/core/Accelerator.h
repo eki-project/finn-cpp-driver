@@ -8,6 +8,7 @@
 
 #include "DeviceHandler.h"  // for BufferDescriptor, DeviceHandler
 #include "../utils/ConfigurationStructs.h"
+#include "ert.h"
 
 
 namespace Finn {
@@ -89,18 +90,18 @@ namespace Finn {
          * @param forceArchive Whether or not to force a readout into archive. Necessary to get new data
          * @return std::vector<std::vector<uint8_t>> 
          */
-        std::vector<std::vector<uint8_t>> readOut(const unsigned int deviceIndex, const std::string& outputBufferKernelName, unsigned int samples, bool forceArchive);
-
+        std::vector<std::vector<uint8_t>> retrieveResults(const unsigned int deviceIndex, const std::string& outputBufferKernelName);
+    
         /**
-         * @brief Read data from device but dont return it for performance reasons 
+         * @brief Execute the output kernel and return it's result. If a run fails, the function returns early. 
          * 
          * @param deviceIndex 
          * @param outputBufferKernelName 
          * @param samples 
-         * @param forceArchive 
+         * @return ert_cmd_state 
          */
-        void read(const unsigned int deviceIndex, const std::string& outputBufferKernelName, unsigned int samples, bool forceArchive);
-    
+        ert_cmd_state read(const unsigned int deviceIndex, const std::string& outputBufferKernelName, unsigned int samples);
+
         /**
          * @brief Get the size of the buffer with the specified device index and buffer name 
          * 

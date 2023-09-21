@@ -23,7 +23,6 @@
 #include "xrt/xrt_kernel.h"
 
 using std::string;
-auto logger = Logger::getLogger();
 
 
 /**
@@ -158,7 +157,8 @@ void logDeviceInformation(logger_type& logger, xrt::device& device, const std::s
 namespace po = finnBoost::program_options;
 
 int main(int argc, char* argv[]) {
-    FINN_LOG(logger, loglevel::info) << "C++ Driver started, acquiring logger...";
+    auto logger = Logger::getLogger();
+    FINN_LOG(logger, loglevel::info) << "C++ Driver started";
     
     auto logMode = [&logger](std::string m) { FINN_LOG(logger, loglevel::info) << "Driver Mode: " << m; };
     auto logConfig = [&logger](std::string m) { FINN_LOG(logger, loglevel::info) << "Configuration file: " << m; };

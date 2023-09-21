@@ -18,18 +18,20 @@
 namespace fs = std::filesystem;
 
 namespace Finn {
-    DeviceHandler::DeviceHandler(const DeviceWrapper& devWrap, unsigned int hostBufferSize = 100) {   
+    DeviceHandler::DeviceHandler(const DeviceWrapper& devWrap, unsigned int hostBufferSize = 100) : 
+        xrtDeviceIndex(devWrap.xrtDeviceIndex),
+        xclbinPath(devWrap.xclbin) 
+        {   
         // Checks and member assignments
         checkDeviceWrapper(devWrap);
-        xrtDeviceIndex = devWrap.xrtDeviceIndex;
-        xclbinPath = devWrap.xclbin;
-
+        
         // XRT Device and DeviceBuffer initialization
         initializeDevice();
         loadXclbinSetUUID();
         initializeBufferObjects(devWrap, hostBufferSize);
-        FINN_LOG(logger, loglevel::info) << "Finished setting up device " << xrtDeviceIndex;
-    }
+        
+        FINN_LOG(log, loglevel::info) << "Finished setting up device " << xrtDeviceIndex;
+    }    
 
     void DeviceHandler::checkDeviceWrapper(const DeviceWrapper& devWrap) {
         if (devWrap.xclbin.empty()) {
@@ -92,17 +94,17 @@ namespace Finn {
                 )
             );
         }
-        FINN_LOG(logger, loglevel::info) << "Finished initializing buffer objects on device " << xrtDeviceIndex;
+        FINN_LOG(log, loglevel::info) << "Finished initializing buffer objects on device " << xrtDeviceIndex;
 #ifndef NDEBUG
-        for (index = 0; index < inputBufferMap.bucket_count(); ++index) {
+        for (size_t index = 0; index < inputBufferMap.bucket_count(); ++index) {
             if (inputBufferMap.bucket_size(index) > 1) {
-                FINN_LOG_DEBUG(log, loglevel::error) << "(" << name << ") "
+                FINN_LOG_DEBUG(log, loglevel::error) << "(" << xrtDeviceIndex << ") "
                                                      << "Hash collision in inputBufferMap. This access to the inputBufferMap is no longer constant time!";
             }
         }
-        for (index = 0; index < outputBufferMap.bucket_count(); ++index) {
+        for (size_t index = 0; index < outputBufferMap.bucket_count(); ++index) {
             if (outputBufferMap.bucket_size(index) > 1) {
-                FINN_LOG_DEBUG(log, loglevel::error) << "(" << name << ") "
+                FINN_LOG_DEBUG(log, loglevel::error) << "(" << xrtDeviceIndex << ") "
                                                      << "Hash collision in outputBufferMap. This access to the outputBufferMap is no longer constant time!";
             }
         }
@@ -117,7 +119,7 @@ namespace Finn {
         return inputBufferMap.at(inputBufferKernelName).store(data);
     }
 
-    unsigned int DeviceHandler::getDeviceIndex() {
+    unsigned int DeviceHandler::getDeviceIndex() const {
         return xrtDeviceIndex;
     }
 
@@ -128,25 +130,26 @@ namespace Finn {
         return inputBufferMap.at(inputBufferKernelName).run();
     }
 
-    std::vector<std::vector<uint8_t>> DeviceHandler::read(const std::string& outputBufferKernelName, unsigned int samples, bool forceArchive) {
+    std::vector<std::vector<uint8_t>> DeviceHandler::retrieveResults(const std::string& outputBufferKernelName) {
         if (!outputBufferMap.contains(outputBufferKernelName)) {
             FinnUtils::logAndError<std::runtime_error>("Tried accessing kernel/buffer with name " + outputBufferKernelName + " but this kernel / buffer does not exist!");
-        }
-        // TODO: Avoid triple map access
-        outputBufferMap.at(outputBufferKernelName).read(samples);
-        if (forceArchive) {
-            outputBufferMap.at(outputBufferKernelName).retrieveArchive();
         }
         return outputBufferMap.at(outputBufferKernelName).retrieveArchive();
     }
 
+    ert_cmd_state DeviceHandler::read(const std::string& outputBufferKernelName, unsigned int samples) {
+        if (!outputBufferMap.contains(outputBufferKernelName)) {
+            FinnUtils::logAndError<std::runtime_error>("Tried accessing kernel/buffer with name " + outputBufferKernelName + " but this kernel / buffer does not exist!");
+        }
+        return outputBufferMap.at(outputBufferKernelName).read(samples);
+    }
 
     size_t DeviceHandler::size(SIZE_SPECIFIER ss, const std::string& bufferName) {
         if (inputBufferMap.contains(bufferName)) {
-            return static_cast<size_t>(inputBufferMap.at(bufferName).size(ss));
+            return inputBufferMap.at(bufferName).size(ss);
+        } else if (outputBufferMap.contains(bufferName)) {
+            return outputBufferMap.at(bufferName).size(ss);
         }
-        if (outputBufferMap.contains(bufferName)) {
-            return static_cast<size_t>(outputBufferMap.at(bufferName).size(ss));
-        }
+        return 0;
     }
 }  // namespace Finn

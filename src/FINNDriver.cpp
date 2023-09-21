@@ -156,8 +156,8 @@ void logDeviceInformation(logger_type& logger, xrt::device& device, const std::s
 namespace po = finnBoost::program_options;
 
 int main(int argc, char* argv[]) {
+    FINN_LOG(logger, loglevel::info) << "C++ Driver started, acquiring logger...";
     auto logger = Logger::getLogger();
-    FINN_LOG(logger, loglevel::info) << "C++ Driver started";
     
     auto logMode = [&logger](std::string m) { FINN_LOG(logger, loglevel::info) << "Driver Mode: " << m; };
     auto logConfig = [&logger](std::string m) { FINN_LOG(logger, loglevel::info) << "Configuration file: " << m; };
@@ -172,6 +172,8 @@ int main(int argc, char* argv[]) {
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);
     po::notify(vm);
+
+    FINN_LOG(logger, loglevel::info) << "Parsed command line params";
 
     if (vm.count("help")) {
         FINN_LOG(logger, loglevel::info) << desc;
@@ -247,9 +249,6 @@ int main(int argc, char* argv[]) {
 
 
     } else if (vm["mode"].as<std::string>() == "filetest") {
-        if (!vm.count("input")) {
-            FinnUtils::logAndError<std::invalid_argument>("No input file specified for file execution mode!");
-        }
         auto inputFilePath = std::filesystem::path(vm["input"].as<std::string>());
         Finn::BaseDriver baseDriver = Finn::BaseDriver<InputFinnType, OutputFinnType, uint8_t>(inputFilePath, 10);
 

@@ -15,7 +15,7 @@ namespace xrt {
 
     void run::wait(unsigned int ms) {}
 
-    ert_cmd_state state() {}
+    ert_cmd_state run::state() {}
 
 
     std::string kernel::get_name() const {

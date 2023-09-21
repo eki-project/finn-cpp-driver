@@ -121,6 +121,13 @@ namespace Finn {
         unsigned int getDeviceIndex() const;
 
         /**
+         * @brief Return a reference to the actual xrt::device object used
+         * 
+         * @return xrt::device& 
+         */
+        xrt::device& getDevice();
+
+        /**
          * @brief Store the given vector data in the corresponding buffer. 
          * 
          * @param data The data to store 

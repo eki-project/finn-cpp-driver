@@ -258,6 +258,9 @@ int main(int argc, char* argv[]) {
 
         Finn::BaseDriver baseDriver = Finn::BaseDriver<InputFinnType, OutputFinnType, uint8_t>(configFilePath, 10);
 
+        // TODO(bwintermann): Remove after debugging
+        logDeviceInformation(logger, baseDriver.getDeviceHandler(0).getDevice(), baseDriver.getConfig().deviceWrappers[0].xclbin);
+
         auto filler = FinnUtils::BufferFiller(0,2);
         std::vector<uint8_t> data;
         data.resize(baseDriver.size(SIZE_SPECIFIER::ELEMENTS_PER_PART, 0, "StreamingDataflowPartition_0:{idma0}"));

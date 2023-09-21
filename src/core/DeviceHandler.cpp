@@ -86,7 +86,7 @@ namespace Finn {
             );
         }
         for (auto&& ebdptr : devWrap.odmas) {
-            auto tmpKern = xrt::kernel(device, uuid, ebdptr->kernelName, xrt::kernel::cu_access_mode::shared);
+            auto tmpKern = xrt::kernel(device, uuid, ebdptr->kernelName, xrt::kernel::cu_access_mode::exclusive);
             outputBufferMap.emplace(
                 std::make_pair(
                     ebdptr->kernelName,
@@ -111,6 +111,9 @@ namespace Finn {
 #endif
     }
 
+    xrt::device& DeviceHandler::getDevice() {
+        return device;
+    }
 
     bool DeviceHandler::store(const std::vector<uint8_t>& data, const std::string& inputBufferKernelName) {
         if (!inputBufferMap.contains(inputBufferKernelName)) {

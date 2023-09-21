@@ -53,6 +53,25 @@ namespace Finn {
         // TODO(bwintermann): Add methods for Iterator reading/storing
 
         /**
+         * @brief Get the Config object. Simple getter to check things outside the driver
+         * 
+         * @return Config 
+         */
+        Config getConfig() {
+            return config;
+        }
+
+        /**
+         * @brief Get the Device object, specified by its index
+         * 
+         * @param index 
+         * @return DeviceHandler& 
+         */
+        DeviceHandler& getDeviceHandler(unsigned int index) {
+            return accelerator.getDeviceHandlerByDeviceIndex(index);
+        }
+
+        /**
          * @brief Do an inference with the given data. This assumes already flattened data in uint8_t's. Specify inputs and outputs. 
          * 
          * @param data 
@@ -71,10 +90,10 @@ namespace Finn {
             if (stored && ran) {
                 FINN_LOG(logger, loglevel::info) << "Reading out buffers";
                 ert_cmd_state resultState = accelerator.read(outputDeviceIndex, outputBufferKernelName, samples);
-                if (resultState == ERT_CMD_STATE_COMPLETED) {
+                if (resultState == ERT_CMD_STATE_COMPLETED || resultState == ERT_CMD_STATE_TIMEOUT) {
                     return accelerator.retrieveResults(outputDeviceIndex, outputBufferKernelName);
                 } else {
-                    FinnUtils::logAndError<std::runtime_error>("Unspecifiable error during inference");
+                    FinnUtils::logAndError<std::runtime_error>("Unspecifiable error during inference (ert_cmd_state is " + std::to_string(resultState) + ")!");
                 }
             } else {
                 FinnUtils::logAndError<std::runtime_error>("Data either couldnt be stored or there was no data to execute!");

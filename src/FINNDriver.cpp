@@ -250,6 +250,11 @@ int main(int argc, char* argv[]) {
 
     } else if (vm["mode"].as<std::string>() == "filetest") {
         auto inputFilePath = std::filesystem::path(vm["input"].as<std::string>());
+        FINN_LOG(logger, loglevel::info) << "Reading config file " << inputFilePath.string();
+        if (!std::filesystem::exists(inputFilePath)) {
+            FinnUtils::logAndError<std::runtime_error>("Cannot find config file at " + inputFilePath.string());
+        }
+
         Finn::BaseDriver baseDriver = Finn::BaseDriver<InputFinnType, OutputFinnType, uint8_t>(inputFilePath, 10);
 
         auto filler = FinnUtils::BufferFiller(0,2);

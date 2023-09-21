@@ -163,16 +163,16 @@ endif ()
 
 include(cmake/Sanitizers.cmake)
 
-OPTION(FINNC_ENABLE_SANITIZERS "Enable default analyzers" ON)
-OPTION(FINNC_ENABLE_THREAD_SANITIZERS "Enable thread analyzer" OFF)
-OPTION(FINNC_ENABLE_MEMORY_SANITIZERS "Enable memory analyzer" OFF)
+#OPTION(FINNC_ENABLE_SANITIZERS "Enable default analyzers" ON)
+#OPTION(FINNC_ENABLE_THREAD_SANITIZERS "Enable thread analyzer" OFF)
+#OPTION(FINNC_ENABLE_MEMORY_SANITIZERS "Enable memory analyzer" OFF)
 
-finncpp_enable_sanitizers(finnc_options
-                          ${FINNC_ENABLE_SANITIZERS}
-                          ${FINNC_ENABLE_SANITIZERS}
-                          ${FINNC_ENABLE_SANITIZERS}
-                          ${FINNC_ENABLE_THREAD_SANITIZERS}
-                          ${FINNC_ENABLE_MEMORY_SANITIZERS})
+#finncpp_enable_sanitizers(finnc_options
+#                          ${FINNC_ENABLE_SANITIZERS}
+#                          ${FINNC_ENABLE_SANITIZERS}
+#                          ${FINNC_ENABLE_SANITIZERS}
+#                          ${FINNC_ENABLE_THREAD_SANITIZERS}
+#                          ${FINNC_ENABLE_MEMORY_SANITIZERS})
 
 message(STATUS "Checks:")
 list(APPEND CMAKE_MESSAGE_INDENT "  ") #indent +1

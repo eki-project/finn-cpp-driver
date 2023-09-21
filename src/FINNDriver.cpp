@@ -264,6 +264,7 @@ int main(int argc, char* argv[]) {
 
         filler.fillRandom(data);
         auto results = baseDriver.inferRaw(data, 0, "StreamingDataflowPartition_0:{idma0}", 0, "StreamingDataflowPartition_2:{odma0}", 9); 
+        FINN_LOG(logger, loglevel::info) << "Received " << results.size() << " results!";
 
         for (auto& resultVector : results) {
             for (auto& val : resultVector) {

@@ -28,6 +28,7 @@ namespace Finn {
         initializeDevice();
         loadXclbinSetUUID();
         initializeBufferObjects(devWrap, hostBufferSize);
+        FINN_LOG(logger, loglevel::info) << "Finished setting up device " << xrtDeviceIndex;
     }
 
     void DeviceHandler::checkDeviceWrapper(const DeviceWrapper& devWrap) {
@@ -91,6 +92,7 @@ namespace Finn {
                 )
             );
         }
+        FINN_LOG(logger, loglevel::info) << "Finished initializing buffer objects on device " << xrtDeviceIndex;
 #ifndef NDEBUG
         for (index = 0; index < inputBufferMap.bucket_count(); ++index) {
             if (inputBufferMap.bucket_size(index) > 1) {

@@ -189,6 +189,8 @@ namespace Finn {
 
         bool store(const std::vector<T>& data) {
             // TODO(bjarne): Enable support to write multiple parts from one vector, which has then to be a multiple of elementsPerPart large
+            // TODO: Remove FINN_LOG
+            FINN_LOG(logger, loglevel::info) << "DeviceBuffer (" << this->name << ") storing data...";
             return this->ringBuffer.template store<std::vector<T>>(data, data.size());
         }
 
@@ -199,6 +201,8 @@ namespace Finn {
         }
 
         bool run() {
+            // TODO: Remove FINN_LOG
+            FINN_LOG(logger, loglevel::info) << "DeviceBuffer (" << this->name << ") executing...";
             std::lock_guard<std::mutex> guard(runMutex);
             if (!loadMap()) {
                 return false;

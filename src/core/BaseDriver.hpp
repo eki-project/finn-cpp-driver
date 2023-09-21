@@ -23,7 +23,7 @@ namespace Finn {
          private:
         Accelerator accelerator;
         Config configuration;
-        logger_type& logger;
+        logger_type& logger = Logger::getLogger();
 
         unsigned int defaultInputDeviceIndex;
         unsigned int defaultOutputDeviceIndex;

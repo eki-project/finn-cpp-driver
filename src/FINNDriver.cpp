@@ -23,6 +23,8 @@
 #include "xrt/xrt_kernel.h"
 
 using std::string;
+auto logger = Logger::getLogger();
+
 
 /**
  * @brief Start a thread that writes 100 random data samples to the device. Returns a thread that can be waited on
@@ -157,7 +159,6 @@ namespace po = finnBoost::program_options;
 
 int main(int argc, char* argv[]) {
     FINN_LOG(logger, loglevel::info) << "C++ Driver started, acquiring logger...";
-    auto logger = Logger::getLogger();
     
     auto logMode = [&logger](std::string m) { FINN_LOG(logger, loglevel::info) << "Driver Mode: " << m; };
     auto logConfig = [&logger](std::string m) { FINN_LOG(logger, loglevel::info) << "Configuration file: " << m; };
@@ -244,18 +245,18 @@ int main(int argc, char* argv[]) {
         if (!vm.count("input")) {
             FinnUtils::logAndError<std::invalid_argument>("No input file specified for file execution mode!");
         }
-        auto inputFilePath = std::filesystem::path(vm["input"].as<std::string>());
-        Finn::BaseDriver baseDriver = Finn::BaseDriver<InputFinnType, OutputFinnType, uint8_t>(inputFilePath, 100);
+        auto configFilePath = std::filesystem::path(vm["configpath"].as<std::string>());
+        Finn::BaseDriver baseDriver = Finn::BaseDriver<InputFinnType, OutputFinnType, uint8_t>(configFilePath, 100);
 
 
     } else if (vm["mode"].as<std::string>() == "filetest") {
-        auto inputFilePath = std::filesystem::path(vm["input"].as<std::string>());
-        FINN_LOG(logger, loglevel::info) << "Reading config file " << inputFilePath.string();
-        if (!std::filesystem::exists(inputFilePath)) {
-            FinnUtils::logAndError<std::runtime_error>("Cannot find config file at " + inputFilePath.string());
+        auto configFilePath = std::filesystem::path(vm["configpath"].as<std::string>());
+        FINN_LOG(logger, loglevel::info) << "Reading config file " << configFilePath.string();
+        if (!std::filesystem::exists(configFilePath)) {
+            FinnUtils::logAndError<std::runtime_error>("Cannot find config file at " + configFilePath.string());
         }
 
-        Finn::BaseDriver baseDriver = Finn::BaseDriver<InputFinnType, OutputFinnType, uint8_t>(inputFilePath, 10);
+        Finn::BaseDriver baseDriver = Finn::BaseDriver<InputFinnType, OutputFinnType, uint8_t>(configFilePath, 10);
 
         auto filler = FinnUtils::BufferFiller(0,2);
         std::vector<uint8_t> data;

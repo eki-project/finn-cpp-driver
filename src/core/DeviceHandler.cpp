@@ -72,7 +72,7 @@ namespace Finn {
     }
 
     void DeviceHandler::initializeBufferObjects(const DeviceWrapper& devWrap, unsigned int hostBufferSize) {
-        FINN_LOG_DEBUG(log, loglevel::info) << "(" << xrtDeviceIndex << ") " << "Initializing buffer objects\n";
+        FINN_LOG(log, loglevel::info) << "(" << xrtDeviceIndex << ") " << "Initializing buffer objects\n";
         for (auto&& ebdptr : devWrap.idmas) {
             auto tmpKern = xrt::kernel(device, uuid, ebdptr->kernelName, xrt::kernel::cu_access_mode::shared);
             inputBufferMap.emplace(

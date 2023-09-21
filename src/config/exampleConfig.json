@@ -1,7 +1,7 @@
 [
     {
-        "fpgaIndex": 0,
-        "xclbinPath": "finn-accel.xclbin",
+        "xrtDeviceIndex": 0,
+        "xclbinPath": "bitfile/finn-accel.xclbin",
         "name": "MainDevice",
         "idmas": [
             {

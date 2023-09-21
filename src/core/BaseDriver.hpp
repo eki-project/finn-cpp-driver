@@ -9,6 +9,7 @@
 #include "Accelerator.h"
 
 #include "../utils/Types.h"
+#include "../utils/Logger.h"
 #include "../utils/ConfigurationStructs.h"
 #include "../utils/FinnDatatypes.hpp"
 
@@ -22,6 +23,7 @@ namespace Finn {
          private:
         Accelerator accelerator;
         Config configuration;
+        logger_type& logger;
 
         unsigned int defaultInputDeviceIndex;
         unsigned int defaultOutputDeviceIndex;
@@ -38,7 +40,7 @@ namespace Finn {
         BaseDriver(const std::filesystem::path& configPath, unsigned int hostBufferSize) {
             configuration = createConfigFromPath(configPath);
             accelerator = Accelerator(configuration.deviceWrappers, hostBufferSize);
-
+            logger = Logger::getLogger();
         };
         BaseDriver(BaseDriver&&) noexcept = default;
         BaseDriver(const BaseDriver&) noexcept = delete;
@@ -61,9 +63,12 @@ namespace Finn {
          * @return std::vector<std::vector<uint8_t>> 
          */
         std::vector<std::vector<uint8_t>> inferRaw(const std::vector<uint8_t>& data, unsigned int inputDeviceIndex, const std::string& inputBufferKernelName, unsigned int outputDeviceIndex, const std::string& outputBufferKernelName, unsigned int samples) {
+            FINN_LOG(logger, loglevel::info) << "Starting inference (raw data)";
             bool stored = accelerator.store(data, inputDeviceIndex, inputBufferKernelName);
+            FINN_LOG(logger, loglevel::info) << "Running kernels";
             bool ran = accelerator.run(inputDeviceIndex, inputBufferKernelName);
             if (stored && ran) {
+                FINN_LOG(logger, loglevel::info) << "Reading out buffers";
                 return accelerator.readOut(outputDeviceIndex, outputBufferKernelName, samples, true);
             } else {
                 FinnUtils::logAndError<std::runtime_error>("Data either couldnt be stored or there was no data to execute!");

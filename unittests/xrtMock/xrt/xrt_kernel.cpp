@@ -13,6 +13,11 @@ namespace xrt {
 
     void run::wait() {}
 
+    void run::wait(unsigned int ms) {}
+
+    ert_cmd_state state() {}
+
+
     std::string kernel::get_name() const {
         return "testkernel";
     }

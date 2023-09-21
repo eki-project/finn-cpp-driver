@@ -9,7 +9,7 @@
 #include "xrt_device.h"
 #include "xrt_uuid.h"
 #include "xrt_bo.h"
-
+#include "../ert.h"
 
 namespace xrt {
 
@@ -18,6 +18,8 @@ namespace xrt {
         run() = default;
         void start();
         void wait();
+        void wait(unsigned int);
+        ert_cmd_state state(); 
     };
 
     /*!

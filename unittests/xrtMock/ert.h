@@ -1,3 +1,5 @@
+#ifndef ERT_H
+#define ERT_H
 enum ert_cmd_state {
     ERT_CMD_STATE_NEW = 1,
     ERT_CMD_STATE_QUEUED = 2,
@@ -12,3 +14,4 @@ enum ert_cmd_state {
     ERT_CMD_STATE_SKCRASHED = 11, //Soft kernel has crashed
     ERT_CMD_STATE_MAX, // Always the last one
 };
+#endif

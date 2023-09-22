@@ -24,111 +24,6 @@
 
 using std::string;
 
-
-/**
- * @brief Start a thread that writes 100 random data samples to the device. Returns a thread that can be waited on
- * 
- * @param logger 
- * @param filler 
- * @param mydb 
- * @return std::thread 
- */
-std::thread testStartWriteThread(logger_type& logger, FinnUtils::BufferFiller& filler, Finn::DeviceInputBuffer<uint8_t>& mydb) {
-    FINN_LOG(logger, loglevel::info) << "Starting write thread";
-    std::vector<uint8_t> data;
-    data.resize(mydb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
-    return std::thread([&filler, &data, &mydb]() {
-        for (size_t i = 0; i < 100; i++) {
-            filler.fillRandom(data);
-            while (!mydb.store(data));
-        }
-    });
-}
-
-/**
- * @brief Start a threas to execute and run the kernel 100 times. Returns a thread that can be waited on
- * 
- * @param logger 
- * @param mydb 
- * @return std::thread 
- */
-std::thread testStartExecuteThread(logger_type& logger, Finn::DeviceInputBuffer<uint8_t>& mydb) {
-    FINN_LOG(logger, loglevel::info) << "Starting execute thread";
-    return std::thread([&mydb]() {
-        for (size_t j = 0; j < 100; j++) {
-            while (!mydb.run())
-                ;
-        }
-    });
-}
-
-/**
- * @brief Start a thread to read 100 entries and write them into LTS. Returns a thread that can be waited on 
- * 
- * @param logger 
- * @param mydb 
- * @return std::thread 
- */
-std::thread testStartReadThread(logger_type& logger, Finn::DeviceOutputBuffer<uint8_t>& myodb) {
-    FINN_LOG(logger, loglevel::info) << "Starting read thread";
-    return std::thread([&myodb]() {
-        for (size_t k = 0; k < 100; k++) {
-            myodb.read(1);
-        }
-    });
-}
-
-/**
- * @brief Run a manual write-read test with the FPGA to see if everything works 
- * 
- * @param logger 
- * @param mydb 
- * @param filler 
- * @param kern 
- * @param kernOut 
- */
-void manualTest1(logger_type& logger, Finn::DeviceInputBuffer<uint8_t>& mydb, FinnUtils::BufferFiller& filler, xrt::device& device, xrt::kernel& kern, xrt::kernel& kernOut) {
-    std::vector<uint8_t> data;
-    data.resize(mydb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
-    filler.fillRandom(data);                                     // Fill input buffer data
-    auto x = xrt::bo(device, 4096, 0);                  // Create input buffer
-    auto y = xrt::bo(device, 4096, 0);                  // Create output buffer
-    x.write(data.data());                                       // Write test data into input buffer
-    x.sync(xclBOSyncDirection::XCL_BO_SYNC_BO_TO_DEVICE);       // Sync test data to device
-    auto myres = kern(x, 1);                            // Run the data into the kernel
-    myres.wait();                                               // Wait for the kernel results
-    auto myresout = kernOut(y, 1);                      // Run the output kernel
-    myresout.wait();                                            // Wait for the output
-    y.sync(xclBOSyncDirection::XCL_BO_SYNC_BO_FROM_DEVICE);     // Sync data from device back
-    uint8_t* buf = new uint8_t[4096];                           // Create temporary buffer
-    y.read(buf);                                                // Read data from output buffer into memory
-
-    for (unsigned int i = 0; i < 100; i++) {
-        FINN_LOG(logger, loglevel::info) << "TEST: " << static_cast<unsigned int>(buf[i]);
-    }
-    delete[] buf;
-}
-
-/**
- * @brief Run a manual write-read test with the FPGA to see if everything works. Use the device buffers now
- * 
- * @param logger 
- * @param mydb 
- * @param filler 
- */
-void manualTest2(logger_type& logger, Finn::DeviceInputBuffer<uint8_t>& mydb, Finn::DeviceOutputBuffer<uint8_t>& myodb) {
-    std::vector<uint8_t> data;
-    data.resize(mydb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
-    mydb.store(data);
-    mydb.run();
-    myodb.read(1);
-    myodb.archiveValidBufferParts();
-    auto rr = myodb.retrieveArchive();
-    for (auto rrval : rr[0]) {
-        FINN_LOG(logger, loglevel::info) << "TEST 2:  " << static_cast<unsigned int>(rrval);
-    }
-}
-
 /**
  * @brief Log some initial information about the device and the kernels used
  * 
@@ -154,128 +49,111 @@ void logDeviceInformation(logger_type& logger, xrt::device& device, const std::s
     }
 }
 
+/**
+ * @brief A simple helper function to create a Finn Driver from a given config file.
+ * 
+ * @param configFilePath 
+ * @param hostBufferSize 
+ * @return Finn::Driver 
+ */
+Finn::Driver createDriverFromConfig(const std::filesystem::path& configFilePath, unsigned int hostBufferSize) {
+    return { configFilePath, hostBufferSize };
+}
+
+/**
+ * @brief Run test inferences. The data used is generated randomly. Useful for testing functionality
+ * @attention This does NOT FOLD or PACK. As such it does NOT count towards performance measuring 
+ * 
+ * @param baseDriver 
+ * @param logger 
+ */
+void runFiletest(Finn::Driver& baseDriver, logger_type& logger) {
+        // TODO(bwintermann): Remove after debugging
+        logDeviceInformation(logger, baseDriver.getDeviceHandler(0).getDevice(), baseDriver.getConfig().deviceWrappers[0].xclbin);
+
+        // Create vector for inputting data
+        auto filler = FinnUtils::BufferFiller(0,2);
+        std::vector<uint8_t> data;
+        data.resize(baseDriver.size(SIZE_SPECIFIER::ELEMENTS_PER_PART, 0, "StreamingDataflowPartition_0:{idma0}"));
+
+        // Do a test run with random data and raw inference (no packing no folding)
+        filler.fillRandom(data);
+        auto results = baseDriver.inferRaw(data, 0, "StreamingDataflowPartition_0:{idma0}", 0, "StreamingDataflowPartition_2:{odma0}", 9, true); 
+        FINN_LOG(logger, loglevel::info) << "Received " << results.size() << " results!";
+
+        // Print Results
+        for (auto& resultVector : results) {
+            for (auto& val : resultVector) {
+                FINN_LOG(logger, loglevel::info) << "VALUE: " << static_cast<unsigned int>(val) << "\n";
+            }
+        }
+}
+
+/**
+ * @brief Run inference on an input file with folding and packing beforehand and unfolding and unpacking afterwards 
+ * 
+ * @param baseDriver 
+ * @param logger 
+ */
+void runWithInputFile(Finn::Driver& baseDriver, logger_type& logger) {
+        FINN_LOG(logger, loglevel::info) << "Running driver on input files";
+        // TODO(bwintermann): Finish this method
+
+        baseDriver.infer();
+}
+
+
+
+
 namespace po = finnBoost::program_options;
 
 int main(int argc, char* argv[]) {
     auto logger = Logger::getLogger();
     FINN_LOG(logger, loglevel::info) << "C++ Driver started";
     
-    auto logMode = [&logger](std::string m) { FINN_LOG(logger, loglevel::info) << "Driver Mode: " << m; };
-    auto logConfig = [&logger](std::string m) { FINN_LOG(logger, loglevel::info) << "Configuration file: " << m; };
-    auto logInputFile = [&logger](std::string m) { FINN_LOG(logger, loglevel::info) << "Input file: " << m; };
+    // Helper lambas for debug output
+    auto logMode = [&logger](const std::string& m) { FINN_LOG(logger, loglevel::info) << "Driver Mode: " << m; };
+    auto logConfig = [&logger](const std::string& m) { FINN_LOG(logger, loglevel::info) << "Configuration file: " << m; };
+    auto logInputFile = [&logger](const std::string& m) { FINN_LOG(logger, loglevel::info) << "Input file: " << m; };
+    auto logHBufferSize = [&logger](const unsigned int m) { FINN_LOG(logger, loglevel::info) << "Host Buffer Size: " << m; };
 
+    // Command Line Argument Parser
     po::options_description desc{"Options"};
     desc.add_options()
         ("help,h", "Display help")
         ("mode,m", po::value<std::string>()->default_value("test")->notifier(logMode), "Mode of execution (file or test)")
         ("configpath,c", po::value<std::string>()->notifier(logConfig), "Path to the config.json file emitted by the FINN compiler")
-        ("input,i", po::value<std::string>()->notifier(logInputFile), "Path to the input file. Only required if mode is set to \"file\"");
-    po::variables_map vm;
-    po::store(po::parse_command_line(argc, argv, desc), vm);
-    po::notify(vm);
-
+        ("input,i", po::value<std::string>()->notifier(logInputFile), "Path to the input file. Only required if mode is set to \"file\"")
+        ("buffersize,b", po::value<unsigned int>()->notifier(logHBufferSize)->default_value(100), "How large (in samples) the host buffer is supposed to be");
+    po::variables_map varMap;
+    po::store(po::parse_command_line(argc, argv, desc), varMap);
+    po::notify(varMap);
     FINN_LOG(logger, loglevel::info) << "Parsed command line params";
 
-    if (vm.count("help")) {
+    // Display help screen
+    if (varMap.count("help") > 0) {
         FINN_LOG(logger, loglevel::info) << desc;
         return 1;
     }
 
+    // Checking for the existance of the config file 
+    auto configFilePath = std::filesystem::path(varMap["configpath"].as<std::string>());
+    if (!std::filesystem::exists(configFilePath)) {
+        FinnUtils::logAndError<std::runtime_error>("Cannot find config file at " + configFilePath.string());
+    }
+
+
     // Switch on modes
-    if (vm.count("mode") && vm["mode"].as<std::string>() == "test") {
-        // Set parameters
-        const std::string filename = "bitfile/finn-accel.xclbin";
-        const unsigned int runs = 20;
-        shapeNormal_t myShape = std::vector<unsigned int>{1, 300};
-        shapeFolded_t myShapeFolded = std::vector<unsigned int>{1, 10, 30};
-        shapePacked_t myShapePacked = std::vector<unsigned int>{1, 10, 8};
-        shapeNormal_t oMyShape = std::vector<unsigned int>{1, 10};
-        shapeFolded_t oMyShapeFolded = std::vector<unsigned int>{1, 10, 1};
-        shapePacked_t oMyShapePacked = std::vector<unsigned int>{1, 10, 1};
-
-        // Set up device, kernels and buffers
-        auto device = xrt::device(0);
-        auto uuid = device.load_xclbin("bitfile/finn-accel.xclbin");
-        auto kern = xrt::kernel(device, uuid, "StreamingDataflowPartition_0:{idma0}", xrt::kernel::cu_access_mode::shared);
-        auto kernOut = xrt::kernel(device, uuid, "StreamingDataflowPartition_2:{odma0}", xrt::kernel::cu_access_mode::shared);
-        FINN_LOG(logger, loglevel::info) << "Device successfully programmed! UUID: " << uuid;
-        auto mydb = Finn::DeviceInputBuffer<uint8_t>("My Buffer", device, kern, myShapePacked, 100);
-        auto myodb = Finn::DeviceOutputBuffer<uint8_t>("Output Buffer", device, kernOut, oMyShapePacked, runs);
-        auto filler = FinnUtils::BufferFiller(0, 2);
-        auto data = std::vector<uint8_t>(mydb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
-
-        logDeviceInformation(logger, device, filename);
-
-        /***** TESTS ********/
-        manualTest1(logger, mydb, filler, device, kern, kernOut);
-        manualTest2(logger, mydb, myodb);
-
-        /***** REAL TEST ****/
-        auto start = std::chrono::high_resolution_clock::now();
-        testStartWriteThread(logger, filler, mydb).join();
-        auto end = std::chrono::high_resolution_clock::now();
-        long int nsDurationWrite = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-
-        start = std::chrono::high_resolution_clock::now();
-        testStartExecuteThread(logger, mydb).join();
-        end = std::chrono::high_resolution_clock::now();
-        long int nsDurationExecute = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-
-        start = std::chrono::high_resolution_clock::now();
-        testStartReadThread(logger, myodb).join();
-        end = std::chrono::high_resolution_clock::now();
-        long int nsDurationRead = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-
-        FINN_LOG(logger, loglevel::info) << "Write duration (ns): " << nsDurationWrite;
-        FINN_LOG(logger, loglevel::info) << "Execute duration (ns): " << nsDurationExecute;
-        FINN_LOG(logger, loglevel::info) << "Read duration (ns): " << nsDurationRead;
-
-
-        // Readout
-        auto res = myodb.retrieveArchive();
-        FINN_LOG(logger, loglevel::info) << "Reading output!";
-        for (size_t i = 0; i < runs; i++) {
-            FINN_LOG(logger, loglevel::info) << "Reading output of run " << i;
-            for (auto& resvalue : res[i]) {
-                FINN_LOG(logger, loglevel::info) << static_cast<int>(resvalue);
-            }
-        }
-        return 0;
-    } else if (vm["mode"].as<std::string>() == "file") {
-        if (!vm.count("input")) {
+    if (varMap["mode"].as<std::string>() == "file") {
+        if (!(varMap.count("input") > 0)) {
             FinnUtils::logAndError<std::invalid_argument>("No input file specified for file execution mode!");
         }
-        auto configFilePath = std::filesystem::path(vm["configpath"].as<std::string>());
-        Finn::BaseDriver baseDriver = Finn::BaseDriver<InputFinnType, OutputFinnType, uint8_t>(configFilePath, 100);
-
-
-    } else if (vm["mode"].as<std::string>() == "filetest") {
-        auto configFilePath = std::filesystem::path(vm["configpath"].as<std::string>());
-        FINN_LOG(logger, loglevel::info) << "Reading config file " << configFilePath.string();
-        if (!std::filesystem::exists(configFilePath)) {
-            FinnUtils::logAndError<std::runtime_error>("Cannot find config file at " + configFilePath.string());
-        }
-
-        Finn::BaseDriver baseDriver = Finn::BaseDriver<InputFinnType, OutputFinnType, uint8_t>(configFilePath, 10);
-
-        // TODO(bwintermann): Remove after debugging
-        logDeviceInformation(logger, baseDriver.getDeviceHandler(0).getDevice(), baseDriver.getConfig().deviceWrappers[0].xclbin);
-
-        auto filler = FinnUtils::BufferFiller(0,2);
-        std::vector<uint8_t> data;
-        data.resize(baseDriver.size(SIZE_SPECIFIER::ELEMENTS_PER_PART, 0, "StreamingDataflowPartition_0:{idma0}"));
-
-        filler.fillRandom(data);
-        auto results = baseDriver.inferRaw(data, 0, "StreamingDataflowPartition_0:{idma0}", 0, "StreamingDataflowPartition_2:{odma0}", 9); 
-        FINN_LOG(logger, loglevel::info) << "Received " << results.size() << " results!";
-
-        for (auto& resultVector : results) {
-            for (auto& val : resultVector) {
-                FINN_LOG(logger, loglevel::info) << "VALUE: " << static_cast<unsigned int>(val) << "\n";
-            }
-        }
-
+        auto driver = createDriverFromConfig(configFilePath, varMap["buffersize"].as<unsigned int>());
+        runWithInputFile(driver, logger);
+    } else if (varMap["mode"].as<std::string>() == "test") {
+        auto driver = createDriverFromConfig(configFilePath, varMap["buffersize"].as<unsigned int>());
+        runFiletest(driver, logger);
     } else {
-        FinnUtils::logAndError<std::invalid_argument>("Unknown driver mode: " + vm["mode"].as<std::string>());
+        FinnUtils::logAndError<std::invalid_argument>("Unknown driver mode: " + varMap["mode"].as<std::string>());
     }
 }

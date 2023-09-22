@@ -21,31 +21,28 @@ namespace Finn {
         );
     }
 
-    // FIXME: Shorten names!!!
-
-    DeviceHandler& Accelerator::getDeviceHandlerByDeviceIndex(unsigned int deviceIndex) {
-        if (!containsDeviceHandlerWithDeviceIndex(deviceIndex)) {
+    DeviceHandler& Accelerator::getDeviceHandler(unsigned int deviceIndex) {
+        if (!containsDevice(deviceIndex)) {
             FinnUtils::logAndError<std::runtime_error>("Tried retrieving a deviceHandler with an unknown index");
         }
-        for (auto& dh : devices) {
-            if (dh.getDeviceIndex() == deviceIndex) {
-                return dh;
-            }
+        auto isCorrectHandler = [deviceIndex](const DeviceHandler& dhh) { return dhh.getDeviceIndex() == deviceIndex; }; 
+        if (auto dhIt = std::find_if(devices.begin(), devices.end(), isCorrectHandler); dhIt != devices.end()) {
+            return *dhIt;
         }
+        return devices[0];
     }
 
-    bool Accelerator::containsDeviceHandlerWithDeviceIndex(unsigned int deviceIndex) {
-        return std::count_if(devices.begin(), devices.end(), [deviceIndex](DeviceHandler& dh) { return dh.getDeviceIndex() == deviceIndex; }) > 0;
+    bool Accelerator::containsDevice(unsigned int deviceIndex) {
+        return std::count_if(devices.begin(), devices.end(), [deviceIndex](const DeviceHandler& dh) { return dh.getDeviceIndex() == deviceIndex; }) > 0;
     }
 
-    // FIXME:
     // TODO(bwintermann): Make this either a factory or do the checks before calling store to save performance
     bool Accelerator::store(const std::vector<uint8_t>& data, const unsigned int deviceIndex, const std::string& inputBufferKernelName) {
-        if (containsDeviceHandlerWithDeviceIndex(deviceIndex)) {
-            return getDeviceHandlerByDeviceIndex(deviceIndex).store(data, inputBufferKernelName);
+        if (containsDevice(deviceIndex)) {
+            return getDeviceHandler(deviceIndex).store(data, inputBufferKernelName);
         } else {
-            if (containsDeviceHandlerWithDeviceIndex(0)) {
-                return getDeviceHandlerByDeviceIndex(0).store(data, inputBufferKernelName);
+            if (containsDevice(0)) {
+                return getDeviceHandler(0).store(data, inputBufferKernelName);
             } else {
                 FinnUtils::logAndError<std::runtime_error>("Tried storing data in a devicehandler with an invalid deviceIndex!");
             }
@@ -53,11 +50,11 @@ namespace Finn {
     }
 
     bool Accelerator::run(const unsigned int deviceIndex, const std::string& inputBufferKernelName) {
-        if (containsDeviceHandlerWithDeviceIndex(deviceIndex)) {
-            return getDeviceHandlerByDeviceIndex(deviceIndex).run(inputBufferKernelName);
+        if (containsDevice(deviceIndex)) {
+            return getDeviceHandler(deviceIndex).run(inputBufferKernelName);
         } else {
-            if (containsDeviceHandlerWithDeviceIndex(0)) {
-                return getDeviceHandlerByDeviceIndex(0).run(inputBufferKernelName);
+            if (containsDevice(0)) {
+                return getDeviceHandler(0).run(inputBufferKernelName);
             } else {
                 FinnUtils::logAndError<std::runtime_error>("Tried running data in a devicehandler with an invalid deviceIndex!");
             }
@@ -65,11 +62,11 @@ namespace Finn {
     }
 
     std::vector<std::vector<uint8_t>> Accelerator::retrieveResults(const unsigned int deviceIndex, const std::string& outputBufferKernelName, bool forceArchival) {
-        if (containsDeviceHandlerWithDeviceIndex(deviceIndex)) {
-            return getDeviceHandlerByDeviceIndex(deviceIndex).retrieveResults(outputBufferKernelName, forceArchival);
+        if (containsDevice(deviceIndex)) {
+            return getDeviceHandler(deviceIndex).retrieveResults(outputBufferKernelName, forceArchival);
         } else {
-            if (containsDeviceHandlerWithDeviceIndex(0)) {
-                return getDeviceHandlerByDeviceIndex(0).retrieveResults(outputBufferKernelName, forceArchival);
+            if (containsDevice(0)) {
+                return getDeviceHandler(0).retrieveResults(outputBufferKernelName, forceArchival);
             } else {
                 FinnUtils::logAndError<std::runtime_error>("Tried receiving data in a devicehandler with an invalid deviceIndex!");
             }
@@ -78,11 +75,11 @@ namespace Finn {
 
 
     ert_cmd_state Accelerator::read(const unsigned int deviceIndex, const std::string& outputBufferKernelName, unsigned int samples) {
-        if (containsDeviceHandlerWithDeviceIndex(deviceIndex)) {
-            return getDeviceHandlerByDeviceIndex(deviceIndex).read(outputBufferKernelName, samples);
+        if (containsDevice(deviceIndex)) {
+            return getDeviceHandler(deviceIndex).read(outputBufferKernelName, samples);
         } else {
-            if (containsDeviceHandlerWithDeviceIndex(0)) {
-                return getDeviceHandlerByDeviceIndex(0).read(outputBufferKernelName, samples);
+            if (containsDevice(0)) {
+                return getDeviceHandler(0).read(outputBufferKernelName, samples);
             } else {
                 FinnUtils::logAndError<std::runtime_error>("Tried reading data in a devicehandler with an invalid deviceIndex!");
             }
@@ -91,7 +88,7 @@ namespace Finn {
 
 
     size_t Accelerator::size(SIZE_SPECIFIER ss, unsigned int deviceIndex, const std::string& bufferName) {
-        return getDeviceHandlerByDeviceIndex(deviceIndex).size(ss, bufferName);
+        return getDeviceHandler(deviceIndex).size(ss, bufferName);
     }
 
 }  // namespace Finn

@@ -12,11 +12,6 @@
 
 
 namespace Finn {
-    // Fwd declarations
-    // class DeviceHandler;
-    // struct BufferDescriptor;
-
-
     /**
      * @brief The Accelerator class wraps one or more Devices into a single Accelerator
      *
@@ -44,12 +39,12 @@ namespace Finn {
         ~Accelerator() = default;
 
         /**
-         * @brief Return a reference to the deviceHandler with the given index. Crashes the driver if the index is invalid
+         * @brief Return a reference to the deviceHandler with the given index. Crashes the driver if the index is invalid. To avoid accesses to uncertain indices, use Accelerator::containsDevice first.
          * 
          * @param deviceIndex 
          * @return DeviceHandler& 
          */
-        DeviceHandler& getDeviceHandlerByDeviceIndex(unsigned int deviceIndex);
+        DeviceHandler& getDeviceHandler(unsigned int deviceIndex);
 
         /**
          * @brief Checks whether a device handler with the given device index exists
@@ -58,7 +53,7 @@ namespace Finn {
          * @return true 
          * @return false 
          */
-        bool containsDeviceHandlerWithDeviceIndex(unsigned int deviceIndex);
+        bool containsDevice(unsigned int deviceIndex);
 
         /**
          * @brief Store data in the device handler with the given deviceIndex, and in the buffer with the given inputBufferKernelName.
@@ -66,10 +61,10 @@ namespace Finn {
          * @param data 
          * @param deviceIndex If such a deviceIndex does not exist, use the first (0) device handler. If it doesnt exist, crash.
          * @param inputBufferKernelName 
-         * @return true 
-         * @return false 
+         * @return true The write was successfull
+         * @return false The buffer is full and data needs to be run first
          */
-        bool store(const std::vector<uint8_t>& data, const unsigned int deviceIndex, const std::string& inputBufferKernelName);
+        bool store(const std::vector<uint8_t>& data, unsigned int deviceIndex, const std::string& inputBufferKernelName);
 
         /**
          * @brief Run the given buffer. Returns false if no valid data was found to execute on. 
@@ -79,7 +74,7 @@ namespace Finn {
          * @return true 
          * @return false 
          */
-        bool run(const unsigned int deviceIndex, const std::string& inputBufferKernelName);
+        bool run(unsigned int deviceIndex, const std::string& inputBufferKernelName);
 
         /**
          * @brief Return a vector of output samples.  
@@ -87,20 +82,20 @@ namespace Finn {
          * @param deviceIndex 
          * @param outputBufferKernelName 
          * @param samples The number of samples to read
-         * @param forceArchive Whether or not to force a readout into archive. Necessary to get new data
+         * @param forceArchive Whether or not to force a readout into archive. Necessary to get new data. Will be done automatically if a whole multiple of the buffer size is produced
          * @return std::vector<std::vector<uint8_t>> 
          */
-        std::vector<std::vector<uint8_t>> retrieveResults(const unsigned int deviceIndex, const std::string& outputBufferKernelName, bool forceArchival);
+        std::vector<std::vector<uint8_t>> retrieveResults(unsigned int deviceIndex, const std::string& outputBufferKernelName, bool forceArchival);
     
         /**
-         * @brief Execute the output kernel and return it's result. If a run fails, the function returns early. 
+         * @brief Execute the output kernel and return it's result. If a run fails, the function returns early, with the corresponding ert_cmd_state. 
          * 
          * @param deviceIndex 
          * @param outputBufferKernelName 
          * @param samples 
          * @return ert_cmd_state 
          */
-        ert_cmd_state read(const unsigned int deviceIndex, const std::string& outputBufferKernelName, unsigned int samples);
+        ert_cmd_state read(unsigned int deviceIndex, const std::string& outputBufferKernelName, unsigned int samples);
 
         /**
          * @brief Get the size of the buffer with the specified device index and buffer name 

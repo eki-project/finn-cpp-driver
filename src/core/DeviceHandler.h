@@ -41,8 +41,6 @@ namespace Finn {
      */
     class DeviceHandler {
          private:
-        logger_type& log = Logger::getLogger();
-        
         /**
          * @brief The xrt device itself 
          * 
@@ -194,9 +192,6 @@ namespace Finn {
          * @param hostBufferSize How many multiples of one sample should be store-able in the buffer
          */
         void initializeBufferObjects(const DeviceWrapper& devWrap, unsigned int hostBufferSize); 
-
-
-
     };
 }  // namespace Finn
 

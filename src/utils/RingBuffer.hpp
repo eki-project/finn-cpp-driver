@@ -53,6 +53,7 @@ class RingBuffer {
 
     /**
      * @brief Move Constructor !!!NOT THREAD SAFE. DO NOT MOVE RINGBUFFERS WHILE IN USE WITH MULTIPLE THREADS!!!
+     * @attention NOT THREAD SAFE!
      *
      * @param other
      */
@@ -95,9 +96,9 @@ class RingBuffer {
 
     void testSetReadPointer(index_t i) { readPart = i; }
 
-    index_t testGetHeadPointer() { return headPart; }
+    index_t testGetHeadPointer() const { return headPart; }
 
-    index_t testGetReadPointer() { return readPart; }
+    index_t testGetReadPointer() const { return readPart; }
 
 #endif
 

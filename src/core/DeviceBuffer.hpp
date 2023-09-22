@@ -71,13 +71,8 @@ namespace Finn {
 
         DeviceBuffer(const DeviceBuffer& buf) noexcept = delete;
 
-        /**
-         * @brief Destructor which is also responsible for free-ing the memory map allocated by XRT.
-         * 
-         */
         virtual ~DeviceBuffer() { 
             FINN_LOG(logger, loglevel::info) << "Destructing DeviceBuffer " << name << "\n"; 
-            free(map);
         };
 
         DeviceBuffer& operator=(DeviceBuffer&& buf) = delete;
@@ -125,6 +120,7 @@ namespace Finn {
          *
          * @param buf
          */
+        // NOLINTNEXTLINE
         DeviceInputBuffer(DeviceInputBuffer&& buf) noexcept
             : DeviceBuffer<T>(buf.name, buf.shapePacked, buf.mapSize, buf.internalBo, buf.associatedKernel, buf.map, buf.ringBuffer),
               ioMode(buf.ioMode),

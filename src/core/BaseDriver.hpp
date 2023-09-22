@@ -19,6 +19,13 @@
 using json = nlohmann::json;
 
 namespace Finn {
+    /**
+     * @brief A class to represent a basic FINN-Driver 
+     * 
+     * @tparam F The FINN input datatype
+     * @tparam S The FINN output datatype
+     * @tparam T The C-datatype used to pass data to the FPGA
+     */
     template<typename F, typename S, typename T = uint8_t>
     class BaseDriver {
          private:
@@ -26,8 +33,8 @@ namespace Finn {
         Config configuration;
         logger_type& logger = Logger::getLogger();
 
-        unsigned int defaultInputDeviceIndex;
-        unsigned int defaultOutputDeviceIndex;
+        unsigned int defaultInputDeviceIndex = 0;
+        unsigned int defaultOutputDeviceIndex = 0;
         std::string defaultInputKernelName;
         std::string defaultOutputKernelName;
 
@@ -38,10 +45,8 @@ namespace Finn {
          * @param configPath 
          * @param hostBufferSize 
          */
-        BaseDriver(const std::filesystem::path& configPath, unsigned int hostBufferSize) {
-            configuration = createConfigFromPath(configPath);
+        BaseDriver(const std::filesystem::path& configPath, unsigned int hostBufferSize) : configuration(createConfigFromPath(configPath)), logger(Logger::getLogger()) {
             accelerator = Accelerator(configuration.deviceWrappers, hostBufferSize);
-            logger = Logger::getLogger();
         };
         BaseDriver(BaseDriver&&) noexcept = default;
         BaseDriver(const BaseDriver&) noexcept = delete;
@@ -49,7 +54,6 @@ namespace Finn {
         BaseDriver& operator=(const BaseDriver&) = delete;
         virtual ~BaseDriver() = default;
     
-        // TODO:
         // TODO(bwintermann): Add methods for Iterator reading/storing
 
         /**
@@ -57,7 +61,7 @@ namespace Finn {
          * 
          * @return Config 
          */
-        Config getConfig() {
+        Config getConfig() const {
             return configuration;
         }
 
@@ -68,7 +72,7 @@ namespace Finn {
          * @return DeviceHandler& 
          */
         DeviceHandler& getDeviceHandler(unsigned int index) {
-            return accelerator.getDeviceHandlerByDeviceIndex(index);
+            return accelerator.getDeviceHandler(index);
         }
 
         /**
@@ -101,6 +105,10 @@ namespace Finn {
             } else {
                 FinnUtils::logAndError<std::runtime_error>("Data either couldnt be stored or there was no data to execute!");
             }
+        }
+
+        void infer() {
+            // TODO(bwintermann,linusjun): Implement
         }
 
         /**

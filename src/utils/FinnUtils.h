@@ -13,6 +13,10 @@
 
 namespace FinnUtils {
 
+    /**
+     * @brief Helper class to fill a vector with random values. Useful for testing the throughput? 
+     * 
+     */
     class BufferFiller {
          private:
         std::random_device rd;
@@ -35,6 +39,12 @@ namespace FinnUtils {
      */
     constexpr int32_t ceil(float num) { return (static_cast<float>(static_cast<int32_t>(num)) == num) ? static_cast<int32_t>(num) : static_cast<int32_t>(num) + ((num > 0) ? 1 : 0); }
 
+    /**
+     * @brief Return the innermost dimension of a shape. For example for (1,30,10) this would return 10 
+     * 
+     * @param shape 
+     * @return unsigned int 
+     */
     inline unsigned int innermostDimension(const shape_t& shape) { return shape.back(); }
 
     /**
@@ -99,6 +109,12 @@ namespace FinnUtils {
         return static_cast<size_t>(std::accumulate(pShape.begin(), pShape.end(), 1, std::multiplies<>()));
     }
 
+    /**
+     * @brief Return a string representation of shape vector 
+     * 
+     * @param pShape 
+     * @return std::string 
+     */
     inline std::string shapeToString(const shape_t& pShape) {
         std::string str = "(";
         unsigned int index = 0;

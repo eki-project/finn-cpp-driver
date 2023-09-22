@@ -48,6 +48,10 @@ namespace Finn {
 
         BufferDescriptor() = default;
         BufferDescriptor(const std::string& pKernelName, const shape_t& pPackedShape) : kernelName(pKernelName), packedShape(pPackedShape){};
+        BufferDescriptor(BufferDescriptor&&) = default;
+        BufferDescriptor(const BufferDescriptor&) = default;
+        BufferDescriptor& operator=(BufferDescriptor&&) = default;
+        BufferDescriptor& operator=(const BufferDescriptor&) = default;
         virtual ~BufferDescriptor() = default;  // Needed for dynamic cast
     };
 
@@ -69,9 +73,11 @@ namespace Finn {
      */
     struct DeviceWrapper {
         std::filesystem::path xclbin;
-        unsigned int xrtDeviceIndex;
+        unsigned int xrtDeviceIndex = 0;
         std::vector<std::shared_ptr<BufferDescriptor>> idmas;
         std::vector<std::shared_ptr<BufferDescriptor>> odmas;
+
+        DeviceWrapper() = default;
     };
 
     /**
@@ -132,8 +138,8 @@ namespace Finn {
      * @return Config 
      */
     inline Config createConfigFromPath(const std::filesystem::path& configPath) {
-        std::ifstream f(configPath.string());
-        json dataJson = json::parse(f);
+        std::ifstream file(configPath.string());
+        json dataJson = json::parse(file);
         Config config;
         for (auto& fpgaDevice : dataJson) {
             DeviceWrapper devWrap;

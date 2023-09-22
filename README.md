@@ -24,7 +24,7 @@ You will first have to load a few dependencies before being able to build the pr
 
 ```bash
 ml fpga
-ml xilinx/xrt/2.15
+ml xilinx/xrt/2.14
 ml devel/Doxygen/1.9.5-GCCcore-12.2.0
 ml compiler/GCC/12.2.0
 ml devel/CMake/3.24.3-GCCcore-12.2.0

@@ -154,7 +154,7 @@ namespace Finn {
          * @param samples Number of samples to read
          * @return std::vector<std::vector<uint8_t>> 
          */
-        std::vector<std::vector<uint8_t>> retrieveResults(const std::string& outputBufferKernelName);
+        std::vector<std::vector<uint8_t>> retrieveResults(const std::string& outputBufferKernelName, bool forceArchival);
 
         /**
          * @brief Execute the output kernel and return it's result. If a run fails, the function returns early. 

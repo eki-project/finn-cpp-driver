@@ -4,6 +4,7 @@
 
 #include <boost/circular_buffer.hpp>
 #include <limits>
+#include <cstdlib>
 
 #include "../utils/FinnDatatypes.hpp"
 #include "../utils/Logger.h"
@@ -70,7 +71,14 @@ namespace Finn {
 
         DeviceBuffer(const DeviceBuffer& buf) noexcept = delete;
 
-        virtual ~DeviceBuffer() { FINN_LOG(logger, loglevel::info) << "Destructing DeviceBuffer " << name << "\n"; };
+        /**
+         * @brief Destructor which is also responsible for free-ing the memory map allocated by XRT.
+         * 
+         */
+        virtual ~DeviceBuffer() { 
+            FINN_LOG(logger, loglevel::info) << "Destructing DeviceBuffer " << name << "\n"; 
+            free(map);
+        };
 
         DeviceBuffer& operator=(DeviceBuffer&& buf) = delete;
         DeviceBuffer& operator=(const DeviceBuffer& buf) = delete;

@@ -64,12 +64,12 @@ namespace Finn {
         }
     }
 
-    std::vector<std::vector<uint8_t>> Accelerator::retrieveResults(const unsigned int deviceIndex, const std::string& outputBufferKernelName) {
+    std::vector<std::vector<uint8_t>> Accelerator::retrieveResults(const unsigned int deviceIndex, const std::string& outputBufferKernelName, bool forceArchival) {
         if (containsDeviceHandlerWithDeviceIndex(deviceIndex)) {
-            return getDeviceHandlerByDeviceIndex(deviceIndex).retrieveResults(outputBufferKernelName);
+            return getDeviceHandlerByDeviceIndex(deviceIndex).retrieveResults(outputBufferKernelName, forceArchival);
         } else {
             if (containsDeviceHandlerWithDeviceIndex(0)) {
-                return getDeviceHandlerByDeviceIndex(0).retrieveResults(outputBufferKernelName);
+                return getDeviceHandlerByDeviceIndex(0).retrieveResults(outputBufferKernelName, forceArchival);
             } else {
                 FinnUtils::logAndError<std::runtime_error>("Tried receiving data in a devicehandler with an invalid deviceIndex!");
             }

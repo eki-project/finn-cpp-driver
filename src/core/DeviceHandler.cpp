@@ -133,9 +133,12 @@ namespace Finn {
         return inputBufferMap.at(inputBufferKernelName).run();
     }
 
-    std::vector<std::vector<uint8_t>> DeviceHandler::retrieveResults(const std::string& outputBufferKernelName) {
+    std::vector<std::vector<uint8_t>> DeviceHandler::retrieveResults(const std::string& outputBufferKernelName, bool forceArchival) {
         if (!outputBufferMap.contains(outputBufferKernelName)) {
             FinnUtils::logAndError<std::runtime_error>("Tried accessing kernel/buffer with name " + outputBufferKernelName + " but this kernel / buffer does not exist!");
+        }
+        if (forceArchival) {
+            outputBufferMap.at(outputBufferKernelName).archiveValidBufferParts();
         }
         return outputBufferMap.at(outputBufferKernelName).retrieveArchive();
     }

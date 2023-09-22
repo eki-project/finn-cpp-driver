@@ -58,7 +58,7 @@ namespace Finn {
          * @return Config 
          */
         Config getConfig() {
-            return config;
+            return configuration;
         }
 
         /**
@@ -80,9 +80,10 @@ namespace Finn {
          * @param outputDeviceIndex 
          * @param outputBufferKernelName 
          * @param samples
+         * @param forceArchival If true, the data gets written to LTS either way, ensuring that there is data to be read!
          * @return std::vector<std::vector<uint8_t>> 
          */
-        std::vector<std::vector<uint8_t>> inferRaw(const std::vector<uint8_t>& data, unsigned int inputDeviceIndex, const std::string& inputBufferKernelName, unsigned int outputDeviceIndex, const std::string& outputBufferKernelName, unsigned int samples) {
+        std::vector<std::vector<uint8_t>> inferRaw(const std::vector<uint8_t>& data, unsigned int inputDeviceIndex, const std::string& inputBufferKernelName, unsigned int outputDeviceIndex, const std::string& outputBufferKernelName, unsigned int samples, bool forceArchival) {
             FINN_LOG(logger, loglevel::info) << "Starting inference (raw data)";
             bool stored = accelerator.store(data, inputDeviceIndex, inputBufferKernelName);
             FINN_LOG(logger, loglevel::info) << "Running kernels";
@@ -90,8 +91,10 @@ namespace Finn {
             if (stored && ran) {
                 FINN_LOG(logger, loglevel::info) << "Reading out buffers";
                 ert_cmd_state resultState = accelerator.read(outputDeviceIndex, outputBufferKernelName, samples);
-                if (resultState == ERT_CMD_STATE_COMPLETED || resultState == ERT_CMD_STATE_TIMEOUT) {
-                    return accelerator.retrieveResults(outputDeviceIndex, outputBufferKernelName);
+
+                // If the kernel run is completed (success or by timeout (more reads than were in the pipeline)), return the data
+                if (resultState == ERT_CMD_STATE_COMPLETED || resultState == ERT_CMD_STATE_TIMEOUT || resultState == ERT_CMD_STATE_NEW) {
+                    return accelerator.retrieveResults(outputDeviceIndex, outputBufferKernelName, forceArchival);
                 } else {
                     FinnUtils::logAndError<std::runtime_error>("Unspecifiable error during inference (ert_cmd_state is " + std::to_string(resultState) + ")!");
                 }

@@ -24,15 +24,27 @@ template<typename T>
 class RingBuffer {
     finnBoost::circular_buffer<T> buffer;
     std::vector<bool> validParts;
-    std::mutex validPartMutex;
-    std::vector<std::unique_ptr<std::mutex>> partMutexes;
     const size_t parts;
     const size_t elementsPerPart;
+    /**
+     * @brief Points to position 1 _after_ the last written valid data entry.  
+     * 
+     */
     index_t headPart = 0;
-    std::mutex headPartMutex;
+
+    /**
+     * @brief Points to position 1 _after_ the last read valid data entry.  
+     * 
+     */
     index_t readPart = 0;
-    std::mutex readPartMutex;
     logger_type& logger;
+
+    //* Mutexes
+    std::mutex validPartMutex;
+    std::vector<std::unique_ptr<std::mutex>> partMutexes;
+    std::mutex headPartMutex;
+    std::mutex readPartMutex;
+    
 
     /**
      * @brief Construct a new Ring Buffer object. It's size in terms of values of type T is given by pElementsPerPart * pParts. By default all parts are invalid data to start with.
@@ -52,8 +64,9 @@ class RingBuffer {
     }
 
     /**
-     * @brief Move Constructor !!!NOT THREAD SAFE. DO NOT MOVE RINGBUFFERS WHILE IN USE WITH MULTIPLE THREADS!!!
+     * @brief Move Constructor 
      * @attention NOT THREAD SAFE!
+     * ! This constructor is NOT THREAD SAFE!
      *
      * @param other
      */
@@ -66,7 +79,6 @@ class RingBuffer {
 
     RingBuffer(const RingBuffer& other) = delete;
     virtual ~RingBuffer() = default;
-
     RingBuffer& operator=(RingBuffer&& other) = delete;
     RingBuffer& operator=(const RingBuffer& other) = delete;
 
@@ -80,27 +92,6 @@ class RingBuffer {
      */
     index_t elementIndex(index_t partIndex, index_t offset) const { return (partIndex * elementsPerPart + offset) % buffer.size(); }
 
-#ifdef INSPECTION_TEST
-     public:
-    std::vector<T> testGetAsVector(index_t partIndex) {
-        std::vector<T> temp;
-        for (size_t i = 0; i < elementsPerPart; i++) {
-            temp.push_back(buffer[elementIndex(partIndex, i)]);
-        }
-        return temp;
-    }
-
-    bool testGetValidity(index_t partIndex) const { return validParts[partIndex]; }
-
-    void testSetHeadPointer(index_t i) { headPart = i; }
-
-    void testSetReadPointer(index_t i) { readPart = i; }
-
-    index_t testGetHeadPointer() const { return headPart; }
-
-    index_t testGetReadPointer() const { return readPart; }
-
-#endif
 
      public:
     /**
@@ -176,7 +167,7 @@ class RingBuffer {
             for (unsigned int i = 0; i < parts; ++i) {
                 indexP = (headPart + i) % parts;
                 if (!validParts[indexP]) {
-                    // Only now set mutex. Even if the spot just became free during the loop we'll take it, but now data has to be preserved.
+                    //! Only now set mutex. Even if the spot just became free during the loop we'll take it, but now data has to be preserved.
                     std::lock_guard<std::mutex> guardPartMutex(*partMutexes[indexP]);
                     std::lock_guard<std::mutex> guardHeadMutex(headPartMutex);
                     for (size_t j = 0; j < datasize; ++j) {
@@ -209,7 +200,7 @@ class RingBuffer {
         for (unsigned int i = 0; i < parts; ++i) {
             indexP = (headPart + i) % parts;
             if (!validParts[indexP]) {
-                // Only now set mutex. Even if the spot just became free during the loop we'll take it, but now data has to be preserved.
+                //! Only now set mutex. Even if the spot just became free during the loop we'll take it, but now data has to be preserved.
                 std::lock_guard<std::mutex> guardPartMutex(*partMutexes[indexP]);
                 std::lock_guard<std::mutex> guardHeadMutex(headPartMutex);
                 for (auto [it, j] = std::tuple(beginning, 0); it != end; ++it, ++j) {
@@ -217,13 +208,12 @@ class RingBuffer {
                 }
                 validParts[indexP] = true;
                 headPart = (indexP + 1) % parts;
-                // assert((buffer[indexP * elementsPerPart + 0] == data[0]));
+                //? Add in assert?
                 return true;
             }
         }
         return false;
     }
-
 
     /**
      * @brief Searches from thep position of the read pointer to the first valid data part, and returns it into outData. This sets the read pointer to that point+1 and invalidates the read part.
@@ -244,7 +234,7 @@ class RingBuffer {
             for (unsigned int i = 0; i < parts; ++i) {
                 indexP = (readPart + i) % parts;
                 if (validParts[indexP]) {
-                    // Only now set mutex. Even if the spot just became free during the loop we'll take it, but now data has to be preserved.
+                    //! Only now set mutex. Even if the spot just became free during the loop we'll take it, but now data has to be preserved.
                     std::lock_guard<std::mutex> guardPartMutex(*partMutexes[indexP]);
                     std::lock_guard<std::mutex> guardHeadMutex(headPartMutex);
                     for (size_t j = 0; j < elementsPerPart; ++j) {
@@ -259,6 +249,23 @@ class RingBuffer {
         }
         return false;
     }
+
+
+#ifdef NDEBUG
+     public:
+    std::vector<T> testGetAsVector(index_t partIndex) {
+        std::vector<T> temp;
+        for (size_t i = 0; i < elementsPerPart; i++) {
+            temp.push_back(buffer[elementIndex(partIndex, i)]);
+        }
+        return temp;
+    }
+    bool testGetValidity(index_t partIndex) const { return validParts[partIndex]; }
+    void testSetHeadPointer(index_t i) { headPart = i; }
+    void testSetReadPointer(index_t i) { readPart = i; }
+    index_t testGetHeadPointer() const { return headPart; }
+    index_t testGetReadPointer() const { return readPart; }
+#endif
 };
 
 #endif  // RINGBUFFER_H

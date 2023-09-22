@@ -36,7 +36,7 @@ namespace Finn {
         return std::count_if(devices.begin(), devices.end(), [deviceIndex](const DeviceHandler& dh) { return dh.getDeviceIndex() == deviceIndex; }) > 0;
     }
 
-    // TODO(bwintermann): Make this either a factory or do the checks before calling store to save performance
+    //! Make this either a factory or do the checks before calling store to save performance
     bool Accelerator::store(const std::vector<uint8_t>& data, const unsigned int deviceIndex, const std::string& inputBufferKernelName) {
         if (containsDevice(deviceIndex)) {
             return getDeviceHandler(deviceIndex).store(data, inputBufferKernelName);
@@ -85,7 +85,6 @@ namespace Finn {
             }
         }
     }
-
 
     size_t Accelerator::size(SIZE_SPECIFIER ss, unsigned int deviceIndex, const std::string& bufferName) {
         return getDeviceHandler(deviceIndex).size(ss, bufferName);

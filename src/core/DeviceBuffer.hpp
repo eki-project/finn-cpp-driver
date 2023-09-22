@@ -1,7 +1,6 @@
 #ifndef DEVICEBUFFER_H
 #define DEVICEBUFFER_H
 
-
 #include <boost/circular_buffer.hpp>
 #include <limits>
 #include <cstdlib>
@@ -15,22 +14,16 @@
 #include "xrt/xrt_kernel.h"
 #include "ert.h"
 
-// TODO(bwintermann): Replace ... with using DeviceBuffer<T,F>::...
-
 namespace Finn {
     /**
      * @brief Parent class for DeviceBuffer objects.
      *
      * @tparam T Datatype in which the data is stored (e.g. uint8_t)
-     * @tparam F FINN-Datatype which should be stored as a composition of T values
      */
-    template<typename T /*, typename F*/>
+    template<typename T>
     class DeviceBuffer {
          protected:
         std::string name;
-        // size_t numbers;  // Numbers of type F: in a shape (1,20) this would be 20
-        //  shape_t shapeNormal;  // Input shape (Type F): (1,20)
-        //  shape_t shapeFolded;  // Folded shape (Type F): (1,2,10)
         shapePacked_t shapePacked;  // Packed shape (Type T): (1,2,3)
         size_t mapSize;             // Numbers of type T: When F has bitwidth 2, and T has bitwidth 8, the folded shape would be (1,2,10) and the packed (1,2,3) and thus 6
         xrt::bo internalBo;
@@ -40,11 +33,9 @@ namespace Finn {
         RingBuffer<T> ringBuffer;
 
          public:
+        //* Normal Constructor
         DeviceBuffer(const std::string& pName, xrt::device& device, xrt::kernel pAssociatedKernel, /*const shape_t& pShapeNormal, const shape_t& pShapeFolded,*/ const shapePacked_t& pShapePacked, unsigned int ringBufferSizeFactor)
             : name(pName),
-              // numbers(FinnUtils::shapeToElements(pShapeNormal)),
-              //  shapeNormal(pShapeNormal),
-              //  shapeFolded(pShapeFolded),
               shapePacked(pShapePacked),
               mapSize(FinnUtils::getActualBufferSize(FinnUtils::shapeToElements(pShapePacked))),
               internalBo(xrt::bo(device, mapSize * sizeof(T), 0)),
@@ -59,6 +50,7 @@ namespace Finn {
             }
         }
 
+        //* Move Constructor
         DeviceBuffer(DeviceBuffer&& buf) noexcept
             : name(std::move(buf.name)),
               shapePacked(std::move(buf.shapePacked)),
@@ -78,7 +70,6 @@ namespace Finn {
         DeviceBuffer& operator=(DeviceBuffer&& buf) = delete;
         DeviceBuffer& operator=(const DeviceBuffer& buf) = delete;
 
-
          protected:
         /**
          * @brief Internal constructor used by the move constructors of the sub classes !!!NOT THREAD SAFE!!!
@@ -93,46 +84,36 @@ namespace Finn {
          */
         DeviceBuffer(const std::string& pName, const shape_t& pShapePacked, const std::size_t pMapSize, xrt::bo& pInternalBo, xrt::kernel& pAssociatedKernel, T* pMap, RingBuffer<T>& pRingBuffer)
             : name(pName), shapePacked(pShapePacked), mapSize(pMapSize), internalBo(std::move(pInternalBo)), associatedKernel(pAssociatedKernel), map(pMap), logger(Logger::getLogger()), ringBuffer(std::move(pRingBuffer)) {}
-
-        std::string loggerPrefix() {
-            std::string str = "[";
-            str += this->name;
-            str += "] ";
-            return str;
-        }
     };
 
 
-    template<typename T /*, typename F*/>
-    class DeviceInputBuffer : DeviceBuffer<T /*, F*/> {
+    template<typename T>
+    class DeviceInputBuffer : DeviceBuffer<T> {
         std::mutex runMutex;
-
         const IO ioMode = IO::INPUT;
         bool executeAutomatically = false;
         bool executeAutomaticallyHalfway = false;
-
-        using DeviceBuffer<T /*, F*/>::DeviceBuffer;
-        using DeviceBuffer<T /*, F*/>::logger;
+        using DeviceBuffer<T>::DeviceBuffer;
+        using DeviceBuffer<T>::logger;
 
          public:
         /**
-         * @brief Move Constructor !!!NOT THREAD SAFE!!!
+         * @brief Move Constructor
+         * @attention This move constructor is NOT THREAD SAFE
          *
          * @param buf
          */
-        // NOLINTNEXTLINE
+        //! NOT THREAD SAFE
         DeviceInputBuffer(DeviceInputBuffer&& buf) noexcept
             : DeviceBuffer<T>(buf.name, buf.shapePacked, buf.mapSize, buf.internalBo, buf.associatedKernel, buf.map, buf.ringBuffer),
               ioMode(buf.ioMode),
               executeAutomatically(buf.executeAutomatically),
               executeAutomaticallyHalfway(buf.executeAutomaticallyHalfway){};
+
         DeviceInputBuffer(const DeviceInputBuffer& buf) noexcept = delete;
-
         ~DeviceInputBuffer() override = default;
-
         DeviceInputBuffer& operator=(DeviceInputBuffer&& buf) = delete;
         DeviceInputBuffer& operator=(const DeviceInputBuffer& buf) = delete;
-
 
          private:
         /**
@@ -147,30 +128,12 @@ namespace Finn {
             return str;
         }
 
-#ifdef INSPECTION_TEST
-         public:
-        std::vector<T> testGetMap() {
-            std::vector<T> temp;
-            for (size_t i = 0; i < this->mapSize; i++) {
-                temp.push_back(this->map[i]);
-            }
-            return temp;
-        }
-
-        void testSyncBackFromDevice() { this->internalBo.sync(XCL_BO_SYNC_BO_FROM_DEVICE); }
-
-        xrt::bo& testGetInternalBO() { return this->internalBo; }
-
-        RingBuffer<T>& testGetRingBuffer() { return this->ringBuffer; }
-#endif
-
          public:
         /**
          * @brief Sync data from the map to the device.
          *
          */
         void sync() {
-            FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "Syncing to device";
             this->internalBo.sync(XCL_BO_SYNC_BO_TO_DEVICE);
         }
 
@@ -180,33 +143,56 @@ namespace Finn {
          *
          */
         void execute() {
-            FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "Executing the kernel " << this->associatedKernel.get_name();
             // TODO(bwintermann): Make batch_size changeable from 1
             auto runCall = this->associatedKernel(this->internalBo, 1);
             runCall.wait();
         }
 
+        /**
+         * @brief Load data from the ring buffer into the memory map of the device 
+         * 
+         * @return true 
+         * @return false 
+         */
         bool loadMap() {
-            FINN_LOG_DEBUG(logger, loglevel::debug) << loggerPrefix() << "Loading data from ring buffer into map";
             return this->ringBuffer.read(this->map, this->mapSize);
         }
 
+        /**
+         * @brief Store the given vector of data in the ring buffer 
+         * 
+         * @param data 
+         * @return true 
+         * @return false 
+         */
         bool store(const std::vector<T>& data) {
             // TODO(bwintermann): Enable support to write multiple parts from one vector, which has then to be a multiple of elementsPerPart large
-            // TODO(bwintermann): Remove FINN_LOG
-            FINN_LOG(logger, loglevel::info) << "DeviceBuffer (" << this->name << ") storing data...";
             return this->ringBuffer.template store<std::vector<T>>(data, data.size());
         }
 
-        template<typename VecUintIt>
-        bool store(VecUintIt beginning, VecUintIt end) {
-            static_assert(std::is_same<typename std::iterator_traits<VecUintIt>::value_type, T>::value);
+        /**
+         * @brief Store the given data in the ring buffer
+         * 
+         * @tparam InputIt The type of the iterator
+         * @param beginning 
+         * @param end 
+         * @return true 
+         * @return false 
+         */
+        template<typename InputIt>
+        bool store(InputIt beginning, InputIt end) {
+            static_assert(std::is_same<typename std::iterator_traits<InputIt>::value_type, T>::value);
             return this->ringBuffer.store(beginning, end);
         }
 
+        /**
+         * @brief Execute the first valid data that is found in the buffer. Returns false if no valid data was found
+         * 
+         * @return true 
+         * @return false 
+         */
         bool run() {
-            // TODO(bwintermann): Remove FINN_LOG
-            FINN_LOG(logger, loglevel::info) << "DeviceBuffer (" << this->name << ") executing...";
+            FINN_LOG_DEBUG(logger, loglevel::info) << "DeviceBuffer (" << this->name << ") executing...";
             std::lock_guard<std::mutex> guard(runMutex);
             if (!loadMap()) {
                 return false;
@@ -216,7 +202,6 @@ namespace Finn {
             return true;
         }
 
-
         /**
          * @brief Return the size of the buffer as specified by the argument. Bytes returns all bytes the buffer takes up, elements returns the number of T-values, numbers the number of F-values.
          *
@@ -224,36 +209,31 @@ namespace Finn {
          * @return size_t
          */
         size_t size(SIZE_SPECIFIER ss) { return this->ringBuffer.size(ss); }
+
+
+#ifdef NDEBUG
+         public:
+        std::vector<T> testGetMap() {
+            std::vector<T> temp;
+            for (size_t i = 0; i < this->mapSize; i++) {
+                temp.push_back(this->map[i]);
+            }
+            return temp;
+        }
+        void testSyncBackFromDevice() { this->internalBo.sync(XCL_BO_SYNC_BO_FROM_DEVICE); }
+        xrt::bo& testGetInternalBO() { return this->internalBo; }
+        RingBuffer<T>& testGetRingBuffer() { return this->ringBuffer; }
+#endif
     };
 
-
-    /**
-     * @brief DeviceBuffer for reading output data from the inference run.
-     * Example usage:
-     * @code {.cpp}
-     * auto myDB = DeviceOutputBuffer<uint8_t, DatatypeUint<2>>(...);
-     * for (int i = 0; i < 1000; i++) {
-     *      myDB.read(100); // Read inferences
-     * }
-     * auto inferenceData = myDB.retrieveArchive();
-     * myDB.clearArchive();
-     * @endcode
-     * This would read 100 samples at a time, 1000 times. The data gets read from the FPGA and stored in the internal ring buffer.
-     * When the ring buffer is full, the data gets placed in the long term storage (archive), from which it can be read or cleared. In order to avoid performance hickups,
-     * it is advised to make the ringBufferSizeFactor of the DeviceOutputBuffer a whole multiple of the batch size of your dataset, so that the longer copying of the ring buffer to the archive does not happen mid-batch-inference.
-     *
-     * @tparam T
-     * @tparam F
-     */
-    template<typename T /*, typename F*/>
-    class DeviceOutputBuffer : DeviceBuffer<T /*, F*/> {
+    template<typename T>
+    class DeviceOutputBuffer : DeviceBuffer<T> {
         const IO ioMode = IO::OUTPUT;
         std::vector<std::vector<T>> longTermStorage;
-
-        using DeviceBuffer<T /*, F*/>::DeviceBuffer;
-        using DeviceBuffer<T /*, F*/>::logger;
-
         unsigned int msExecuteTimeout = 1000;
+
+        using DeviceBuffer<T>::DeviceBuffer;
+        using DeviceBuffer<T>::logger;
 
          private:
         /**
@@ -268,30 +248,21 @@ namespace Finn {
             return str;
         }
 
-
-#ifdef INSPECTION_TEST
          public:
-        std::vector<T> testGetMap() {
-            std::vector<T> temp;
-            for (size_t i = 0; i < this->map_size; i++) {
-                temp.push_back(this->map[i]);
-            }
-            return temp;
-        }
-
-        unsigned int testGetLongTermStorageSize() const { return longTermStorage.size(); }
-
-        xrt::bo& testGetInternalBO() { return this->interalBo; }
-
-        RingBuffer<T>& testGetRingBuffer() { return this->ringBuffer; }
-#endif
-
-         public:
-
+        /**
+         * @brief Get the the kernel timeout in miliseconds
+         * 
+         * @return unsigned int 
+         */
         unsigned int getMsExecuteTimeout() const {
             return msExecuteTimeout;
         }
 
+        /**
+         * @brief Set the kernel timeout in miliseconds
+         * 
+         * @param val 
+         */
         void setMsExecuteTimeout(unsigned int val) {
             msExecuteTimeout = val;
         }
@@ -313,11 +284,11 @@ namespace Finn {
          */
         ert_cmd_state execute() {
             FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "Executing on device";
-            // TODO(bwintermann): Add arguments for kernel run!
             auto run = this->associatedKernel(this->internalBo, 1);
             run.wait(msExecuteTimeout);
             return run.state();
         }
+
         /**
          * @brief Store the contents of the memory map into the ring buffer.
          *
@@ -333,12 +304,15 @@ namespace Finn {
          * @note This function can be executed manually instead of wait for it to be called by read() when the ring buffer is full.
          *
          */
-        // TODO(bjarne): Make more efficient
+        //? This should be done more efficiently maybe?
+        //? Implement a variant for iterators?
         void archiveValidBufferParts() {
             FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "Archiving data from ring buffer to long term storage";
             for (index_t i = 0; i < this->ringBuffer.size(SIZE_SPECIFIER::PARTS); i++) {
-                longTermStorage.push_back(std::vector<T>(this->ringBuffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART)));
-                this->ringBuffer.read(longTermStorage.back(), this->ringBuffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
+                auto tmp = std::vector<T>();
+                tmp.resize(this->ringBuffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
+                this->ringBuffer.read(tmp, this->ringBuffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
+                longTermStorage.push_back(tmp);
             }
         }
 
@@ -378,7 +352,6 @@ namespace Finn {
             return outExecuteResult;
         }
         
-        
         /**
          * @brief Return the size of the buffer as specified by the argument. Bytes returns all bytes the buffer takes up, elements returns the number of T-values, numbers the number of F-values.
          *
@@ -386,6 +359,21 @@ namespace Finn {
          * @return size_t
          */
         size_t size(SIZE_SPECIFIER ss) { return this->ringBuffer.size(ss); }
+
+
+#ifdef NDEBUG
+         public:
+        std::vector<T> testGetMap() {
+            std::vector<T> temp;
+            for (size_t i = 0; i < this->map_size; i++) {
+                temp.push_back(this->map[i]);
+            }
+            return temp;
+        }
+        unsigned int testGetLongTermStorageSize() const { return longTermStorage.size(); }
+        xrt::bo& testGetInternalBO() { return this->interalBo; }
+        RingBuffer<T>& testGetRingBuffer() { return this->ringBuffer; }
+#endif
     };
 }  // namespace Finn
 

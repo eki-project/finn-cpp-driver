@@ -24,6 +24,7 @@ shape_t myShapePacked = std::vector<unsigned int>(myShapeArrayPacked.begin(), my
 
 
 #define INSPECTION_TEST  // Defines testing methods in deviceBuffer, thus needs to be defined before the inclue
+#define NDEBUG
 #include "../../src/core/DeviceBuffer.hpp"
 TEST(DeviceBufferTest, BasicFunctionalityTest) {
     auto log = Logger::getLogger();

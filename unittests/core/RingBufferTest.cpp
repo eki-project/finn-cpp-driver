@@ -1,6 +1,7 @@
 #include <vector>
 
 #define INSPECTION_TEST                 // For access to RingBuffer testing methods
+#define NDEBUG
 #include "../../src/utils/RingBuffer.hpp"
 
 

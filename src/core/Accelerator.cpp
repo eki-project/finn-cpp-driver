@@ -4,6 +4,7 @@
 #include <cstddef>    // for size_t
 #include <iterator>   // for back_insert_iterator, back_inserter
 #include <memory>     // for allocator_traits<>::value_type
+#include <functional>
 
 #include "DeviceHandler.h"
 #include "../utils/ConfigurationStructs.h"
@@ -47,6 +48,18 @@ namespace Finn {
                 FinnUtils::logAndError<std::runtime_error>("Tried storing data in a devicehandler with an invalid deviceIndex!");
             }
         }
+    }
+
+    std::function<bool(const std::vector<uint8_t>&)> Accelerator::storeFactory(const unsigned int deviceIndex, const std::string& inputBufferKernelName) {
+        if (containsDevice(deviceIndex)) {
+            DeviceHandler& devHand = getDeviceHandler(deviceIndex); 
+            if (devHand.containsBuffer(inputBufferKernelName, IO::INPUT)) {
+                auto storeFunc = [&](const std::vector<uint8_t>& data) { return devHand.storeUnchecked(data, inputBufferKernelName); };
+                return storeFunc;
+            }
+        }
+        FinnUtils::logAndError<std::runtime_error>("Tried creating a store-closure on a deviceIndex or kernelBufferName which don't exist!");
+        return [](const std::vector<uint8_t>& _) {return false;};
     }
 
     bool Accelerator::run(const unsigned int deviceIndex, const std::string& inputBufferKernelName) {

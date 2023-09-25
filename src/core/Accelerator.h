@@ -56,6 +56,16 @@ namespace Finn {
         bool containsDevice(unsigned int deviceIndex);
 
         /**
+         * @brief Factory to create a functon that can store data without index checks because they are checked beforehand. The created function only takes the data vector 
+         * 
+         * @param deviceIndex 
+         * @param inputBufferKernelName 
+         * @return std::function<bool(const std::vector<uint8_t>&)> 
+         */
+        std::function<bool(const std::vector<uint8_t>&)> storeFactory(unsigned int deviceIndex, const std::string& inputBufferKernelName);
+
+
+        /**
          * @brief Store data in the device handler with the given deviceIndex, and in the buffer with the given inputBufferKernelName.
          * 
          * @param data 

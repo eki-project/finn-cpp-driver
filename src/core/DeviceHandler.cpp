@@ -118,6 +118,10 @@ namespace Finn {
         return inputBufferMap.at(inputBufferKernelName).store(data);
     }
 
+    bool DeviceHandler::storeUnchecked(const std::vector<uint8_t>& data, const std::string& inputBufferKernelName) {
+        return inputBufferMap.at(inputBufferKernelName).store(data);
+    }
+
     [[maybe_unused]] unsigned int DeviceHandler::getDeviceIndex() const {
         return xrtDeviceIndex;
     }
@@ -153,5 +157,14 @@ namespace Finn {
             return outputBufferMap.at(bufferName).size(ss);
         }
         return 0;
+    }
+
+    bool DeviceHandler::containsBuffer (const std::string& kernelBufferName, IO ioMode) {
+        if (ioMode == IO::INPUT) {
+            return inputBufferMap.contains(kernelBufferName);
+        } else if (ioMode == IO::OUTPUT) {
+            return outputBufferMap.contains(kernelBufferName);
+        }
+        return false;
     }
 }  // namespace Finn

@@ -136,6 +136,16 @@ namespace Finn {
         bool store(const std::vector<uint8_t>& data, const std::string& inputBufferKernelName);
 
         /**
+         * @brief Same as store, but without performing a check whether the kernel exists before accessing 
+         * 
+         * @param data 
+         * @param inputBufferKernelName 
+         * @return true 
+         * @return false 
+         */
+        bool storeUnchecked(const std::vector<uint8_t>& data, const std::string& inputBufferKernelName);
+
+        /**
          * @brief Run the kernel of the given name. Returns true if successfull, returns false if no valid data to write was found 
          * 
          * @param inputBufferKernelName 
@@ -172,6 +182,17 @@ namespace Finn {
          */
         size_t size(SIZE_SPECIFIER ss, const std::string& bufferName);
 
+        /**
+         * @brief Return whether there is a kernel with the given name in this device 
+         * 
+         * @param kernelBufferName 
+         * @param ioMode
+         * @return true 
+         * @return false 
+         */
+        bool containsBuffer(const std::string& kernelBufferName, IO ioMode);
+
+
          protected:
         /**
          * @brief Initialize the device by it's given xrtDeviceIndex, initializing the "device" member variable 
@@ -192,6 +213,9 @@ namespace Finn {
          * @param hostBufferSize How many multiples of one sample should be store-able in the buffer
          */
         void initializeBufferObjects(const DeviceWrapper& devWrap, unsigned int hostBufferSize); 
+    
+
+
     };
 }  // namespace Finn
 

@@ -88,8 +88,10 @@ namespace Finn {
          * @return std::vector<std::vector<uint8_t>> 
          */
         std::vector<std::vector<uint8_t>> inferRaw(const std::vector<uint8_t>& data, unsigned int inputDeviceIndex, const std::string& inputBufferKernelName, unsigned int outputDeviceIndex, const std::string& outputBufferKernelName, unsigned int samples, bool forceArchival) {
+            auto storeFunc = accelerator.storeFactory(inputDeviceIndex, inputBufferKernelName);
+
             FINN_LOG(logger, loglevel::info) << "Starting inference (raw data)";
-            bool stored = accelerator.store(data, inputDeviceIndex, inputBufferKernelName);
+            bool stored = storeFunc(data);
             FINN_LOG(logger, loglevel::info) << "Running kernels";
             bool ran = accelerator.run(inputDeviceIndex, inputBufferKernelName);
             if (stored && ran) {

@@ -285,6 +285,7 @@ namespace Finn {
          */
         void saveMap() {
             FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "Saving data from device map into ring buffer";
+            //! Fix that if no space is available, the data will be discarded!
             this->ringBuffer.template store<T*>(this->map, this->mapSize);
         }
 
@@ -301,8 +302,10 @@ namespace Finn {
             for (index_t i = 0; i < this->ringBuffer.size(SIZE_SPECIFIER::PARTS); i++) {
                 auto tmp = std::vector<T>();
                 tmp.resize(this->ringBuffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
-                this->ringBuffer.read(tmp, this->ringBuffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
-                longTermStorage.push_back(tmp);
+                auto dataStored = this->ringBuffer.read(tmp, this->ringBuffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
+                if (dataStored) {
+                    longTermStorage.push_back(tmp);
+                }
             }
         }
 

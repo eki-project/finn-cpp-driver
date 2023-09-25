@@ -79,6 +79,7 @@ set(ENV{BOOST_ROOT} "")
 find_package(Boost 1.80.0 COMPONENTS system log log_setup program_options filesystem ${BOOST_THREAD} REQUIRED)
 include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
 set(ENV{BOOST_ROOT} ${FINNC_SAVE_BOOST_ROOT})
+message(STATUS "${Boost_LIBRARIES}")
 
 #mdspan
 include_directories(SYSTEM external/mdspan/include)
@@ -163,16 +164,16 @@ endif ()
 
 include(cmake/Sanitizers.cmake)
 
-#OPTION(FINNC_ENABLE_SANITIZERS "Enable default analyzers" ON)
-#OPTION(FINNC_ENABLE_THREAD_SANITIZERS "Enable thread analyzer" OFF)
-#OPTION(FINNC_ENABLE_MEMORY_SANITIZERS "Enable memory analyzer" OFF)
+OPTION(FINNC_ENABLE_SANITIZERS "Enable default analyzers" ON)
+OPTION(FINNC_ENABLE_THREAD_SANITIZERS "Enable thread analyzer" OFF)
+OPTION(FINNC_ENABLE_MEMORY_SANITIZERS "Enable memory analyzer" OFF)
 
-#finncpp_enable_sanitizers(finnc_options
-#                          ${FINNC_ENABLE_SANITIZERS}
-#                          ${FINNC_ENABLE_SANITIZERS}
-#                          ${FINNC_ENABLE_SANITIZERS}
-#                          ${FINNC_ENABLE_THREAD_SANITIZERS}
-#                          ${FINNC_ENABLE_MEMORY_SANITIZERS})
+finncpp_enable_sanitizers(finnc_options
+                         ${FINNC_ENABLE_SANITIZERS}
+                         ${FINNC_ENABLE_SANITIZERS}
+                         ${FINNC_ENABLE_SANITIZERS}
+                         ${FINNC_ENABLE_THREAD_SANITIZERS}
+                         ${FINNC_ENABLE_MEMORY_SANITIZERS})
 
 message(STATUS "Checks:")
 list(APPEND CMAKE_MESSAGE_INDENT "  ") #indent +1

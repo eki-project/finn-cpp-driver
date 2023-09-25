@@ -14,8 +14,8 @@
 namespace FinnUtils {
 
     /**
-     * @brief Helper class to fill a vector with random values. Useful for testing the throughput? 
-     * 
+     * @brief Helper class to fill a vector with random values. Useful for testing the throughput?
+     *
      */
     class BufferFiller {
          private:
@@ -40,10 +40,10 @@ namespace FinnUtils {
     constexpr int32_t ceil(float num) { return (static_cast<float>(static_cast<int32_t>(num)) == num) ? static_cast<int32_t>(num) : static_cast<int32_t>(num) + ((num > 0) ? 1 : 0); }
 
     /**
-     * @brief Return the innermost dimension of a shape. For example for (1,30,10) this would return 10 
-     * 
-     * @param shape 
-     * @return unsigned int 
+     * @brief Return the innermost dimension of a shape. For example for (1,30,10) this would return 10
+     *
+     * @param shape
+     * @return unsigned int
      */
     inline unsigned int innermostDimension(const shape_t& shape) { return shape.back(); }
 
@@ -110,10 +110,10 @@ namespace FinnUtils {
     }
 
     /**
-     * @brief Return a string representation of shape vector 
-     * 
-     * @param pShape 
-     * @return std::string 
+     * @brief Return a string representation of shape vector
+     *
+     * @param pShape
+     * @return std::string
      */
     inline std::string shapeToString(const shape_t& pShape) {
         std::string str = "(";
@@ -127,6 +127,23 @@ namespace FinnUtils {
         }
         str.append(")");
         return str;
+    }
+
+    /**
+     * @brief Implement std::unreachable
+     *
+     */
+    [[noreturn]] inline void unreachable() {
+        // Uses compiler specific extensions if possible.
+        // Even if no extension is used, undefined behavior is still raised by
+        // an empty function body and the noreturn attribute.
+#ifdef __GNUC__  // GCC, Clang, ICC
+        __builtin_unreachable();
+#else
+    #ifdef _MSC_VER  // MSVC
+        __assume(false);
+    #endif
+#endif
     }
 
 }  // namespace FinnUtils

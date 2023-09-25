@@ -2,12 +2,14 @@
 #define CONFIGURATION_STRUCTS_H
 
 #include <cctype>
+#include <fstream>
 #include <memory>
 #include <nlohmann/json.hpp>
 #include <string>
 #include <variant>
 #include <vector>
-#include <fstream>
+
+#include "Types.h"
 
 using json = nlohmann::json;
 
@@ -40,8 +42,8 @@ namespace Finn {
      *
      */
     struct BufferDescriptor : public std::enable_shared_from_this<BufferDescriptor> {
-        std::string kernelName;     // Kernel Name (e.g. vadd:{inst0} / idma0:{inst0})
-        shape_t packedShape;        // This assumes that the values are in uint8_ts (instead of the Finn Datatypes)
+        std::string kernelName;  // Kernel Name (e.g. vadd:{inst0} / idma0:{inst0})
+        shape_t packedShape;     // This assumes that the values are in uint8_ts (instead of the Finn Datatypes)
 
         // TODO(bwintermann): Currently unused, reserved for multi-fpga usage
         unsigned int slrIndex = 0;
@@ -56,8 +58,8 @@ namespace Finn {
     };
 
     /**
-     * @brief Extended version of the buffer descriptor which includes the normal and folded shapes 
-     * 
+     * @brief Extended version of the buffer descriptor which includes the normal and folded shapes
+     *
      */
     struct ExtendedBufferDescriptor : public BufferDescriptor {
         ExtendedBufferDescriptor() = default;
@@ -81,31 +83,29 @@ namespace Finn {
     };
 
     /**
-     * @brief Encompassing struct that represents an entire configuration 
-     * 
+     * @brief Encompassing struct that represents an entire configuration
+     *
      */
     struct Config {
         std::vector<DeviceWrapper> deviceWrappers;
     };
 
 
-
-
     /***** JSON CONVERSION FUNCTIONS ******/
     /**
-     * @brief JSON -> ExtendedBufferDescriptor 
-     * 
-     * @param j 
-     * @param ebd 
+     * @brief JSON -> ExtendedBufferDescriptor
+     *
+     * @param j
+     * @param ebd
      */
     // NOLINTNEXTLINE
     void inline to_json(json& j, const ExtendedBufferDescriptor& ebd) { j = json{{"kernelName", ebd.kernelName}, {"packedShape", ebd.packedShape}, {"normalShape", ebd.normalShape}, {"foldedShape", ebd.foldedShape}}; }
 
     /**
-     * @brief ExtendedBufferDescriptor -> JSON 
-     * 
-     * @param j 
-     * @param ebd 
+     * @brief ExtendedBufferDescriptor -> JSON
+     *
+     * @param j
+     * @param ebd
      */
     // NOLINTNEXTLINE
     void inline from_json(const json& j, ExtendedBufferDescriptor& ebd) {
@@ -116,10 +116,10 @@ namespace Finn {
     }
 
     /**
-     * @brief JSON -> DeviceWrapper 
-     * 
-     * @param j 
-     * @param devWrap 
+     * @brief JSON -> DeviceWrapper
+     *
+     * @param j
+     * @param devWrap
      */
     // NOLINTNEXTLINE
     void inline from_json(const json& j, DeviceWrapper& devWrap) {
@@ -133,9 +133,9 @@ namespace Finn {
 
     /**
      * @brief Create a Config from a filepath by parsing it's JSON.
-     * 
-     * @param configPath 
-     * @return Config 
+     *
+     * @param configPath
+     * @return Config
      */
     inline Config createConfigFromPath(const std::filesystem::path& configPath) {
         std::ifstream file(configPath.string());
@@ -149,6 +149,6 @@ namespace Finn {
         return config;
     }
 
-} // namespace Finn
+}  // namespace Finn
 
-#endif // CONFIGURATION_STRUCTS_H
+#endif  // CONFIGURATION_STRUCTS_H

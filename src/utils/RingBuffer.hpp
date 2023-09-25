@@ -27,14 +27,14 @@ class RingBuffer {
     const size_t parts;
     const size_t elementsPerPart;
     /**
-     * @brief Points to position 1 _after_ the last written valid data entry.  
-     * 
+     * @brief Points to position 1 _after_ the last written valid data entry.
+     *
      */
     index_t headPart = 0;
 
     /**
-     * @brief Points to position 1 _after_ the last read valid data entry.  
-     * 
+     * @brief Points to position 1 _after_ the last read valid data entry.
+     *
      */
     index_t readPart = 0;
     logger_type& logger;
@@ -44,7 +44,7 @@ class RingBuffer {
     std::vector<std::unique_ptr<std::mutex>> partMutexes;
     std::mutex headPartMutex;
     std::mutex readPartMutex;
-    
+
 
     /**
      * @brief Construct a new Ring Buffer object. It's size in terms of values of type T is given by pElementsPerPart * pParts. By default all parts are invalid data to start with.
@@ -64,7 +64,7 @@ class RingBuffer {
     }
 
     /**
-     * @brief Move Constructor 
+     * @brief Move Constructor
      * @attention NOT THREAD SAFE!
      * ! This constructor is NOT THREAD SAFE!
      *
@@ -203,7 +203,7 @@ class RingBuffer {
                 //! Only now set mutex. Even if the spot just became free during the loop we'll take it, but now data has to be preserved.
                 std::lock_guard<std::mutex> guardPartMutex(*partMutexes[indexP]);
                 std::lock_guard<std::mutex> guardHeadMutex(headPartMutex);
-                for (auto [it, j] = std::tuple(beginning, 0); it != end; ++it, ++j) {
+                for (auto [it, j] = std::tuple(beginning, 0UL); it != end; ++it, ++j) {
                     buffer[elementIndex(indexP, j)] = *it;
                 }
                 validParts[indexP] = true;

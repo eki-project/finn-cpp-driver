@@ -2,17 +2,17 @@
 #define DEVICEBUFFER_H
 
 #include <boost/circular_buffer.hpp>
-#include <limits>
 #include <cstdlib>
+#include <limits>
 
 #include "../utils/FinnDatatypes.hpp"
 #include "../utils/Logger.h"
 #include "../utils/RingBuffer.hpp"
 #include "../utils/Types.h"
+#include "ert.h"
 #include "xrt.h"
 #include "xrt/xrt_bo.h"
 #include "xrt/xrt_kernel.h"
-#include "ert.h"
 
 namespace Finn {
     /**
@@ -34,12 +34,12 @@ namespace Finn {
 
          public:
         //* Normal Constructor
-        DeviceBuffer(const std::string& pName, xrt::device& device, xrt::kernel pAssociatedKernel, /*const shape_t& pShapeNormal, const shape_t& pShapeFolded,*/ const shapePacked_t& pShapePacked, unsigned int ringBufferSizeFactor)
+        DeviceBuffer(const std::string& pName, xrt::device& device, xrt::kernel& pAssociatedKernel, /*const shape_t& pShapeNormal, const shape_t& pShapeFolded,*/ const shapePacked_t& pShapePacked, unsigned int ringBufferSizeFactor)
             : name(pName),
               shapePacked(pShapePacked),
               mapSize(FinnUtils::getActualBufferSize(FinnUtils::shapeToElements(pShapePacked))),
               internalBo(xrt::bo(device, mapSize * sizeof(T), 0)),
-              associatedKernel(std::move(pAssociatedKernel)),
+              associatedKernel(pAssociatedKernel),
               map(internalBo.template map<T*>()),
               logger(Logger::getLogger()),
               ringBuffer(RingBuffer<T>(ringBufferSizeFactor, mapSize)) {
@@ -63,9 +63,7 @@ namespace Finn {
 
         DeviceBuffer(const DeviceBuffer& buf) noexcept = delete;
 
-        virtual ~DeviceBuffer() { 
-            FINN_LOG(logger, loglevel::info) << "Destructing DeviceBuffer " << name << "\n"; 
-        };
+        virtual ~DeviceBuffer() { FINN_LOG(logger, loglevel::info) << "Destructing DeviceBuffer " << name << "\n"; };
 
         DeviceBuffer& operator=(DeviceBuffer&& buf) = delete;
         DeviceBuffer& operator=(const DeviceBuffer& buf) = delete;
@@ -133,9 +131,7 @@ namespace Finn {
          * @brief Sync data from the map to the device.
          *
          */
-        void sync() {
-            this->internalBo.sync(XCL_BO_SYNC_BO_TO_DEVICE);
-        }
+        void sync() { this->internalBo.sync(XCL_BO_SYNC_BO_TO_DEVICE); }
 
         /**
          * @brief Start a run on the associated kernel and wait for it's result.
@@ -149,21 +145,19 @@ namespace Finn {
         }
 
         /**
-         * @brief Load data from the ring buffer into the memory map of the device 
-         * 
-         * @return true 
-         * @return false 
+         * @brief Load data from the ring buffer into the memory map of the device
+         *
+         * @return true
+         * @return false
          */
-        bool loadMap() {
-            return this->ringBuffer.read(this->map, this->mapSize);
-        }
+        bool loadMap() { return this->ringBuffer.read(this->map, this->mapSize); }
 
         /**
-         * @brief Store the given vector of data in the ring buffer 
-         * 
-         * @param data 
-         * @return true 
-         * @return false 
+         * @brief Store the given vector of data in the ring buffer
+         *
+         * @param data
+         * @return true
+         * @return false
          */
         bool store(const std::vector<T>& data) {
             // TODO(bwintermann): Enable support to write multiple parts from one vector, which has then to be a multiple of elementsPerPart large
@@ -172,12 +166,12 @@ namespace Finn {
 
         /**
          * @brief Store the given data in the ring buffer
-         * 
+         *
          * @tparam InputIt The type of the iterator
-         * @param beginning 
-         * @param end 
-         * @return true 
-         * @return false 
+         * @param beginning
+         * @param end
+         * @return true
+         * @return false
          */
         template<typename InputIt>
         bool store(InputIt beginning, InputIt end) {
@@ -187,9 +181,9 @@ namespace Finn {
 
         /**
          * @brief Execute the first valid data that is found in the buffer. Returns false if no valid data was found
-         * 
-         * @return true 
-         * @return false 
+         *
+         * @return true
+         * @return false
          */
         bool run() {
             FINN_LOG_DEBUG(logger, loglevel::info) << "DeviceBuffer (" << this->name << ") executing...";
@@ -251,21 +245,17 @@ namespace Finn {
          public:
         /**
          * @brief Get the the kernel timeout in miliseconds
-         * 
-         * @return unsigned int 
+         *
+         * @return unsigned int
          */
-        unsigned int getMsExecuteTimeout() const {
-            return msExecuteTimeout;
-        }
+        unsigned int getMsExecuteTimeout() const { return msExecuteTimeout; }
 
         /**
          * @brief Set the kernel timeout in miliseconds
-         * 
-         * @param val 
+         *
+         * @param val
          */
-        void setMsExecuteTimeout(unsigned int val) {
-            msExecuteTimeout = val;
-        }
+        void setMsExecuteTimeout(unsigned int val) { msExecuteTimeout = val; }
 
         /**
          * @brief Sync data from the FPGA into the memory map
@@ -330,16 +320,16 @@ namespace Finn {
         void clearArchive() { longTermStorage.resize(0); }
 
         /**
-         * @brief Read the specified number of samples. If a read fails, immediately return. If all are successfull, the kernel state of the last run is returned 
-         * 
-         * @param samples 
-         * @return ert_cmd_state 
+         * @brief Read the specified number of samples. If a read fails, immediately return. If all are successfull, the kernel state of the last run is returned
+         *
+         * @param samples
+         * @return ert_cmd_state
          */
         ert_cmd_state read(unsigned int samples) {
             FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "Reading " << samples << " samples from the device";
-            ert_cmd_state outExecuteResult = ERT_CMD_STATE_ERROR;   // Return error if samples == 0
+            ert_cmd_state outExecuteResult = ERT_CMD_STATE_ERROR;  // Return error if samples == 0
             for (unsigned int i = 0; i < samples; i++) {
-                 outExecuteResult = execute();
+                outExecuteResult = execute();
                 if (outExecuteResult == ERT_CMD_STATE_ERROR || outExecuteResult == ERT_CMD_STATE_ABORT) {
                     return outExecuteResult;
                 }
@@ -351,7 +341,7 @@ namespace Finn {
             }
             return outExecuteResult;
         }
-        
+
         /**
          * @brief Return the size of the buffer as specified by the argument. Bytes returns all bytes the buffer takes up, elements returns the number of T-values, numbers the number of F-values.
          *

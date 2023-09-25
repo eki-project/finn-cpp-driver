@@ -2,34 +2,29 @@
 
 #include <algorithm>  // for transform
 #include <cstddef>    // for size_t
-#include <iterator>   // for back_insert_iterator, back_inserter
-#include <memory>     // for allocator_traits<>::value_type
 #include <functional>
+#include <iterator>  // for back_insert_iterator, back_inserter
+#include <memory>    // for allocator_traits<>::value_type
 
-#include "DeviceHandler.h"
 #include "../utils/ConfigurationStructs.h"
+#include "../utils/FinnUtils.h"
+#include "DeviceHandler.h"
 #include "ert.h"
 
 namespace Finn {
     Accelerator::Accelerator(const std::vector<DeviceWrapper>& deviceDefinitions, unsigned int hostBufferSize) {
-        std::transform(
-            deviceDefinitions.begin(),
-            deviceDefinitions.end(),
-            std::back_inserter(devices),
-            [hostBufferSize](const DeviceWrapper& dew) { 
-                return DeviceHandler(dew, hostBufferSize);
-            }
-        );
+        std::transform(deviceDefinitions.begin(), deviceDefinitions.end(), std::back_inserter(devices), [hostBufferSize](const DeviceWrapper& dew) { return DeviceHandler(dew, hostBufferSize); });
     }
 
     DeviceHandler& Accelerator::getDeviceHandler(unsigned int deviceIndex) {
         if (!containsDevice(deviceIndex)) {
             FinnUtils::logAndError<std::runtime_error>("Tried retrieving a deviceHandler with an unknown index");
         }
-        auto isCorrectHandler = [deviceIndex](const DeviceHandler& dhh) { return dhh.getDeviceIndex() == deviceIndex; }; 
+        auto isCorrectHandler = [deviceIndex](const DeviceHandler& dhh) { return dhh.getDeviceIndex() == deviceIndex; };
         if (auto dhIt = std::find_if(devices.begin(), devices.end(), isCorrectHandler); dhIt != devices.end()) {
             return *dhIt;
         }
+        FinnUtils::unreachable();
         return devices[0];
     }
 
@@ -50,16 +45,16 @@ namespace Finn {
         }
     }
 
-    std::function<bool(const std::vector<uint8_t>&)> Accelerator::storeFactory(const unsigned int deviceIndex, const std::string& inputBufferKernelName) {
+    UncheckedStore Accelerator::storeFactory(const unsigned int deviceIndex, const std::string& inputBufferKernelName) {
         if (containsDevice(deviceIndex)) {
-            DeviceHandler& devHand = getDeviceHandler(deviceIndex); 
+            DeviceHandler& devHand = getDeviceHandler(deviceIndex);
             if (devHand.containsBuffer(inputBufferKernelName, IO::INPUT)) {
-                auto storeFunc = [&](const std::vector<uint8_t>& data) { return devHand.storeUnchecked(data, inputBufferKernelName); };
-                return storeFunc;
+                return UncheckedStore(devHand, inputBufferKernelName);
             }
         }
         FinnUtils::logAndError<std::runtime_error>("Tried creating a store-closure on a deviceIndex or kernelBufferName which don't exist!");
-        return [](const std::vector<uint8_t>& _) {return false;};
+        FinnUtils::unreachable();
+        return {};
     }
 
     bool Accelerator::run(const unsigned int deviceIndex, const std::string& inputBufferKernelName) {
@@ -99,8 +94,6 @@ namespace Finn {
         }
     }
 
-    size_t Accelerator::size(SIZE_SPECIFIER ss, unsigned int deviceIndex, const std::string& bufferName) {
-        return getDeviceHandler(deviceIndex).size(ss, bufferName);
-    }
+    size_t Accelerator::size(SIZE_SPECIFIER ss, unsigned int deviceIndex, const std::string& bufferName) { return getDeviceHandler(deviceIndex).size(ss, bufferName); }
 
 }  // namespace Finn

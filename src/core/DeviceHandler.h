@@ -227,6 +227,7 @@ namespace Finn {
          */
         void initializeBufferObjects(const DeviceWrapper& devWrap, unsigned int hostBufferSize);
 
+         public:
         /**
          * @brief Same as store, but without performing a check whether the kernel exists before accessing
          *
@@ -237,10 +238,13 @@ namespace Finn {
          */
         bool storeUnchecked(const std::vector<uint8_t>& data, const std::string& inputBufferKernelName);
 
-        #ifdef NDEBUG
-        public:
+        /**
+         * @brief Get an input buffer from this device based on its name 
+         * 
+         * @param name 
+         * @return DeviceInputBuffer<uint8_t>& 
+         */
         DeviceInputBuffer<uint8_t>& getInputBuffer(const std::string& name);
-        #endif
 
         /**
          * @brief Same as store, but without performing a check whether the kernel exists before accessing
@@ -255,8 +259,22 @@ namespace Finn {
             static_assert(std::is_same<typename std::iterator_traits<IteratorType>::value_type, uint8_t>::value);
             return inputBufferMap.at(inputBufferKernelName).store(first, last);
         }
+
+#ifndef NDEBUG
+        /**
+         * @brief Check if the input and output buffer maps are collision free (i.e. have O(1) access). Also logs. 
+         * 
+         * @return true 
+         * @return false 
+         */
+        bool isBufferMapCollisionFree();
+#endif
     };
 
+    /**
+     * @brief Functor for faster store operations 
+     * 
+     */
     class UncheckedStore {
         DeviceHandler& dev;
         std::string inputBufferName;

@@ -45,7 +45,9 @@ namespace Finn {
          */
         BaseDriver(const std::filesystem::path& configPath, unsigned int hostBufferSize) : configuration(createConfigFromPath(configPath)), logger(Logger::getLogger()) {
             accelerator = Accelerator(configuration.deviceWrappers, hostBufferSize);
+            #ifndef NDEBUG
             logDriver();
+            #endif
         };
         BaseDriver(BaseDriver&&) noexcept = default;
         BaseDriver(const BaseDriver&) noexcept = delete;
@@ -71,6 +73,18 @@ namespace Finn {
         DeviceHandler& getDeviceHandler(unsigned int index) { return accelerator.getDeviceHandler(index); }
 
         /**
+         * @brief Get a specific buffer object specified by its name and the device it is on
+         * 
+         * @param deviceIndex 
+         * @param bufferName 
+         * @return DeviceInputBuffer<uint8_t> 
+         */
+        DeviceInputBuffer<uint8_t>& getInputBuffer(unsigned int deviceIndex, const std::string& bufferName) {
+            return getDeviceHandler(deviceIndex).getInputBuffer(bufferName);
+        }
+
+        /**
+         * 
          * @brief Do an inference with the given data. This assumes already flattened data in uint8_t's. Specify inputs and outputs.
          *
          * @param data
@@ -84,47 +98,16 @@ namespace Finn {
          */
         [[nodiscard]] std::vector<std::vector<uint8_t>> inferRaw(const std::vector<uint8_t>& data, unsigned int inputDeviceIndex, const std::string& inputBufferKernelName, unsigned int outputDeviceIndex,
                                                                  const std::string& outputBufferKernelName, unsigned int samples, bool forceArchival) {
+            FINN_LOG_DEBUG(logger, loglevel::info) << "Starting inference (raw data)";
             auto storeFunc = accelerator.storeFactory(inputDeviceIndex, inputBufferKernelName);
 
-            FINN_LOG_DEBUG(logger, loglevel::info) << "Starting inference (raw data)";
             bool stored = storeFunc(data);
-
-#ifdef NDEBUG
-            accelerator.getDeviceHandler(inputDeviceIndex).getInputBuffer(inputBufferKernelName).testSyncBackFromDevice();
-
-            auto readBack = accelerator.getDeviceHandler(inputDeviceIndex).getInputBuffer(inputBufferKernelName).testGetMap();
-
-            std::string ts = ""; 
-            for (auto val : readBack) {
-                ts += " " + std::to_string(val);
-            }
-            FINN_LOG(logger, loglevel::info) << "READBACK DATA " << ts;
-            logDriver();
-#endif
-
-            FINN_LOG(logger, loglevel::info) << "Running kernels";
             bool ran = accelerator.run(inputDeviceIndex, inputBufferKernelName);
-            if (stored && ran) {
-                FINN_LOG_DEBUG(logger, loglevel::info) << "Reading out buffers";
-                ert_cmd_state resultState = accelerator.read(outputDeviceIndex, outputBufferKernelName, samples);
+            
+            #ifndef NDEBUG
+            FINN_LOG_DEBUG(logger, loglevel::info) << "Readback test returned: " << isSyncedDataEquivalent(inputDeviceIndex, inputBufferKernelName, data);
+            #endif 
 
-                // If the kernel run is completed (success or by timeout (more reads than were in the pipeline)), return the data
-                if (resultState == ERT_CMD_STATE_COMPLETED || resultState == ERT_CMD_STATE_TIMEOUT || resultState == ERT_CMD_STATE_NEW) {
-                    return accelerator.retrieveResults(outputDeviceIndex, outputBufferKernelName, forceArchival);
-                } else {
-                    FinnUtils::logAndError<std::runtime_error>("Unspecifiable error during inference (ert_cmd_state is " + std::to_string(resultState) + ")!");
-                }
-            } else {
-                FinnUtils::logAndError<std::runtime_error>("Data either couldnt be stored or there was no data to execute!");
-            }
-        }
-
-        [[nodiscard]] std::vector<std::vector<uint8_t>> infer(const std::vector<uint8_t>& data, unsigned int inputDeviceIndex, const std::string& inputBufferKernelName, unsigned int outputDeviceIndex,
-                                                              const std::string& outputBufferKernelName, unsigned int samples, bool forceArchival) {
-            FINN_LOG_DEBUG(logger, loglevel::info) << "Starting inference";
-            bool stored = accelerator.store(data, inputDeviceIndex, inputBufferKernelName);
-            FINN_LOG_DEBUG(logger, loglevel::info) << "Running kernels";
-            bool ran = accelerator.run(inputDeviceIndex, inputBufferKernelName);
             if (stored && ran) {
                 FINN_LOG_DEBUG(logger, loglevel::info) << "Reading out buffers";
                 ert_cmd_state resultState = accelerator.read(outputDeviceIndex, outputBufferKernelName, samples);
@@ -141,6 +124,23 @@ namespace Finn {
         }
 
         /**
+         * @brief Normal inference with packing
+         *  ! TODO 
+         * 
+         * @param data 
+         * @param inputDeviceIndex 
+         * @param inputBufferKernelName 
+         * @param outputDeviceIndex 
+         * @param outputBufferKernelName 
+         * @param samples 
+         * @param forceArchival 
+         * @return std::vector<std::vector<uint8_t>> 
+         */
+        //[[nodiscard]] std::vector<std::vector<uint8_t>> infer(const std::vector<uint8_t>& data, unsigned int inputDeviceIndex, const std::string& inputBufferKernelName, unsigned int outputDeviceIndex,
+        //                                                      const std::string& outputBufferKernelName, unsigned int samples, bool forceArchival) {
+        //}
+
+        /**
          * @brief Return the size (type specified by SIZE_SPECIFIER) at the given device at the given buffer
          *
          * @param ss
@@ -150,26 +150,48 @@ namespace Finn {
          */
         size_t size(SIZE_SPECIFIER ss, unsigned int deviceIndex, const std::string& bufferName) { return accelerator.size(ss, deviceIndex, bufferName); }
 
+
+#ifndef NDEBUG
+        /**
+         * @brief Return whether the data that is currently held on the FPGA is equivalent to the passed data 
+         * 
+         * @param deviceIndex 
+         * @param bufferName 
+         * @param data 
+         * @return true 
+         * @return false 
+         */
+        bool isSyncedDataEquivalent(unsigned int deviceIndex, const std::string& bufferName, const std::vector<uint8_t>& data) {
+            DeviceInputBuffer<uint8_t>& devInBuf = getInputBuffer(deviceIndex, bufferName);
+            devInBuf.testSyncBackFromDevice();
+            return devInBuf.testGetMap() == data;
+        }
+
+        /**
+         * @brief Log out the entire structure of the driver (devices and their buffers) 
+         * 
+         */
         void logDriver() {
             FINN_LOG(logger, loglevel::info) << "DRIVER:\n";
             for (DeviceHandler& devHandler : accelerator) {
                 FINN_LOG(logger, loglevel::info) << "\tDevice Index: " << devHandler.getDeviceIndex();
-                for (auto& kv : devHandler.getInputBufferMap()) {
+                for (auto& keyValuePair : devHandler.getInputBufferMap()) {
                     FINN_LOG(logger, loglevel::info) << "\t\tInput buffers: ";
-                    FINN_LOG(logger, loglevel::info) << "\t\t\tName: " << kv.second.getName() << " (in hashmap as "<< kv.first << ")";
-                    FINN_LOG(logger, loglevel::info) << "\t\t\tShape packed: " << FinnUtils::shapeToString(kv.second.getPackedShape());
-                    FINN_LOG(logger, loglevel::info) << "\t\t\tElements of type T (usually uint8_t) per sample: " << kv.second.size(SIZE_SPECIFIER::ELEMENTS_PER_PART);
-                    FINN_LOG(logger, loglevel::info) << "\t\t\tElements of type T (usually uint8_t) in buffer overall: " << kv.second.size(SIZE_SPECIFIER::ELEMENTS);
+                    FINN_LOG(logger, loglevel::info) << "\t\t\tName: " << keyValuePair.second.getName() << " (in hashmap as "<< keyValuePair.first << ")";
+                    FINN_LOG(logger, loglevel::info) << "\t\t\tShape packed: " << FinnUtils::shapeToString(keyValuePair.second.getPackedShape());
+                    FINN_LOG(logger, loglevel::info) << "\t\t\tElements of type T (usually uint8_t) per sample: " << keyValuePair.second.size(SIZE_SPECIFIER::ELEMENTS_PER_PART);
+                    FINN_LOG(logger, loglevel::info) << "\t\t\tElements of type T (usually uint8_t) in buffer overall: " << keyValuePair.second.size(SIZE_SPECIFIER::ELEMENTS);
                 }
-                for (auto& kv : devHandler.getOutputBufferMap()) {
+                for (auto& keyValuePair : devHandler.getOutputBufferMap()) {
                     FINN_LOG(logger, loglevel::info) << "\t\tOutput buffers: ";
-                    FINN_LOG(logger, loglevel::info) << "\t\t\tName: " << kv.second.getName() << " (in hashmap as "<< kv.first << ")";
-                    FINN_LOG(logger, loglevel::info) << "\t\t\tShape packed: " << FinnUtils::shapeToString(kv.second.getPackedShape());
-                    FINN_LOG(logger, loglevel::info) << "\t\t\tElements of type T (usually uint8_t) per sample: " << kv.second.size(SIZE_SPECIFIER::ELEMENTS_PER_PART);
-                    FINN_LOG(logger, loglevel::info) << "\t\t\tElements of type T (usually uint8_t) in buffer overall: " << kv.second.size(SIZE_SPECIFIER::ELEMENTS);
+                    FINN_LOG(logger, loglevel::info) << "\t\t\tName: " << keyValuePair.second.getName() << " (in hashmap as "<< keyValuePair.first << ")";
+                    FINN_LOG(logger, loglevel::info) << "\t\t\tShape packed: " << FinnUtils::shapeToString(keyValuePair.second.getPackedShape());
+                    FINN_LOG(logger, loglevel::info) << "\t\t\tElements of type T (usually uint8_t) per sample: " << keyValuePair.second.size(SIZE_SPECIFIER::ELEMENTS_PER_PART);
+                    FINN_LOG(logger, loglevel::info) << "\t\t\tElements of type T (usually uint8_t) in buffer overall: " << keyValuePair.second.size(SIZE_SPECIFIER::ELEMENTS);
                 }
             }
         }
+#endif
     };
 }  // namespace Finn
 

@@ -209,8 +209,7 @@ namespace Finn {
         size_t size(SIZE_SPECIFIER ss) { return this->ringBuffer.size(ss); }
 
 
-#ifdef NDEBUG
-         public:
+#ifndef NDEBUG
         std::vector<T> testGetMap() {
             std::vector<T> temp;
             for (size_t i = 0; i < this->mapSize; i++) {
@@ -360,8 +359,7 @@ namespace Finn {
         size_t size(SIZE_SPECIFIER ss) { return this->ringBuffer.size(ss); }
 
 
-#ifdef NDEBUG
-         public:
+#ifndef NDEBUG
         std::vector<T> testGetMap() {
             std::vector<T> temp;
             for (size_t i = 0; i < this->map_size; i++) {

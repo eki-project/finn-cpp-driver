@@ -60,7 +60,7 @@ namespace Finn {
         if (containsDevice(deviceIndex)) {
             DeviceHandler& devHand = getDeviceHandler(deviceIndex);
             if (devHand.containsBuffer(inputBufferKernelName, IO::INPUT)) {
-                return UncheckedStore(devHand, inputBufferKernelName);
+                return { devHand, inputBufferKernelName };
             }
         }
         FinnUtils::logAndError<std::runtime_error>("Tried creating a store-closure on a deviceIndex or kernelBufferName which don't exist!");

@@ -65,7 +65,7 @@ namespace Finn {
         }
         FinnUtils::logAndError<std::runtime_error>("Tried creating a store-closure on a deviceIndex or kernelBufferName which don't exist!");
         FinnUtils::unreachable();
-        return {};
+        return {devices[0], ""};
     }
 
     bool Accelerator::run(const unsigned int deviceIndex, const std::string& inputBufferKernelName) {

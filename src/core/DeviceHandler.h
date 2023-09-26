@@ -258,7 +258,7 @@ namespace Finn {
     };
 
     class UncheckedStore {
-        DeviceHandler dev;
+        DeviceHandler& dev;
         std::string inputBufferName;
 
          public:
@@ -266,9 +266,10 @@ namespace Finn {
          * @brief Dummy constructor, this one should never be used
          *
          */
-        UncheckedStore() : dev(DeviceWrapper(), 0){};
-        explicit UncheckedStore(DeviceHandler& pDev, const std::string& pInputBufferName) : dev(std::move(pDev)), inputBufferName(pInputBufferName) {}
+        UncheckedStore(DeviceHandler& pDev, const std::string& pInputBufferName) : dev(pDev), inputBufferName(pInputBufferName) {}
+
         bool operator()(const std::vector<uint8_t>& data) { return dev.storeUnchecked(data, inputBufferName); }
+        
         template<typename IteratorType>
         bool operator()(IteratorType first, IteratorType last) {
             return dev.storeUnchecked(first, last, inputBufferName);

@@ -155,8 +155,15 @@ namespace Finn {
             for (DeviceHandler& devHandler : accelerator) {
                 FINN_LOG(logger, loglevel::info) << "\tDevice Index: " << devHandler.getDeviceIndex();
                 for (auto& kv : devHandler.getInputBufferMap()) {
-                    FINN_LOG(logger, loglevel::info) << "\t\tDevice Buffer: " << kv.first;
-                    FINN_LOG(logger, loglevel::info) << "\t\t\tName: " << kv.second.getName();
+                    FINN_LOG(logger, loglevel::info) << "\t\tInput buffers: ";
+                    FINN_LOG(logger, loglevel::info) << "\t\t\tName: " << kv.second.getName() << " (in hashmap as "<< kv.first << ")";
+                    FINN_LOG(logger, loglevel::info) << "\t\t\tShape packed: " << FinnUtils::shapeToString(kv.second.getPackedShape());
+                    FINN_LOG(logger, loglevel::info) << "\t\t\tElements of type T (usually uint8_t) per sample: " << kv.second.size(SIZE_SPECIFIER::ELEMENTS_PER_PART);
+                    FINN_LOG(logger, loglevel::info) << "\t\t\tElements of type T (usually uint8_t) in buffer overall: " << kv.second.size(SIZE_SPECIFIER::ELEMENTS);
+                }
+                for (auto& kv : devHandler.getOutputBufferMap()) {
+                    FINN_LOG(logger, loglevel::info) << "\t\tOutput buffers: ";
+                    FINN_LOG(logger, loglevel::info) << "\t\t\tName: " << kv.second.getName() << " (in hashmap as "<< kv.first << ")";
                     FINN_LOG(logger, loglevel::info) << "\t\t\tShape packed: " << FinnUtils::shapeToString(kv.second.getPackedShape());
                     FINN_LOG(logger, loglevel::info) << "\t\t\tElements of type T (usually uint8_t) per sample: " << kv.second.size(SIZE_SPECIFIER::ELEMENTS_PER_PART);
                     FINN_LOG(logger, loglevel::info) << "\t\t\tElements of type T (usually uint8_t) in buffer overall: " << kv.second.size(SIZE_SPECIFIER::ELEMENTS);

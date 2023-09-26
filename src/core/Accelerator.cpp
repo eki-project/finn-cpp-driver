@@ -33,11 +33,11 @@ namespace Finn {
         return std::count_if(devices.begin(), devices.end(), [deviceIndex](const DeviceHandler& dh) { return dh.getDeviceIndex() == deviceIndex; }) > 0;
     }
 
-    auto Accelerator::begin() {
+    std::vector<DeviceHandler>::iterator Accelerator::begin() {
         return devices.begin();
     }
 
-    auto Accelerator::end() {
+    std::vector<DeviceHandler>::iterator Accelerator::end() {
         return devices.end();
     }
 

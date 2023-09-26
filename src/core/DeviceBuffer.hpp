@@ -68,8 +68,6 @@ namespace Finn {
         DeviceBuffer& operator=(DeviceBuffer&& buf) = delete;
         DeviceBuffer& operator=(const DeviceBuffer& buf) = delete;
 
-        std::string& getName() { return name; }
-        shape_t& getPackedShape() { return shapePacked; }
         
 
          protected:
@@ -99,6 +97,8 @@ namespace Finn {
         using DeviceBuffer<T>::logger;
 
          public:
+        std::string& getName() { return this->name; }
+        shape_t& getPackedShape() { return this->shapePacked; }
         /**
          * @brief Move Constructor
          * @attention This move constructor is NOT THREAD SAFE
@@ -247,6 +247,8 @@ namespace Finn {
         }
 
          public:
+        std::string& getName() { return this->name; }
+        shape_t& getPackedShape() { return this->shapePacked; }
         /**
          * @brief Get the the kernel timeout in miliseconds
          *

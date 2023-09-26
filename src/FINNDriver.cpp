@@ -2,17 +2,18 @@
 // #include <iostream>
 // #include <numeric>
 // #include <stdexcept>
+#include <chrono>
+#include <functional>
 #include <string>
 #include <thread>
-#include <functional>
-#include <chrono>
 
 // Helper
+#include <boost/program_options.hpp>
+
 #include "core/BaseDriver.hpp"
 #include "core/DeviceBuffer.hpp"
 #include "utils/FinnDatatypes.hpp"
 #include "utils/Logger.h"
-#include <boost/program_options.hpp>
 
 // Created by FINN during compilation
 #include "config/FinnDriverUsedDatatypes.h"
@@ -26,10 +27,10 @@ using std::string;
 
 /**
  * @brief Log some initial information about the device and the kernels used
- * 
- * @param logger 
- * @param device 
- * @param filename 
+ *
+ * @param logger
+ * @param device
+ * @param filename
  */
 void logDeviceInformation(logger_type& logger, xrt::device& device, const std::string& filename) {
     auto bdfInfo = device.get_info<xrt::info::device::bdf>();
@@ -51,58 +52,54 @@ void logDeviceInformation(logger_type& logger, xrt::device& device, const std::s
 
 /**
  * @brief A simple helper function to create a Finn Driver from a given config file.
- * 
- * @param configFilePath 
- * @param hostBufferSize 
- * @return Finn::Driver 
+ *
+ * @param configFilePath
+ * @param hostBufferSize
+ * @return Finn::Driver
  */
-Finn::Driver createDriverFromConfig(const std::filesystem::path& configFilePath, unsigned int hostBufferSize) {
-    return { configFilePath, hostBufferSize };
-}
+Finn::Driver createDriverFromConfig(const std::filesystem::path& configFilePath, unsigned int hostBufferSize) { return {configFilePath, hostBufferSize}; }
 
 /**
  * @brief Run test inferences. The data used is generated randomly. Useful for testing functionality
- * @attention This does NOT FOLD or PACK. As such it does NOT count towards performance measuring 
- * 
- * @param baseDriver 
- * @param logger 
+ * @attention This does NOT FOLD or PACK. As such it does NOT count towards performance measuring
+ *
+ * @param baseDriver
+ * @param logger
  */
 void runFiletest(Finn::Driver& baseDriver, logger_type& logger) {
-        // TODO(bwintermann): Remove after debugging
-        logDeviceInformation(logger, baseDriver.getDeviceHandler(0).getDevice(), baseDriver.getConfig().deviceWrappers[0].xclbin);
+    // TODO(bwintermann): Remove after debugging
+    logDeviceInformation(logger, baseDriver.getDeviceHandler(0).getDevice(), baseDriver.getConfig().deviceWrappers[0].xclbin);
 
-        // Create vector for inputting data
-        auto filler = FinnUtils::BufferFiller(0,2);
-        std::vector<uint8_t> data;
-        data.resize(baseDriver.size(SIZE_SPECIFIER::ELEMENTS_PER_PART, 0, "StreamingDataflowPartition_0:{idma0}"));
+    // Create vector for inputting data
+    auto filler = FinnUtils::BufferFiller(0, 2);
+    std::vector<uint8_t> data;
+    data.resize(baseDriver.size(SIZE_SPECIFIER::ELEMENTS_PER_PART, 0, "StreamingDataflowPartition_0:{idma0}"));
 
-        // Do a test run with random data and raw inference (no packing no folding)
-        filler.fillRandom(data);
-        auto results = baseDriver.inferRaw(data, 0, "StreamingDataflowPartition_0:{idma0}", 0, "StreamingDataflowPartition_2:{odma0}", 9, true); 
-        FINN_LOG(logger, loglevel::info) << "Received " << results.size() << " results!";
+    // Do a test run with random data and raw inference (no packing no folding)
+    filler.fillRandom(data);
+    auto results = baseDriver.inferRaw(data, 0, "StreamingDataflowPartition_0:{idma0}", 0, "StreamingDataflowPartition_2:{odma0}", 9, true);
+    FINN_LOG(logger, loglevel::info) << "Received " << results.size() << " results!";
 
-        // Print Results
-        for (auto& resultVector : results) {
-            for (auto& val : resultVector) {
-                FINN_LOG(logger, loglevel::info) << "VALUE: " << static_cast<unsigned int>(val) << "\n";
-            }
+    // Print Results
+    for (auto& resultVector : results) {
+        for (auto& val : resultVector) {
+            FINN_LOG(logger, loglevel::info) << "VALUE: " << static_cast<unsigned int>(val) << "\n";
         }
+    }
 }
 
 /**
- * @brief Run inference on an input file with folding and packing beforehand and unfolding and unpacking afterwards 
- * 
- * @param baseDriver 
- * @param logger 
+ * @brief Run inference on an input file with folding and packing beforehand and unfolding and unpacking afterwards
+ *
+ * @param baseDriver
+ * @param logger
  */
 void runWithInputFile(Finn::Driver& baseDriver, logger_type& logger) {
-        FINN_LOG(logger, loglevel::info) << "Running driver on input files";
-        // TODO(bwintermann): Finish this method
+    FINN_LOG(logger, loglevel::info) << "Running driver on input files";
+    // TODO(bwintermann): Finish this method
 
-        baseDriver.infer();
+    // baseDriver.infer();
 }
-
-
 
 
 namespace po = finnBoost::program_options;
@@ -110,7 +107,7 @@ namespace po = finnBoost::program_options;
 int main(int argc, char* argv[]) {
     auto logger = Logger::getLogger();
     FINN_LOG(logger, loglevel::info) << "C++ Driver started";
-    
+
     // Helper lambas for debug output
     auto logMode = [&logger](const std::string& m) { FINN_LOG(logger, loglevel::info) << "Driver Mode: " << m; };
     auto logConfig = [&logger](const std::string& m) { FINN_LOG(logger, loglevel::info) << "Configuration file: " << m; };
@@ -119,12 +116,10 @@ int main(int argc, char* argv[]) {
 
     // Command Line Argument Parser
     po::options_description desc{"Options"};
-    desc.add_options()
-        ("help,h", "Display help")
-        ("mode,m", po::value<std::string>()->default_value("test")->notifier(logMode), "Mode of execution (file or test)")
-        ("configpath,c", po::value<std::string>()->notifier(logConfig), "Path to the config.json file emitted by the FINN compiler")
-        ("input,i", po::value<std::string>()->notifier(logInputFile), "Path to the input file. Only required if mode is set to \"file\"")
-        ("buffersize,b", po::value<unsigned int>()->notifier(logHBufferSize)->default_value(100), "How large (in samples) the host buffer is supposed to be");
+    desc.add_options()("help,h", "Display help")("mode,m", po::value<std::string>()->default_value("test")->notifier(logMode), "Mode of execution (file or test)")("configpath,c", po::value<std::string>()->notifier(logConfig),
+                                                                                                                                                                   "Path to the config.json file emitted by the FINN compiler")(
+        "input,i", po::value<std::string>()->notifier(logInputFile), "Path to the input file. Only required if mode is set to \"file\"")("buffersize,b", po::value<unsigned int>()->notifier(logHBufferSize)->default_value(100),
+                                                                                                                                         "How large (in samples) the host buffer is supposed to be");
     po::variables_map varMap;
     po::store(po::parse_command_line(argc, argv, desc), varMap);
     po::notify(varMap);
@@ -136,7 +131,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    // Checking for the existance of the config file 
+    // Checking for the existance of the config file
     auto configFilePath = std::filesystem::path(varMap["configpath"].as<std::string>());
     if (!std::filesystem::exists(configFilePath)) {
         FinnUtils::logAndError<std::runtime_error>("Cannot find config file at " + configFilePath.string());

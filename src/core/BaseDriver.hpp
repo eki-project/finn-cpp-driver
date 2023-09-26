@@ -55,6 +55,17 @@ namespace Finn {
         BaseDriver& operator=(const BaseDriver&) = delete;
         virtual ~BaseDriver() = default;
 
+        /**
+         * @brief A logger prefix to determine the source of a log write 
+         * 
+         * @return std::string 
+         */
+         private:
+        std::string loggerPrefix() {
+            return "[BaseDriver] ";
+        }
+         public:
+
         // TODO(bwintermann): Add methods for Iterator reading/storing
 
         /**
@@ -98,18 +109,18 @@ namespace Finn {
          */
         [[nodiscard]] std::vector<std::vector<uint8_t>> inferRaw(const std::vector<uint8_t>& data, unsigned int inputDeviceIndex, const std::string& inputBufferKernelName, unsigned int outputDeviceIndex,
                                                                  const std::string& outputBufferKernelName, unsigned int samples, bool forceArchival) {
-            FINN_LOG_DEBUG(logger, loglevel::info) << "Starting inference (raw data)";
+            FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "Starting inference (raw data)";
             auto storeFunc = accelerator.storeFactory(inputDeviceIndex, inputBufferKernelName);
 
             bool stored = storeFunc(data);
             bool ran = accelerator.run(inputDeviceIndex, inputBufferKernelName);
             
             #ifndef NDEBUG
-            FINN_LOG_DEBUG(logger, loglevel::info) << "Readback test returned: " << isSyncedDataEquivalent(inputDeviceIndex, inputBufferKernelName, data);
+            FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "Readback test returned: " << isSyncedDataEquivalent(inputDeviceIndex, inputBufferKernelName, data);
             #endif 
 
             if (stored && ran) {
-                FINN_LOG_DEBUG(logger, loglevel::info) << "Reading out buffers";
+                FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "Reading out buffers";
                 ert_cmd_state resultState = accelerator.read(outputDeviceIndex, outputBufferKernelName, samples);
 
                 // If the kernel run is completed (success or by timeout (more reads than were in the pipeline)), return the data
@@ -172,7 +183,7 @@ namespace Finn {
          * 
          */
         void logDriver() {
-            FINN_LOG(logger, loglevel::info) << "DRIVER:\n";
+            FINN_LOG(logger, loglevel::info) << loggerPrefix() << "Driver Overview:\n";
             for (DeviceHandler& devHandler : accelerator) {
                 FINN_LOG(logger, loglevel::info) << "\tDevice Index: " << devHandler.getDeviceIndex();
                 for (auto& keyValuePair : devHandler.getInputBufferMap()) {

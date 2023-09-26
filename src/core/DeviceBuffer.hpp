@@ -43,7 +43,7 @@ namespace Finn {
               map(internalBo.template map<T*>()),
               logger(Logger::getLogger()),
               ringBuffer(RingBuffer<T>(ringBufferSizeFactor, mapSize)) {
-            FINN_LOG(logger, loglevel::info) << "Initializing DeviceBuffer " << name << " (SHAPE PACKED: " << FinnUtils::shapeToString(pShapePacked) << ", BUFFER SIZE: " << ringBufferSizeFactor
+            FINN_LOG(logger, loglevel::info) << "[DeviceBuffer] " << "Initializing DeviceBuffer " << name << " (SHAPE PACKED: " << FinnUtils::shapeToString(pShapePacked) << ", BUFFER SIZE: " << ringBufferSizeFactor
                                              << " inputs of the given shape, MAP SIZE: " << mapSize << ")\n";
             if (ringBufferSizeFactor == 0) {
                 FinnUtils::logAndError<std::runtime_error>("DeviceBuffer of size 0 cannot be constructed currently!");
@@ -63,7 +63,7 @@ namespace Finn {
 
         DeviceBuffer(const DeviceBuffer& buf) noexcept = delete;
 
-        virtual ~DeviceBuffer() { FINN_LOG(logger, loglevel::info) << "Destructing DeviceBuffer " << name << "\n"; };
+        virtual ~DeviceBuffer() { FINN_LOG(logger, loglevel::info) << "[DeviceBuffer] Destructing DeviceBuffer " << name << "\n"; };
 
         DeviceBuffer& operator=(DeviceBuffer&& buf) = delete;
         DeviceBuffer& operator=(const DeviceBuffer& buf) = delete;
@@ -124,7 +124,7 @@ namespace Finn {
          * @return std::string
          */
         std::string loggerPrefix() {
-            std::string str = "[INPUT - ";
+            std::string str = "[DeviceInputBuffer - ";
             str += this->name;
             str += "] ";
             return str;
@@ -190,7 +190,7 @@ namespace Finn {
          * @return false
          */
         bool run() {
-            FINN_LOG_DEBUG(logger, loglevel::info) << "DeviceBuffer (" << this->name << ") executing...";
+            FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "DeviceBuffer (" << this->name << ") executing...";
             std::lock_guard<std::mutex> guard(runMutex);
             if (!loadMap()) {
                 return false;
@@ -239,7 +239,7 @@ namespace Finn {
          * @return std::string
          */
         std::string loggerPrefix() {
-            std::string str = "[OUTPUT - ";
+            std::string str = "[DeviceOutputBuffer - ";
             str += this->name;
             str += "] ";
             return str;
@@ -268,7 +268,6 @@ namespace Finn {
          * @return * void
          */
         void sync() {
-            FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "Syncing data from device";
             this->internalBo.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
         }
 
@@ -278,7 +277,6 @@ namespace Finn {
          *
          */
         ert_cmd_state execute() {
-            FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "Executing on device";
             auto run = this->associatedKernel(this->internalBo, 1);
             run.wait(msExecuteTimeout);
             return run.state();
@@ -289,7 +287,6 @@ namespace Finn {
          *
          */
         void saveMap() {
-            FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "Saving data from device map into ring buffer";
             //! Fix that if no space is available, the data will be discarded!
             this->ringBuffer.template store<T*>(this->map, this->mapSize);
         }

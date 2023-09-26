@@ -38,6 +38,15 @@ namespace Finn {
         Accelerator& operator=(const Accelerator&) = delete;
         ~Accelerator() = default;
 
+         private:
+        /**
+         * @brief A small prefix to determine where the log write came from 
+         * 
+         * @return std::string 
+         */
+        std::string loggerPrefix();
+         public:
+
         /**
          * @brief Return a beginning iterator to the internal device vector (contains DeviceHandler) 
          * 

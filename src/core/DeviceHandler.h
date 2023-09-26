@@ -227,7 +227,15 @@ namespace Finn {
          */
         void initializeBufferObjects(const DeviceWrapper& devWrap, unsigned int hostBufferSize);
 
+         private:
+        /**
+         * @brief A logger prefix to determine the source of a log write 
+         * 
+         * @return std::string 
+         */
+        std::string loggerPrefix();
          public:
+
         /**
          * @brief Same as store, but without performing a check whether the kernel exists before accessing
          *

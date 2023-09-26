@@ -16,6 +16,10 @@ namespace Finn {
         std::transform(deviceDefinitions.begin(), deviceDefinitions.end(), std::back_inserter(devices), [hostBufferSize](const DeviceWrapper& dew) { return DeviceHandler(dew, hostBufferSize); });
     }
 
+    std::string Accelerator::loggerPrefix() {
+        return "[Accelerator] ";
+    }
+
     /****** GETTER / SETTER ******/
     DeviceHandler& Accelerator::getDeviceHandler(unsigned int deviceIndex) {
         if (!containsDevice(deviceIndex)) {
@@ -82,11 +86,11 @@ namespace Finn {
 
     std::vector<std::vector<uint8_t>> Accelerator::retrieveResults(const unsigned int deviceIndex, const std::string& outputBufferKernelName, bool forceArchival) {
         if (containsDevice(deviceIndex)) {
-            FINN_LOG(Logger::getLogger(), loglevel::info) << "Retrieving results from the specified device index! [accelerator.retrueveResults()]";
+            FINN_LOG_DEBUG(Logger::getLogger(), loglevel::info) << loggerPrefix() << "Retrieving results from the specified device index! [accelerator.retrueveResults()]";
             return getDeviceHandler(deviceIndex).retrieveResults(outputBufferKernelName, forceArchival);
         } else {
             if (containsDevice(0)) {
-                FINN_LOG(Logger::getLogger(), loglevel::info) << "Retrieving results from 0  device index! [accelerator.retrueveResults()]";
+                FINN_LOG_DEBUG(Logger::getLogger(), loglevel::info) << loggerPrefix() << "Retrieving results from 0  device index! [accelerator.retrueveResults()]";
                 return getDeviceHandler(0).retrieveResults(outputBufferKernelName, forceArchival);
             } else {
                 FinnUtils::logAndError<std::runtime_error>("Tried receiving data in a devicehandler with an invalid deviceIndex!");
@@ -97,11 +101,11 @@ namespace Finn {
 
     ert_cmd_state Accelerator::read(const unsigned int deviceIndex, const std::string& outputBufferKernelName, unsigned int samples) {
         if (containsDevice(deviceIndex)) {
-            FINN_LOG(Logger::getLogger(), loglevel::info) << "Reading from the specified device index! [accelerator.read()]";
+            FINN_LOG_DEBUG(Logger::getLogger(), loglevel::info) << loggerPrefix() << "Reading from the specified device index! [accelerator.read()]";
             return getDeviceHandler(deviceIndex).read(outputBufferKernelName, samples);
         } else {
             if (containsDevice(0)) {
-                FINN_LOG(Logger::getLogger(), loglevel::info) << "Reading from 0 device index! [accelerator.read()]";
+                FINN_LOG_DEBUG(Logger::getLogger(), loglevel::info) << loggerPrefix() << "Reading from 0 device index! [accelerator.read()]";
                 return getDeviceHandler(0).read(outputBufferKernelName, samples);
             } else {
                 FinnUtils::logAndError<std::runtime_error>("Tried reading data in a devicehandler with an invalid deviceIndex!");

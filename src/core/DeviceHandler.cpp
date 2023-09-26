@@ -151,4 +151,12 @@ namespace Finn {
         }
         return false;
     }
+
+    #ifdef NDEBUG
+
+    DeviceBuffer& DeviceHandler::getInputBuffer(const std::string& name) {
+        return inputBufferMap.at(name);
+    }
+
+    #endif
 }  // namespace Finn

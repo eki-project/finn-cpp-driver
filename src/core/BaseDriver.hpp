@@ -92,6 +92,19 @@ namespace Finn {
 
             FINN_LOG(logger, loglevel::info) << "Starting inference (raw data)";
             bool stored = storeFunc(data);
+
+#ifdef NDEBUG
+            accelerator.getDeviceHandler(inputDeviceIndex).getInputBuffer(inputBufferKernelName).testSyncBackFromDevice();
+
+            auto readBack = accelerator.getDeviceHandler(inputDeviceIndex).getInputBuffer(inputBufferKernelName).testGetMap();
+
+            std::string ts = ""; 
+            for (auto val : readBack) {
+                val += " " + std::to_string(val);
+            }
+            FINN_LOG(logger, loglevel::info) << "READBACK DATA " << val; 
+#endif
+
             FINN_LOG(logger, loglevel::info) << "Running kernels";
             bool ran = accelerator.run(inputDeviceIndex, inputBufferKernelName);
             if (stored && ran) {

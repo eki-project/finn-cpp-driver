@@ -223,6 +223,10 @@ namespace Finn {
          */
         bool storeUnchecked(const std::vector<uint8_t>& data, const std::string& inputBufferKernelName);
 
+        #ifdef NDEBUG
+        DeviceBuffer& DeviceHandler::getInputBuffer(const std::string& name);
+        #endif
+
         /**
          * @brief Same as store, but without performing a check whether the kernel exists before accessing
          *

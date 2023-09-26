@@ -68,6 +68,10 @@ namespace Finn {
         DeviceBuffer& operator=(DeviceBuffer&& buf) = delete;
         DeviceBuffer& operator=(const DeviceBuffer& buf) = delete;
 
+        std::string& getName() { return name; }
+        shape_t& getPackedShape() { return shapePacked; }
+        
+
          protected:
         /**
          * @brief Internal constructor used by the move constructors of the sub classes !!!NOT THREAD SAFE!!!

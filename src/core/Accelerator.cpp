@@ -16,6 +16,7 @@ namespace Finn {
         std::transform(deviceDefinitions.begin(), deviceDefinitions.end(), std::back_inserter(devices), [hostBufferSize](const DeviceWrapper& dew) { return DeviceHandler(dew, hostBufferSize); });
     }
 
+    /****** GETTER / SETTER ******/
     DeviceHandler& Accelerator::getDeviceHandler(unsigned int deviceIndex) {
         if (!containsDevice(deviceIndex)) {
             FinnUtils::logAndError<std::runtime_error>("Tried retrieving a deviceHandler with an unknown index");
@@ -32,6 +33,16 @@ namespace Finn {
         return std::count_if(devices.begin(), devices.end(), [deviceIndex](const DeviceHandler& dh) { return dh.getDeviceIndex() == deviceIndex; }) > 0;
     }
 
+    auto Accelerator::begin() {
+        return devices.begin();
+    }
+
+    auto Accelerator::end() {
+        return devices.end();
+    }
+
+
+    /****** USER METHODS ******/
     //! Make this either a factory or do the checks before calling store to save performance
     bool Accelerator::store(const std::vector<uint8_t>& data, const unsigned int deviceIndex, const std::string& inputBufferKernelName) {
         if (containsDevice(deviceIndex)) {

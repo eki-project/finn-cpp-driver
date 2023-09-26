@@ -45,6 +45,7 @@ namespace Finn {
          */
         BaseDriver(const std::filesystem::path& configPath, unsigned int hostBufferSize) : configuration(createConfigFromPath(configPath)), logger(Logger::getLogger()) {
             accelerator = Accelerator(configuration.deviceWrappers, hostBufferSize);
+            logDriver();
         };
         BaseDriver(BaseDriver&&) noexcept = default;
         BaseDriver(const BaseDriver&) noexcept = delete;
@@ -95,9 +96,10 @@ namespace Finn {
 
             std::string ts = ""; 
             for (auto val : readBack) {
-                val += " " + std::to_string(val);
+                ts += " " + std::to_string(val);
             }
-            FINN_LOG(logger, loglevel::info) << "READBACK DATA " << val; 
+            FINN_LOG(logger, loglevel::info) << "READBACK DATA " << ts;
+            logDriver();
 #endif
 
             FINN_LOG(logger, loglevel::info) << "Running kernels";
@@ -147,6 +149,20 @@ namespace Finn {
          * @return size_t
          */
         size_t size(SIZE_SPECIFIER ss, unsigned int deviceIndex, const std::string& bufferName) { return accelerator.size(ss, deviceIndex, bufferName); }
+
+        void logDriver() {
+            FINN_LOG(logger, loglevel::info) << "DRIVER:\n";
+            for (DeviceHandler& devHandler : accelerator) {
+                FINN_LOG(logger, loglevel::info) << "\tDevice Index: " << devHandler.getDeviceIndex();
+                for (auto& kv : devHandler.getInputBufferMap()) {
+                    FINN_LOG(logger, loglevel::info) << "\t\tDevice Buffer: " << kv.first;
+                    FINN_LOG(logger, loglevel::info) << "\t\t\tName: " << kv.second.getName();
+                    FINN_LOG(logger, loglevel::info) << "\t\t\tShape packed: " << FinnUtils::shapeToString(kv.second.getPackedShape());
+                    FINN_LOG(logger, loglevel::info) << "\t\t\tElements of type T (usually uint8_t) per sample: " << kv.second.size(SIZE_SPECIFIER::ELEMENTS_PER_PART);
+                    FINN_LOG(logger, loglevel::info) << "\t\t\tElements of type T (usually uint8_t) in buffer overall: " << kv.second.size(SIZE_SPECIFIER::ELEMENTS);
+                }
+            }
+        }
     };
 }  // namespace Finn
 

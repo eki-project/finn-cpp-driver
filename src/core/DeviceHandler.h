@@ -127,6 +127,20 @@ namespace Finn {
         xrt::device& getDevice();
 
         /**
+         * @brief Get the Input Buffer Map 
+         * 
+         * @return std::unordered_map<std::string, DeviceInputBuffer<uint8_t>>& 
+         */
+        std::unordered_map<std::string, DeviceInputBuffer<uint8_t>>& getInputBufferMap();
+
+        /**
+         * @brief Get the Output Buffer Map
+         * 
+         * @return std::unordered_map<std::string, DeviceOutputBuffer<uint8_t>>& 
+         */
+        std::unordered_map<std::string, DeviceOutputBuffer<uint8_t>>& getOutputBufferMap();
+
+        /**
          * @brief Store the given vector data in the corresponding buffer.
          *
          * @param data The data to store
@@ -224,7 +238,8 @@ namespace Finn {
         bool storeUnchecked(const std::vector<uint8_t>& data, const std::string& inputBufferKernelName);
 
         #ifdef NDEBUG
-        DeviceBuffer& DeviceHandler::getInputBuffer(const std::string& name);
+        public:
+        DeviceInputBuffer<uint8_t>& getInputBuffer(const std::string& name);
         #endif
 
         /**
@@ -238,7 +253,7 @@ namespace Finn {
         template<typename IteratorType>
         bool storeUnchecked(IteratorType first, IteratorType last, const std::string& inputBufferKernelName) {
             static_assert(std::is_same<typename std::iterator_traits<IteratorType>::value_type, uint8_t>::value);
-            inputBufferMap.at(inputBufferKernelName).store(first, last);
+            return inputBufferMap.at(inputBufferKernelName).store(first, last);
         }
     };
 

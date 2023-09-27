@@ -4,6 +4,7 @@
 #include <cinttypes>  // for uint8_t
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <memory>
 #include <nlohmann/json.hpp>
 
@@ -125,7 +126,91 @@ namespace Finn {
             }
         }
 
-        // TODO(linusjun): Implement iterator version and document everything
+        /**
+         *
+         * @brief Do an inference with the given data. This assumes already flattened data in uint8_t's. Specify inputs and outputs.
+         *
+         * @param first Iterator to first element in input sequence
+         * @param last  Iterator to last element in input sequence
+         * @param inputDeviceIndex
+         * @param inputBufferKernelName
+         * @param outputDeviceIndex
+         * @param outputBufferKernelName
+         * @param samples
+         * @param forceArchival If true, the data gets written to LTS either way, ensuring that there is data to be read!
+         * @return std::vector<std::vector<uint8_t>>
+         */
+        template<typename IteratorType>
+        [[nodiscard]] std::vector<std::vector<uint8_t>> inferRaw(IteratorType first, IteratorType last, unsigned int inputDeviceIndex, const std::string& inputBufferKernelName, unsigned int outputDeviceIndex,
+                                                                 const std::string& outputBufferKernelName, unsigned int samples, bool forceArchival) {
+            FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "Starting inference (raw data)";
+            auto storeFunc = accelerator.storeFactory(inputDeviceIndex, inputBufferKernelName);
+
+            bool stored = storeFunc(first, last);
+            bool ran = accelerator.run(inputDeviceIndex, inputBufferKernelName);
+            if (stored && ran) {
+                FINN_LOG_DEBUG(logger, loglevel::info) << "Reading out buffers";
+                ert_cmd_state resultState = accelerator.read(outputDeviceIndex, outputBufferKernelName, samples);
+
+                // If the kernel run is completed (success or by timeout (more reads than were in the pipeline)), return the data
+                if (resultState == ERT_CMD_STATE_COMPLETED || resultState == ERT_CMD_STATE_TIMEOUT || resultState == ERT_CMD_STATE_NEW) {
+                    return accelerator.retrieveResults(outputDeviceIndex, outputBufferKernelName, forceArchival);
+                } else {
+                    FinnUtils::logAndError<std::runtime_error>("Unspecifiable error during inference (ert_cmd_state is " + std::to_string(resultState) + ")!");
+                }
+            } else {
+                FinnUtils::logAndError<std::runtime_error>("Data either couldnt be stored or there was no data to execute!");
+            }
+        }
+
+        /**
+         * @brief Do an inference with the given data. This assumes already flattened data in uint8_t's. Specify inputs and outputs.
+         *
+         * @tparam IteratorType
+         * @param first
+         * @param last
+         * @param inputDeviceIndex
+         * @param inputBufferKernelName
+         * @param outputDeviceIndex
+         * @param outputBufferKernelName
+         * @param samples
+         * @param forceArchival
+         * @return std::vector<std::vector<uint8_t>>
+         */
+        template<typename IteratorType>
+        [[nodiscard]] std::vector<std::vector<uint8_t>> infer(IteratorType first, IteratorType last, unsigned int inputDeviceIndex, const std::string& inputBufferKernelName, unsigned int outputDeviceIndex,
+                                                              const std::string& outputBufferKernelName, unsigned int samples, bool forceArchival) {
+            FINN_LOG_DEBUG(logger, loglevel::info) << "Starting inference";
+            bool stored = accelerator.store(first, last, inputDeviceIndex, inputBufferKernelName);
+            FINN_LOG_DEBUG(logger, loglevel::info) << "Running kernels";
+            bool ran = accelerator.run(inputDeviceIndex, inputBufferKernelName);
+            if (stored && ran) {
+                FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "Reading out buffers";
+                ert_cmd_state resultState = accelerator.read(outputDeviceIndex, outputBufferKernelName, samples);
+
+                // If the kernel run is completed (success or by timeout (more reads than were in the pipeline)), return the data
+                if (resultState == ERT_CMD_STATE_COMPLETED || resultState == ERT_CMD_STATE_TIMEOUT || resultState == ERT_CMD_STATE_NEW) {
+                    return accelerator.retrieveResults(outputDeviceIndex, outputBufferKernelName, forceArchival);
+                } else {
+                    FinnUtils::logAndError<std::runtime_error>("Unspecifiable error during inference (ert_cmd_state is " + std::to_string(resultState) + ")!");
+                }
+            } else {
+                FinnUtils::logAndError<std::runtime_error>("Data either couldnt be stored or there was no data to execute!");
+            }
+        }
+
+        /**
+         * @brief Do an inference with the given data. This assumes already flattened data in uint8_t's. Specify inputs and outputs.
+         *
+         * @param data
+         * @param inputDeviceIndex
+         * @param inputBufferKernelName
+         * @param outputDeviceIndex
+         * @param outputBufferKernelName
+         * @param samples
+         * @param forceArchival
+         * @return std::vector<std::vector<uint8_t>>
+         */
         [[nodiscard]] std::vector<std::vector<uint8_t>> infer(const std::vector<uint8_t>& data, unsigned int inputDeviceIndex, const std::string& inputBufferKernelName, unsigned int outputDeviceIndex,
                                                               const std::string& outputBufferKernelName, unsigned int samples, bool forceArchival) {
             FINN_LOG_DEBUG(logger, loglevel::info) << "Starting inference";
@@ -146,23 +231,6 @@ namespace Finn {
                 FinnUtils::logAndError<std::runtime_error>("Data either couldnt be stored or there was no data to execute!");
             }
         }
-
-        /**
-         * @brief Normal inference with packing
-         *  ! TODO
-         *
-         * @param data
-         * @param inputDeviceIndex
-         * @param inputBufferKernelName
-         * @param outputDeviceIndex
-         * @param outputBufferKernelName
-         * @param samples
-         * @param forceArchival
-         * @return std::vector<std::vector<uint8_t>>
-         */
-        //[[nodiscard]] std::vector<std::vector<uint8_t>> infer(const std::vector<uint8_t>& data, unsigned int inputDeviceIndex, const std::string& inputBufferKernelName, unsigned int outputDeviceIndex,
-        //                                                      const std::string& outputBufferKernelName, unsigned int samples, bool forceArchival) {
-        //}
 
         /**
          * @brief Return the size (type specified by SIZE_SPECIFIER) at the given device at the given buffer

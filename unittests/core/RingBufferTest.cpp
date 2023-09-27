@@ -45,8 +45,7 @@ TEST(RBTest, RBInitTest) {
 }
 
 TEST(RBTest, RBStoreReadTest) {
-
-    //! TEST IF THE DATA THAT WAS WRITTEN/READ FROM/TO MAP IS CORRECT 
+    //! TEST IF THE DATA THAT WAS WRITTEN/READ FROM/TO MAP IS CORRECT
 
 
     auto rb = RB(parts, elementsPerPart);
@@ -71,8 +70,8 @@ TEST(RBTest, RBStoreReadTest) {
 
     // Read two entries
     uint8_t buf[elementsPerPart];
-    EXPECT_TRUE(rb.read(buf, elementsPerPart));
-    EXPECT_TRUE(rb.read(buf, elementsPerPart));
+    EXPECT_TRUE(rb.readToArray(buf, elementsPerPart));
+    EXPECT_TRUE(rb.readToArray(buf, elementsPerPart));
 
     // Check pointer positions
     EXPECT_EQ(rb.testGetHeadPointer(), 0);

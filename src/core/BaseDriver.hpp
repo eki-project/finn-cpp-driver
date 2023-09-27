@@ -6,7 +6,6 @@
 #include <fstream>
 #include <iterator>
 #include <memory>
-#include <nlohmann/json.hpp>
 
 #include "../utils/ConfigurationStructs.h"
 #include "../utils/FinnDatatypes.hpp"
@@ -15,7 +14,6 @@
 #include "../utils/Types.h"
 #include "Accelerator.h"
 #include "ert.h"
-using json = nlohmann::json;
 
 namespace Finn {
     /**

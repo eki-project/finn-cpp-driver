@@ -91,30 +91,28 @@ namespace FinnUtils {
     }
 
     /**
-     * @brief Put some newlines into the log script for clearer reading 
-     * 
-     * @param logger 
+     * @brief Put some newlines into the log script for clearer reading
+     *
+     * @param logger
      */
-    inline void logSpacer(logger_type& logger) {
-        FINN_LOG(logger, loglevel::info) << "\n\n\n\n";
-    } 
+    inline void logSpacer(logger_type& logger) { FINN_LOG(logger, loglevel::info) << "\n\n\n\n"; }
 
     /**
-     * @brief Log out the given number of results in a vector. If entriesToRead is larger than the vector size, the whole vector gets printed 
-     * 
-     * @param logger 
-     * @param results 
-     * @param entriesToRead 
-     * @param prefix 
+     * @brief Log out the given number of results in a vector. If entriesToRead is larger than the vector size, the whole vector gets printed
+     *
+     * @param logger
+     * @param results
+     * @param entriesToRead
+     * @param prefix
      */
     template<typename T>
     inline void logResults(logger_type& logger, const std::vector<T>& results, unsigned int entriesToRead, const std::string& prefix = "") {
         FINN_LOG(logger, loglevel::info) << prefix << "Values: ";
-        std::string s = "";
-    for (unsigned int i = 0; i < std::max(entriesToRead, static_cast<unsigned int>(results.size())); i++) {
-            s += std::to_string(results[i]) + " ";
+        std::string str;
+        for (unsigned int i = 0; i < std::max(entriesToRead, static_cast<unsigned int>(results.size())); ++i) {
+            str += std::to_string(results[i]) + " ";
         }
-        FINN_LOG(logger, loglevel::info) << s;
+        FINN_LOG(logger, loglevel::info) << str;
     }
 
     /**

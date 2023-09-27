@@ -225,38 +225,34 @@ class RingBuffer {
     }
 
     /**
-     * @brief Read the ring buffer and write out the first valid entry into the provided storage container. If no valid part is found, false is returned 
-     * 
-     * @param outData 
-     * @param datasize 
-     * @return true 
-     * @return false 
+     * @brief Read the ring buffer and write out the first valid entry into the provided storage container. If no valid part is found, false is returned
+     *
+     * @param outData
+     * @param datasize
+     * @return true
+     * @return false
      */
-    bool readToVector(std::vector<T>& outData, size_t datasize) {
-        return read(outData, datasize);
-    }
+    bool readToVector(const std::vector<T>& outData, size_t datasize) { return read(outData, datasize); }
 
     /**
-     * @brief Read the ring buffer and write out the first valid entry into the provided storage container. If no valid part is found, false is returned 
-     * 
-     * @param outData 
-     * @param datasize 
-     * @return true 
-     * @return false 
+     * @brief Read the ring buffer and write out the first valid entry into the provided storage container. If no valid part is found, false is returned
+     *
+     * @param outData
+     * @param datasize
+     * @return true
+     * @return false
      */
-    bool readToArray(T* outData, size_t datasize) {
-        return read(outData, datasize);
-    }
+    bool readToArray(T* outData, size_t datasize) { return read(outData, datasize); }
 
      private:
     /**
-     * @brief Private internal read method called by the two variants in the public namespace 
-     * 
-     * @tparam C 
-     * @param outData 
-     * @param datasize 
-     * @return true 
-     * @return false 
+     * @brief Private internal read method called by the two variants in the public namespace
+     *
+     * @tparam C
+     * @param outData
+     * @param datasize
+     * @return true
+     * @return false
      */
     template<typename C>
     bool read(C outData, size_t datasize) {

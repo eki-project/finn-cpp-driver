@@ -18,6 +18,9 @@ function(add_unittest test_name)
     xrt_mock
     # -Wl,--no-as-needed -lm -ldl
   )
+
+  target_compile_definitions(${test} PRIVATE UNITTEST=1)
+
   add_test(NAME "${test}"
     COMMAND ${test} ${CATCH_TEST_FILTER}
     WORKING_DIRECTORY ${FINNC_UNITTEST_DIR}

@@ -46,7 +46,7 @@ namespace Finn {
          */
         BaseDriver(const std::filesystem::path& configPath, unsigned int hostBufferSize) : configuration(createConfigFromPath(configPath)), logger(Logger::getLogger()) {
             accelerator = Accelerator(configuration.deviceWrappers, hostBufferSize);
-#ifndef NDEBUG
+#ifdef UNITTEST
             logDriver();
 #endif
         };
@@ -62,11 +62,9 @@ namespace Finn {
          * @return std::string
          */
          private:
-        std::string loggerPrefix() { return "[BaseDriver] "; }
+        static std::string loggerPrefix() { return "[BaseDriver] "; }
 
          public:
-        // TODO(bwintermann): Add methods for Iterator reading/storing
-
         /**
          * @brief Get the Config object. Simple getter to check things outside the driver
          *
@@ -243,7 +241,7 @@ namespace Finn {
         size_t size(SIZE_SPECIFIER ss, unsigned int deviceIndex, const std::string& bufferName) { return accelerator.size(ss, deviceIndex, bufferName); }
 
 
-#ifndef NDEBUG
+#ifdef UNITTEST
         /**
          * @brief Return whether the data that is currently held on the FPGA is equivalent to the passed data
          *

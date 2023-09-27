@@ -1,6 +1,7 @@
 #include <random>
 #include <span>
 
+#include "../../src/core/DeviceBuffer.hpp"
 #include "../../src/utils/FinnDatatypes.hpp"
 #include "../../src/utils/Logger.h"
 #include "gtest/gtest.h"
@@ -22,10 +23,6 @@ shape_t myShapeNormal = std::vector<unsigned int>(myShapeArrayNormal.begin(), my
 shape_t myShapeFolded = std::vector<unsigned int>(myShapeArrayFolded.begin(), myShapeArrayFolded.end());
 shape_t myShapePacked = std::vector<unsigned int>(myShapeArrayPacked.begin(), myShapeArrayPacked.end());
 
-
-#define INSPECTION_TEST  // Defines testing methods in deviceBuffer, thus needs to be defined before the inclue
-#define NDEBUG
-#include "../../src/core/DeviceBuffer.hpp"
 TEST(DeviceBufferTest, BasicFunctionalityTest) {
     auto log = Logger::getLogger();
     std::random_device rd;

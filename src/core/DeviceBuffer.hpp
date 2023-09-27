@@ -43,7 +43,8 @@ namespace Finn {
               map(internalBo.template map<T*>()),
               logger(Logger::getLogger()),
               ringBuffer(RingBuffer<T>(ringBufferSizeFactor, mapSize)) {
-            FINN_LOG(logger, loglevel::info) << "[DeviceBuffer] " << "Initializing DeviceBuffer " << name << " (SHAPE PACKED: " << FinnUtils::shapeToString(pShapePacked) << ", BUFFER SIZE: " << ringBufferSizeFactor
+            FINN_LOG(logger, loglevel::info) << "[DeviceBuffer] "
+                                             << "Initializing DeviceBuffer " << name << " (SHAPE PACKED: " << FinnUtils::shapeToString(pShapePacked) << ", BUFFER SIZE: " << ringBufferSizeFactor
                                              << " inputs of the given shape, MAP SIZE: " << mapSize << ")\n";
             if (ringBufferSizeFactor == 0) {
                 FinnUtils::logAndError<std::runtime_error>("DeviceBuffer of size 0 cannot be constructed currently!");
@@ -68,7 +69,6 @@ namespace Finn {
         DeviceBuffer& operator=(DeviceBuffer&& buf) = delete;
         DeviceBuffer& operator=(const DeviceBuffer& buf) = delete;
 
-        
 
          protected:
         /**
@@ -209,7 +209,7 @@ namespace Finn {
         size_t size(SIZE_SPECIFIER ss) { return this->ringBuffer.size(ss); }
 
 
-#ifndef NDEBUG
+#ifdef UNITTEST
         std::vector<T> testGetMap() {
             std::vector<T> temp;
             for (size_t i = 0; i < this->mapSize; i++) {
@@ -267,9 +267,7 @@ namespace Finn {
          *
          * @return * void
          */
-        void sync() {
-            this->internalBo.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
-        }
+        void sync() { this->internalBo.sync(XCL_BO_SYNC_BO_FROM_DEVICE); }
 
         /**
          * @brief Execute the kernel and await it's return.
@@ -356,7 +354,7 @@ namespace Finn {
         size_t size(SIZE_SPECIFIER ss) { return this->ringBuffer.size(ss); }
 
 
-#ifndef NDEBUG
+#ifdef UNITTEST
         std::vector<T> testGetMap() {
             std::vector<T> temp;
             for (size_t i = 0; i < this->map_size; i++) {

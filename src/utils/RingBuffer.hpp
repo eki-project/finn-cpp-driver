@@ -64,17 +64,14 @@ class RingBuffer {
     }
 
     /**
-     * @brief A small prefix to determine the source of the log write 
-     * 
-     * @return std::string 
+     * @brief A small prefix to determine the source of the log write
+     *
+     * @return std::string
      */
-    private:
-    std::string loggerPrefix() {
-        return "[RingBuffer] ";
-    }
-    public:
+     private:
+    std::string static loggerPrefix() { return "[RingBuffer] "; }
 
-
+     public:
     /**
      * @brief Move Constructor
      * @attention NOT THREAD SAFE!
@@ -263,7 +260,7 @@ class RingBuffer {
     }
 
 
-#ifndef NDEBUG
+#ifdef UNITTEST
      public:
     std::vector<T> testGetAsVector(index_t partIndex) {
         std::vector<T> temp;

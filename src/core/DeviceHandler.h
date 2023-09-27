@@ -76,7 +76,7 @@ namespace Finn {
 
 
          public:
-        DeviceHandler(const DeviceWrapper& devWrap, unsigned int hostBufferSize);
+        explicit DeviceHandler(const DeviceWrapper& devWrap, unsigned int hostBufferSize = 100);
         /**
          * @brief Default move constructor
          *
@@ -127,16 +127,16 @@ namespace Finn {
         xrt::device& getDevice();
 
         /**
-         * @brief Get the Input Buffer Map 
-         * 
-         * @return std::unordered_map<std::string, DeviceInputBuffer<uint8_t>>& 
+         * @brief Get the Input Buffer Map
+         *
+         * @return std::unordered_map<std::string, DeviceInputBuffer<uint8_t>>&
          */
         std::unordered_map<std::string, DeviceInputBuffer<uint8_t>>& getInputBufferMap();
 
         /**
          * @brief Get the Output Buffer Map
-         * 
-         * @return std::unordered_map<std::string, DeviceOutputBuffer<uint8_t>>& 
+         *
+         * @return std::unordered_map<std::string, DeviceOutputBuffer<uint8_t>>&
          */
         std::unordered_map<std::string, DeviceOutputBuffer<uint8_t>>& getOutputBufferMap();
 
@@ -229,13 +229,13 @@ namespace Finn {
 
          private:
         /**
-         * @brief A logger prefix to determine the source of a log write 
-         * 
-         * @return std::string 
+         * @brief A logger prefix to determine the source of a log write
+         *
+         * @return std::string
          */
-        std::string loggerPrefix();
-         public:
+        static std::string loggerPrefix();
 
+         public:
         /**
          * @brief Same as store, but without performing a check whether the kernel exists before accessing
          *
@@ -247,10 +247,10 @@ namespace Finn {
         bool storeUnchecked(const std::vector<uint8_t>& data, const std::string& inputBufferKernelName);
 
         /**
-         * @brief Get an input buffer from this device based on its name 
-         * 
-         * @param name 
-         * @return DeviceInputBuffer<uint8_t>& 
+         * @brief Get an input buffer from this device based on its name
+         *
+         * @param name
+         * @return DeviceInputBuffer<uint8_t>&
          */
         DeviceInputBuffer<uint8_t>& getInputBuffer(const std::string& name);
 
@@ -270,18 +270,18 @@ namespace Finn {
 
 #ifndef NDEBUG
         /**
-         * @brief Check if the input and output buffer maps are collision free (i.e. have O(1) access). Also logs. 
-         * 
-         * @return true 
-         * @return false 
+         * @brief Check if the input and output buffer maps are collision free (i.e. have O(1) access). Also logs.
+         *
+         * @return true
+         * @return false
          */
         bool isBufferMapCollisionFree();
 #endif
     };
 
     /**
-     * @brief Functor for faster store operations 
-     * 
+     * @brief Functor for faster store operations
+     *
      */
     class UncheckedStore {
         DeviceHandler& dev;
@@ -295,7 +295,7 @@ namespace Finn {
         UncheckedStore(DeviceHandler& pDev, const std::string& pInputBufferName) : dev(pDev), inputBufferName(pInputBufferName) {}
 
         bool operator()(const std::vector<uint8_t>& data) { return dev.storeUnchecked(data, inputBufferName); }
-        
+
         template<typename IteratorType>
         bool operator()(IteratorType first, IteratorType last) {
             return dev.storeUnchecked(first, last, inputBufferName);

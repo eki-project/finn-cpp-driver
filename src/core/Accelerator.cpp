@@ -60,7 +60,7 @@ namespace Finn {
         }
     }
 
-    UncheckedStore Accelerator::storeFactory(const unsigned int deviceIndex, const std::string& inputBufferKernelName) {
+    [[maybe_unused]] UncheckedStore Accelerator::storeFactory(const unsigned int deviceIndex, const std::string& inputBufferKernelName) {
         if (containsDevice(deviceIndex)) {
             DeviceHandler& devHand = getDeviceHandler(deviceIndex);
             if (devHand.containsBuffer(inputBufferKernelName, IO::INPUT)) {

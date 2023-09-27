@@ -1,5 +1,5 @@
 #include "xrt_kernel.h"
-
+#include "../ert.h"
 #include <iostream>
 
 namespace xrt {
@@ -15,7 +15,7 @@ namespace xrt {
 
     void run::wait(unsigned int ms) {}
 
-    ert_cmd_state run::state() {}
+    ert_cmd_state run::state() { return ERT_CMD_STATE_COMPLETED; }
 
 
     std::string kernel::get_name() const {

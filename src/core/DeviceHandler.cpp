@@ -30,12 +30,16 @@ namespace Finn {
 
     /****** INITIALIZERS ******/
     void DeviceHandler::checkDeviceWrapper(const DeviceWrapper& devWrap) {
+// Execute tests on filepath for xclbin in release mode!
+//! CURRENTLY DOES NOT WORK?
+#ifndef UNITTEST
         if (devWrap.xclbin.empty()) {
             throw fs::filesystem_error("Empty filepath to xclbin. Abort.", std::error_code());
         }
         if (!fs::exists(devWrap.xclbin) || !fs::is_regular_file(devWrap.xclbin)) {
             throw fs::filesystem_error("File " + std::string(devWrap.xclbin.c_str()) + " not found. Abort.", std::error_code());
         }
+#endif
         if (devWrap.idmas.empty()) {
             throw std::invalid_argument("Empty input kernel list. Abort.");
         }
@@ -102,11 +106,11 @@ namespace Finn {
         return false;
     }
 
-    std::unordered_map<std::string, DeviceInputBuffer<uint8_t>>& DeviceHandler::getInputBufferMap() { return inputBufferMap; }
+    [[maybe_unused]] std::unordered_map<std::string, DeviceInputBuffer<uint8_t>>& DeviceHandler::getInputBufferMap() { return inputBufferMap; }
 
-    std::unordered_map<std::string, DeviceOutputBuffer<uint8_t>>& DeviceHandler::getOutputBufferMap() { return outputBufferMap; }
+    [[maybe_unused]] std::unordered_map<std::string, DeviceOutputBuffer<uint8_t>>& DeviceHandler::getOutputBufferMap() { return outputBufferMap; }
 
-    DeviceInputBuffer<uint8_t>& DeviceHandler::getInputBuffer(const std::string& name) { return inputBufferMap.at(name); }
+    [[maybe_unused]] DeviceInputBuffer<uint8_t>& DeviceHandler::getInputBuffer(const std::string& name) { return inputBufferMap.at(name); }
 
     /****** USER METHODS ******/
     bool DeviceHandler::store(const std::vector<uint8_t>& data, const std::string& inputBufferKernelName) {
@@ -133,7 +137,7 @@ namespace Finn {
         return inputBufferMap.at(inputBufferKernelName).run();
     }
 
-    std::vector<std::vector<uint8_t>> DeviceHandler::retrieveResults(const std::string& outputBufferKernelName, bool forceArchival) {
+    [[maybe_unused]] std::vector<std::vector<uint8_t>> DeviceHandler::retrieveResults(const std::string& outputBufferKernelName, bool forceArchival) {
         if (!outputBufferMap.contains(outputBufferKernelName)) {
             auto newlineFold = [](std::string a, const auto& b) { return std::move(a) + '\n' + std::move(b.first); };
             std::string existingNames = "Existing buffer names:";

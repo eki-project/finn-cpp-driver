@@ -44,10 +44,20 @@ namespace Finn {
          */
         BaseDriver(const std::filesystem::path& configPath, unsigned int hostBufferSize) : configuration(createConfigFromPath(configPath)), logger(Logger::getLogger()) {
             accelerator = Accelerator(configuration.deviceWrappers, hostBufferSize);
-#ifdef UNITTEST
+#ifndef NDEBUG
             logDriver();
 #endif
         };
+
+        /**
+         * @brief Create a new base driver based on an existing configuration
+         * 
+         * @param pConfig 
+         */
+        BaseDriver(const Config& pConfig, unsigned int hostBufferSize) : configuration(pConfig), logger(Logger::getLogger()) {
+            accelerator = Accelerator(configuration.deviceWrappers, hostBufferSize);
+        }
+
         BaseDriver(BaseDriver&&) noexcept = default;
         BaseDriver(const BaseDriver&) noexcept = delete;
         BaseDriver& operator=(BaseDriver&&) noexcept = default;
@@ -107,6 +117,11 @@ namespace Finn {
 
             bool stored = storeFunc(data);
             bool ran = accelerator.run(inputDeviceIndex, inputBufferKernelName);
+
+#ifndef NDEBUG
+            FINN_LOG(logger, loglevel::info) << "Readback from device buffer confirming data was written to board successfully: " << isSyncedDataEquivalent(inputDeviceIndex, inputBufferKernelName, data);
+#endif
+
             if (stored && ran) {
                 FINN_LOG_DEBUG(logger, loglevel::info) << "Reading out buffers";
                 ert_cmd_state resultState = accelerator.read(outputDeviceIndex, outputBufferKernelName, samples);

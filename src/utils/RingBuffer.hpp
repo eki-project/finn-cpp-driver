@@ -226,6 +226,8 @@ class RingBuffer {
 
     /**
      * @brief Read the ring buffer and write out the first valid entry into the provided storage container. If no valid part is found, false is returned
+     * 
+     * @attention Invalidates the read data!
      *
      * @param outData
      * @param datasize
@@ -239,6 +241,8 @@ class RingBuffer {
     /**
      * @brief Read the ring buffer and write out the first valid entry into the provided storage container. If no valid part is found, false is returned
      *
+     * @attention Invalidates the read data!
+     * 
      * @param outData
      * @param datasize
      * @return true

@@ -7,21 +7,10 @@
 #include "gtest/gtest.h"
 #include "xrt/xrt_device.h"
 #include "xrt/xrt_kernel.h"
-// using namespace Finn;
 
-TEST(DummyTestDB, DTDB) { EXPECT_TRUE(true); }
-
-
-constexpr std::array<unsigned int, 2> myShapeArrayNormal = std::array<unsigned int, 2>{1, 300};
-constexpr std::array<unsigned int, 3> myShapeArrayFolded = std::array<unsigned int, 3>{1, 10, 30};
-constexpr std::array<unsigned int, 3> myShapeArrayPacked = std::array<unsigned int, 3>{1, 10, 8};    // This packing assumes Uint2 as finn datatype
-constexpr std::array<unsigned int, 3> myShapeArrayPacked2 = std::array<unsigned int, 3>{1, 10, 53};  // This packing assumes Uint14 as finn datatype
-constexpr size_t elementsPerPart = FinnUtils::shapeToElementsConstexpr<unsigned int, 3>(myShapeArrayPacked);
-constexpr size_t parts = 10;
-
-shape_t myShapeNormal = std::vector<unsigned int>(myShapeArrayNormal.begin(), myShapeArrayNormal.end());
-shape_t myShapeFolded = std::vector<unsigned int>(myShapeArrayFolded.begin(), myShapeArrayFolded.end());
-shape_t myShapePacked = std::vector<unsigned int>(myShapeArrayPacked.begin(), myShapeArrayPacked.end());
+// Provides config and shapes for testing
+#include "UnittestConfig.h"
+using namespace FinnUnittest;
 
 TEST(DeviceBufferTest, BasicFunctionalityTest) {
     auto log = Logger::getLogger();
@@ -47,6 +36,69 @@ TEST(DeviceBufferTest, BasicFunctionalityTest) {
     inputDB.loadMap();
     EXPECT_NE(initialMapData, inputDB.testGetMap());
     EXPECT_EQ(inputDB.testGetMap(), data);
+}
+
+TEST(DeviceBufferTest, CorrectOutputTest) {
+    // Setup
+    auto filler = FinnUtils::BufferFiller(0,255);
+    auto device = xrt::device();
+    auto kernel = xrt::kernel();
+    auto odb = Finn::DeviceOutputBuffer<uint8_t>("tester", device, kernel, myShapePacked, parts);
+
+    std::vector<uint8_t> data;
+    std::vector<uint8_t> backupData;
+    data.resize(odb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
+
+    // Fill with random data and backup
+    filler.fillRandom(data);
+    backupData = data;
+
+    // Write data -> Map
+    odb.testSetMap(data);
+    EXPECT_EQ(data, odb.testGetMap());
+
+    // Move Map -> Buffer[0]
+    EXPECT_EQ(odb.read(1), ERT_CMD_STATE_COMPLETED);
+    EXPECT_EQ(odb.testGetRingBuffer().testGetAsVector(0), backupData);
+
+    // Write Buffer[0] -> LTS[0]
+    EXPECT_EQ(odb.testGetRingBuffer().countValidParts(), 1);
+    odb.archiveValidBufferParts();
+
+    // Test that the data arrived in the lts
+    EXPECT_EQ(odb.testGetLTS().size(), 1);
+    EXPECT_EQ(odb.testGetLTS()[0], backupData);
+
+    // Test that the LTS gets fetched and deleted as wanted
+    EXPECT_EQ(odb.retrieveArchive()[0], backupData);
+    EXPECT_EQ(odb.testGetLTS().size(), 0);
+}
+
+TEST(DeviceBufferTest, CorrectInputTest) {
+    auto filler = FinnUtils::BufferFiller(0,255);
+    auto device = xrt::device();
+    auto kernel = xrt::kernel();
+    auto idb = Finn::DeviceInputBuffer<uint8_t>("tester", device, kernel, myShapePacked, parts);
+
+    std::vector<uint8_t> data;
+    std::vector<uint8_t> backupData;
+    data.resize(idb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
+
+    // Fill with random data
+    filler.fillRandom(data);
+    backupData = data;
+
+    // Check that after the storing, the data is in the ring buffer (Data -> Buffer[0])
+    EXPECT_NE(idb.testGetRingBuffer().testGetAsVector(0), data);
+    idb.store(data);
+    EXPECT_EQ(idb.testGetRingBuffer().countValidParts(), 1);
+    EXPECT_EQ(idb.testGetRingBuffer().testGetAsVector(0), data);
+
+    // Check that data is in the map (Buffer[0] -> Map) and invalid
+    idb.loadMap();
+    EXPECT_EQ(idb.testGetMap(), data);
+    EXPECT_EQ(idb.testGetRingBuffer().countValidParts(), 0);
+
 }
 
 int main(int argc, char** argv) {

@@ -149,8 +149,10 @@ namespace Finn {
         }
 
         /**
-         * @brief Load data from the ring buffer into the memory map of the device
+         * @brief Load data from the ring buffer into the memory map of the device.
          *
+         * @attention Invalidates the data that was moved to map
+         * 
          * @return true
          * @return false
          */
@@ -324,7 +326,11 @@ namespace Finn {
          *
          * @return std::vector<std::vector<T>>
          */
-        std::vector<std::vector<T>> retrieveArchive() const { return longTermStorage; }
+        std::vector<std::vector<T>> retrieveArchive() { 
+            std::vector<std::vector<T>> tmp = longTermStorage;
+            clearArchive();
+            return tmp;
+        }
 
         /**
          * @brief Clear the archive of all it's entries by resizing it to 0.
@@ -372,9 +378,18 @@ namespace Finn {
             }
             return temp;
         }
+        void testSetMap(const std::vector<T>& data) {
+            if (data.size() != this->mapSize) {
+                FinnUtils::logAndError<std::length_error>("Error setting test map. Sizes dont match");
+            }
+            for (unsigned int i = 0; i < data.size(); i++ ) {
+                this->map[i] = data[i];
+            }
+        }
         unsigned int testGetLongTermStorageSize() const { return longTermStorage.size(); }
         xrt::bo& testGetInternalBO() { return this->interalBo; }
         RingBuffer<T>& testGetRingBuffer() { return this->ringBuffer; }
+        std::vector<std::vector<uint8_t>>& testGetLTS() { return longTermStorage; }
 #endif
     };
 }  // namespace Finn

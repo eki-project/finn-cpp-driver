@@ -79,6 +79,8 @@ namespace Finn {
         std::vector<std::shared_ptr<BufferDescriptor>> idmas;
         std::vector<std::shared_ptr<BufferDescriptor>> odmas;
 
+        DeviceWrapper(const std::filesystem::path& pXclbin, const unsigned int pXrtDeviceIndex, const std::vector<std::shared_ptr<BufferDescriptor>>& pIdmas, const std::vector<std::shared_ptr<BufferDescriptor>>& pOdmas)
+            : xclbin(pXclbin), xrtDeviceIndex(pXrtDeviceIndex), idmas(pIdmas), odmas(pOdmas){};
         DeviceWrapper() = default;
     };
 

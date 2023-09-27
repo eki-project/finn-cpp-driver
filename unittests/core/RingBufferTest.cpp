@@ -1,31 +1,25 @@
+#include <algorithm>
+#include <functional>
+#include <random>
+#include <thread>
 #include <vector>
 
-#define INSPECTION_TEST                 // For access to RingBuffer testing methods
-#define NDEBUG
-#include "../../src/utils/RingBuffer.hpp"
-
-
-#include "../../src/utils/Logger.h"
 #include "../../src/utils/FinnUtils.h"
+#include "../../src/utils/Logger.h"
+#include "../../src/utils/RingBuffer.hpp"
 #include "gtest/gtest.h"
 #include "xrt/xrt_device.h"
 #include "xrt/xrt_kernel.h"
-#include <random>
-#include <thread>
-#include <algorithm>
-#include <functional>
 
 
-TEST(DummyTest, DT) {
-    EXPECT_TRUE(true);
-}
+TEST(DummyTest, DT) { EXPECT_TRUE(true); }
 
 
 // Globals
 using RB = RingBuffer<uint8_t>;
 const size_t parts = 10;
 const size_t elementsPerPart = 30;
-auto filler = FinnUtils::BufferFiller(0,255);
+auto filler = FinnUtils::BufferFiller(0, 255);
 
 
 TEST(RBTest, RBInitTest) {
@@ -51,8 +45,7 @@ TEST(RBTest, RBInitTest) {
 }
 
 TEST(RBTest, RBStoreReadTest) {
-
-    //! TEST IF THE DATA THAT WAS WRITTEN/READ FROM/TO MAP IS CORRECT 
+    //! TEST IF THE DATA THAT WAS WRITTEN/READ FROM/TO MAP IS CORRECT
 
 
     auto rb = RB(parts, elementsPerPart);
@@ -77,8 +70,8 @@ TEST(RBTest, RBStoreReadTest) {
 
     // Read two entries
     uint8_t buf[elementsPerPart];
-    EXPECT_TRUE(rb.read(buf, elementsPerPart));
-    EXPECT_TRUE(rb.read(buf, elementsPerPart));
+    EXPECT_TRUE(rb.readToArray(buf, elementsPerPart));
+    EXPECT_TRUE(rb.readToArray(buf, elementsPerPart));
 
     // Check pointer positions
     EXPECT_EQ(rb.testGetHeadPointer(), 0);

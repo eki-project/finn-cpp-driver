@@ -64,17 +64,14 @@ class RingBuffer {
     }
 
     /**
-     * @brief A small prefix to determine the source of the log write 
-     * 
-     * @return std::string 
+     * @brief A small prefix to determine the source of the log write
+     *
+     * @return std::string
      */
-    private:
-    std::string loggerPrefix() {
-        return "[RingBuffer] ";
-    }
-    public:
+     private:
+    std::string static loggerPrefix() { return "[RingBuffer] "; }
 
-
+     public:
     /**
      * @brief Move Constructor
      * @attention NOT THREAD SAFE!
@@ -228,24 +225,24 @@ class RingBuffer {
     }
 
     /**
-     * @brief Read the ring buffer and write out the first valid entry into the provided storage container. If no valid part is found, false is returned 
-     * 
-     * @param outData 
-     * @param datasize 
-     * @return true 
-     * @return false 
+     * @brief Read the ring buffer and write out the first valid entry into the provided storage container. If no valid part is found, false is returned
+     *
+     * @param outData
+     * @param datasize
+     * @return true
+     * @return false
      */
     bool readToVector(std::vector<T>& outData, size_t datasize) {
         return read<std::vector<T>&>(outData, datasize);
     }
 
     /**
-     * @brief Read the ring buffer and write out the first valid entry into the provided storage container. If no valid part is found, false is returned 
-     * 
-     * @param outData 
-     * @param datasize 
-     * @return true 
-     * @return false 
+     * @brief Read the ring buffer and write out the first valid entry into the provided storage container. If no valid part is found, false is returned
+     *
+     * @param outData
+     * @param datasize
+     * @return true
+     * @return false
      */
     bool readToArray(T* outData, size_t datasize) {
         return read<T*>(outData, datasize);
@@ -253,13 +250,13 @@ class RingBuffer {
 
      private:
     /**
-     * @brief Private internal read method called by the two variants in the public namespace 
-     * 
-     * @tparam C 
-     * @param outData 
-     * @param datasize 
-     * @return true 
-     * @return false 
+     * @brief Private internal read method called by the two variants in the public namespace
+     *
+     * @tparam C
+     * @param outData
+     * @param datasize
+     * @return true
+     * @return false
      */
     template<typename C>
     bool read(C outData, size_t datasize) {
@@ -286,7 +283,7 @@ class RingBuffer {
     }
 
 
-#ifndef NDEBUG
+#ifdef UNITTEST
      public:
     std::vector<T> testGetAsVector(index_t partIndex) {
         std::vector<T> temp;

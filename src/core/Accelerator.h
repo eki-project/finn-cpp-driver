@@ -38,6 +38,29 @@ namespace Finn {
         Accelerator& operator=(const Accelerator&) = delete;
         ~Accelerator() = default;
 
+         private:
+        /**
+         * @brief A small prefix to determine where the log write came from 
+         * 
+         * @return std::string 
+         */
+        std::string loggerPrefix();
+         public:
+
+        /**
+         * @brief Return a beginning iterator to the internal device vector (contains DeviceHandler) 
+         * 
+         * @return auto 
+         */
+        std::vector<DeviceHandler>::iterator begin();
+
+        /**
+         * @brief Return an end iterator to the internal device vector (contains DeviceHandler) 
+         * 
+         * @return auto 
+         */
+        std::vector<DeviceHandler>::iterator end();
+
         /**
          * @brief Return a reference to the deviceHandler with the given index. Crashes the driver if the index is invalid. To avoid accesses to uncertain indices, use Accelerator::containsDevice first.
          *

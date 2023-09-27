@@ -23,9 +23,14 @@ namespace Finn {
         initializeDevice();
         loadXclbinSetUUID();
         initializeBufferObjects(devWrap, hostBufferSize);
-        FINN_LOG(Logger::getLogger(), loglevel::info) << "Finished setting up device " << xrtDeviceIndex;
+        FINN_LOG(Logger::getLogger(), loglevel::info) << loggerPrefix() << "Finished setting up device " << xrtDeviceIndex;
     }
 
+    std::string DeviceHandler::loggerPrefix() {
+        return "[DeviceHandler] ";
+    }
+
+    /****** INITIALIZERS ******/
     void DeviceHandler::checkDeviceWrapper(const DeviceWrapper& devWrap) {
         if (devWrap.xclbin.empty()) {
             throw fs::filesystem_error("Empty filepath to xclbin. Abort.", std::error_code());
@@ -58,19 +63,19 @@ namespace Finn {
     }
 
     void DeviceHandler::initializeDevice() {
-        FINN_LOG(Logger::getLogger(), loglevel::info) << "(" << xrtDeviceIndex << ") "
+        FINN_LOG(Logger::getLogger(), loglevel::info) << loggerPrefix() << "(" << xrtDeviceIndex << ") "
                                                       << "Initializing xrt::device, loading xclbin and assigning IP\n";
         device = xrt::device(xrtDeviceIndex);
     }
 
     void DeviceHandler::loadXclbinSetUUID() {
-        FINN_LOG(Logger::getLogger(), loglevel::info) << "(" << xrtDeviceIndex << ") "
+        FINN_LOG(Logger::getLogger(), loglevel::info) << loggerPrefix() << "(" << xrtDeviceIndex << ") "
                                                       << "Loading XCLBIN and setting uuid\n";
         uuid = device.load_xclbin(xclbinPath);
     }
 
     void DeviceHandler::initializeBufferObjects(const DeviceWrapper& devWrap, unsigned int hostBufferSize) {
-        FINN_LOG(Logger::getLogger(), loglevel::info) << "(" << xrtDeviceIndex << ") "
+        FINN_LOG(Logger::getLogger(), loglevel::info) << loggerPrefix() << "(" << xrtDeviceIndex << ") "
                                                       << "Initializing buffer objects\n";
         for (auto&& ebdptr : devWrap.idmas) {
             auto tmpKern = xrt::kernel(device, uuid, ebdptr->kernelName, xrt::kernel::cu_access_mode::shared);
@@ -80,28 +85,45 @@ namespace Finn {
             auto tmpKern = xrt::kernel(device, uuid, ebdptr->kernelName, xrt::kernel::cu_access_mode::exclusive);
             outputBufferMap.emplace(std::make_pair(ebdptr->kernelName, Finn::DeviceOutputBuffer<uint8_t>(ebdptr->kernelName, device, tmpKern, ebdptr->packedShape, hostBufferSize)));
         }
-        FINN_LOG(Logger::getLogger(), loglevel::info) << "Finished initializing buffer objects on device " << xrtDeviceIndex;
-#ifndef NDEBUG
-        for (size_t index = 0; index < inputBufferMap.bucket_count(); ++index) {
-            if (inputBufferMap.bucket_size(index) > 1) {
-                FINN_LOG_DEBUG(Logger::getLogger(), loglevel::error) << "(" << xrtDeviceIndex << ") "
-                                                                     << "Hash collision in inputBufferMap. This access to the inputBufferMap is no longer constant time!";
-            }
-        }
-        for (size_t index = 0; index < outputBufferMap.bucket_count(); ++index) {
-            if (outputBufferMap.bucket_size(index) > 1) {
-                FINN_LOG_DEBUG(Logger::getLogger(), loglevel::error) << "(" << xrtDeviceIndex << ") "
-                                                                     << "Hash collision in outputBufferMap. This access to the outputBufferMap is no longer constant time!";
-            }
-        }
-#endif
+        FINN_LOG(Logger::getLogger(), loglevel::info) << loggerPrefix() << "Finished initializing buffer objects on device " << xrtDeviceIndex;
+        
+        #ifndef NDEBUG
+        isBufferMapCollisionFree();
+        #endif
     }
 
+    /****** GETTER / SETTER ******/
     [[maybe_unused]] xrt::device& DeviceHandler::getDevice() { return device; }
 
+    [[maybe_unused]] bool DeviceHandler::containsBuffer(const std::string& kernelBufferName, IO ioMode) {
+        if (ioMode == IO::INPUT) {
+            return inputBufferMap.contains(kernelBufferName);
+        } else if (ioMode == IO::OUTPUT) {
+            return outputBufferMap.contains(kernelBufferName);
+        }
+        return false;
+    }
+
+    std::unordered_map<std::string, DeviceInputBuffer<uint8_t>>& DeviceHandler::getInputBufferMap() {
+        return inputBufferMap;
+    }
+
+    std::unordered_map<std::string, DeviceOutputBuffer<uint8_t>>& DeviceHandler::getOutputBufferMap() {
+        return outputBufferMap;
+    }
+    
+    DeviceInputBuffer<uint8_t>& DeviceHandler::getInputBuffer(const std::string& name) {
+        return inputBufferMap.at(name);
+    }
+
+    /****** USER METHODS ******/
     bool DeviceHandler::store(const std::vector<uint8_t>& data, const std::string& inputBufferKernelName) {
         if (!inputBufferMap.contains(inputBufferKernelName)) {
-            FinnUtils::logAndError<std::runtime_error>("Tried accessing kernel/buffer with name " + inputBufferKernelName + " but this kernel / buffer does not exist!");
+            std::string existingNames = "Existing buffer names: \n";
+            for (auto& nm : inputBufferMap) {
+                existingNames += nm.first + "\n";
+            }
+            FinnUtils::logAndError<std::runtime_error>("[store] Tried accessing kernel/buffer with name " + inputBufferKernelName + " but this kernel / buffer does not exist! " + existingNames);
         }
         return inputBufferMap.at(inputBufferKernelName).store(data);
     }
@@ -112,14 +134,23 @@ namespace Finn {
 
     bool DeviceHandler::run(const std::string& inputBufferKernelName) {
         if (!inputBufferMap.contains(inputBufferKernelName)) {
-            FinnUtils::logAndError<std::runtime_error>("Tried accessing kernel/buffer with name " + inputBufferKernelName + " but this kernel / buffer does not exist!");
+            std::string existingNames = "Existing buffer names: \n";
+            for (auto& nm : inputBufferMap) {
+                existingNames += nm.first + "\n";
+            }
+            FinnUtils::logAndError<std::runtime_error>("[run] Tried accessing kernel/buffer with name " + inputBufferKernelName + " but this kernel / buffer does not exist! " + existingNames);
         }
         return inputBufferMap.at(inputBufferKernelName).run();
     }
 
     std::vector<std::vector<uint8_t>> DeviceHandler::retrieveResults(const std::string& outputBufferKernelName, bool forceArchival) {
         if (!outputBufferMap.contains(outputBufferKernelName)) {
-            FinnUtils::logAndError<std::runtime_error>("Tried accessing kernel/buffer with name " + outputBufferKernelName + " but this kernel / buffer does not exist!");
+            std::string existingNames = "Existing buffer names: \n";
+            for (auto& nm : outputBufferMap) {
+                existingNames += nm.first + "\n";
+                
+            }
+            FinnUtils::logAndError<std::runtime_error>("[retrieve] Tried accessing kernel/buffer with name " + outputBufferKernelName + " but this kernel / buffer does not exist! " + existingNames);
         }
         if (forceArchival) {
             outputBufferMap.at(outputBufferKernelName).archiveValidBufferParts();
@@ -129,7 +160,11 @@ namespace Finn {
 
     ert_cmd_state DeviceHandler::read(const std::string& outputBufferKernelName, unsigned int samples) {
         if (!outputBufferMap.contains(outputBufferKernelName)) {
-            FinnUtils::logAndError<std::runtime_error>("Tried accessing kernel/buffer with name " + outputBufferKernelName + " but this kernel / buffer does not exist!");
+            std::string existingNames = "Existing buffer names: \n";
+            for (auto& nm : outputBufferMap) {
+                existingNames += nm.first + "\n";
+            }
+            FinnUtils::logAndError<std::runtime_error>("[readread] Tried accessing kernel/buffer with name " + outputBufferKernelName + " but this kernel / buffer does not exist! " + existingNames);
         }
         return outputBufferMap.at(outputBufferKernelName).read(samples);
     }
@@ -143,12 +178,26 @@ namespace Finn {
         return 0;
     }
 
-    [[maybe_unused]] bool DeviceHandler::containsBuffer(const std::string& kernelBufferName, IO ioMode) {
-        if (ioMode == IO::INPUT) {
-            return inputBufferMap.contains(kernelBufferName);
-        } else if (ioMode == IO::OUTPUT) {
-            return outputBufferMap.contains(kernelBufferName);
+    
+
+#ifndef NDEBUG
+    bool DeviceHandler::isBufferMapCollisionFree() {
+        bool collisionFound = false;
+        for (size_t index = 0; index < inputBufferMap.bucket_count(); ++index) {
+            if (inputBufferMap.bucket_size(index) > 1) {
+                FINN_LOG_DEBUG(Logger::getLogger(), loglevel::error) << loggerPrefix() << "(" << xrtDeviceIndex << ") "
+                                                                     << "Hash collision in inputBufferMap. This access to the inputBufferMap is no longer constant time!";
+                collisionFound = true;
+            }        
         }
-        return false;
+        for (size_t index = 0; index < outputBufferMap.bucket_count(); ++index) {
+            if (outputBufferMap.bucket_size(index) > 1) {
+                FINN_LOG_DEBUG(Logger::getLogger(), loglevel::error) << loggerPrefix() << "(" << xrtDeviceIndex << ") "
+                                                                     << "Hash collision in outputBufferMap. This access to the outputBufferMap is no longer constant time!";
+                collisionFound = true;
+            }
+        }
+        return collisionFound;
     }
+#endif
 }  // namespace Finn

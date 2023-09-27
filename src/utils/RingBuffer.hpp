@@ -60,8 +60,20 @@ class RingBuffer {
         }
         std::fill(validParts.begin(), validParts.end(), false);
         buffer.resize(pElementsPerPart * pParts);
-        FINN_LOG(logger, loglevel::info) << "Initialized RingBuffer (PARTS: " << parts << ", ELEMENTS: " << buffer.size() << ", ELEMENTS PER PART: " << elementsPerPart << ", BYTES: " << buffer.size() / sizeof(T) << ")\n";
+        FINN_LOG(logger, loglevel::info) << loggerPrefix() << "Initialized RingBuffer (PARTS: " << parts << ", ELEMENTS: " << buffer.size() << ", ELEMENTS PER PART: " << elementsPerPart << ", BYTES: " << buffer.size() / sizeof(T) << ")\n";
     }
+
+    /**
+     * @brief A small prefix to determine the source of the log write 
+     * 
+     * @return std::string 
+     */
+    private:
+    std::string loggerPrefix() {
+        return "[RingBuffer] ";
+    }
+    public:
+
 
     /**
      * @brief Move Constructor
@@ -251,7 +263,7 @@ class RingBuffer {
     }
 
 
-#ifdef NDEBUG
+#ifndef NDEBUG
      public:
     std::vector<T> testGetAsVector(index_t partIndex) {
         std::vector<T> temp;

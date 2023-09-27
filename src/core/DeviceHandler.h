@@ -127,6 +127,20 @@ namespace Finn {
         xrt::device& getDevice();
 
         /**
+         * @brief Get the Input Buffer Map 
+         * 
+         * @return std::unordered_map<std::string, DeviceInputBuffer<uint8_t>>& 
+         */
+        std::unordered_map<std::string, DeviceInputBuffer<uint8_t>>& getInputBufferMap();
+
+        /**
+         * @brief Get the Output Buffer Map
+         * 
+         * @return std::unordered_map<std::string, DeviceOutputBuffer<uint8_t>>& 
+         */
+        std::unordered_map<std::string, DeviceOutputBuffer<uint8_t>>& getOutputBufferMap();
+
+        /**
          * @brief Store the given vector data in the corresponding buffer.
          *
          * @param data The data to store
@@ -213,6 +227,15 @@ namespace Finn {
          */
         void initializeBufferObjects(const DeviceWrapper& devWrap, unsigned int hostBufferSize);
 
+         private:
+        /**
+         * @brief A logger prefix to determine the source of a log write 
+         * 
+         * @return std::string 
+         */
+        std::string loggerPrefix();
+         public:
+
         /**
          * @brief Same as store, but without performing a check whether the kernel exists before accessing
          *
@@ -222,6 +245,14 @@ namespace Finn {
          * @return false
          */
         bool storeUnchecked(const std::vector<uint8_t>& data, const std::string& inputBufferKernelName);
+
+        /**
+         * @brief Get an input buffer from this device based on its name 
+         * 
+         * @param name 
+         * @return DeviceInputBuffer<uint8_t>& 
+         */
+        DeviceInputBuffer<uint8_t>& getInputBuffer(const std::string& name);
 
         /**
          * @brief Same as store, but without performing a check whether the kernel exists before accessing
@@ -234,12 +265,26 @@ namespace Finn {
         template<typename IteratorType>
         bool storeUnchecked(IteratorType first, IteratorType last, const std::string& inputBufferKernelName) {
             static_assert(std::is_same<typename std::iterator_traits<IteratorType>::value_type, uint8_t>::value);
-            inputBufferMap.at(inputBufferKernelName).store(first, last);
+            return inputBufferMap.at(inputBufferKernelName).store(first, last);
         }
+
+#ifndef NDEBUG
+        /**
+         * @brief Check if the input and output buffer maps are collision free (i.e. have O(1) access). Also logs. 
+         * 
+         * @return true 
+         * @return false 
+         */
+        bool isBufferMapCollisionFree();
+#endif
     };
 
+    /**
+     * @brief Functor for faster store operations 
+     * 
+     */
     class UncheckedStore {
-        DeviceHandler dev;
+        DeviceHandler& dev;
         std::string inputBufferName;
 
          public:
@@ -247,9 +292,10 @@ namespace Finn {
          * @brief Dummy constructor, this one should never be used
          *
          */
-        UncheckedStore() : dev(DeviceWrapper(), 0){};
-        explicit UncheckedStore(DeviceHandler& pDev, const std::string& pInputBufferName) : dev(std::move(pDev)), inputBufferName(pInputBufferName) {}
+        UncheckedStore(DeviceHandler& pDev, const std::string& pInputBufferName) : dev(pDev), inputBufferName(pInputBufferName) {}
+
         bool operator()(const std::vector<uint8_t>& data) { return dev.storeUnchecked(data, inputBufferName); }
+        
         template<typename IteratorType>
         bool operator()(IteratorType first, IteratorType last) {
             return dev.storeUnchecked(first, last, inputBufferName);

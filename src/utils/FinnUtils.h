@@ -91,6 +91,15 @@ namespace FinnUtils {
     }
 
     /**
+     * @brief Put some newlines into the log script for clearer reading 
+     * 
+     * @param logger 
+     */
+    inline void logSpacer(logger_type& logger) {
+        FINN_LOG(logger, loglevel::info) << "\n\n\n\n";
+    } 
+
+    /**
      * @brief First log the message as an error into the logger, then throw the passed error!
      *
      * @tparam E

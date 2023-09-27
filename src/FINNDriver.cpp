@@ -26,6 +26,15 @@
 using std::string;
 
 /**
+ * @brief A short prefix usable with the logger to determine the source of the log write 
+ * 
+ * @return std::string 
+ */
+std::string finnMainLogPrefix() {
+    return "[FINNDriver] ";
+}
+
+/**
  * @brief Log some initial information about the device and the kernels used
  *
  * @param logger
@@ -68,6 +77,7 @@ Finn::Driver createDriverFromConfig(const std::filesystem::path& configFilePath,
  */
 void runFiletest(Finn::Driver& baseDriver, logger_type& logger) {
     // TODO(bwintermann): Remove after debugging
+    FINN_LOG(logger, loglevel::info) << finnMainLogPrefix() << "Device Information: ";
     logDeviceInformation(logger, baseDriver.getDeviceHandler(0).getDevice(), baseDriver.getConfig().deviceWrappers[0].xclbin);
 
     // Create vector for inputting data
@@ -78,12 +88,12 @@ void runFiletest(Finn::Driver& baseDriver, logger_type& logger) {
     // Do a test run with random data and raw inference (no packing no folding)
     filler.fillRandom(data);
     auto results = baseDriver.inferRaw(data, 0, "StreamingDataflowPartition_0:{idma0}", 0, "StreamingDataflowPartition_2:{odma0}", 9, true);
-    FINN_LOG(logger, loglevel::info) << "Received " << results.size() << " results!";
+    FINN_LOG(logger, loglevel::info) << finnMainLogPrefix() << "Received " << results.size() << " results!";
 
     // Print Results
     for (auto& resultVector : results) {
         for (auto& val : resultVector) {
-            FINN_LOG(logger, loglevel::info) << "VALUE: " << static_cast<unsigned int>(val) << "\n";
+            FINN_LOG(logger, loglevel::info) << finnMainLogPrefix() << "VALUE: " << static_cast<unsigned int>(val) << "\n";
         }
     }
 }
@@ -95,7 +105,7 @@ void runFiletest(Finn::Driver& baseDriver, logger_type& logger) {
  * @param logger
  */
 void runWithInputFile(Finn::Driver& baseDriver, logger_type& logger) {
-    FINN_LOG(logger, loglevel::info) << "Running driver on input files";
+    FINN_LOG(logger, loglevel::info) << finnMainLogPrefix() << "Running driver on input files";
     // TODO(bwintermann): Finish this method
 
     // baseDriver.infer();
@@ -109,10 +119,10 @@ int main(int argc, char* argv[]) {
     FINN_LOG(logger, loglevel::info) << "C++ Driver started";
 
     // Helper lambas for debug output
-    auto logMode = [&logger](const std::string& m) { FINN_LOG(logger, loglevel::info) << "Driver Mode: " << m; };
-    auto logConfig = [&logger](const std::string& m) { FINN_LOG(logger, loglevel::info) << "Configuration file: " << m; };
-    auto logInputFile = [&logger](const std::string& m) { FINN_LOG(logger, loglevel::info) << "Input file: " << m; };
-    auto logHBufferSize = [&logger](const unsigned int m) { FINN_LOG(logger, loglevel::info) << "Host Buffer Size: " << m; };
+    auto logMode = [&logger](const std::string& m) { FINN_LOG(logger, loglevel::info) << finnMainLogPrefix() << "Driver Mode: " << m; };
+    auto logConfig = [&logger](const std::string& m) { FINN_LOG(logger, loglevel::info) << finnMainLogPrefix() << "Configuration file: " << m; };
+    auto logInputFile = [&logger](const std::string& m) { FINN_LOG(logger, loglevel::info) << finnMainLogPrefix() << "Input file: " << m; };
+    auto logHBufferSize = [&logger](const unsigned int m) { FINN_LOG(logger, loglevel::info) << finnMainLogPrefix() << "Host Buffer Size: " << m; };
 
     // Command Line Argument Parser
     po::options_description desc{"Options"};
@@ -123,7 +133,7 @@ int main(int argc, char* argv[]) {
     po::variables_map varMap;
     po::store(po::parse_command_line(argc, argv, desc), varMap);
     po::notify(varMap);
-    FINN_LOG(logger, loglevel::info) << "Parsed command line params";
+    FINN_LOG(logger, loglevel::info) << finnMainLogPrefix() << "Parsed command line params";
 
     // Display help screen
     if (varMap.count("help") > 0) {

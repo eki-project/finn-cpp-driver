@@ -87,6 +87,8 @@ void runFiletest(Finn::Driver& baseDriver, logger_type& logger) {
 
     // Do a test run with random data and raw inference (no packing no folding)
     filler.fillRandom(data);
+    FinnUtils::logResults<uint8_t>(logger, data, 5000, "INPUT DATA: ");
+
     auto results = baseDriver.inferRaw(data, 0, "StreamingDataflowPartition_0:{idma0}", 0, "StreamingDataflowPartition_2:{odma0}", 9, true);
     FINN_LOG(logger, loglevel::info) << finnMainLogPrefix() << "Received " << results.size() << " results!";
 

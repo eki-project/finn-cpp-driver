@@ -236,7 +236,7 @@ class RingBuffer {
      * @return false 
      */
     bool readToVector(std::vector<T>& outData, size_t datasize) {
-        return read(outData, datasize);
+        return read<std::vector<T>&>(outData, datasize);
     }
 
     /**
@@ -248,7 +248,7 @@ class RingBuffer {
      * @return false 
      */
     bool readToArray(T* outData, size_t datasize) {
-        return read(outData, datasize);
+        return read<T*>(outData, datasize);
     }
 
      private:

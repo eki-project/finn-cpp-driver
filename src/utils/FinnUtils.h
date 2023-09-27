@@ -111,7 +111,7 @@ namespace FinnUtils {
     inline void logResults(logger_type& logger, const std::vector<T>& results, unsigned int entriesToRead, const std::string& prefix = "") {
         FINN_LOG(logger, loglevel::info) << prefix << "Values: ";
         std::string s = "";
-    for (unsigned int i = 0; i < std::max(entriesToRead, static_cast<unsigned int>(results.size())); i++) {
+    for (unsigned int i = 0; i < std::min(entriesToRead, static_cast<unsigned int>(results.size())); i++) {
             s += std::to_string(results[i]) + " ";
         }
         FINN_LOG(logger, loglevel::info) << s;

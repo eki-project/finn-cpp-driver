@@ -51,6 +51,10 @@ TEST(RBTest, RBInitTest) {
 }
 
 TEST(RBTest, RBStoreReadTest) {
+
+    //! TEST IF THE DATA THAT WAS WRITTEN/READ FROM/TO MAP IS CORRECT 
+
+
     auto rb = RB(parts, elementsPerPart);
 
     // Store data

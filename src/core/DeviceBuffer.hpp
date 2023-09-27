@@ -154,7 +154,7 @@ namespace Finn {
          * @return true
          * @return false
          */
-        bool loadMap() { return this->ringBuffer.read(this->map, this->mapSize); }
+        bool loadMap() { return this->ringBuffer.readToArray(this->map, this->mapSize); }
 
         /**
          * @brief Store the given vector of data in the ring buffer
@@ -248,6 +248,16 @@ namespace Finn {
          public:
         std::string& getName() { return this->name; }
         shape_t& getPackedShape() { return this->shapePacked; }
+
+        /**
+         * @brief Reserve enough storage for the expectedEntries number of entries. Note however that because this is a vec of vecs, this only allocates memory for the pointers, not the data itself. 
+         * 
+         * @param expectedEntries 
+         */
+        void allocateLongTermStorage(unsigned int expectedEntries) {
+            longTermStorage.reserve(expectedEntries);
+        }
+
         /**
          * @brief Get the the kernel timeout in miliseconds
          *
@@ -304,7 +314,7 @@ namespace Finn {
             for (index_t i = 0; i < this->ringBuffer.size(SIZE_SPECIFIER::PARTS); i++) {
                 auto tmp = std::vector<T>();
                 tmp.resize(this->ringBuffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
-                auto dataStored = this->ringBuffer.read(tmp, this->ringBuffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
+                auto dataStored = this->ringBuffer.readToVector(tmp, this->ringBuffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
                 if (dataStored) {
                     longTermStorage.push_back(tmp);
                 }
@@ -359,7 +369,7 @@ namespace Finn {
 #ifndef NDEBUG
         std::vector<T> testGetMap() {
             std::vector<T> temp;
-            for (size_t i = 0; i < this->map_size; i++) {
+            for (size_t i = 0; i < this->mapSize; i++) {
                 temp.push_back(this->map[i]);
             }
             return temp;

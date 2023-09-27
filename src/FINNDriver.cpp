@@ -91,10 +91,9 @@ void runFiletest(Finn::Driver& baseDriver, logger_type& logger) {
     FINN_LOG(logger, loglevel::info) << finnMainLogPrefix() << "Received " << results.size() << " results!";
 
     // Print Results
+    int counter = 0;
     for (auto& resultVector : results) {
-        for (auto& val : resultVector) {
-            FINN_LOG(logger, loglevel::info) << finnMainLogPrefix() << "VALUE: " << static_cast<unsigned int>(val) << "\n";
-        }
+        FinnUtils::logResults<uint8_t>(logger, resultVector, 8, finnMainLogPrefix() + "Vec " + std::to_string(counter++)); 
     }
 }
 

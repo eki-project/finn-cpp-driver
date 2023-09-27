@@ -104,6 +104,7 @@ namespace Finn {
             }
         }
 
+        // TODO(linusjun): Implement iterator version and document everything
         [[nodiscard]] std::vector<std::vector<uint8_t>> infer(const std::vector<uint8_t>& data, unsigned int inputDeviceIndex, const std::string& inputBufferKernelName, unsigned int outputDeviceIndex,
                                                               const std::string& outputBufferKernelName, unsigned int samples, bool forceArchival) {
             FINN_LOG_DEBUG(logger, loglevel::info) << "Starting inference";

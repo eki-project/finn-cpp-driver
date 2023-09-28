@@ -11,13 +11,19 @@
 
 namespace Finn {
 
-    template<typename T, IsDatatype U>
+    template<IsDatatype U, typename T>
     std::vector<uint8_t> pack(const std::vector<T>& foldedVec) {
         if constexpr (std::endian::native == std::endian::big) {
             FinnUtils::logAndError<std::runtime_error>("Big-endian architectures are currently not supported!\n");
         } else if constexpr (std::endian::native == std::endian::little) {
-            if constexpr (U().bitwidth() == 8 && std::is_same<T, uint8_t>::value) {
-                return foldedVec;
+            // Little Endian
+            if constexpr (U().bitwidth() == 8) {                  // FINN Datatype is a byte long
+                if constexpr (std::is_same<T, uint8_t>::value) {  // Input data is in uint8_t, then nop
+                    return foldedVec;
+                } else if (sizeof(T) == 1) {  // Input data is in other one byte representation, then just cast
+                    return std::vector<uint8_t>(foldedVec.begin(), foldedVec.end());
+                } else {
+                }
             }
         } else {
             FinnUtils::logAndError<std::runtime_error>("Mixed architectures are currently not supported!\n");
@@ -25,14 +31,17 @@ namespace Finn {
         return {};
     }
 
-    template<typename T, IsDatatype U, typename IteratorType>
+    template<IsDatatype U, typename IteratorType>
     std::vector<uint8_t> pack(IteratorType first, IteratorType last) {
-        static_assert(std::is_same<typename std::iterator_traits<IteratorType>::value_type, T>::value);
+        using T = std::iterator_traits<IteratorType>::value_type;
         if constexpr (std::endian::native == std::endian::big) {
             FinnUtils::logAndError<std::runtime_error>("Big-endian architectures are currently not supported!\n");
-        } else if constexpr (std::endian::native == std::endian::little) {
-            if constexpr (std::is_same<T, uint8_t>::value) {
-                return std::vector<uint8_t>(first, last);
+        } else if constexpr (std::endian::native == std::endian::little) {  // FINN Datatype is a byte long
+            if constexpr (U().bitwidth() == 8) {                            // Input data is in uint8_t, then nop
+                if constexpr (sizeof(T) == 1) {                             // Input data is in other one byte representation, then just cast
+                    return std::vector<uint8_t>(first, last);
+                } else {
+                }
             }
         } else {
             FinnUtils::logAndError<std::runtime_error>("Mixed architectures are currently not supported!\n");

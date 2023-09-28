@@ -251,13 +251,42 @@ std::array<uint8_t, 288> mat21 = {0,   2,   8,   24, 64, 160, 128, 129, 3,   8, 
                                   192, 130, 9,   27, 70, 172, 152, 177, 99,  200, 146, 41,  91, 198, 172, 153, 179, 103, 208, 162, 73,  155, 70, 173, 154, 181, 107, 216, 178, 105, 219, 198, 173, 155, 183, 111,
                                   224, 194, 137, 27, 71, 174, 156, 185, 115, 232, 210, 169, 91, 199, 174, 157, 187, 119, 240, 226, 201, 155, 71, 175, 158, 189, 123, 248, 242, 233, 219, 199, 175, 159, 191, 127};
 
+TEST(DataPacking, IntTest) {
+    auto ret = Finn::pack<Finn::DatatypeInt<32>>(inputMat.begin(), inputMat.end());
+    EXPECT_TRUE(mat1.size() == ret.size() && std::equal(ret.begin(), ret.end(), mat1.begin()));
+}
+
 TEST(DataPacking, Uint8Test) {
-    auto ret = Finn::pack<uint8_t, Finn::DatatypeUInt<8>>(inputMat4.begin(), inputMat4.end());
+    auto ret = Finn::pack<Finn::DatatypeUInt<8>>(inputMat4.begin(), inputMat4.end());
     EXPECT_TRUE(mat16.size() == ret.size() && std::equal(ret.begin(), ret.end(), mat16.begin()));
 
     std::vector<uint8_t> tmp(inputMat4.begin(), inputMat4.end());
-    ret = Finn::pack<uint8_t, Finn::DatatypeUInt<8>>(tmp);
+    ret = Finn::pack<Finn::DatatypeUInt<8>>(tmp);
     EXPECT_TRUE(mat16.size() == ret.size() && std::equal(ret.begin(), ret.end(), mat16.begin()));
+
+    ret = Finn::pack<Finn::DatatypeInt<8>>(inputMat4.begin(), inputMat4.end());
+    EXPECT_TRUE(mat17.size() == ret.size() && std::equal(ret.begin(), ret.end(), mat17.begin()));
+
+    std::vector<uint8_t> tmp2(inputMat4.begin(), inputMat4.end());
+    ret = Finn::pack<Finn::DatatypeInt<8>>(tmp2);
+    EXPECT_TRUE(mat17.size() == ret.size() && std::equal(ret.begin(), ret.end(), mat17.begin()));
+}
+
+
+TEST(DataPacking, Int8Test) {
+    auto ret = Finn::pack<Finn::DatatypeUInt<8>>(inputMat5.begin(), inputMat5.end());
+    EXPECT_TRUE(mat18.size() == ret.size() && std::equal(ret.begin(), ret.end(), mat18.begin()));
+
+    std::vector<int8_t> tmp(inputMat5.begin(), inputMat5.end());
+    ret = Finn::pack<Finn::DatatypeUInt<8>>(tmp);
+    EXPECT_TRUE(mat18.size() == ret.size() && std::equal(ret.begin(), ret.end(), mat18.begin()));
+
+    ret = Finn::pack<Finn::DatatypeInt<8>>(inputMat5.begin(), inputMat5.end());
+    EXPECT_TRUE(mat19.size() == ret.size() && std::equal(ret.begin(), ret.end(), mat19.begin()));
+
+    std::vector<int8_t> tmp2(inputMat5.begin(), inputMat5.end());
+    ret = Finn::pack<Finn::DatatypeInt<8>>(tmp2);
+    EXPECT_TRUE(mat19.size() == ret.size() && std::equal(ret.begin(), ret.end(), mat19.begin()));
 }
 
 int main(int argc, char** argv) {

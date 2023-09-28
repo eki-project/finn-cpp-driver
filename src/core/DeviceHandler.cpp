@@ -112,6 +112,8 @@ namespace Finn {
 
     [[maybe_unused]] DeviceInputBuffer<uint8_t>& DeviceHandler::getInputBuffer(const std::string& name) { return inputBufferMap.at(name); }
 
+    [[maybe_unused]] DeviceOutputBuffer<uint8_t>& DeviceHandler::getOutputBuffer(const std::string& name) { return outputBufferMap.at(name); }
+
     /****** USER METHODS ******/
     bool DeviceHandler::store(const std::vector<uint8_t>& data, const std::string& inputBufferKernelName) {
         if (!inputBufferMap.contains(inputBufferKernelName)) {

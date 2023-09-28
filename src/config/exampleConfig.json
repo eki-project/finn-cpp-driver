@@ -1,7 +1,7 @@
 [
     {
         "xrtDeviceIndex": 0,
-        "xclbinPath": "bitfile/finn-accel.xclbin",
+        "xclbinPath": "finn-accel.xclbin",
         "name": "MainDevice",
         "idmas": [
             {

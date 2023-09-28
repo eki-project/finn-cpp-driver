@@ -255,6 +255,14 @@ namespace Finn {
         DeviceInputBuffer<uint8_t>& getInputBuffer(const std::string& name);
 
         /**
+         * @brief Get the Output Buffer from this device by its name
+         * 
+         * @param name 
+         * @return DeviceOutputBuffer<uint8_t>& 
+         */
+        DeviceOutputBuffer<uint8_t>& getOutputBuffer(const std::string& name);
+
+        /**
          * @brief Same as store, but without performing a check whether the kernel exists before accessing
          *
          * @param data

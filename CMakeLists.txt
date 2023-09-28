@@ -103,6 +103,7 @@ set(FINNC_ENABLE_TESTING "Build all tests (default is ON)" ON)
 FetchContent_MakeAvailable(googletest)
 include(cmake/AddUnittest.cmake)
 enable_testing()
+set(ENV{GTEST_OUTPUT} "json")
 
 if (FINNC_ENABLE_TESTING)
   message(STATUS "Finn C++ unittests:")

@@ -12,6 +12,9 @@ namespace FinnUnittest {
     const std::string configFilePath = "../../src/config/exampleConfig.json";
     Finn::Config unittestConfig = Finn::createConfigFromPath(std::filesystem::path(configFilePath));
 
+    const std::string inputDmaName = "StreamingDataflowPartition_0:{idma0}";
+    const std::string outputDmaName = "StreamingDataflowPartition_2:{odma0}";
+
     auto myShapeNormal = (*std::dynamic_pointer_cast<Finn::ExtendedBufferDescriptor>(unittestConfig.deviceWrappers[0].idmas[0])).normalShape;
     auto myShapeFolded = (*std::dynamic_pointer_cast<Finn::ExtendedBufferDescriptor>(unittestConfig.deviceWrappers[0].idmas[0])).foldedShape;
     auto myShapePacked = (*std::dynamic_pointer_cast<Finn::ExtendedBufferDescriptor>(unittestConfig.deviceWrappers[0].idmas[0])).packedShape;

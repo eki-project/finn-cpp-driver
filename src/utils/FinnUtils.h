@@ -26,6 +26,10 @@ namespace FinnUtils {
          public:
         BufferFiller(uint8_t min, uint8_t max) : sampler(std::uniform_int_distribution<uint8_t>(min, max)) {}
 
+        static BufferFiller create(uint8_t min, uint8_t max) {
+            return BufferFiller(min, max);
+        } 
+
         void fillRandom(std::vector<uint8_t>& vec) {
             std::transform(vec.begin(), vec.end(), vec.begin(), [this]([[maybe_unused]] uint8_t x) { return sampler(engine); });
         }

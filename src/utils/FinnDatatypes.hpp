@@ -30,7 +30,7 @@ namespace Finn {
      */
     template<typename D>
     class Datatype {
-        public:
+         public:
         /**
          * @brief Query whether type is signed type.
          *
@@ -111,10 +111,7 @@ namespace Finn {
                 return 1;
             }
             // NOLINTNEXTLINE(clang-diagnostic-implicit-int-float-conversion)
-            return static_cast<unsigned int>(
-                FinnUtils::ceil(
-                    static_cast<float>(bitwidth()) / (static_cast<float>(sizeof(T)) * 8.0F))
-            );
+            return static_cast<unsigned int>(FinnUtils::ceil(static_cast<float>(bitwidth()) / (static_cast<float>(sizeof(T)) * 8.0F)));
         }
 
         /**
@@ -149,9 +146,9 @@ namespace Finn {
          * @brief Destroy the Datatype object
          *
          */
-        virtual ~Datatype() = default;
+        constexpr virtual ~Datatype() = default;
 
-        protected:
+         protected:
         /**
          * @brief Construct a new Datatype object (Move construction)
          *
@@ -175,7 +172,7 @@ namespace Finn {
          */
         Datatype& operator=(const Datatype&) = default;
 
-        private:
+         private:
         /**
          * @brief Construct a new Datatype object; Some somewhat hacky code to make sure that CRTP is implemented correctly by all Derived classes -> creates error if for class A : public Base<B> A!=B
          *
@@ -202,10 +199,12 @@ namespace Finn {
      *
      */
     class DatatypeFloat : public Datatype<DatatypeFloat> {
-        private:
+         private:
         friend class Datatype<DatatypeFloat>;
 
-        public:
+         public:
+        constexpr DatatypeFloat() = default;
+        constexpr ~DatatypeFloat() override = default;
         /**
          * @brief @see Datatype
          */
@@ -235,7 +234,7 @@ namespace Finn {
          */
         constexpr bool isFixedPoint() const override { return false; }
 
-        private:
+         private:
         /**
          * @brief Implementation of the allowed method. Is implemented by each subclass individually.
          *
@@ -257,10 +256,12 @@ namespace Finn {
      */
     template<std::size_t B>
     class DatatypeInt : public Datatype<DatatypeInt<B>> {
-        private:
+         private:
         friend class Datatype<DatatypeInt<B>>;
 
-        public:
+         public:
+        constexpr DatatypeInt() = default;
+        constexpr ~DatatypeInt() override = default;
         /**
          * @brief @see Datatype
          */
@@ -289,7 +290,7 @@ namespace Finn {
          */
         constexpr bool isFixedPoint() const override { return false; }
 
-        private:
+         private:
         /**
          * @brief Implementation of the allowed method. Is implemented by each subclass individually.
          *
@@ -312,10 +313,12 @@ namespace Finn {
      */
     template<std::size_t B, std::size_t I>
     class DatatypeFixed : public Datatype<DatatypeFixed<B, I>> {
-        private:
+         private:
         friend class Datatype<DatatypeFixed<B, I>>;
 
-        public:
+         public:
+        constexpr DatatypeFixed() = default;
+        constexpr ~DatatypeFixed() override = default;
         /**
          * @brief @see Datatype
          */
@@ -358,7 +361,7 @@ namespace Finn {
          */
         constexpr bool isFixedPoint() const override { return true; }
 
-        private:
+         private:
         /**
          * @brief Implementation of the allowed method. Is implemented by each subclass individually.
          *
@@ -381,10 +384,12 @@ namespace Finn {
      */
     template<std::size_t B>
     class DatatypeUInt : public Datatype<DatatypeUInt<B>> {
-        private:
+         private:
         friend class Datatype<DatatypeUInt<B>>;
 
-        public:
+         public:
+        constexpr DatatypeUInt() = default;
+        constexpr ~DatatypeUInt() override = default;
         /**
          * @brief @see Datatype
          */
@@ -414,7 +419,7 @@ namespace Finn {
          */
         constexpr bool isFixedPoint() const override { return false; }
 
-        private:
+         private:
         /**
          * @brief Implementation of the allowed method. Is implemented by each subclass individually.
          *
@@ -440,10 +445,12 @@ namespace Finn {
      *
      */
     class DatatypeBipolar : public Datatype<DatatypeBipolar> {
-        private:
+         private:
         friend class Datatype<DatatypeBipolar>;
 
-        public:
+         public:
+        constexpr DatatypeBipolar() = default;
+        constexpr ~DatatypeBipolar() override = default;
         /**
          * @brief @see Datatype
          */
@@ -477,7 +484,7 @@ namespace Finn {
          */
         constexpr double getNumPossibleValues() const override { return 2; }
 
-        private:
+         private:
         /**
          * @brief Implementation of the allowed method. Is implemented by each subclass individually.
          *
@@ -497,10 +504,12 @@ namespace Finn {
      *
      */
     class DatatypeTernary : public Datatype<DatatypeTernary> {
-        private:
+         private:
         friend class Datatype<DatatypeTernary>;
 
-        public:
+         public:
+        constexpr DatatypeTernary() = default;
+        constexpr ~DatatypeTernary() override = default;
         /**
          * @brief @see Datatype
          */
@@ -534,7 +543,7 @@ namespace Finn {
          */
         constexpr double getNumPossibleValues() const override { return 3; }
 
-        private:
+         private:
         /**
          * @brief Implementation of the allowed method. Is implemented by each subclass individually.
          *
@@ -548,6 +557,6 @@ namespace Finn {
             return (val == -1 || val == 1 || val == 0);
         }
     };
-} // namespace Finn
+}  // namespace Finn
 
 #endif  // DATATYPE_H

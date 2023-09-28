@@ -22,7 +22,7 @@ class DeviceHandlerSetup : public ::testing::Test {
         tmpfile.close();
     }
 
-    // void TearDown() override { std::filesystem::remove(fn); }
+    void TearDown() override { std::filesystem::remove(fn); }
 };
 
 

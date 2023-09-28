@@ -30,16 +30,13 @@ namespace Finn {
 
     /****** INITIALIZERS ******/
     void DeviceHandler::checkDeviceWrapper(const DeviceWrapper& devWrap) {
-// Execute tests on filepath for xclbin in release mode!
-//! CURRENTLY DOES NOT WORK?
-#ifndef UNITTEST
+        // Execute tests on filepath for xclbin in release mode!
         if (devWrap.xclbin.empty()) {
             throw fs::filesystem_error("Empty filepath to xclbin. Abort.", std::error_code());
         }
         if (!fs::exists(devWrap.xclbin) || !fs::is_regular_file(devWrap.xclbin)) {
             throw fs::filesystem_error("File " + std::string(devWrap.xclbin.c_str()) + " not found. Abort.", std::error_code());
         }
-#endif
         if (devWrap.idmas.empty()) {
             throw std::invalid_argument("Empty input kernel list. Abort.");
         }

@@ -83,10 +83,12 @@ namespace Finn {
     template<IsDatatype U, bool invertBytes = true, bool flipBits = true, std::integral V>
     std::vector<std::bitset<U().bitwidth()>> toBitset(std::vector<V>& input) {
         if constexpr (flipBits) {
+            constexpr std::size_t shift = (sizeof(V) * 8 - U().bitwidth());
             bitshuffling::Wrapper wrap{};
             std::vector<int> test1(input.begin(), input.end());
             std::cout << join(test1, " ") << "\n";
             std::transform(input.cbegin(), input.cend(), input.begin(), wrap);
+            std::transform(input.cbegin(), input.cend(), input.begin(), [](const V& val) { return val >> shift; });
             std::vector<int> test2(input.begin(), input.end());
             std::cout << join(test2, " ") << "\n";
         }
@@ -103,11 +105,14 @@ namespace Finn {
     std::vector<std::bitset<U().bitwidth()>> toBitset(IteratorType first, IteratorType last) {
         using T = std::iterator_traits<IteratorType>::value_type;
         static_assert(std::is_integral<T>::value);
+        constexpr std::size_t shift = (sizeof(T) * 8 - U().bitwidth());
         if constexpr (flipBits) {
+            std::cout << "Shiftbits:" << shift << "\n";
             std::vector<int> test1(first, last);
             std::cout << join(test1, " ") << "\n";
             bitshuffling::Wrapper wrap{};
             std::transform(first, last, first, wrap);
+            std::transform(first, last, first, [](const T& val) { return val >> shift; });
             std::vector<int> test2(first, last);
             std::cout << join(test1, " ") << "\n";
         }

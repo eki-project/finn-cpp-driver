@@ -1,7 +1,6 @@
-#include "../../src/core/DeviceBuffer.hpp"
-#include "../../src/utils/FinnDatatypes.hpp"
-#include "../../src/utils/Logger.h"
-#include "gtest/gtest.h"
+#include "core/DeviceBuffer.hpp"
+#include "utils/FinnDatatypes.hpp"
+#include "utils/Logger.h"
 #include "xrt/xrt_device.h"
 #include "xrt/xrt_kernel.h"
 
@@ -9,49 +8,38 @@
 #include <fstream>
 
 // Provides config and shapes for testing
-#include "UnittestConfig.h"
+#include "../unittests/core/UnittestConfig.h"
 using namespace FinnUnittest;
 
 
-class Timer {
-    std::chrono::time_point<std::chrono::high_resolution_clock> startTime;
-
-     public:
-    Timer() = default;
-    Timer(Timer&&) = default;
-    Timer(const Timer&) = default;
-    Timer(Timer&) = default;
-
-    void start() {
-        startTime = std::chrono::high_resolution_clock::now();
-    }
-
-    long int stopMs() {
-        auto res = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - startTime).count();
-        return res;
-    }
-};
-
+#include "../../src/utils/Timer.hpp"
 
 const unsigned int benchmarkBufferSize = 10000;
 
-// TODO: Move setup into setup class
 
-TEST(DBBenchmarkTest, StoreBenchmark) {
+
+//TODO: Fix:
+//! Currently for this to work, the sanitizers have to be disabled!
+
+
+
+int main() {
     auto filler = FinnUtils::BufferFiller(0, 255);
     auto device = xrt::device();
     auto kernel = xrt::kernel();
+    FINN_LOG(Logger::getLogger(), loglevel::info) << "Starting benchmark!";
+
 
     std::fstream logfile("benchmark_log.txt", std::fstream::out);
 
     auto idb = Finn::DeviceInputBuffer<uint8_t>("Tester", device, kernel, myShapePacked, benchmarkBufferSize);
+    FINN_LOG(Logger::getLogger(), loglevel::info) << "DeviceBuffer created!";
 
     // Setup
     std::vector<uint8_t> data;
     data.resize(idb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
     auto timer = Timer();
     
-
     // CHANGING VECTOR, REFERENCE PASSING
     auto idb1 = Finn::DeviceInputBuffer<uint8_t>("Tester", device, kernel, myShapePacked, benchmarkBufferSize);
     timer.start();
@@ -74,9 +62,14 @@ TEST(DBBenchmarkTest, StoreBenchmark) {
 
     // CONST VECTOR, REFERENCE PASSING
     auto idb3 = Finn::DeviceInputBuffer<uint8_t>("Tester", device, kernel, myShapePacked, benchmarkBufferSize);
+    auto t2 = std::vector<uint8_t>();
+    t2.resize(data.size());
     timer.start();
     for (unsigned int i = 0; i < benchmarkBufferSize; i++) {
-        idb3.store(data);
+        //idb3.store(data);
+        for (unsigned int j = 0; j  < data.size(); j++) {
+            t2[j] = data[j];
+        }
     }
     logfile << "[BENCHMARK] Constant Vector & Reference Passing: " << timer.stopMs() << "ms\n";
 
@@ -115,6 +108,8 @@ TEST(DBBenchmarkTest, StoreBenchmark) {
         }
     }
 
+
+
     // MULTITHREAD, CHANGING VECTOR, REFERENCE PASSING
     timer.start();
     for (unsigned int batch = 0; batch < countThreads; batch++) {
@@ -130,9 +125,4 @@ TEST(DBBenchmarkTest, StoreBenchmark) {
     logfile << "[BENCHMARK] Multithreaded, Prepared Data & Reference Passing: " << timer.stopMs() << "ms\n";
 
     logfile.close();
-}
-
-int main(int argc, char** argv) {
-    ::testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
 }

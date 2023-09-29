@@ -3,6 +3,9 @@
 
 #include <algorithm>
 #include <bit>
+#include <bitset>
+// #include <boost/dynamic_bitset/dynamic_bitset.hpp>
+#include <concepts>
 #include <cstdint>
 #include <vector>
 
@@ -10,6 +13,15 @@
 #include "FinnUtils.h"
 
 namespace Finn {
+
+    template<IsDatatype U, std::integral V>
+    std::vector<std::bitset<U().bitwidth()>> toBitset(const std::vector<V>& input) {
+        std::vector<std::bitset<U().bitwidth()>> ret(input.begin(), input.end());
+        return ret;
+    }
+
+    // template<IsDatatype U>
+    // FinnBoost::dynamic_bitset<> mergeBitsets(const std::vector<std::bitset<U().bitwidth()>>& input) {}
 
     template<IsDatatype U, typename T>
     std::vector<uint8_t> pack(const std::vector<T>& foldedVec) {

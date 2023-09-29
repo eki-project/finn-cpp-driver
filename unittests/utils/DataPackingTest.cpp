@@ -289,6 +289,14 @@ TEST(DataPacking, Int8Test) {
     EXPECT_TRUE(mat19.size() == ret.size() && std::equal(ret.begin(), ret.end(), mat19.begin()));
 }
 
+TEST(DataPacking, IntegralToBitsetTest) {
+    std::vector<uint8_t> inp = {0, 1, 2, 3, 4, 5, 6, 7};
+    auto ret = Finn::toBitset<Finn::DatatypeUInt<3>>(inp);
+    std::vector<u_int64_t> retElems;
+    std::transform(ret.begin(), ret.end(), std::back_inserter(retElems), [](const std::bitset<3>& bit) { return bit.to_ulong(); });
+    EXPECT_TRUE(inp.size() == retElems.size() && std::equal(inp.begin(), inp.end(), retElems.begin()));
+}
+
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();

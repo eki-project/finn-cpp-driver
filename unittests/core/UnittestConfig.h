@@ -2,14 +2,20 @@
 #include "../../src/utils/Types.h"
 #include "../../src/utils/FinnUtils.h"
 #include "../../src/utils/ConfigurationStructs.h"
-#include "gtest/gtest.h"
 #include <vector>
 #include <array>
 #include <memory>
 #include <filesystem>
 
+#define MSTR(x) #x
+
 namespace FinnUnittest {
+#ifndef FINN_CUSTOM_UNITTEST_CONFIG
     const std::string configFilePath = "../../src/config/exampleConfig.json";
+#else
+    const std::string configFilePath = MSTR(FINN_CUSTOM_UNITTEST_CONFIG);
+#endif
+    
     Finn::Config unittestConfig = Finn::createConfigFromPath(std::filesystem::path(configFilePath));
 
     const std::string inputDmaName = "StreamingDataflowPartition_0:{idma0}";

@@ -19,6 +19,46 @@ cmake ..
 make -j $(nprocs)
 ```
 
+## FINN Pipeline
+Doing the build like shown above will produce a build with placeholder configurations. To actually use the driver it has to be compiled for the network it should use.
+During the FINN pipeline (or of course it can also be done manually afterwards), the project has to be compiled.
+The driver requires two types of configurations: 
+
+* A header file which defines the type of the driver. The driver depends on which FINN-datatypes are used in the network for input and output, and can run a little faster by optimizing this at compile time
+* A configuration file in the JSON format. This specifies the path to the .xclbin produced by FINN, the devices by their XRT device indices, their inputs and outputs and how they are shaped, which is needed for the folding and packing operations. Note that this is passed during the _runtime_! This means that the location of the xclbin for example does not need to be fixed. 
+
+If you ever need help on which arguments the driver requires, simply use the ```--help``` flag on the driver. 
+```
+$ ./finn --help
+  -h [ --help ]                  Display help
+  -m [ --mode ] arg (=test)      Mode of execution (file or test)
+  -c [ --configpath ] arg        Path to the config.json file emitted by the 
+                                 FINN compiler
+  -i [ --input ] arg             Path to the input file. Only required if mode 
+                                 is set to "file"
+  -b [ --buffersize ] arg (=100) How large (in samples) the host buffer is 
+                                 supposed to be
+```
+
+
+The header file location be passed by letting cmake set the macro
+
+```
+FINN_HEADER_LOCATION
+```
+
+If left undefined, the path will be ```config/FinnDriverUsedDatatypes.h``` (as included from ```./src/FINNDriver.cpp```). 
+
+For unittest, the used configuration (meaning the runtime-JSON-config) can also be changed (because when running unittests, the JSON is actually needed at compile time). This can be done by setting
+
+```
+FINN_CUSTOM_UNITTEST_CONFIG
+```
+
+If left undefined, the path will be ```../../src/config/exampleConfig.json``` (as included from ```./unittests/core/UnittestConfig.h```).
+
+
+## Manual Building
 ### Getting Started on the N2 Cluster
 You will first have to load a few dependencies before being able to build the project:
 

@@ -44,7 +44,7 @@ namespace Finn {
          */
         BaseDriver(const std::filesystem::path& configPath, unsigned int hostBufferSize) : configuration(createConfigFromPath(configPath)), logger(Logger::getLogger()) {
             accelerator = Accelerator(configuration.deviceWrappers, hostBufferSize);
-#ifndef NDEBUG
+#ifdef UNITTEST
             logDriver();
 #endif
         };
@@ -118,7 +118,7 @@ namespace Finn {
             bool stored = storeFunc(data);
             bool ran = accelerator.run(inputDeviceIndex, inputBufferKernelName);
 
-#ifndef NDEBUG
+#ifdef UNITTEST
             FINN_LOG(logger, loglevel::info) << "Readback from device buffer confirming data was written to board successfully: " << isSyncedDataEquivalent(inputDeviceIndex, inputBufferKernelName, data);
 #endif
 

@@ -1,5 +1,6 @@
 #include <array>
 #include <cstdint>
+#include <iostream>
 
 #include "../../src/utils/DataPacking.hpp"
 #include "gtest/gtest.h"
@@ -295,6 +296,57 @@ TEST(DataPacking, IntegralToBitsetTest) {
     std::vector<u_int64_t> retElems;
     std::transform(ret.begin(), ret.end(), std::back_inserter(retElems), [](const std::bitset<3>& bit) { return bit.to_ulong(); });
     EXPECT_TRUE(inp.size() == retElems.size() && std::equal(inp.begin(), inp.end(), retElems.begin()));
+}
+
+TEST(DataPacking, MergeBitsets) {
+    std::vector<uint8_t> inp = {0, 1, 2, 3, 4, 5, 6, 7};
+    auto ret = Finn::toBitset<Finn::DatatypeUInt<3>>(inp);
+    auto ret2 = Finn::mergeBitsets<Finn::DatatypeUInt<3>>(ret);
+    std::string compare;
+    to_string(ret2, compare);
+    EXPECT_STREQ(compare.c_str(), "000100010110001101011111");
+    ret2 = Finn::mergeBitsets<Finn::DatatypeUInt<3>, false>(ret);
+    to_string(ret2, compare);
+    EXPECT_STREQ(compare.c_str(), "111110101100011010001000");
+    auto ret4bit = Finn::toBitset<Finn::DatatypeUInt<4>>(inp);
+    ret2 = Finn::mergeBitsets<Finn::DatatypeUInt<4>>(ret4bit);
+    to_string(ret2, compare);
+    EXPECT_STREQ(compare.c_str(), "00001000010011000010101001101110");
+    ret2 = Finn::mergeBitsets<Finn::DatatypeUInt<4>, false>(ret4bit);
+    to_string(ret2, compare);
+    EXPECT_STREQ(compare.c_str(), "01110110010101000011001000010000");
+
+    std::vector<int64_t> inp64 = {0, 1, 2, 3, 4, 5, 6, 7};
+    ret = Finn::toBitset<Finn::DatatypeUInt<3>>(inp64);
+    ret2 = Finn::mergeBitsets<Finn::DatatypeUInt<3>>(ret);
+    to_string(ret2, compare);
+    EXPECT_STREQ(compare.c_str(), "000100010110001101011111");
+    ret2 = Finn::mergeBitsets<Finn::DatatypeUInt<3>, false>(ret);
+    to_string(ret2, compare);
+    EXPECT_STREQ(compare.c_str(), "111110101100011010001000");
+    ret4bit = Finn::toBitset<Finn::DatatypeUInt<4>>(inp64);
+    ret2 = Finn::mergeBitsets<Finn::DatatypeUInt<4>>(ret4bit);
+    to_string(ret2, compare);
+    EXPECT_STREQ(compare.c_str(), "00001000010011000010101001101110");
+    ret2 = Finn::mergeBitsets<Finn::DatatypeUInt<4>, false>(ret4bit);
+    to_string(ret2, compare);
+    EXPECT_STREQ(compare.c_str(), "01110110010101000011001000010000");
+    auto ret9bit = Finn::toBitset<Finn::DatatypeUInt<9>>(inp64);
+    ret2 = Finn::mergeBitsets<Finn::DatatypeUInt<9>>(ret9bit);
+    to_string(ret2, compare);
+    EXPECT_STREQ(compare.c_str(), "000000000100000000010000000110000000001000000101000000011000000111000000");
+    ret2 = Finn::mergeBitsets<Finn::DatatypeUInt<9>, false>(ret9bit);
+    to_string(ret2, compare);
+    EXPECT_STREQ(compare.c_str(), "000000111000000110000000101000000100000000011000000010000000001000000000");
+
+    std::vector<int64_t> inp64s = {0, -1, -2, -3, 4, 5, 6, 7};
+    auto rets = Finn::toBitset<Finn::DatatypeInt<4>>(inp64s);
+    ret2 = Finn::mergeBitsets<Finn::DatatypeInt<4>>(rets);
+    to_string(ret2, compare);
+    EXPECT_STREQ(compare.c_str(), "00001111011110110010101001101110");
+    ret2 = Finn::mergeBitsets<Finn::DatatypeInt<4>, false>(rets);
+    to_string(ret2, compare);
+    EXPECT_STREQ(compare.c_str(), "01110110010101001101111011110000");
 }
 
 int main(int argc, char** argv) {

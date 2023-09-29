@@ -4,7 +4,7 @@
 #include <algorithm>
 #include <bit>
 #include <bitset>
-// #include <boost/dynamic_bitset/dynamic_bitset.hpp>
+#include <boost/dynamic_bitset.hpp>
 #include <concepts>
 #include <cstdint>
 #include <vector>
@@ -20,8 +20,23 @@ namespace Finn {
         return ret;
     }
 
-    // template<IsDatatype U>
-    // FinnBoost::dynamic_bitset<> mergeBitsets(const std::vector<std::bitset<U().bitwidth()>>& input) {}
+    template<IsDatatype U, bool invertDirection = true>
+    finnBoost::dynamic_bitset<> mergeBitsets(const std::vector<std::bitset<U().bitwidth()>>& input) {
+        constexpr std::size_t bits = U().bitwidth();
+        finnBoost::dynamic_bitset<> ret;
+        const std::size_t outputSize = input.size() * bits;
+        ret.resize(outputSize);
+        for (std::size_t i = 0; i < input.size(); ++i) {
+            for (std::size_t j = 0; j < bits; ++j) {
+                if constexpr (invertDirection) {
+                    ret[outputSize - 1 - (i * bits + j)] = input[i][j];
+                } else {
+                    ret[i * bits + j] = input[i][j];
+                }
+            }
+        }
+        return ret;
+    }
 
     template<IsDatatype U, typename T>
     std::vector<uint8_t> pack(const std::vector<T>& foldedVec) {

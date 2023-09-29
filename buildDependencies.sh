@@ -22,7 +22,7 @@ else
   rm -rf "../../deps/finn_boost"/*
 fi
 
-./dist/bin/bcp --namespace=finnBoost log build boost_install config predef program_options thread circular_buffer ../../deps/finn_boost/ || exit 1 
+./dist/bin/bcp --namespace=finnBoost log build boost_install config predef program_options thread circular_buffer dynamic_bitset ../../deps/finn_boost/ || exit 1 
 cp boostcpp.jam ../../deps/finn_boost/
 cp boost-build.jam ../../deps/finn_boost/
 cp project-config.jam ../../deps/finn_boost/

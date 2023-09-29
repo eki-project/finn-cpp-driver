@@ -1,5 +1,5 @@
-#ifndef RINGBUFFER_H
-#define RINGBUFFER_H
+#ifndef RINGBUFFER_HPP
+#define RINGBUFFER_HPP
 
 #include <algorithm>
 #include <boost/circular_buffer.hpp>
@@ -296,4 +296,4 @@ class RingBuffer {
 #endif
 };
 
-#endif  // RINGBUFFER_H
+#endif  // RINGBUFFER_HPP

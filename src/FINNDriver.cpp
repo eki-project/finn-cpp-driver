@@ -18,10 +18,12 @@
 // Created by FINN during compilation
 // Use the default testing Driver type when none is specified. Normally this is set by the FINN compiler and available together with the xclbin.
 #define MSTR(x) #x
+#define STRNGFY(x) MSTR(x)
+
 #ifndef FINN_HEADER_LOCATION
     #include "config/FinnDriverUsedDatatypes.h"
 #else
-    #include MSTR(FINN_HEADER_LOCATION)
+    #include STRNGFY(FINN_HEADER_LOCATION)
 #endif
 
 // XRT

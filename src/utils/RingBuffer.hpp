@@ -4,9 +4,12 @@
 #include <algorithm>
 #include <boost/circular_buffer.hpp>
 #include <functional>
+#include <vector>
+#include <numeric>
 #include <iterator>
 #include <mutex>
 #include <span>
+#include <execution>
 #include <tuple>
 #include <type_traits>
 
@@ -216,6 +219,7 @@ class RingBuffer {
             }
             elementIndex = (elementIndex + elementsPerPart) % bufferSize;
         }
+        return false;
     }
 
     /**
@@ -245,6 +249,7 @@ class RingBuffer {
             }
             elementIndex = (elementIndex + elementsPerPart) % bufferSize;
         }
+        return false;
     }
 
     /**

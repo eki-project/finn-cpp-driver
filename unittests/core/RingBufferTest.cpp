@@ -87,6 +87,46 @@ TEST(RBTest, RBStoreReadTest) {
     EXPECT_EQ(rb.testGetReadPointer(), 2);
 }
 
+TEST(RBTest, RBFastStoreTest) {
+    auto rb = RB(parts, elementsPerPart);
+
+    // Store data
+    std::vector<uint8_t> data;
+    data.resize(elementsPerPart);
+
+    auto storedDatas = std::vector<std::vector<uint8_t>>();
+
+    // FIll until all spots are valid
+    for (size_t i = 0; i < parts; i++) {
+        filler.fillRandom(data);
+        storedDatas.push_back(data);
+        EXPECT_TRUE(rb.storeFast(data.begin(), data.end()));
+    }
+
+    // Confirm that the head pointer wrapped around
+    EXPECT_EQ(rb.testGetHeadPointer(), 0);
+    EXPECT_EQ(rb.testGetReadPointer(), 0);
+
+    // Temporary save first entry
+    auto current = rb.testGetAsVector(0);
+
+    // Confirm that no new data can be stored until some data is read
+    filler.fillRandom(data);
+    EXPECT_FALSE(rb.storeFast(data.begin(), data.end()));
+
+    // Test that the valid data was not changed 
+    EXPECT_EQ(rb.testGetAsVector(0), current);
+
+    // Read two entries
+    uint8_t buf[elementsPerPart];
+    EXPECT_TRUE(rb.readToArray(buf, elementsPerPart));
+    EXPECT_TRUE(rb.readToArray(buf, elementsPerPart));
+
+    // Check pointer positions
+    EXPECT_EQ(rb.testGetHeadPointer(), 0);
+    EXPECT_EQ(rb.testGetReadPointer(), 2);
+}
+
 
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);

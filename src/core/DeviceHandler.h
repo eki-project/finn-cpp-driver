@@ -140,23 +140,6 @@ namespace Finn {
          */
         std::unordered_map<std::string, DeviceOutputBuffer<uint8_t>>& getOutputBufferMap();
 
-        /**
-         * @brief Store the given vector data in the corresponding buffer.
-         *
-         * @param data The data to store
-         * @param inputBufferKernelName The kernelName which specifies the buffer
-         * @return true
-         * @return false
-         */
-        bool store(const std::vector<uint8_t>& data, const std::string& inputBufferKernelName);
-
-        template<typename IteratorType>
-        bool store(IteratorType first, IteratorType last, const std::string& inputBufferKernelName) {
-            if (!inputBufferMap.contains(inputBufferKernelName)) {
-                FinnUtils::logAndError<std::runtime_error>("Tried accessing kernel/buffer with name " + inputBufferKernelName + " but this kernel / buffer does not exist!");
-            }
-            return inputBufferMap.at(inputBufferKernelName).store(first, last);
-        }
 
         /**
          * @brief Run the kernel of the given name. Returns true if successful, returns false if no valid data to write was found
@@ -236,15 +219,37 @@ namespace Finn {
         static std::string loggerPrefix();
 
          public:
-        /**
-         * @brief Same as store, but without performing a check whether the kernel exists before accessing
-         *
-         * @param data
-         * @param inputBufferKernelName
-         * @return true
-         * @return false
-         */
+        //* SAFE + REFERENCE
+        bool store(const std::vector<uint8_t>& data, const std::string& inputBufferKernelName);
+
+        //* SAFE + ITERATOR
+        template<typename IteratorType>
+        bool store(IteratorType first, IteratorType last, const std::string& inputBufferKernelName) {
+            if (!inputBufferMap.contains(inputBufferKernelName)) {
+                FinnUtils::logAndError<std::runtime_error>("Tried accessing kernel/buffer with name " + inputBufferKernelName + " but this kernel / buffer does not exist!");
+            }
+            return inputBufferMap.at(inputBufferKernelName).store(first, last);
+        }
+
+        //* UNSAFE + REFERENCE
         bool storeUnchecked(const std::vector<uint8_t>& data, const std::string& inputBufferKernelName);
+
+        //* UNSAFE + ITERATOR
+        template<typename IteratorType>
+        bool storeUnchecked(IteratorType first, IteratorType last, const std::string& inputBufferKernelName) {
+            static_assert(std::is_same<typename std::iterator_traits<IteratorType>::value_type, uint8_t>::value);
+            return inputBufferMap.at(inputBufferKernelName).store(first, last);
+        }
+
+        //* UNSAFE + FAST + REFERENCE
+        bool storeUncheckedFast(const std::vector<uint8_t>& data, const std::string& inputBufferKernelName);
+        
+        //* UNSAFE + FAST + ITERATOR
+        template<typename IteratorType>
+        bool storeUncheckedFast(IteratorType first, IteratorType last, const std::string& inputBufferKernelName) {
+            static_assert(std::is_same<typename std::iterator_traits<IteratorType>::value_type, uint8_t>::value);
+            return inputBufferMap.at(inputBufferKernelName).storeFast(first, last);
+        }
 
         /**
          * @brief Get an input buffer from this device based on its name
@@ -261,20 +266,6 @@ namespace Finn {
          * @return DeviceOutputBuffer<uint8_t>& 
          */
         DeviceOutputBuffer<uint8_t>& getOutputBuffer(const std::string& name);
-
-        /**
-         * @brief Same as store, but without performing a check whether the kernel exists before accessing
-         *
-         * @param data
-         * @param inputBufferKernelName
-         * @return true
-         * @return false
-         */
-        template<typename IteratorType>
-        bool storeUnchecked(IteratorType first, IteratorType last, const std::string& inputBufferKernelName) {
-            static_assert(std::is_same<typename std::iterator_traits<IteratorType>::value_type, uint8_t>::value);
-            return inputBufferMap.at(inputBufferKernelName).store(first, last);
-        }
 
 #ifndef NDEBUG
         /**
@@ -302,11 +293,11 @@ namespace Finn {
          */
         UncheckedStore(DeviceHandler& pDev, const std::string& pInputBufferName) : dev(pDev), inputBufferName(pInputBufferName) {}
 
-        bool operator()(const std::vector<uint8_t>& data) { return dev.storeUnchecked(data, inputBufferName); }
+        bool operator()(const std::vector<uint8_t>& data) { return dev.storeUncheckedFast(data, inputBufferName); }
 
         template<typename IteratorType>
         bool operator()(IteratorType first, IteratorType last) {
-            return dev.storeUnchecked(first, last, inputBufferName);
+            return dev.storeUncheckedFast(first, last, inputBufferName);
         }
     };
 

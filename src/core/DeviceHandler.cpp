@@ -112,6 +112,7 @@ namespace Finn {
     [[maybe_unused]] DeviceOutputBuffer<uint8_t>& DeviceHandler::getOutputBuffer(const std::string& name) { return outputBufferMap.at(name); }
 
     /****** USER METHODS ******/
+    //* SAFE + REFERENCE
     bool DeviceHandler::store(const std::vector<uint8_t>& data, const std::string& inputBufferKernelName) {
         if (!inputBufferMap.contains(inputBufferKernelName)) {
             auto newlineFold = [](std::string a, const auto& b) { return std::move(a) + '\n' + std::move(b.first); };
@@ -122,7 +123,11 @@ namespace Finn {
         return inputBufferMap.at(inputBufferKernelName).store(data);
     }
 
+    //* UNSAFE + REFERENCE
     bool DeviceHandler::storeUnchecked(const std::vector<uint8_t>& data, const std::string& inputBufferKernelName) { return inputBufferMap.at(inputBufferKernelName).store(data); }
+
+    //* UNSAFE + FAST + REFERENCE
+    bool DeviceHandler::storeUncheckedFast(const std::vector<uint8_t>& data, const std::string& inputBufferKernelName) { return inputBufferMap.at(inputBufferKernelName).storeFast(data); }
 
     [[maybe_unused]] unsigned int DeviceHandler::getDeviceIndex() const { return xrtDeviceIndex; }
 

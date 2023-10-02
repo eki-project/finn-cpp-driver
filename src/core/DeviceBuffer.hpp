@@ -171,6 +171,31 @@ namespace Finn {
         }
 
         /**
+         * @brief Stores data without size checks and without guarding mutexes!
+         * @attention This function is NOT THREAD SAFE! 
+         * 
+         * @param data 
+         * @return true 
+         * @return false 
+         */
+        bool storeFast(const std::vector<T>& data) {
+            return this->ringBuffer.storeFast(data);
+        }
+
+        /**
+         * @brief Stores data without size checks and without guarding mutexes!
+         * @attention This function is NOT THREAD SAFE! 
+         * 
+         * @param first 
+         * @param last 
+         * @return tempate<typename IteratorType> 
+         */
+        template<typename IteratorType>
+        bool storeFast(IteratorType first, IteratorType last) {
+            return this->ringBuffer.storeFast(first, last);
+        }
+
+        /**
          * @brief Store the given data in the ring buffer
          *
          * @tparam InputIt The type of the iterator

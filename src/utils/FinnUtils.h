@@ -131,6 +131,13 @@ namespace FinnUtils {
         throw E(msg);
     }
 
+    /**
+     * @brief Calculates the number of elements in a tensor given its shape.
+     * @attention This does NOT calculate the size of a buffer on that same tensor. Due to XRT min page size, every size is atleast 4096 elements large!!! 
+     * 
+     * @param pShape 
+     * @return size_t 
+     */
     inline size_t shapeToElements(const shape_t& pShape) { return static_cast<size_t>(std::accumulate(pShape.begin(), pShape.end(), 1, std::multiplies<>())); }
 
     template<typename T, size_t S>

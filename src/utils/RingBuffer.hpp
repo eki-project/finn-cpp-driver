@@ -193,6 +193,61 @@ class RingBuffer {
     }
 
     /**
+     * @brief This does the same as store(), but does _not_ check on the length of the passed vector and does NOT provide mutexes (i.e. thread safety)
+     * @attention This function is NOT THEAD SAFE! 
+     * 
+     * @param data 
+     * @return true 
+     * @return false 
+     */
+    bool storeFast(const std::vector<T>& data) {
+        index_t indexP = 0;
+        auto bufferSize = buffer.size();
+        index_t elementIndex = headPart * elementsPerPart;
+        for (unsigned int i = 0; i < parts; ++i) {
+            indexP = (headPart + i) % parts;
+            if (!validParts[indexP]) {
+                for (size_t j = 0; j < data.size(); ++j) {
+                    buffer[elementIndex++] = data[j];
+                }
+                validParts[indexP] = true;
+                headPart = (indexP + 1) % parts;
+                return true;
+            }
+            elementIndex = (elementIndex + elementsPerPart) % bufferSize;
+        }
+    }
+
+    /**
+     * @brief This does the same as store(), but does _not_ check on the length of the passed vector and does NOT provide mutexes (i.e. thread safety)
+     * @attention This function is NOT THEAD SAFE! 
+     * 
+     * @tparam IteratorType 
+     * @param first 
+     * @param last 
+     * @return true 
+     * @return false 
+     */
+    template<typename IteratorType>
+    bool storeFast(IteratorType first, IteratorType last) {
+        index_t indexP = 0;
+        auto bufferSize = buffer.size();
+        index_t elementIndex = headPart * elementsPerPart;
+        for (unsigned int i = 0; i < parts; ++i) {
+            indexP = (headPart + i) % parts;
+            if (!validParts[indexP]) {
+                for (auto it = first; it != last; ++it) {
+                    buffer[elementIndex++] = *it;
+                }
+                validParts[indexP] = true;
+                headPart = (indexP + 1) % parts;
+                return true;
+            }
+            elementIndex = (elementIndex + elementsPerPart) % bufferSize;
+        }
+    }
+
+    /**
      * @brief Searches from the position of the head pointer to the first free (invalid data) spot and stores the data, setting the head pointer to this point+1. If no free spot is found, fase is returned
      *
      * @param data

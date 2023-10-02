@@ -24,4 +24,9 @@ class Timer {
         auto res = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - startTime).count();
         return res;
     }
+
+    long int stopNs() {
+        auto res = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - startTime).count();
+        return res;
+    }
 };

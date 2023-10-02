@@ -1,27 +1,25 @@
-#include "core/DeviceBuffer.hpp"
-#include "utils/FinnDatatypes.hpp"
-#include "utils/Logger.h"
+#include "../src/core/DeviceBuffer.hpp"
+#include "../src/utils/FinnDatatypes.hpp"
+#include "../src/utils/Logger.h"
 #include "xrt/xrt_device.h"
 #include "xrt/xrt_kernel.h"
 
 #include <chrono>
 #include <fstream>
+#include <thread>
 
 // Provides config and shapes for testing
-#include "../unittests/core/UnittestConfig.h"
+#include "core/UnittestConfig.h"
 using namespace FinnUnittest;
 
 
-#include "../../src/utils/Timer.hpp"
+#include "../src/utils/Timer.hpp"
 
 const unsigned int benchmarkBufferSize = 10000;
 
 
-
 //TODO: Fix:
 //! Currently for this to work, the sanitizers have to be disabled!
-
-
 
 int main() {
     auto filler = FinnUtils::BufferFiller(0, 255);
@@ -30,8 +28,9 @@ int main() {
     FINN_LOG(Logger::getLogger(), loglevel::info) << "Starting benchmark!";
 
 
-    std::fstream logfile("benchmark_log.txt", std::fstream::out);
+    std::fstream logfile("benchmark_log_execution.txt", std::fstream::out);
 
+    FINN_LOG(Logger::getLogger(), loglevel::info) << "Creating device buffer";
     auto idb = Finn::DeviceInputBuffer<uint8_t>("Tester", device, kernel, myShapePacked, benchmarkBufferSize);
     FINN_LOG(Logger::getLogger(), loglevel::info) << "DeviceBuffer created!";
 

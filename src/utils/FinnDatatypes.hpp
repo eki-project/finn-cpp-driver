@@ -46,6 +46,19 @@ namespace Finn {
          */
         constexpr virtual std::size_t bitwidth() const = 0;
 
+        // /**
+        //  * @brief Queries the bitwidth of data that can be stored in the type
+        //  *
+        //  * @return constexpr std::size_t
+        //  */
+        // constexpr virtual std::size_t dataBitwidth() const {
+        //     if constexpr (sign()) {
+        //         return bitwidth() - 1;
+        //     } else {
+        //         return bitwidth();
+        //     }
+        // }
+
         /**
          * @brief Minimum value that can be stored in the datatype
          *
@@ -341,7 +354,7 @@ namespace Finn {
         /**
          * @brief @see Datatype
          */
-        constexpr double scaleFactor() const { return 1.0 / (1U << I); }
+        constexpr double scaleFactor() const { return 1.0 / (1U << fracBits()); }
 
         /**
          * @brief @see Datatype

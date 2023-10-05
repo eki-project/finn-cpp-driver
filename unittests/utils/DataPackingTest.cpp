@@ -253,23 +253,122 @@ std::array<uint8_t, 288> mat21 = {0,   2,   8,   24, 64, 160, 128, 129, 3,   8, 
                                   192, 130, 9,   27, 70, 172, 152, 177, 99,  200, 146, 41,  91, 198, 172, 153, 179, 103, 208, 162, 73,  155, 70, 173, 154, 181, 107, 216, 178, 105, 219, 198, 173, 155, 183, 111,
                                   224, 194, 137, 27, 71, 174, 156, 185, 115, 232, 210, 169, 91, 199, 174, 157, 187, 119, 240, 226, 201, 155, 71, 175, 158, 189, 123, 248, 242, 233, 219, 199, 175, 159, 191, 127};
 
-TEST(DataPacking, IntTest) {
-    auto ret = Finn::pack<Finn::DatatypeInt<32>>(inputMat.begin(), inputMat.end());
+std::array<double, 256> inputMat7 = {
+    2.5000e-01, 1.2500e+00, 2.2500e+00, 3.2500e+00, 4.2500e+00, 5.2500e+00, 6.2500e+00, 7.2500e+00, 8.2500e+00, 9.2500e+00, 1.0250e+01, 1.1250e+01, 1.2250e+01, 1.3250e+01, 1.4250e+01, 1.5250e+01, 1.6250e+01, 1.7250e+01, 1.8250e+01,
+    1.9250e+01, 2.0250e+01, 2.1250e+01, 2.2250e+01, 2.3250e+01, 2.4250e+01, 2.5250e+01, 2.6250e+01, 2.7250e+01, 2.8250e+01, 2.9250e+01, 3.0250e+01, 3.1250e+01, 3.2250e+01, 3.3250e+01, 3.4250e+01, 3.5250e+01, 3.6250e+01, 3.7250e+01,
+    3.8250e+01, 3.9250e+01, 4.0250e+01, 4.1250e+01, 4.2250e+01, 4.3250e+01, 4.4250e+01, 4.5250e+01, 4.6250e+01, 4.7250e+01, 4.8250e+01, 4.9250e+01, 5.0250e+01, 5.1250e+01, 5.2250e+01, 5.3250e+01, 5.4250e+01, 5.5250e+01, 5.6250e+01,
+    5.7250e+01, 5.8250e+01, 5.9250e+01, 6.0250e+01, 6.1250e+01, 6.2250e+01, 6.3250e+01, 6.4250e+01, 6.5250e+01, 6.6250e+01, 6.7250e+01, 6.8250e+01, 6.9250e+01, 7.0250e+01, 7.1250e+01, 7.2250e+01, 7.3250e+01, 7.4250e+01, 7.5250e+01,
+    7.6250e+01, 7.7250e+01, 7.8250e+01, 7.9250e+01, 8.0250e+01, 8.1250e+01, 8.2250e+01, 8.3250e+01, 8.4250e+01, 8.5250e+01, 8.6250e+01, 8.7250e+01, 8.8250e+01, 8.9250e+01, 9.0250e+01, 9.1250e+01, 9.2250e+01, 9.3250e+01, 9.4250e+01,
+    9.5250e+01, 9.6250e+01, 9.7250e+01, 9.8250e+01, 9.9250e+01, 1.0025e+02, 1.0125e+02, 1.0225e+02, 1.0325e+02, 1.0425e+02, 1.0525e+02, 1.0625e+02, 1.0725e+02, 1.0825e+02, 1.0925e+02, 1.1025e+02, 1.1125e+02, 1.1225e+02, 1.1325e+02,
+    1.1425e+02, 1.1525e+02, 1.1625e+02, 1.1725e+02, 1.1825e+02, 1.1925e+02, 1.2025e+02, 1.2125e+02, 1.2225e+02, 1.2325e+02, 1.2425e+02, 1.2525e+02, 1.2625e+02, 1.2725e+02, 1.2825e+02, 1.2925e+02, 1.3025e+02, 1.3125e+02, 1.3225e+02,
+    1.3325e+02, 1.3425e+02, 1.3525e+02, 1.3625e+02, 1.3725e+02, 1.3825e+02, 1.3925e+02, 1.4025e+02, 1.4125e+02, 1.4225e+02, 1.4325e+02, 1.4425e+02, 1.4525e+02, 1.4625e+02, 1.4725e+02, 1.4825e+02, 1.4925e+02, 1.5025e+02, 1.5125e+02,
+    1.5225e+02, 1.5325e+02, 1.5425e+02, 1.5525e+02, 1.5625e+02, 1.5725e+02, 1.5825e+02, 1.5925e+02, 1.6025e+02, 1.6125e+02, 1.6225e+02, 1.6325e+02, 1.6425e+02, 1.6525e+02, 1.6625e+02, 1.6725e+02, 1.6825e+02, 1.6925e+02, 1.7025e+02,
+    1.7125e+02, 1.7225e+02, 1.7325e+02, 1.7425e+02, 1.7525e+02, 1.7625e+02, 1.7725e+02, 1.7825e+02, 1.7925e+02, 1.8025e+02, 1.8125e+02, 1.8225e+02, 1.8325e+02, 1.8425e+02, 1.8525e+02, 1.8625e+02, 1.8725e+02, 1.8825e+02, 1.8925e+02,
+    1.9025e+02, 1.9125e+02, 1.9225e+02, 1.9325e+02, 1.9425e+02, 1.9525e+02, 1.9625e+02, 1.9725e+02, 1.9825e+02, 1.9925e+02, 2.0025e+02, 2.0125e+02, 2.0225e+02, 2.0325e+02, 2.0425e+02, 2.0525e+02, 2.0625e+02, 2.0725e+02, 2.0825e+02,
+    2.0925e+02, 2.1025e+02, 2.1125e+02, 2.1225e+02, 2.1325e+02, 2.1425e+02, 2.1525e+02, 2.1625e+02, 2.1725e+02, 2.1825e+02, 2.1925e+02, 2.2025e+02, 2.2125e+02, 2.2225e+02, 2.2325e+02, 2.2425e+02, 2.2525e+02, 2.2625e+02, 2.2725e+02,
+    2.2825e+02, 2.2925e+02, 2.3025e+02, 2.3125e+02, 2.3225e+02, 2.3325e+02, 2.3425e+02, 2.3525e+02, 2.3625e+02, 2.3725e+02, 2.3825e+02, 2.3925e+02, 2.4025e+02, 2.4125e+02, 2.4225e+02, 2.4325e+02, 2.4425e+02, 2.4525e+02, 2.4625e+02,
+    2.4725e+02, 2.4825e+02, 2.4925e+02, 2.5025e+02, 2.5125e+02, 2.5225e+02, 2.5325e+02, 2.5425e+02, 2.5525e+02};
+
+// FLOAT32
+std::array<uint8_t, 1024> mat22 = {
+    0, 0,   128, 62, 0, 0,   160, 63, 0, 0,   16,  64, 0, 0,   80,  64, 0, 0,   136, 64, 0, 0,   168, 64, 0, 0,   200, 64, 0, 0,   232, 64, 0, 0,   4,   65, 0, 0,   20,  65, 0, 0,   36,  65, 0, 0,   52,  65, 0, 0,   68,  65,
+    0, 0,   84,  65, 0, 0,   100, 65, 0, 0,   116, 65, 0, 0,   130, 65, 0, 0,   138, 65, 0, 0,   146, 65, 0, 0,   154, 65, 0, 0,   162, 65, 0, 0,   170, 65, 0, 0,   178, 65, 0, 0,   186, 65, 0, 0,   194, 65, 0, 0,   202, 65,
+    0, 0,   210, 65, 0, 0,   218, 65, 0, 0,   226, 65, 0, 0,   234, 65, 0, 0,   242, 65, 0, 0,   250, 65, 0, 0,   1,   66, 0, 0,   5,   66, 0, 0,   9,   66, 0, 0,   13,  66, 0, 0,   17,  66, 0, 0,   21,  66, 0, 0,   25,  66,
+    0, 0,   29,  66, 0, 0,   33,  66, 0, 0,   37,  66, 0, 0,   41,  66, 0, 0,   45,  66, 0, 0,   49,  66, 0, 0,   53,  66, 0, 0,   57,  66, 0, 0,   61,  66, 0, 0,   65,  66, 0, 0,   69,  66, 0, 0,   73,  66, 0, 0,   77,  66,
+    0, 0,   81,  66, 0, 0,   85,  66, 0, 0,   89,  66, 0, 0,   93,  66, 0, 0,   97,  66, 0, 0,   101, 66, 0, 0,   105, 66, 0, 0,   109, 66, 0, 0,   113, 66, 0, 0,   117, 66, 0, 0,   121, 66, 0, 0,   125, 66, 0, 128, 128, 66,
+    0, 128, 130, 66, 0, 128, 132, 66, 0, 128, 134, 66, 0, 128, 136, 66, 0, 128, 138, 66, 0, 128, 140, 66, 0, 128, 142, 66, 0, 128, 144, 66, 0, 128, 146, 66, 0, 128, 148, 66, 0, 128, 150, 66, 0, 128, 152, 66, 0, 128, 154, 66,
+    0, 128, 156, 66, 0, 128, 158, 66, 0, 128, 160, 66, 0, 128, 162, 66, 0, 128, 164, 66, 0, 128, 166, 66, 0, 128, 168, 66, 0, 128, 170, 66, 0, 128, 172, 66, 0, 128, 174, 66, 0, 128, 176, 66, 0, 128, 178, 66, 0, 128, 180, 66,
+    0, 128, 182, 66, 0, 128, 184, 66, 0, 128, 186, 66, 0, 128, 188, 66, 0, 128, 190, 66, 0, 128, 192, 66, 0, 128, 194, 66, 0, 128, 196, 66, 0, 128, 198, 66, 0, 128, 200, 66, 0, 128, 202, 66, 0, 128, 204, 66, 0, 128, 206, 66,
+    0, 128, 208, 66, 0, 128, 210, 66, 0, 128, 212, 66, 0, 128, 214, 66, 0, 128, 216, 66, 0, 128, 218, 66, 0, 128, 220, 66, 0, 128, 222, 66, 0, 128, 224, 66, 0, 128, 226, 66, 0, 128, 228, 66, 0, 128, 230, 66, 0, 128, 232, 66,
+    0, 128, 234, 66, 0, 128, 236, 66, 0, 128, 238, 66, 0, 128, 240, 66, 0, 128, 242, 66, 0, 128, 244, 66, 0, 128, 246, 66, 0, 128, 248, 66, 0, 128, 250, 66, 0, 128, 252, 66, 0, 128, 254, 66, 0, 64,  0,   67, 0, 64,  1,   67,
+    0, 64,  2,   67, 0, 64,  3,   67, 0, 64,  4,   67, 0, 64,  5,   67, 0, 64,  6,   67, 0, 64,  7,   67, 0, 64,  8,   67, 0, 64,  9,   67, 0, 64,  10,  67, 0, 64,  11,  67, 0, 64,  12,  67, 0, 64,  13,  67, 0, 64,  14,  67,
+    0, 64,  15,  67, 0, 64,  16,  67, 0, 64,  17,  67, 0, 64,  18,  67, 0, 64,  19,  67, 0, 64,  20,  67, 0, 64,  21,  67, 0, 64,  22,  67, 0, 64,  23,  67, 0, 64,  24,  67, 0, 64,  25,  67, 0, 64,  26,  67, 0, 64,  27,  67,
+    0, 64,  28,  67, 0, 64,  29,  67, 0, 64,  30,  67, 0, 64,  31,  67, 0, 64,  32,  67, 0, 64,  33,  67, 0, 64,  34,  67, 0, 64,  35,  67, 0, 64,  36,  67, 0, 64,  37,  67, 0, 64,  38,  67, 0, 64,  39,  67, 0, 64,  40,  67,
+    0, 64,  41,  67, 0, 64,  42,  67, 0, 64,  43,  67, 0, 64,  44,  67, 0, 64,  45,  67, 0, 64,  46,  67, 0, 64,  47,  67, 0, 64,  48,  67, 0, 64,  49,  67, 0, 64,  50,  67, 0, 64,  51,  67, 0, 64,  52,  67, 0, 64,  53,  67,
+    0, 64,  54,  67, 0, 64,  55,  67, 0, 64,  56,  67, 0, 64,  57,  67, 0, 64,  58,  67, 0, 64,  59,  67, 0, 64,  60,  67, 0, 64,  61,  67, 0, 64,  62,  67, 0, 64,  63,  67, 0, 64,  64,  67, 0, 64,  65,  67, 0, 64,  66,  67,
+    0, 64,  67,  67, 0, 64,  68,  67, 0, 64,  69,  67, 0, 64,  70,  67, 0, 64,  71,  67, 0, 64,  72,  67, 0, 64,  73,  67, 0, 64,  74,  67, 0, 64,  75,  67, 0, 64,  76,  67, 0, 64,  77,  67, 0, 64,  78,  67, 0, 64,  79,  67,
+    0, 64,  80,  67, 0, 64,  81,  67, 0, 64,  82,  67, 0, 64,  83,  67, 0, 64,  84,  67, 0, 64,  85,  67, 0, 64,  86,  67, 0, 64,  87,  67, 0, 64,  88,  67, 0, 64,  89,  67, 0, 64,  90,  67, 0, 64,  91,  67, 0, 64,  92,  67,
+    0, 64,  93,  67, 0, 64,  94,  67, 0, 64,  95,  67, 0, 64,  96,  67, 0, 64,  97,  67, 0, 64,  98,  67, 0, 64,  99,  67, 0, 64,  100, 67, 0, 64,  101, 67, 0, 64,  102, 67, 0, 64,  103, 67, 0, 64,  104, 67, 0, 64,  105, 67,
+    0, 64,  106, 67, 0, 64,  107, 67, 0, 64,  108, 67, 0, 64,  109, 67, 0, 64,  110, 67, 0, 64,  111, 67, 0, 64,  112, 67, 0, 64,  113, 67, 0, 64,  114, 67, 0, 64,  115, 67, 0, 64,  116, 67, 0, 64,  117, 67, 0, 64,  118, 67,
+    0, 64,  119, 67, 0, 64,  120, 67, 0, 64,  121, 67, 0, 64,  122, 67, 0, 64,  123, 67, 0, 64,  124, 67, 0, 64,  125, 67, 0, 64,  126, 67, 0, 64,  127, 67};
+
+// Fixed<16,10>
+std::array<uint8_t, 512> mat23 = {16, 0,  80, 0,  144, 0,  208, 0,  16, 1,  80, 1,  144, 1,  208, 1,  16, 2,  80, 2,  144, 2,  208, 2,  16, 3,  80, 3,  144, 3,  208, 3,  16, 4,  80, 4,  144, 4,  208, 4,  16, 5,  80, 5,  144, 5,  208, 5,
+                                  16, 6,  80, 6,  144, 6,  208, 6,  16, 7,  80, 7,  144, 7,  208, 7,  16, 8,  80, 8,  144, 8,  208, 8,  16, 9,  80, 9,  144, 9,  208, 9,  16, 10, 80, 10, 144, 10, 208, 10, 16, 11, 80, 11, 144, 11, 208, 11,
+                                  16, 12, 80, 12, 144, 12, 208, 12, 16, 13, 80, 13, 144, 13, 208, 13, 16, 14, 80, 14, 144, 14, 208, 14, 16, 15, 80, 15, 144, 15, 208, 15, 16, 16, 80, 16, 144, 16, 208, 16, 16, 17, 80, 17, 144, 17, 208, 17,
+                                  16, 18, 80, 18, 144, 18, 208, 18, 16, 19, 80, 19, 144, 19, 208, 19, 16, 20, 80, 20, 144, 20, 208, 20, 16, 21, 80, 21, 144, 21, 208, 21, 16, 22, 80, 22, 144, 22, 208, 22, 16, 23, 80, 23, 144, 23, 208, 23,
+                                  16, 24, 80, 24, 144, 24, 208, 24, 16, 25, 80, 25, 144, 25, 208, 25, 16, 26, 80, 26, 144, 26, 208, 26, 16, 27, 80, 27, 144, 27, 208, 27, 16, 28, 80, 28, 144, 28, 208, 28, 16, 29, 80, 29, 144, 29, 208, 29,
+                                  16, 30, 80, 30, 144, 30, 208, 30, 16, 31, 80, 31, 144, 31, 208, 31, 16, 32, 80, 32, 144, 32, 208, 32, 16, 33, 80, 33, 144, 33, 208, 33, 16, 34, 80, 34, 144, 34, 208, 34, 16, 35, 80, 35, 144, 35, 208, 35,
+                                  16, 36, 80, 36, 144, 36, 208, 36, 16, 37, 80, 37, 144, 37, 208, 37, 16, 38, 80, 38, 144, 38, 208, 38, 16, 39, 80, 39, 144, 39, 208, 39, 16, 40, 80, 40, 144, 40, 208, 40, 16, 41, 80, 41, 144, 41, 208, 41,
+                                  16, 42, 80, 42, 144, 42, 208, 42, 16, 43, 80, 43, 144, 43, 208, 43, 16, 44, 80, 44, 144, 44, 208, 44, 16, 45, 80, 45, 144, 45, 208, 45, 16, 46, 80, 46, 144, 46, 208, 46, 16, 47, 80, 47, 144, 47, 208, 47,
+                                  16, 48, 80, 48, 144, 48, 208, 48, 16, 49, 80, 49, 144, 49, 208, 49, 16, 50, 80, 50, 144, 50, 208, 50, 16, 51, 80, 51, 144, 51, 208, 51, 16, 52, 80, 52, 144, 52, 208, 52, 16, 53, 80, 53, 144, 53, 208, 53,
+                                  16, 54, 80, 54, 144, 54, 208, 54, 16, 55, 80, 55, 144, 55, 208, 55, 16, 56, 80, 56, 144, 56, 208, 56, 16, 57, 80, 57, 144, 57, 208, 57, 16, 58, 80, 58, 144, 58, 208, 58, 16, 59, 80, 59, 144, 59, 208, 59,
+                                  16, 60, 80, 60, 144, 60, 208, 60, 16, 61, 80, 61, 144, 61, 208, 61, 16, 62, 80, 62, 144, 62, 208, 62, 16, 63, 80, 63, 144, 63, 208, 63};
+
+TEST(DataPacking, IntInputTest) {
+    std::array<int, 300> inputM = {};
+    std::copy(inputMat.begin(), inputMat.end(), inputM.begin());
+    auto ret = Finn::pack<Finn::DatatypeInt<32>>(inputM.begin(), inputM.end());
     EXPECT_TRUE(mat1.size() == ret.size() && std::equal(ret.begin(), ret.end(), mat1.begin()));
 
-    ret = Finn::pack<Finn::DatatypeInt<24>>(inputMat.begin(), inputMat.end());
+    std::copy(inputMat.begin(), inputMat.end(), inputM.begin());
+    ret = Finn::pack<Finn::DatatypeInt<24>>(inputM.begin(), inputM.end());
     EXPECT_TRUE(mat2.size() == ret.size() && std::equal(ret.begin(), ret.end(), mat2.begin()));
 
-    ret = Finn::pack<Finn::DatatypeInt<16>>(inputMat.begin(), inputMat.end());
+    std::copy(inputMat.begin(), inputMat.end(), inputM.begin());
+    ret = Finn::pack<Finn::DatatypeInt<16>>(inputM.begin(), inputM.end());
     EXPECT_TRUE(mat3.size() == ret.size() && std::equal(ret.begin(), ret.end(), mat3.begin()));
 
-    ret = Finn::pack<Finn::DatatypeInt<10>>(inputMat.begin(), inputMat.end());
-    std::vector<int> dummy(ret.begin(), ret.end());
-    std::cout << join(dummy, " ") << "\n";
+    std::copy(inputMat.begin(), inputMat.end(), inputM.begin());
+    ret = Finn::pack<Finn::DatatypeInt<10>>(inputM.begin(), inputM.end());
     EXPECT_TRUE(mat4.size() == ret.size() && std::equal(ret.begin(), ret.end(), mat4.begin()));
+
+    std::copy(inputMat.begin(), inputMat.end(), inputM.begin());
+    ret = Finn::pack<Finn::DatatypeUInt<9>>(inputM.begin(), inputM.end());
+    EXPECT_TRUE(mat5.size() == ret.size() && std::equal(ret.begin(), ret.end(), mat5.begin()));
+
+    std::copy(inputMat.begin(), inputMat.end(), inputM.begin());
+    ret = Finn::pack<Finn::DatatypeFloat>(inputM.begin(), inputM.end());
+    EXPECT_TRUE(mat6.size() == ret.size() && std::equal(ret.begin(), ret.end(), mat6.begin()));
+
+    std::copy(inputMat.begin(), inputMat.end(), inputM.begin());
+    ret = Finn::pack<Finn::DatatypeFixed<12, 10>>(inputM.begin(), inputM.end());
+    EXPECT_TRUE(mat7.size() == ret.size() && std::equal(ret.begin(), ret.end(), mat7.begin()));
+
+    std::copy(inputMat.begin(), inputMat.end(), inputM.begin());
+    ret = Finn::pack<Finn::DatatypeFixed<11, 10>>(inputM.begin(), inputM.end());
+    EXPECT_TRUE(mat8.size() == ret.size() && std::equal(ret.begin(), ret.end(), mat8.begin()));
+
+    std::copy(inputMat.begin(), inputMat.end(), inputM.begin());
+    ret = Finn::pack<Finn::DatatypeFixed<16, 10>>(inputM.begin(), inputM.end());
+    EXPECT_TRUE(mat9.size() == ret.size() && std::equal(ret.begin(), ret.end(), mat9.begin()));
+
+    // inputMat1
+
+    ret = Finn::pack<Finn::DatatypeInt<10>>(inputMat1.begin(), inputMat1.end());
+    EXPECT_TRUE(mat10.size() == ret.size() && std::equal(ret.begin(), ret.end(), mat10.begin()));
+
+    ret = Finn::pack<Finn::DatatypeInt<8>>(inputMat1.begin(), inputMat1.end());
+    EXPECT_TRUE(mat11.size() == ret.size() && std::equal(ret.begin(), ret.end(), mat11.begin()));
+
+    ret = Finn::pack<Finn::DatatypeBinary>(inputMat1.begin(), inputMat1.end());
+    EXPECT_TRUE(mat12.size() == ret.size() && std::equal(ret.begin(), ret.end(), mat12.begin()));
+
+    // inputMat2
+
+    ret = Finn::pack<Finn::DatatypeInt<8>>(inputMat2.begin(), inputMat2.end());
+    EXPECT_TRUE(mat13.size() == ret.size() && std::equal(ret.begin(), ret.end(), mat13.begin()));
+
+    ret = Finn::pack<Finn::DatatypeBipolar>(inputMat2.begin(), inputMat2.end());
+    EXPECT_TRUE(mat14.size() == ret.size() && std::equal(ret.begin(), ret.end(), mat14.begin()));
+
+    // inputMat3
+
+    ret = Finn::pack<Finn::DatatypeTernary>(inputMat3.begin(), inputMat3.end());
+    EXPECT_TRUE(mat15.size() == ret.size() && std::equal(ret.begin(), ret.end(), mat15.begin()));
 }
 
-TEST(DataPacking, Uint8Test) {
+TEST(DataPacking, Uint8InputTest) {
     auto ret = Finn::pack<Finn::DatatypeUInt<8>>(inputMat4.begin(), inputMat4.end());
     EXPECT_TRUE(mat16.size() == ret.size() && std::equal(ret.begin(), ret.end(), mat16.begin()));
 
@@ -286,7 +385,7 @@ TEST(DataPacking, Uint8Test) {
 }
 
 
-TEST(DataPacking, Int8Test) {
+TEST(DataPacking, Int8InputTest) {
     auto ret = Finn::pack<Finn::DatatypeUInt<8>>(inputMat5.begin(), inputMat5.end());
     EXPECT_TRUE(mat18.size() == ret.size() && std::equal(ret.begin(), ret.end(), mat18.begin()));
 
@@ -302,6 +401,23 @@ TEST(DataPacking, Int8Test) {
     EXPECT_TRUE(mat19.size() == ret.size() && std::equal(ret.begin(), ret.end(), mat19.begin()));
 }
 
+TEST(DataPacking, FloatingPointInputTest) {
+    auto ret = Finn::pack<Finn::DatatypeUInt<8>>(inputMat6.begin(), inputMat6.end());
+    EXPECT_TRUE(mat20.size() == ret.size() && std::equal(ret.begin(), ret.end(), mat20.begin()));
+
+    ret = Finn::pack<Finn::DatatypeInt<9>>(inputMat6.begin(), inputMat6.end());
+    EXPECT_TRUE(mat21.size() == ret.size() && std::equal(ret.begin(), ret.end(), mat21.begin()));
+
+    std::array<double, 256> inputM = {};
+    std::copy(inputMat7.begin(), inputMat7.end(), inputM.begin());
+
+    ret = Finn::pack<Finn::DatatypeFloat>(inputM.begin(), inputM.end());
+    EXPECT_TRUE(mat22.size() == ret.size() && std::equal(ret.begin(), ret.end(), mat22.begin()));
+
+    ret = Finn::pack<Finn::DatatypeFixed<16, 10>>(inputM.begin(), inputM.end());
+    EXPECT_TRUE(mat23.size() == ret.size() && std::equal(ret.begin(), ret.end(), mat23.begin()));
+}
+
 TEST(DataPacking, IntegralToBitsetTest) {
     std::vector<uint8_t> inp = {0, 1, 2, 3, 4, 5, 6, 7};
     auto ret = Finn::toBitset<Finn::DatatypeUInt<3>, true, false>(inp);
@@ -312,6 +428,13 @@ TEST(DataPacking, IntegralToBitsetTest) {
     inp = {0, 1};
     ret = Finn::toBitset<Finn::DatatypeUInt<3>, true, true>(inp);
     std::vector<uint8_t> groundTruth = {0, 4};
+    retElems.clear();
+    std::transform(ret.begin(), ret.end(), std::back_inserter(retElems), [](const std::bitset<3>& bit) { return bit.to_ulong(); });
+    EXPECT_EQ(groundTruth, retElems);
+
+    std::vector<int8_t> inp2 = {2, 3, -2, -3};
+    ret = Finn::toBitset<Finn::DatatypeInt<3>, true, true>(inp2);
+    groundTruth = {2, 6, 3, 5};
     retElems.clear();
     std::transform(ret.begin(), ret.end(), std::back_inserter(retElems), [](const std::bitset<3>& bit) { return bit.to_ulong(); });
     EXPECT_EQ(groundTruth, retElems);
@@ -371,9 +494,9 @@ TEST(DataPacking, MergeBitsets) {
 TEST(DataPacking, BitsetToByteVector) {
     std::vector<uint8_t> inp = {0, 1, 2, 3, 4, 5, 6, 7};
     auto ret = Finn::toBitset<Finn::DatatypeUInt<3>, true, false>(inp);
-    auto ret2 = Finn::mergeBitsets<Finn::DatatypeUInt<3>>(ret);
+    auto ret2 = Finn::mergeBitsets<Finn::DatatypeUInt<3>, false>(ret);
     auto ret3 = Finn::bitsetToByteVector(ret2);
-    std::vector<uint8_t> base = {17, 99, 95};
+    std::vector<uint8_t> base = {136, 198, 250};
     EXPECT_EQ(base, ret3);
 }
 

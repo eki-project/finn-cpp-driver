@@ -2,7 +2,9 @@
 #define FINN_UTILS_H
 
 #include <algorithm>
+#include <bit>
 #include <cmath>
+#include <concepts>
 #include <cstdint>
 #include <limits>
 #include <numeric>
@@ -31,13 +33,84 @@ namespace FinnUtils {
         }
     };
 
+
+    template<typename T>
+    concept FloatingPoint = std::is_floating_point_v<T> && (sizeof(T) == 4 || sizeof(T) == 8) &&  // Only 32/64 bit allowed. 80 bit fp not allowed
+                            sizeof(float) == 4 && sizeof(double) == 8 &&                          // float must be 32 bit fp while double must be 64 bit fp
+                            std::numeric_limits<T>::is_iec559 == true &&                          // Only IEEE 754 fp allowed
+                            std::endian::native == std::endian::little;
+
     /**
-     * @brief Return the ceil of a float as in integer type
+     * @brief Helper function for ceil. Checks if param is inf. Based on https://codereview.stackexchange.com/questions/248169/two-constexpr-ceil-functions
      *
-     * @param num
-     * @return constexpr int32_t
+     * @tparam T
+     * @param inFp
+     * @return true
+     * @return false
      */
-    constexpr int32_t ceil(float num) { return (static_cast<float>(static_cast<int32_t>(num)) == num) ? static_cast<int32_t>(num) : static_cast<int32_t>(num) + ((num > 0) ? 1 : 0); }
+    template<FloatingPoint T>
+    constexpr bool isInf(T inFp)  // detect if infinity or -infinity
+    {
+        constexpr bool isTFloat = std::is_same_v<T, float>;
+        using uintN_t = std::conditional_t<isTFloat, uint32_t, uint64_t>;
+        using intN_t = std::conditional_t<isTFloat, int32_t, int64_t>;
+
+        constexpr uintN_t mantissaBitNumber = isTFloat ? 23 : 52;
+        constexpr uintN_t infinityExponentValue = isTFloat ? 0xff : 0x7ff;                     // the value of the exponent if infinity
+        constexpr uintN_t positiveInfinityValue = infinityExponentValue << mantissaBitNumber;  // the value of positive infinity
+        constexpr uintN_t signRemovalMask = std::numeric_limits<intN_t>::max();                // the max value of a signed int is all bits set to one except sign
+
+        return ((std::bit_cast<uintN_t, T>(inFp) & signRemovalMask) == positiveInfinityValue);  // remove sign before comparing against positive infinity value
+    }
+
+    /**
+     * @brief Helper function for ceil. Checks if param is NaN. Based on https://codereview.stackexchange.com/questions/248169/two-constexpr-ceil-functions
+     *
+     * @tparam T
+     * @param inFp
+     * @return true
+     * @return false
+     */
+    template<FloatingPoint T>
+    constexpr bool isNaN(T inFp) {
+        constexpr bool isTFloat = std::is_same_v<T, float>;
+        using uintN_t = std::conditional_t<isTFloat, uint32_t, uint64_t>;
+        using intN_t = std::conditional_t<isTFloat, int32_t, int64_t>;
+
+        constexpr uintN_t mantissaBitNumber = isTFloat ? 23 : 52;
+        constexpr uintN_t NaNExponentValue = isTFloat ? 0xff : 0x7ff;            // the value of the exponent if NaN
+        constexpr uintN_t signRemovalMask = std::numeric_limits<intN_t>::max();  // the max value of a signed int is all bits set to one except sign
+        constexpr uintN_t exponentMask = NaNExponentValue << mantissaBitNumber;
+        constexpr uintN_t mantissaMask = (~exponentMask) & signRemovalMask;  // the bits of the mantissa are 1's, sign and exponent 0's.
+
+        return (((std::bit_cast<uintN_t, T>(inFp) & exponentMask) == exponentMask) &&  // if exponent is all 1's
+                ((std::bit_cast<uintN_t, T>(inFp) & mantissaMask) != 0)                // if mantissa is != 0
+        );
+    }
+
+    /**
+     * @brief constexpr ceil function based on https://codereview.stackexchange.com/questions/248169/two-constexpr-ceil-functions
+     *
+     * @tparam T
+     * @param inFp
+     * @return constexpr T
+     */
+    template<FloatingPoint T>
+    constexpr T ceil(const T inFp)  // simpler version
+    {
+        if (isInf<T>(inFp) || isNaN<T>(inFp)) {
+            return inFp;
+        }
+
+        constexpr bool isTFloat = std::is_same_v<T, float>;
+        using intN_t = std::conditional_t<isTFloat, int32_t, int64_t>;
+
+        if (inFp > 0 && inFp != static_cast<intN_t>(inFp)) {
+            return static_cast<intN_t>(inFp + 1);
+        } else {
+            return static_cast<intN_t>(inFp);
+        }
+    }
 
     /**
      * @brief Return the innermost dimension of a shape. For example for (1,30,10) this would return 10

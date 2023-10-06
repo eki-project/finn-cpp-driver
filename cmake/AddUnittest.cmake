@@ -1,8 +1,10 @@
 function(add_unittest test_name)
-  list(APPEND CMAKE_MESSAGE_INDENT "  ") #indent +1
-  message(STATUS "Set-up unittest: ${test_name}")
-  list(POP_BACK CMAKE_MESSAGE_INDENT)    #indent -1
   get_filename_component(test ${test_name} NAME_WE)
+
+  list(APPEND CMAKE_MESSAGE_INDENT "  ") #indent +1
+  message(STATUS "Set-up unittest: ${test}")
+  list(POP_BACK CMAKE_MESSAGE_INDENT)    #indent -1
+  
   add_executable(${test}
     ${test_name}
   )
@@ -16,8 +18,11 @@ function(add_unittest test_name)
     finnc_utils
     finnc_core_test
     xrt_mock
+    OpenMP::OpenMP_CXX
     # -Wl,--no-as-needed -lm -ldl
   )
+
+  target_include_directories(${test} PRIVATE ${FINNC_SRC_DIR})
 
   target_compile_definitions(${test} PRIVATE UNITTEST=1)
 

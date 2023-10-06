@@ -218,6 +218,11 @@ namespace Finn {
          public:
         constexpr DatatypeFloat() = default;
         constexpr ~DatatypeFloat() override = default;
+        constexpr DatatypeFloat(DatatypeFloat&&) noexcept = default;
+        constexpr DatatypeFloat(DatatypeFloat const&) = default;
+        DatatypeFloat& operator=(DatatypeFloat&&) noexcept = default;
+        DatatypeFloat& operator=(const DatatypeFloat&) = default;
+
         /**
          * @brief @see Datatype
          */
@@ -275,6 +280,11 @@ namespace Finn {
          public:
         constexpr DatatypeInt() = default;
         constexpr ~DatatypeInt() override = default;
+        constexpr DatatypeInt(DatatypeInt<B>&&) noexcept = default;
+        constexpr DatatypeInt(DatatypeInt<B> const&) = default;
+        constexpr DatatypeInt<B>& operator=(DatatypeInt<B>&&) noexcept = default;
+        constexpr DatatypeInt<B>& operator=(const DatatypeInt<B>&) = default;
+
         /**
          * @brief @see Datatype
          */
@@ -332,6 +342,10 @@ namespace Finn {
          public:
         constexpr DatatypeFixed() = default;
         constexpr ~DatatypeFixed() override = default;
+        constexpr DatatypeFixed(DatatypeFixed<B, I>&&) noexcept = default;
+        constexpr DatatypeFixed(DatatypeFixed<B, I> const&) = default;
+        constexpr DatatypeFixed<B, I>& operator=(DatatypeFixed<B, I>&&) noexcept = default;
+        constexpr DatatypeFixed<B, I>& operator=(const DatatypeFixed<B, I>&) = default;
         /**
          * @brief @see Datatype
          */
@@ -403,6 +417,11 @@ namespace Finn {
          public:
         constexpr DatatypeUInt() = default;
         constexpr ~DatatypeUInt() override = default;
+        constexpr DatatypeUInt(DatatypeUInt<B>&&) noexcept = default;
+        constexpr DatatypeUInt(DatatypeUInt<B> const&) = default;
+        constexpr DatatypeUInt<B>& operator=(DatatypeUInt<B>&&) noexcept = default;
+        constexpr DatatypeUInt<B>& operator=(const DatatypeUInt<B>&) = default;
+
         /**
          * @brief @see Datatype
          */
@@ -464,6 +483,10 @@ namespace Finn {
          public:
         constexpr DatatypeBipolar() = default;
         constexpr ~DatatypeBipolar() override = default;
+        constexpr DatatypeBipolar(DatatypeBipolar&&) noexcept = default;
+        constexpr DatatypeBipolar(DatatypeBipolar const&) = default;
+        DatatypeBipolar& operator=(DatatypeBipolar&&) noexcept = default;
+        DatatypeBipolar& operator=(const DatatypeBipolar&) = default;
         /**
          * @brief @see Datatype
          */
@@ -523,6 +546,10 @@ namespace Finn {
          public:
         constexpr DatatypeTernary() = default;
         constexpr ~DatatypeTernary() override = default;
+        constexpr DatatypeTernary(DatatypeTernary&&) noexcept = default;
+        constexpr DatatypeTernary(DatatypeTernary const&) = default;
+        DatatypeTernary& operator=(DatatypeTernary&&) noexcept = default;
+        DatatypeTernary& operator=(const DatatypeTernary&) = default;
         /**
          * @brief @see Datatype
          */

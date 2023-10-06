@@ -1,17 +1,22 @@
 #ifndef DATAPACKING_HPP
 #define DATAPACKING_HPP
 
+#include <omp.h>
+
 #include <algorithm>
 #include <bit>
 #include <bitset>
 #include <boost/dynamic_bitset.hpp>
 #include <concepts>
 #include <cstdint>
+#include <iostream>
 #include <iterator>
 #include <vector>
 
+#include "AlignedAllocator.hpp"
 #include "FinnDatatypes.hpp"
 #include "FinnUtils.h"
+#include "Types.h"
 
 namespace Finn {
     /**
@@ -120,15 +125,14 @@ namespace Finn {
          * @tparam IteratorType
          * @param first iterator pointing to first element of input
          * @param last iterator pointing to last element of input
-         * @return std::vector<std::bitset<U().bitwidth()>> vector of bitsets containing bit representations of inputs
+         * @return Finn::vector<std::bitset<U().bitwidth()>> vector of bitsets containing bit representations of inputs
          */
         template<IsDatatype U, bool invertBytes = true, bool reverseBits = true, typename IteratorType>
-        std::vector<std::bitset<U().bitwidth()>> toBitsetImpl(IteratorType first, IteratorType last) {
+        Finn::vector<std::bitset<U().bitwidth()>> toBitsetImpl(IteratorType first, IteratorType last) {
             using T = std::iterator_traits<IteratorType>::value_type;
             if constexpr (reverseBits) {
                 constexpr std::size_t shift = (sizeof(T) * 8 - U().bitwidth());
                 bitshuffling::Wrapper wrap{};
-                // TODO(linusjun): Parallelize?
                 std::transform(first, last, first, wrap);
                 if constexpr (std::is_same_v<U, DatatypeBipolar>) {
                     std::transform(first, last, first, [](const T& val) { return (val + 1) >> (shift - 1); });  // This converts bipolar to binary
@@ -141,10 +145,10 @@ namespace Finn {
                 }
             }
             if constexpr (invertBytes) {
-                std::vector<std::bitset<U().bitwidth()>> ret(first, last);
+                Finn::vector<std::bitset<U().bitwidth()>> ret(first, last);
                 return ret;
             } else {
-                std::vector<std::bitset<U().bitwidth()>> ret(std::make_reverse_iterator(last), std::make_reverse_iterator(first));
+                Finn::vector<std::bitset<U().bitwidth()>> ret(std::make_reverse_iterator(last), std::make_reverse_iterator(first));
                 return ret;
             }
         }
@@ -160,25 +164,25 @@ namespace Finn {
      * @tparam IteratorType
      * @param first iterator pointing to first element of input
      * @param last iterator pointing to last element of input
-     * @return std::vector<std::bitset<U().bitwidth()>> vector of bitsets containing bit representations of inputs
+     * @return Finn::vector<std::bitset<U().bitwidth()>> vector of bitsets containing bit representations of inputs
      */
     template<IsDatatype U, bool invertBytes = true, bool reverseBits = true, typename IteratorType>
-    std::vector<std::bitset<U().bitwidth()>> toBitset(IteratorType first, IteratorType last) {
+    Finn::vector<std::bitset<U().bitwidth()>> toBitset(IteratorType first, IteratorType last) {
         using T = std::iterator_traits<IteratorType>::value_type;
         static_assert(std::is_integral<T>::value);
         static_assert(sizeof(T) <= 8, "Datatypes with more than 8 bytes are currently not supported!");
         if constexpr (std::is_signed_v<T>) {  // Needs to be casted to an unsigned input type to avoid undefined behavior of shift operations on negative values
             if constexpr (sizeof(T) == 1) {
-                std::vector<uint8_t> vec(first, last);
+                Finn::vector<uint8_t> vec(first, last);
                 return detail::toBitsetImpl<U, invertBytes, reverseBits>(vec.begin(), vec.end());
             } else if constexpr (sizeof(T) == 2) {
-                std::vector<uint16_t> vec(first, last);
+                Finn::vector<uint16_t> vec(first, last);
                 return detail::toBitsetImpl<U, invertBytes, reverseBits>(vec.begin(), vec.end());
             } else if constexpr (sizeof(T) <= 4) {
-                std::vector<uint32_t> vec(first, last);
+                Finn::vector<uint32_t> vec(first, last);
                 return detail::toBitsetImpl<U, invertBytes, reverseBits>(vec.begin(), vec.end());
             } else {
-                std::vector<uint64_t> vec(first, last);
+                Finn::vector<uint64_t> vec(first, last);
                 return detail::toBitsetImpl<U, invertBytes, reverseBits>(vec.begin(), vec.end());
             }
         } else {
@@ -194,12 +198,15 @@ namespace Finn {
      * @tparam reverseBits Flag to reverse bit direction
      * @tparam V
      * @param input Vector to be converted to vector of bitset
-     * @return std::vector<std::bitset<U().bitwidth()>> vector of bitsets containing bit representations of inputs
+     * @return Finn::vector<std::bitset<U().bitwidth()>> vector of bitsets containing bit representations of inputs
      */
     template<IsDatatype U, bool invertBytes = true, bool reverseBits = true, std::integral V>
-    std::vector<std::bitset<U().bitwidth()>> toBitset(std::vector<V>& input) {
-        return toBitset<U, invertBytes, reverseBits, typename std::vector<V>::iterator>(input.begin(), input.end());
+    Finn::vector<std::bitset<U().bitwidth()>> toBitset(Finn::vector<V>& input) {
+        return toBitset<U, invertBytes, reverseBits, typename Finn::vector<V>::iterator>(input.begin(), input.end());
     }
+
+    void bitsetOR(finnBoost::dynamic_bitset<uint8_t, AlignedAllocator<uint8_t>>& inout, finnBoost::dynamic_bitset<uint8_t, AlignedAllocator<uint8_t>>& in) { inout |= in; }
+#pragma omp declare reduction(bitsetOR : finnBoost::dynamic_bitset<uint8_t, AlignedAllocator<uint8_t>> : bitsetOR(omp_out, omp_in)) initializer(omp_priv = omp_orig)
 
 
     /**
@@ -208,16 +215,19 @@ namespace Finn {
      * @tparam U Finn Datatype of input data
      * @tparam invertDirection Flag to reverse bit direction
      * @param input vector of bitsets to be merged
-     * @return finnBoost::dynamic_bitset<uint8_t> Merged bitset
+     * @return finnBoost::dynamic_bitset<uint8_t, AlignedAllocator<uint8_t>> Merged bitset
      */
     template<IsDatatype U, bool invertDirection = true>
-    finnBoost::dynamic_bitset<uint8_t> mergeBitsets(const std::vector<std::bitset<U().bitwidth()>>& input) {
+    finnBoost::dynamic_bitset<uint8_t, AlignedAllocator<uint8_t>> mergeBitsets(const Finn::vector<std::bitset<U().bitwidth()>>& input) {
         constexpr std::size_t bits = U().bitwidth();
-        finnBoost::dynamic_bitset<uint8_t> ret;
+        finnBoost::dynamic_bitset<uint8_t, AlignedAllocator<uint8_t>> ret;
         const std::size_t outputSize = input.size() * bits;
+        const std::size_t numThreads = std::min(static_cast<std::size_t>(omp_get_num_procs()), input.size() / 100);
         ret.resize(outputSize);
-        // TODO(linusjun): Parallelize
+
+#pragma omp parallel for schedule(guided) shared(input, outputSize) reduction(bitsetOR : ret) default(none) num_threads(numThreads) if (input.size() > (static_cast<std::size_t>(omp_get_num_procs()) * 100))
         for (std::size_t i = 0; i < input.size(); ++i) {
+#pragma omp simd
             for (std::size_t j = 0; j < bits; ++j) {
                 if constexpr (invertDirection) {
                     ret[outputSize - 1 - (i * bits + j)] = input[i][j];
@@ -234,11 +244,11 @@ namespace Finn {
      *
      * @tparam T Type of data storage format (usually uint8_t aka byte)
      * @param input bitset to be converted
-     * @return std::vector<T> Vector of data (usually vector of bytes)
+     * @return Finn::vector<T> Vector of data (usually vector of bytes)
      */
     template<typename T>
-    std::vector<T> bitsetToByteVector(const finnBoost::dynamic_bitset<T>& input) {
-        std::vector<uint8_t> ret;
+    Finn::vector<T> bitsetToByteVector(const finnBoost::dynamic_bitset<T, AlignedAllocator<T>>& input) {
+        Finn::vector<uint8_t> ret;
         ret.reserve(input.num_blocks());
         finnBoost::to_block_range(input, std::back_inserter(ret));
         return ret;
@@ -256,12 +266,12 @@ namespace Finn {
          * @tparam IteratorType
          * @param first iterator pointing to first element of input
          * @param last iterator pointing to last element of input
-         * @return std::vector<uint8_t> Vector of packed bytes
+         * @return Finn::vector<uint8_t> Vector of packed bytes
          */
         template<IsDatatype U, typename IteratorType>
-        std::vector<uint8_t> packImpl(IteratorType first, IteratorType last) {
-            if constexpr (U().bitwidth() == 8) {           // FINN Datatype is a byte long
-                return std::vector<uint8_t>(first, last);  // It fits exactly in a byte, so casting should be fine
+        Finn::vector<uint8_t> packImpl(IteratorType first, IteratorType last) {
+            if constexpr (U().bitwidth() == 8) {            // FINN Datatype is a byte long
+                return Finn::vector<uint8_t>(first, last);  // It fits exactly in a byte, so casting should be fine
             } else {
                 // TODO(linusjun): For full bytes this is maybe overkill. So change it?
                 auto bitsetvector = toBitset<U, true, false>(first, last);
@@ -279,10 +289,10 @@ namespace Finn {
      * @tparam IteratorType
      * @param first iterator pointing to first element of input
      * @param last iterator pointing to last element of input
-     * @return std::vector<uint8_t> Vector of packed bytes
+     * @return Finn::vector<uint8_t> Vector of packed bytes
      */
     template<IsDatatype U, typename IteratorType>
-    std::vector<uint8_t> pack(IteratorType first, IteratorType last) {
+    Finn::vector<uint8_t> pack(IteratorType first, IteratorType last) {
         using T = std::iterator_traits<IteratorType>::value_type;
         if constexpr (std::endian::native == std::endian::big) {
             []<bool flag = false>() { static_assert(flag, "Big-endian architectures are currently not supported!"); }
@@ -290,7 +300,6 @@ namespace Finn {
         } else if constexpr (std::endian::native == std::endian::little) {
             if constexpr (U().isFixedPoint()) {  // Datatype is Fixed Point Number
                 constexpr std::size_t bytes = static_cast<std::size_t>(FinnUtils::ceil(static_cast<double>(U().bitwidth()) / 8.0));
-                // TODO(linusjun): Parallelize?
                 if constexpr (std::is_floating_point_v<T>) {  // floating point T have no shift operation, so replace with multiplication
                     std::transform(first, last, first, [](const T& val) { return val * (1 << U().fracBits()); });
                 } else {
@@ -299,25 +308,25 @@ namespace Finn {
 
                 // Use smallest possible datatype for storing data
                 if constexpr (bytes == 1) {
-                    std::vector<uint8_t> vec(first, last);
+                    Finn::vector<uint8_t> vec(first, last);
                     return detail::packImpl<DatatypeInt<U().bitwidth()>>(vec.begin(), vec.end());
                 } else if constexpr (bytes == 2) {
-                    std::vector<uint16_t> vec(first, last);
+                    Finn::vector<uint16_t> vec(first, last);
                     return detail::packImpl<DatatypeInt<U().bitwidth()>>(vec.begin(), vec.end());
                 } else if constexpr (bytes <= 4) {
-                    std::vector<uint32_t> vec(first, last);
+                    Finn::vector<uint32_t> vec(first, last);
                     return detail::packImpl<DatatypeInt<U().bitwidth()>>(vec.begin(), vec.end());
                 } else {
-                    std::vector<uint64_t> vec(first, last);
+                    Finn::vector<uint64_t> vec(first, last);
                     return detail::packImpl<DatatypeInt<U().bitwidth()>>(vec.begin(), vec.end());
                 }
             } else if constexpr (std::is_floating_point_v<T> && U().isInteger()) {  // Datatype is integer number stored in floating point inputs
                 // Use smallest possible datatype for storing data
                 if constexpr (sizeof(T) == 4) {
-                    std::vector<uint32_t> input(first, last);
+                    Finn::vector<uint32_t> input(first, last);
                     return detail::packImpl<U>(input.begin(), input.end());
                 } else if constexpr (sizeof(T) == 8) {
-                    std::vector<uint64_t> input(first, last);
+                    Finn::vector<uint64_t> input(first, last);
                     return detail::packImpl<U>(input.begin(), input.end());
                 } else {
                     []<bool flag = false>() { static_assert(flag, "Weird floating point data length. Not supported!"); }
@@ -325,24 +334,24 @@ namespace Finn {
                 }
             } else if constexpr (std::is_floating_point_v<T>) {  // Datatype is floating point number
                 static_assert(sizeof(float) == 4 && sizeof(double) == 8 && std::numeric_limits<T>::is_iec559, "Floating point format is not iee754 or unexpected type width!");
-                if constexpr (sizeof(T) == 8) {           // FINN only supports 32 bit floating point numbers
-                    std::vector<float> vec(first, last);  // This cast is necessary to make sure, that data is in a 32-bit floating point format before the bitcast.
-                    std::vector<uint32_t> input;
+                if constexpr (sizeof(T) == 8) {            // FINN only supports 32 bit floating point numbers
+                    Finn::vector<float> vec(first, last);  // This cast is necessary to make sure, that data is in a 32-bit floating point format before the bitcast.
+                    Finn::vector<uint32_t> input;
                     input.resize(static_cast<std::size_t>(std::distance(first, last)));
                     std::transform(vec.begin(), vec.end(), input.begin(), [](const float& val) { return std::bit_cast<uint32_t>(val); });
                     return detail::packImpl<U>(input.begin(), input.end());
                 } else if constexpr (sizeof(T) == 4) {
-                    std::vector<uint32_t> input;
-                    input.resize(std::distance(first, last));
-                    std::transform(first, last, input.begin(), [](const T& val) { return bit_cast<uint32_t>(val); });
+                    Finn::vector<uint32_t> input;
+                    input.resize(static_cast<std::size_t>(std::distance(first, last)));
+                    std::transform(first, last, input.begin(), [](const T& val) { return std::bit_cast<uint32_t>(val); });
                     return detail::packImpl<U>(input.begin(), input.end());
                 } else {
                     []<bool flag = false>() { static_assert(flag, "Weird floating point data length. Not supported!"); }
                     ();
                 }
             } else if constexpr (!U().isInteger() && std::is_integral_v<T>) {  // Datatype is float stored in ints
-                std::vector<float> vec(first, last);                           // This cast is necessary to make sure, that data is in a 32-bit floating point format before the bitcast.
-                std::vector<uint32_t> input;
+                Finn::vector<float> vec(first, last);                          // This cast is necessary to make sure, that data is in a 32-bit floating point format before the bitcast.
+                Finn::vector<uint32_t> input;
                 input.resize(static_cast<std::size_t>(std::distance(first, last)));
                 std::transform(vec.begin(), vec.end(), input.begin(), [](const float& val) { return std::bit_cast<uint32_t>(val); });  // This conversion can overflow, but thats the user responsibility
                 return detail::packImpl<U>(input.begin(), input.end());
@@ -362,10 +371,10 @@ namespace Finn {
      * @tparam U Finn Datatype of input data
      * @tparam T
      * @param foldedVec Vector of data to be packed
-     * @return std::vector<uint8_t> Vector of packed bytes
+     * @return Finn::vector<uint8_t> Vector of packed bytes
      */
     template<IsDatatype U, typename T>
-    std::vector<uint8_t> pack(std::vector<T>& foldedVec) {
+    Finn::vector<uint8_t> pack(Finn::vector<T>& foldedVec) {
         if constexpr (U().bitwidth() == 8 && std::is_same<T, uint8_t>::value) {
             return foldedVec;
         }

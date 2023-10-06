@@ -37,7 +37,7 @@ namespace FinnUtils {
     template<typename T>
     concept FloatingPoint = std::is_floating_point_v<T> && (sizeof(T) == 4 || sizeof(T) == 8) &&  // Only 32/64 bit allowed. 80 bit fp not allowed
                             sizeof(float) == 4 && sizeof(double) == 8 &&                          // float must be 32 bit fp while double must be 64 bit fp
-                            std::numeric_limits<T>::is_iec559 == true &&                          // Only IEEE 754 fp allowed
+                            std::numeric_limits<T>::is_iec559 &&                                  // Only IEEE 754 fp allowed
                             std::endian::native == std::endian::little;
 
     /**
@@ -78,9 +78,9 @@ namespace FinnUtils {
         using intN_t = std::conditional_t<isTFloat, int32_t, int64_t>;
 
         constexpr uintN_t mantissaBitNumber = isTFloat ? 23 : 52;
-        constexpr uintN_t NaNExponentValue = isTFloat ? 0xff : 0x7ff;            // the value of the exponent if NaN
+        constexpr uintN_t naNExponentValue = isTFloat ? 0xff : 0x7ff;            // the value of the exponent if NaN
         constexpr uintN_t signRemovalMask = std::numeric_limits<intN_t>::max();  // the max value of a signed int is all bits set to one except sign
-        constexpr uintN_t exponentMask = NaNExponentValue << mantissaBitNumber;
+        constexpr uintN_t exponentMask = naNExponentValue << mantissaBitNumber;
         constexpr uintN_t mantissaMask = (~exponentMask) & signRemovalMask;  // the bits of the mantissa are 1's, sign and exponent 0's.
 
         return (((std::bit_cast<uintN_t, T>(inFp) & exponentMask) == exponentMask) &&  // if exponent is all 1's
@@ -105,11 +105,13 @@ namespace FinnUtils {
         constexpr bool isTFloat = std::is_same_v<T, float>;
         using intN_t = std::conditional_t<isTFloat, int32_t, int64_t>;
 
-        if (inFp > 0 && inFp != static_cast<intN_t>(inFp)) {
-            return static_cast<intN_t>(inFp + 1);
+        // NOLINTBEGIN
+        if (inFp > 0 && inFp != static_cast<intN_t>(inFp)) {  // These lossy conversions are intended for rounding
+            return static_cast<intN_t>(inFp + 1);             // These lossy conversions are intended for rounding
         } else {
-            return static_cast<intN_t>(inFp);
+            return static_cast<intN_t>(inFp);  // These lossy conversions are intended for rounding
         }
+        // NOLINTEND
     }
 
     /**

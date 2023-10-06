@@ -1,9 +1,11 @@
+#include <utils/Types.h>
+
 #include <array>
 #include <cstdint>
 #include <iostream>
+#include <utils/DataPacking.hpp>
+#include <utils/join.hpp>
 
-#include "../../src/utils/DataPacking.hpp"
-#include "../../src/utils/join.hpp"
 #include "gtest/gtest.h"
 
 std::array<int, 300> inputMat = {0,   1,   2,   3,   4,   5,   6,   7,   8,   9,   10,  11,  12,  13,  14,  15,  16,  17,  18,  19,  20,  21,  22,  23,  24,  25,  26,  27,  28,  29,  30,  31,  32,  33,  34,  35,  36,  37,
@@ -372,14 +374,14 @@ TEST(DataPacking, Uint8InputTest) {
     auto ret = Finn::pack<Finn::DatatypeUInt<8>>(inputMat4.begin(), inputMat4.end());
     EXPECT_TRUE(mat16.size() == ret.size() && std::equal(ret.begin(), ret.end(), mat16.begin()));
 
-    std::vector<uint8_t> tmp(inputMat4.begin(), inputMat4.end());
+    Finn::vector<uint8_t> tmp(inputMat4.begin(), inputMat4.end());
     ret = Finn::pack<Finn::DatatypeUInt<8>>(tmp);
     EXPECT_TRUE(mat16.size() == ret.size() && std::equal(ret.begin(), ret.end(), mat16.begin()));
 
     ret = Finn::pack<Finn::DatatypeInt<8>>(inputMat4.begin(), inputMat4.end());
     EXPECT_TRUE(mat17.size() == ret.size() && std::equal(ret.begin(), ret.end(), mat17.begin()));
 
-    std::vector<uint8_t> tmp2(inputMat4.begin(), inputMat4.end());
+    Finn::vector<uint8_t> tmp2(inputMat4.begin(), inputMat4.end());
     ret = Finn::pack<Finn::DatatypeInt<8>>(tmp2);
     EXPECT_TRUE(mat17.size() == ret.size() && std::equal(ret.begin(), ret.end(), mat17.begin()));
 }
@@ -389,14 +391,14 @@ TEST(DataPacking, Int8InputTest) {
     auto ret = Finn::pack<Finn::DatatypeUInt<8>>(inputMat5.begin(), inputMat5.end());
     EXPECT_TRUE(mat18.size() == ret.size() && std::equal(ret.begin(), ret.end(), mat18.begin()));
 
-    std::vector<int8_t> tmp(inputMat5.begin(), inputMat5.end());
+    Finn::vector<int8_t> tmp(inputMat5.begin(), inputMat5.end());
     ret = Finn::pack<Finn::DatatypeUInt<8>>(tmp);
     EXPECT_TRUE(mat18.size() == ret.size() && std::equal(ret.begin(), ret.end(), mat18.begin()));
 
     ret = Finn::pack<Finn::DatatypeInt<8>>(inputMat5.begin(), inputMat5.end());
     EXPECT_TRUE(mat19.size() == ret.size() && std::equal(ret.begin(), ret.end(), mat19.begin()));
 
-    std::vector<int8_t> tmp2(inputMat5.begin(), inputMat5.end());
+    Finn::vector<int8_t> tmp2(inputMat5.begin(), inputMat5.end());
     ret = Finn::pack<Finn::DatatypeInt<8>>(tmp2);
     EXPECT_TRUE(mat19.size() == ret.size() && std::equal(ret.begin(), ret.end(), mat19.begin()));
 }
@@ -419,20 +421,20 @@ TEST(DataPacking, FloatingPointInputTest) {
 }
 
 TEST(DataPacking, IntegralToBitsetTest) {
-    std::vector<uint8_t> inp = {0, 1, 2, 3, 4, 5, 6, 7};
+    Finn::vector<uint8_t> inp = {0, 1, 2, 3, 4, 5, 6, 7};
     auto ret = Finn::toBitset<Finn::DatatypeUInt<3>, true, false>(inp);
-    std::vector<uint8_t> retElems;
+    Finn::vector<uint8_t> retElems;
     std::transform(ret.begin(), ret.end(), std::back_inserter(retElems), [](const std::bitset<3>& bit) { return bit.to_ulong(); });
     EXPECT_TRUE(inp.size() == retElems.size() && std::equal(inp.begin(), inp.end(), retElems.begin()));
 
     inp = {0, 1};
     ret = Finn::toBitset<Finn::DatatypeUInt<3>, true, true>(inp);
-    std::vector<uint8_t> groundTruth = {0, 4};
+    Finn::vector<uint8_t> groundTruth = {0, 4};
     retElems.clear();
     std::transform(ret.begin(), ret.end(), std::back_inserter(retElems), [](const std::bitset<3>& bit) { return bit.to_ulong(); });
     EXPECT_EQ(groundTruth, retElems);
 
-    std::vector<int8_t> inp2 = {2, 3, -2, -3};
+    Finn::vector<int8_t> inp2 = {2, 3, -2, -3};
     ret = Finn::toBitset<Finn::DatatypeInt<3>, true, true>(inp2);
     groundTruth = {2, 6, 3, 5};
     retElems.clear();
@@ -441,7 +443,7 @@ TEST(DataPacking, IntegralToBitsetTest) {
 }
 
 TEST(DataPacking, MergeBitsets) {
-    std::vector<uint8_t> inp = {0, 1, 2, 3, 4, 5, 6, 7};
+    Finn::vector<uint8_t> inp = {0, 1, 2, 3, 4, 5, 6, 7};
     auto ret = Finn::toBitset<Finn::DatatypeUInt<3>, true, false>(inp);
     auto ret2 = Finn::mergeBitsets<Finn::DatatypeUInt<3>>(ret);
     std::string compare;
@@ -458,7 +460,7 @@ TEST(DataPacking, MergeBitsets) {
     to_string(ret2, compare);
     EXPECT_STREQ(compare.c_str(), "01110110010101000011001000010000");
 
-    std::vector<int64_t> inp64 = {0, 1, 2, 3, 4, 5, 6, 7};
+    Finn::vector<int64_t> inp64 = {0, 1, 2, 3, 4, 5, 6, 7};
     ret = Finn::toBitset<Finn::DatatypeUInt<3>, true, false>(inp64);
     ret2 = Finn::mergeBitsets<Finn::DatatypeUInt<3>>(ret);
     to_string(ret2, compare);
@@ -481,7 +483,7 @@ TEST(DataPacking, MergeBitsets) {
     to_string(ret2, compare);
     EXPECT_STREQ(compare.c_str(), "000000111000000110000000101000000100000000011000000010000000001000000000");
 
-    std::vector<int64_t> inp64s = {0, -1, -2, -3, 4, 5, 6, 7};
+    Finn::vector<int64_t> inp64s = {0, -1, -2, -3, 4, 5, 6, 7};
     auto rets = Finn::toBitset<Finn::DatatypeInt<4>, true, false>(inp64s);
     ret2 = Finn::mergeBitsets<Finn::DatatypeInt<4>>(rets);
     to_string(ret2, compare);
@@ -492,12 +494,23 @@ TEST(DataPacking, MergeBitsets) {
 }
 
 TEST(DataPacking, BitsetToByteVector) {
-    std::vector<uint8_t> inp = {0, 1, 2, 3, 4, 5, 6, 7};
+    Finn::vector<uint8_t> inp = {0, 1, 2, 3, 4, 5, 6, 7};
     auto ret = Finn::toBitset<Finn::DatatypeUInt<3>, true, false>(inp);
     auto ret2 = Finn::mergeBitsets<Finn::DatatypeUInt<3>, false>(ret);
     auto ret3 = Finn::bitsetToByteVector(ret2);
-    std::vector<uint8_t> base = {136, 198, 250};
+    Finn::vector<uint8_t> base = {136, 198, 250};
     EXPECT_EQ(base, ret3);
+}
+
+
+TEST(DataPacking, DynamicBitsetParallel) {
+    finnBoost::dynamic_bitset<uint8_t, AlignedAllocator<uint8_t>> bit;
+    bit.resize(128);
+#pragma omp parallel for schedule(guided) reduction(Finn::bitsetOR : bit) default(none)
+    for (std::size_t i = 0; i < bit.size(); ++i) {
+        bit[i] = 1;
+    }
+    EXPECT_TRUE(bit.all());
 }
 
 int main(int argc, char** argv) {

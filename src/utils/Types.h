@@ -2,12 +2,19 @@
 #define TYPES_H
 
 #include <cctype>
+#include <fstream>
 #include <memory>
 #include <nlohmann/json.hpp>
 #include <string>
 #include <variant>
 #include <vector>
-#include <fstream>
+
+#include "AlignedAllocator.hpp"
+
+namespace Finn {
+    template<typename T>
+    using vector = std::vector<T, AlignedAllocator<T>>;
+}  // namespace Finn
 
 enum class PLATFORM { ALVEO = 0, INVALID = -1 };
 

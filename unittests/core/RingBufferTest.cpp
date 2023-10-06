@@ -20,56 +20,48 @@ TEST(DummyTest, DT) { EXPECT_TRUE(true); }
 using RB = RingBuffer<uint8_t>;
 const size_t parts = FinnUnittest::parts;
 const size_t elementsPerPart = FinnUnittest::elementsPerPart;
-auto filler = FinnUtils::BufferFiller(0, 255);
 
-
-
-/**
- * @brief Utility function to completely fill a ringBuffer or a deviceinput/output buffer. 
- * 
- * This function uses the data vector to fill the entire rb of type T with random data, based on it's size. 
- * storedDatas gets all data used pushed back.
- * 
- * @tparam T Must be one of the above mentioned types 
- * @param rb 
- * @param data 
- * @param storedDatas 
- * @param fast Whether to use fast store methods (no mutex locking, no length checks) 
- * @param ref Whether to use references (true) or iterators (false)
- * @param pfiller 
- */
-template<typename T>
-void fillCompletely(T& rb, std::vector<uint8_t>& data, std::vector<std::vector<uint8_t>>& storedDatas, bool fast, bool ref, FinnUtils::BufferFiller& pfiller) {
-    for (size_t i = 0; i < rb.size(SIZE_SPECIFIER::PARTS); i++) {
-        pfiller.fillRandom(data);
-        storedDatas.push_back(data);
-        if (fast) {
-            if (ref) {
-                EXPECT_TRUE(rb.storeFast(data));
-            } else {
-                EXPECT_TRUE(rb.storeFast(data.begin(), data.end()));
-            }
-        } else {
-            if (ref) {
-                EXPECT_TRUE(rb.store(data, data.size()));
-            } else {
-                EXPECT_TRUE(rb.store(data.begin(), data.end()));
-            }
-        }
-    }
-}
 
 class RBTest : public ::testing::Test {
      protected:
     RB rb = RB(parts, elementsPerPart);
     std::vector<uint8_t> data;
     std::vector<std::vector<uint8_t>> storedDatas;
+    FinnUtils::BufferFiller filler = FinnUtils::BufferFiller(0,255);
     void SetUp() override {
         data = std::vector<uint8_t>();
         data.resize(rb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
         storedDatas = std::vector<std::vector<uint8_t>>();
     }
 
+    /**
+     * @brief Utility function to completely fill a ringBuffer or a deviceinput/output buffer. 
+     * 
+     * This function uses the data vector to fill the entire rb of type T with random data, based on it's size. 
+     * storedDatas gets all data used pushed back.
+     * 
+     * @param fast Whether to use fast store methods (no mutex locking, no length checks) 
+     * @param ref Whether to use references (true) or iterators (false)
+     */
+    void fillCompletely(bool fast, bool ref) {
+        for (size_t i = 0; i < rb.size(SIZE_SPECIFIER::PARTS); i++) {
+            filler.fillRandom(data);
+            storedDatas.push_back(data);
+            if (fast) {
+                if (ref) {
+                    EXPECT_TRUE(rb.storeFast(data));
+                } else {
+                    EXPECT_TRUE(rb.storeFast(data.begin(), data.end()));
+                }
+            } else {
+                if (ref) {
+                    EXPECT_TRUE(rb.store(data, data.size()));
+                } else {
+                    EXPECT_TRUE(rb.store(data.begin(), data.end()));
+                }
+            }
+        }
+    }
 
     void TearDown() override {}
 };
@@ -99,7 +91,7 @@ TEST(RBTestManual, RBInitTest) {
 }
 
 TEST_F(RBTest, RBStoreReadTestIterator) {
-    fillCompletely(rb, data, storedDatas, false, false, filler);
+    fillCompletely(false, false);
 
     // Confirm that the head pointer wrapped around
     EXPECT_EQ(rb.testGetHeadPointer(), 0);
@@ -127,7 +119,7 @@ TEST_F(RBTest, RBStoreReadTestIterator) {
 }
 
 TEST_F(RBTest, RBFastStoreTestIterator) {
-    fillCompletely(rb, data, storedDatas, true, false, filler);
+    fillCompletely(true, false);
 
     // Confirm that the head pointer wrapped around
     EXPECT_EQ(rb.testGetHeadPointer(), 0);
@@ -155,7 +147,7 @@ TEST_F(RBTest, RBFastStoreTestIterator) {
 }
 
 TEST_F(RBTest, RBStoreReadTestReference) {
-    fillCompletely(rb, data, storedDatas, false, true, filler);
+    fillCompletely(false, true);
 
     // Confirm that the head pointer wrapped around
     EXPECT_EQ(rb.testGetHeadPointer(), 0);
@@ -183,7 +175,7 @@ TEST_F(RBTest, RBStoreReadTestReference) {
 }
 
 TEST_F(RBTest, RBFastStoreTestReference) {
-    fillCompletely(rb, data, storedDatas, true, true, filler);
+    fillCompletely(true, true);
 
     // Confirm that the head pointer wrapped around
     EXPECT_EQ(rb.testGetHeadPointer(), 0);
@@ -212,7 +204,7 @@ TEST_F(RBTest, RBFastStoreTestReference) {
 
 TEST_F(RBTest, RBReadTest) {
     //* Requires that the store tests ran successfully to be successfull itself
-    fillCompletely(rb, data, storedDatas, true, true, filler);
+    fillCompletely(true, true);
     EXPECT_EQ(rb.testGetHeadPointer(), 0);
     EXPECT_EQ(rb.testGetReadPointer(), 0);
 
@@ -225,7 +217,7 @@ TEST_F(RBTest, RBReadTest) {
 
 TEST_F(RBTest, RBReadTestArray) {
     //* Requires that the store tests ran successfully to be successfull itself
-    fillCompletely(rb, data, storedDatas, true, true, filler);
+    fillCompletely(true, true);
     EXPECT_EQ(rb.testGetHeadPointer(), 0);
     EXPECT_EQ(rb.testGetReadPointer(), 0);
 
@@ -248,7 +240,7 @@ TEST_F(RBTest, RBUtilFuncsTest) {
     EXPECT_EQ(rb.size(SIZE_SPECIFIER::ELEMENTS), elementsPerPart * parts);
 
     // Check validity flags    
-    fillCompletely(rb, data, storedDatas, true, true, filler);
+    fillCompletely(true, true);
     EXPECT_TRUE(rb.isFull());
     EXPECT_EQ(rb.countValidParts(), rb.size(SIZE_SPECIFIER::PARTS));
 

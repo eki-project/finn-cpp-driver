@@ -28,6 +28,10 @@ include(cmake/StandardProjectSettings.cmake)
 
 include(FetchContent)
 
+# Enable building when the device is offline
+set(FETCHCONTENT_UPDATES_DISCONNECTED ON)
+
+
 FetchContent_Declare(
   googletest
   GIT_REPOSITORY https://github.com/google/googletest.git

@@ -12,94 +12,70 @@
 #include "UnittestConfig.h"
 using namespace FinnUnittest;
 
-TEST(DeviceBufferTest, BasicFunctionalityTest) {
-    auto log = Logger::getLogger();
-    std::random_device rd;
-    std::mt19937 engine{rd()};
-    std::uniform_int_distribution<uint8_t> sampler(0, 0xFF);
-
-    auto device = xrt::device();
-    auto kernel = xrt::kernel();
-    auto inputDB = Finn::DeviceInputBuffer<uint8_t /*, DatatypeUInt<2>*/>("test", device, kernel, /*myShapeNormal, myShapeFolded,*/ myShapePacked, parts);
-    std::vector<uint8_t> data(inputDB.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
-
-    auto initialMapData = inputDB.testGetMap();
-
-    // Func to fill data with random values
-    auto fillRandomData = [&sampler, &engine, &data]() { std::transform(data.begin(), data.end(), data.begin(), [&sampler, &engine]([[maybe_unused]] uint8_t _) { return sampler(engine); }); };
-
-    // Test basic functions
-    fillRandomData();
-    inputDB.store(data);
-    EXPECT_EQ(inputDB.testGetRingBuffer().testGetAsVector(0), data);
-
-    inputDB.loadMap();
-    EXPECT_NE(initialMapData, inputDB.testGetMap());
-    EXPECT_EQ(inputDB.testGetMap(), data);
+/**
+ * @brief Utility function to completely fill a ringBuffer or a deviceinput/output buffer. 
+ * 
+ * This function uses the data vector to fill the entire rb of type T with random data, based on it's size. 
+ * storedDatas gets all data used pushed back.
+ * 
+ * @tparam T Must be one of the above mentioned types 
+ * @param rb 
+ * @param data 
+ * @param storedDatas 
+ * @param fast Whether to use fast store methods (no mutex locking, no length checks) 
+ * @param ref Whether to use references (true) or iterators (false)
+ * @param pfiller 
+ */
+template<typename T>
+void fillCompletely(T& rb, std::vector<uint8_t>& data, std::vector<std::vector<uint8_t>>& storedDatas, bool fast, bool ref, FinnUtils::BufferFiller& pfiller) {
+    for (size_t i = 0; i < rb.size(SIZE_SPECIFIER::PARTS); i++) {
+        pfiller.fillRandom(data);
+        storedDatas.push_back(data);
+        if (fast) {
+            if (ref) {
+                EXPECT_TRUE(rb.storeFast(data));
+            } else {
+                EXPECT_TRUE(rb.storeFast(data.begin(), data.end()));
+            }
+        } else {
+            if (ref) {
+                EXPECT_TRUE(rb.store(data, data.size()));
+            } else {
+                EXPECT_TRUE(rb.store(data.begin(), data.end()));
+            }
+        }
+    }
 }
 
-TEST(DeviceBufferTest, CorrectOutputTest) {
-    // Setup
-    auto filler = FinnUtils::BufferFiller(0,255);
-    auto device = xrt::device();
-    auto kernel = xrt::kernel();
-    auto odb = Finn::DeviceOutputBuffer<uint8_t>("tester", device, kernel, myShapePacked, parts);
-
+class DBTest : public ::testing::Test {
+     protected:
+    xrt::device device;
+    xrt::kernel kernel;
+    Finn::DeviceInputBuffer<uint8_t> buffer = Finn::DeviceInputBuffer<uint8_t>("TestBuffer", device, kernel, FinnUnittest::myShapePacked, FinnUnittest::parts);
+    Finn::DeviceOutputBuffer<uint8_t> outputBuffer = Finn::DeviceOutputBuffer<uint8_t>("tester", device, kernel, FinnUnittest::myShapePacked, FinnUnittest::parts);
     std::vector<uint8_t> data;
-    std::vector<uint8_t> backupData;
-    data.resize(odb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
+    void SetUp() override {
+        device = xrt::device();
+        kernel = xrt::kernel();
+    }
 
-    // Fill with random data and backup
-    filler.fillRandom(data);
-    backupData = data;
 
-    // Write data -> Map
-    odb.testSetMap(data);
-    EXPECT_EQ(data, odb.testGetMap());
+    void TearDown() override {}
+};
 
-    // Move Map -> Buffer[0]
-    EXPECT_EQ(odb.read(1), ERT_CMD_STATE_COMPLETED);
-    EXPECT_EQ(odb.testGetRingBuffer().testGetAsVector(0), backupData);
+auto filler = FinnUtils::BufferFiller(0,255);
 
-    // Write Buffer[0] -> LTS[0]
-    EXPECT_EQ(odb.testGetRingBuffer().countValidParts(), 1);
-    odb.archiveValidBufferParts();
 
-    // Test that the data arrived in the lts
-    EXPECT_EQ(odb.testGetLTS().size(), 1);
-    EXPECT_EQ(odb.testGetLTS()[0], backupData);
+TEST_F(DBTest, DBStoreTest) {
+    auto initialMapData = buffer.testGetMap();
 
-    // Test that the LTS gets fetched and deleted as wanted
-    EXPECT_EQ(odb.retrieveArchive()[0], backupData);
-    EXPECT_EQ(odb.testGetLTS().size(), 0);
+    auto bufferParts = buffer.size(SIZE_SPECIFIER::PARTS);
+    auto bufferElemPerPart = buffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART);
+
+
+    
 }
 
-TEST(DeviceBufferTest, CorrectInputTest) {
-    auto filler = FinnUtils::BufferFiller(0,255);
-    auto device = xrt::device();
-    auto kernel = xrt::kernel();
-    auto idb = Finn::DeviceInputBuffer<uint8_t>("tester", device, kernel, myShapePacked, parts);
-
-    std::vector<uint8_t> data;
-    std::vector<uint8_t> backupData;
-    data.resize(idb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
-
-    // Fill with random data
-    filler.fillRandom(data);
-    backupData = data;
-
-    // Check that after the storing, the data is in the ring buffer (Data -> Buffer[0])
-    EXPECT_NE(idb.testGetRingBuffer().testGetAsVector(0), data);
-    idb.store(data);
-    EXPECT_EQ(idb.testGetRingBuffer().countValidParts(), 1);
-    EXPECT_EQ(idb.testGetRingBuffer().testGetAsVector(0), data);
-
-    // Check that data is in the map (Buffer[0] -> Map) and invalid
-    idb.loadMap();
-    EXPECT_EQ(idb.testGetMap(), data);
-    EXPECT_EQ(idb.testGetRingBuffer().countValidParts(), 0);
-
-}
 
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);

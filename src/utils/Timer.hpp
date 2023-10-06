@@ -30,3 +30,9 @@ class Timer {
         return res;
     }
 };
+
+#define FINN_BENCHMARK(resultMs, code) \
+    auto timer = Timer(); \
+    timer.start(); \
+    code \
+    resultMs = timer.stopMs; \

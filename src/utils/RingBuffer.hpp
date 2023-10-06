@@ -94,7 +94,12 @@ class RingBuffer {
     RingBuffer& operator=(RingBuffer&& other) = delete;
     RingBuffer& operator=(const RingBuffer& other) = delete;
 
+// Allow public access to private methods in debug/UT mode
+#ifdef NDEBUG
      private:
+#else
+     public:
+#endif
     /**
      * @brief Return the element-wise index of the ring buffer, considering the part partIndex with it's element offset. (Useful for loops)
      *
@@ -163,11 +168,11 @@ class RingBuffer {
     bool isFull() { return countValidParts() == parts; }
 
     /**
-     * @brief Searches from the position of the head pointer to the first free (invalid data) spot and stores the data, setting the head pointer to this point+1. If no free spot is found, fase is returned
+     * @brief Searches from the position of the head pointer to the first free (invalid data) spot and stores the data, setting the head pointer to this point+1..
      *
      * @param data
      * @return true
-     * @return false
+     * @return false Returned if either no spot is found, or two threads tried writing to the same spot in the buffer. This results in ONE thread successfully writing the data and the other failing to do so, returning false here.
      */
     template<typename C>
     bool store(const C data, size_t datasize) {
@@ -182,6 +187,12 @@ class RingBuffer {
                     //! Only now set mutex. Even if the spot just became free during the loop we'll take it, but now data has to be preserved.
                     std::lock_guard<std::mutex> guardPartMutex(*partMutexes[indexP]);
                     std::lock_guard<std::mutex> guardHeadMutex(headPartMutex);
+                    std::lock_guard<std::mutex> guardValidPartMutex(validPartMutex);
+                    
+                    //? Check again if part is still free to avoid collision of 2 threads. Maybe solve this by acquiring validPartMutex before searching? 
+                    if (validParts[indexP]) {
+                        return false;
+                    }
                     for (size_t j = 0; j < datasize; ++j) {
                         buffer[elementIndex(indexP, j)] = data[j];
                     }

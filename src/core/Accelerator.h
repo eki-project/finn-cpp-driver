@@ -79,7 +79,8 @@ namespace Finn {
         bool containsDevice(unsigned int deviceIndex);
 
         /**
-         * @brief Factory to create a functon that can store data without index checks because they are checked beforehand. The created function only takes the data vector
+         * @brief Factory to create a functon that can store data without index checks because they are checked beforehand. The created function only takes the data vector.
+         * @attention (Currently on this commit) This also does NOT do checks on the length of the passed data vector and is _NOT THREAD SAFE_!
          *
          * @param deviceIndex
          * @param inputBufferKernelName

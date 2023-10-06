@@ -42,6 +42,14 @@ namespace FinnUtils {
      * @return constexpr int32_t
      */
     constexpr int32_t ceil(float num) { return (static_cast<float>(static_cast<int32_t>(num)) == num) ? static_cast<int32_t>(num) : static_cast<int32_t>(num) + ((num > 0) ? 1 : 0); }
+    
+    /**
+     * @brief Return the ceil of a double as in integer type
+     *
+     * @param num
+     * @return constexpr int32_t
+     */
+    constexpr int32_t ceil(double num) { return (static_cast<double>(static_cast<int32_t>(num)) == num) ? static_cast<int32_t>(num) : static_cast<int32_t>(num) + ((num > 0) ? 1 : 0); }
 
     /**
      * @brief Return the innermost dimension of a shape. For example for (1,30,10) this would return 10
@@ -57,8 +65,21 @@ namespace FinnUtils {
      * @param requiredBytes The number of bytes that are needed. The return value will be greater or equal than this
      * @return unsigned int
      */
-    inline size_t getActualBufferSize(size_t requiredBytes) { return static_cast<size_t>(std::max(4096.0, pow(2, log2(static_cast<double>(requiredBytes))))); }
+    inline size_t getActualBufferSize(size_t requiredBytes) { 
+        return static_cast<size_t>(
+            std::max(
+                4096.0, 
+                pow(
+                    2, 
+                    ceil(
+                        log2(static_cast<double>(requiredBytes))
+                    )
+                )
+            )
+        ); 
+    }
 
+    // TODO: Rework and integrate with new packing algorithm
     /**
      * @brief Get the number of elements required to represent S elements of FINN datatype F in C++ datatypes DT in the datatype T.
      * Example:
@@ -138,11 +159,11 @@ namespace FinnUtils {
      * @param pShape 
      * @return size_t 
      */
-    inline size_t shapeToElements(const shape_t& pShape) { return static_cast<size_t>(std::accumulate(pShape.begin(), pShape.end(), 1, std::multiplies<>())); }
+    inline size_t shapeToElements(const shape_t& pShape) { return (pShape.size() == 0) ? 0 : static_cast<size_t>(std::accumulate(pShape.begin(), pShape.end(), 1, std::multiplies<>())); }
 
     template<typename T, size_t S>
     constexpr size_t shapeToElementsConstexpr(std::array<T, S> pShape) {
-        return static_cast<size_t>(std::accumulate(pShape.begin(), pShape.end(), 1, std::multiplies<>()));
+        return (S == 0) ? 0 : static_cast<size_t>(std::accumulate(pShape.begin(), pShape.end(), 1, std::multiplies<>()));
     }
 
     /**

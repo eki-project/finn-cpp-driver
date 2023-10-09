@@ -125,6 +125,9 @@ if (FINNC_ENABLE_TESTING)
   add_subdirectory(unittests)
 endif()
 
+# Add integration tests
+add_subdirectory(integrationtest)
+
 #Compiler Options
 add_library(finnc_options INTERFACE)
 add_library(finnc::finnc_options ALIAS finnc_options)

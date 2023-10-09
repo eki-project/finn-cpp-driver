@@ -89,7 +89,7 @@ void runFiletest(Finn::Driver& baseDriver, logger_type& logger) {
     logDeviceInformation(logger, baseDriver.getDeviceHandler(0).getDevice(), baseDriver.getConfig().deviceWrappers[0].xclbin);
 
     // Create vector for inputting data
-    auto filler = FinnUtils::BufferFiller(0, 2);
+    auto filler = FinnUtils::BufferFiller(0, 127);
     std::vector<uint8_t> data;
     data.resize(baseDriver.size(SIZE_SPECIFIER::ELEMENTS_PER_PART, 0, "StreamingDataflowPartition_0:{idma0}"));
 
@@ -105,6 +105,42 @@ void runFiletest(Finn::Driver& baseDriver, logger_type& logger) {
     for (auto& resultVector : results) {
         FinnUtils::logResults<uint8_t>(logger, resultVector, 8, finnMainLogPrefix() + "Vec " + std::to_string(counter++)); 
     }
+}
+
+/**
+ * @brief Run a test inference and save input and output data in a file which can be checked for results 
+ * 
+ * @param baseDriver 
+ * @param logger 
+ */
+void runIntegrationTest(Finn::Driver& baseDriver, logger_type& logger) {
+    std::fstream resultfile("integration_test_outputs.txt", std::fstream::out);
+
+    FINN_LOG(logger, loglevel::info) << finnMainLogPrefix() << "Device Information: ";
+    logDeviceInformation(logger, baseDriver.getDeviceHandler(0).getDevice(), baseDriver.getConfig().deviceWrappers[0].xclbin);
+
+    // Create vector for inputting data
+    auto filler = FinnUtils::BufferFiller(0, 127);
+    std::vector<uint8_t> data;
+    data.resize(baseDriver.size(SIZE_SPECIFIER::ELEMENTS_PER_PART, 0, "StreamingDataflowPartition_0:{idma0}"));
+
+    // Do a test run with random data and raw inference (no packing no folding)
+    filler.fillRandom(data);
+    auto results = baseDriver.inferRaw(data, 0, "StreamingDataflowPartition_0:{idma0}", 0, "StreamingDataflowPartition_2:{odma0}", 1, true);
+
+    // Write data to result file. One line per data, ending with an empty space and a newline
+    // TODO: Check if "uniq" registers the newline too
+    // TODO: Introduce checks for everything 
+    for (auto val : data) {
+        resultfile << val << " ";
+    }
+    resultfile << "\n";
+
+    for (auto val : results[0]) {
+        resultfile << val << " ";
+    }
+    resultfile << "\n";
+    resultfile.close();
 }
 
 /**
@@ -167,6 +203,9 @@ int main(int argc, char* argv[]) {
     } else if (varMap["mode"].as<std::string>() == "test") {
         auto driver = createDriverFromConfig(configFilePath, varMap["buffersize"].as<unsigned int>());
         runFiletest(driver, logger);
+    } else if (varMap["mode"].as<std::string>() == "integrationtest") {
+        auto driver = createDriverFromConfig(configFilePath, varMap["buffersize"].as<unsigned int>());
+        runIntegrationTest(driver, logger);
     } else {
         FinnUtils::logAndError<std::invalid_argument>("Unknown driver mode: " + varMap["mode"].as<std::string>());
     }

@@ -93,6 +93,12 @@ Use ```xbutil``` to get information about the cards and configure them manually 
 
 (Project name, resource usage, output filename, xrt version etc. are all examples and to bet set by the user themselves).
 
+## Running Integration Tests
+To run integration tests either use the predefined cmake target, or go into ```integrationtest``` and run ```run_test.sh``` yourself. Note that the script makes certain assumptions on it's environment,
+and it may very well be that you have to tweak it in advance to run it. The script receives the directory in which ```config.json``` and ```finn-accel.xclbin``` reside. After compiling the driver with the specified header, the finished executable will be moved there as well. It is then executed in a special test mode, emitting the input and output data into a file. The shell script then checks if the input and output are equivalent and returns the result. 
+
+__TODO: In the future, this test should be runnable with custom data inputs and outputs__
+
 ## TODO
 * Check if XRT frees the memory map itself
 * Does XRT ALWAYS take uint8? Even if not should we do it all the same?

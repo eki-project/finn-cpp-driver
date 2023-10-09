@@ -14,6 +14,7 @@
 #include <vector>
 
 #include "AlignedAllocator.hpp"
+#include "CostumDynamicBitset.h"
 #include "FinnDatatypes.hpp"
 #include "FinnUtils.h"
 #include "Types.h"
@@ -205,8 +206,8 @@ namespace Finn {
         return toBitset<U, invertBytes, reverseBits, typename Finn::vector<V>::iterator>(input.begin(), input.end());
     }
 
-    void bitsetOR(finnBoost::dynamic_bitset<uint8_t, AlignedAllocator<uint8_t>>& inout, finnBoost::dynamic_bitset<uint8_t, AlignedAllocator<uint8_t>>& in) { inout |= in; }
-#pragma omp declare reduction(bitsetOR : finnBoost::dynamic_bitset<uint8_t, AlignedAllocator<uint8_t>> : bitsetOR(omp_out, omp_in)) initializer(omp_priv = omp_orig)
+    void bitsetOR(DynamicBitset& inout, DynamicBitset& in) { inout |= in; }
+#pragma omp declare reduction(bitsetOR:DynamicBitset : bitsetOR(omp_out, omp_in)) initializer(omp_priv = omp_orig)
 
 
     /**
@@ -215,26 +216,26 @@ namespace Finn {
      * @tparam U Finn Datatype of input data
      * @tparam invertDirection Flag to reverse bit direction
      * @param input vector of bitsets to be merged
-     * @return finnBoost::dynamic_bitset<uint8_t, AlignedAllocator<uint8_t>> Merged bitset
+     * @return DynamicBitset Merged bitset
      */
-    template<IsDatatype U, bool invertDirection = true>
-    finnBoost::dynamic_bitset<uint8_t, AlignedAllocator<uint8_t>> mergeBitsets(const Finn::vector<std::bitset<U().bitwidth()>>& input) {
+    template<IsDatatype U>
+    DynamicBitset mergeBitsets(const Finn::vector<std::bitset<U().bitwidth()>>& input) {
         constexpr std::size_t bits = U().bitwidth();
-        finnBoost::dynamic_bitset<uint8_t, AlignedAllocator<uint8_t>> ret;
         const std::size_t outputSize = input.size() * bits;
         const std::size_t numThreads = std::min(static_cast<std::size_t>(omp_get_num_procs()), input.size() / 100);
-        ret.resize(outputSize);
+        DynamicBitset ret(outputSize);
 
 #pragma omp parallel for schedule(guided) shared(input, outputSize) reduction(bitsetOR : ret) default(none) num_threads(numThreads) if (input.size() > (static_cast<std::size_t>(omp_get_num_procs()) * 100))
         for (std::size_t i = 0; i < input.size(); ++i) {
-#pragma omp simd
-            for (std::size_t j = 0; j < bits; ++j) {
-                if constexpr (invertDirection) {
-                    ret[outputSize - 1 - (i * bits + j)] = input[i][j];
-                } else {
-                    ret[i * bits + j] = input[i][j];
-                }
-            }
+            ret.setByte(input[i].to_ulong(), i * bits);
+            // #pragma omp simd
+            //             for (std::size_t j = 0; j < bits; ++j) {
+            //                 if constexpr (invertDirection) {
+            //                     ret[outputSize - 1 - (i * bits + j)] = input[i][j];
+            //                 } else {
+            //                     ret[i * bits + j] = input[i][j];
+            //                 }
+            //             }
         }
         return ret;
     }
@@ -246,12 +247,9 @@ namespace Finn {
      * @param input bitset to be converted
      * @return Finn::vector<T> Vector of data (usually vector of bytes)
      */
-    template<typename T>
-    Finn::vector<T> bitsetToByteVector(const finnBoost::dynamic_bitset<T, AlignedAllocator<T>>& input) {
-        Finn::vector<uint8_t> ret;
-        ret.reserve(input.num_blocks());
-        finnBoost::to_block_range(input, std::back_inserter(ret));
-        return ret;
+    template<typename T = uint8_t>
+    Finn::vector<T> bitsetToByteVector(DynamicBitset& input) {
+        return input.getStorageVec();
     }
 
     /**
@@ -275,8 +273,8 @@ namespace Finn {
             } else {
                 // TODO(linusjun): For full bytes this is maybe overkill. So change it?
                 auto bitsetvector = toBitset<U, true, false>(first, last);
-                auto mergedBitset = mergeBitsets<U, false>(bitsetvector);
-                return bitsetToByteVector(mergedBitset);
+                auto mergedBitset = mergeBitsets<U>(bitsetvector);
+                return bitsetToByteVector<uint8_t>(mergedBitset);
             }
         }
     }  // namespace detail

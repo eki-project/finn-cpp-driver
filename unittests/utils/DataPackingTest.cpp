@@ -446,69 +446,43 @@ TEST(DataPacking, MergeBitsets) {
     Finn::vector<uint8_t> inp = {0, 1, 2, 3, 4, 5, 6, 7};
     auto ret = Finn::toBitset<Finn::DatatypeUInt<3>, true, false>(inp);
     auto ret2 = Finn::mergeBitsets<Finn::DatatypeUInt<3>>(ret);
-    std::string compare;
-    to_string(ret2, compare);
-    EXPECT_STREQ(compare.c_str(), "000100010110001101011111");
-    ret2 = Finn::mergeBitsets<Finn::DatatypeUInt<3>, false>(ret);
-    to_string(ret2, compare);
-    EXPECT_STREQ(compare.c_str(), "111110101100011010001000");
+    EXPECT_STREQ(ret2.to_string().c_str(), "111110101100011010001000");
     auto ret4bit = Finn::toBitset<Finn::DatatypeUInt<4>, true, false>(inp);
     ret2 = Finn::mergeBitsets<Finn::DatatypeUInt<4>>(ret4bit);
-    to_string(ret2, compare);
-    EXPECT_STREQ(compare.c_str(), "00001000010011000010101001101110");
-    ret2 = Finn::mergeBitsets<Finn::DatatypeUInt<4>, false>(ret4bit);
-    to_string(ret2, compare);
-    EXPECT_STREQ(compare.c_str(), "01110110010101000011001000010000");
+    EXPECT_STREQ(ret2.to_string().c_str(), "01110110010101000011001000010000");
 
     Finn::vector<int64_t> inp64 = {0, 1, 2, 3, 4, 5, 6, 7};
     ret = Finn::toBitset<Finn::DatatypeUInt<3>, true, false>(inp64);
     ret2 = Finn::mergeBitsets<Finn::DatatypeUInt<3>>(ret);
-    to_string(ret2, compare);
-    EXPECT_STREQ(compare.c_str(), "000100010110001101011111");
-    ret2 = Finn::mergeBitsets<Finn::DatatypeUInt<3>, false>(ret);
-    to_string(ret2, compare);
-    EXPECT_STREQ(compare.c_str(), "111110101100011010001000");
+    EXPECT_STREQ(ret2.to_string().c_str(), "111110101100011010001000");
     ret4bit = Finn::toBitset<Finn::DatatypeUInt<4>, true, false>(inp64);
     ret2 = Finn::mergeBitsets<Finn::DatatypeUInt<4>>(ret4bit);
-    to_string(ret2, compare);
-    EXPECT_STREQ(compare.c_str(), "00001000010011000010101001101110");
-    ret2 = Finn::mergeBitsets<Finn::DatatypeUInt<4>, false>(ret4bit);
-    to_string(ret2, compare);
-    EXPECT_STREQ(compare.c_str(), "01110110010101000011001000010000");
+    EXPECT_STREQ(ret2.to_string().c_str(), "01110110010101000011001000010000");
     auto ret9bit = Finn::toBitset<Finn::DatatypeUInt<9>, true, false>(inp64);
     ret2 = Finn::mergeBitsets<Finn::DatatypeUInt<9>>(ret9bit);
-    to_string(ret2, compare);
-    EXPECT_STREQ(compare.c_str(), "000000000100000000010000000110000000001000000101000000011000000111000000");
-    ret2 = Finn::mergeBitsets<Finn::DatatypeUInt<9>, false>(ret9bit);
-    to_string(ret2, compare);
-    EXPECT_STREQ(compare.c_str(), "000000111000000110000000101000000100000000011000000010000000001000000000");
+    EXPECT_STREQ(ret2.to_string().c_str(), "000000111000000110000000101000000100000000011000000010000000001000000000");
 
     Finn::vector<int64_t> inp64s = {0, -1, -2, -3, 4, 5, 6, 7};
     auto rets = Finn::toBitset<Finn::DatatypeInt<4>, true, false>(inp64s);
     ret2 = Finn::mergeBitsets<Finn::DatatypeInt<4>>(rets);
-    to_string(ret2, compare);
-    EXPECT_STREQ(compare.c_str(), "00001111011110110010101001101110");
-    ret2 = Finn::mergeBitsets<Finn::DatatypeInt<4>, false>(rets);
-    to_string(ret2, compare);
-    EXPECT_STREQ(compare.c_str(), "01110110010101001101111011110000");
+    EXPECT_STREQ(ret2.to_string().c_str(), "01110110010101001101111011110000");
 }
 
 TEST(DataPacking, BitsetToByteVector) {
     Finn::vector<uint8_t> inp = {0, 1, 2, 3, 4, 5, 6, 7};
     auto ret = Finn::toBitset<Finn::DatatypeUInt<3>, true, false>(inp);
-    auto ret2 = Finn::mergeBitsets<Finn::DatatypeUInt<3>, false>(ret);
-    auto ret3 = Finn::bitsetToByteVector(ret2);
+    auto ret2 = Finn::mergeBitsets<Finn::DatatypeUInt<3>>(ret);
+    auto ret3 = Finn::bitsetToByteVector<uint8_t>(ret2);
     Finn::vector<uint8_t> base = {136, 198, 250};
     EXPECT_EQ(base, ret3);
 }
 
 
 TEST(DataPacking, DynamicBitsetParallel) {
-    finnBoost::dynamic_bitset<uint8_t, AlignedAllocator<uint8_t>> bit;
-    bit.resize(128);
+    DynamicBitset bit(128);
 #pragma omp parallel for schedule(guided) reduction(Finn::bitsetOR : bit) default(none)
     for (std::size_t i = 0; i < bit.size(); ++i) {
-        bit[i] = 1;
+        bit.setSingleBit(i);
     }
     EXPECT_TRUE(bit.all());
 }

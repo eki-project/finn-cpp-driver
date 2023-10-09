@@ -1,18 +1,49 @@
 #include <utils/CostumDynamicBitset.h>
 
+#include <algorithm>
+#include <utils/join.hpp>
+
 #include "gtest/gtest.h"
 
 
-TEST(CostumDynamicBitsetTest, Dummy) {
-    for (std::size_t i = 0; i <= 50; ++i) {
+TEST(CostumDynamicBitsetTest, SettingBits) {
+    std::string testString = "0000000000000000000000000000000000000000000000000000000001010101";
+    for (std::size_t i = 0; i <= 57; ++i) {
         DynamicBitset set(64);
         uint32_t x = 1;
         x |= (1 << 4);
-        set.set2(x, i);
+        set.setByte(x, i);
         x = x << 2;
-        set.set2(x, i);
-        std::cout << set.to_string() << "\n";
+        set.setByte(x, i);
+        EXPECT_EQ(testString, set.to_string());
+        std::rotate(testString.begin(), testString.begin() + 1, testString.end());
     }
+}
+
+TEST(CostumDynamicBitsetTest, OutputTest) {
+    DynamicBitset set(64);
+    uint32_t x = 1;
+    x |= (1 << 4);
+    set.setByte(x, 0);
+    x = x << 2;
+    set.setByte(x, 0);
+    std::vector<uint8_t> out;
+    set.outputBytes(std::back_inserter(out));
+    std::vector<uint8_t> base = {0, 0, 0, 0, 0, 0, 0, 85};
+}
+
+TEST(CostumDynamicBitsetTest, MergeTest) {
+    std::string testString = "0000000000000000000000000000000000000000000000000000000001010101";
+
+    DynamicBitset set(64);
+    uint32_t x = 1;
+    x |= (1 << 4);
+    set.setByte(x, 0);
+    x = x << 2;
+    DynamicBitset set2(64);
+    set2.setByte(x, 0);
+    set2 |= set;
+    EXPECT_EQ(testString, set2.to_string());
 }
 
 int main(int argc, char** argv) {

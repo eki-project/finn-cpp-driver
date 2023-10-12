@@ -14,7 +14,10 @@
 #include <utils/AlignedAllocator.hpp>
 #include <vector>
 
-
+/**
+ * @brief A storage class to store a dynamic amount of bits. Assumes that each bit is set to 1 at most once. Bits cannot be reset.
+ *
+ */
 class DynamicBitset {
      public:
     std::vector<uint8_t, AlignedAllocator<uint8_t>> bits;
@@ -25,22 +28,68 @@ class DynamicBitset {
     size_t bytes;
 
      public:
+    /**
+     * @brief Construct a new Dynamic Bitset
+     *
+     * @param n Number of bits that should be stored
+     */
     DynamicBitset(const std::size_t& n) : bits(((n / bitsPerByte) + ((n % bitsPerByte != 0) ? 1 : 0)), 0), capacity(bits.size() * bitsPerByte), bytes(bits.size()) {}
+    /**
+     * @brief Move constructor
+     *
+     */
     DynamicBitset(DynamicBitset&&) = default;
+    /**
+     * @brief Copy constructor
+     *
+     */
     DynamicBitset(const DynamicBitset&) = default;
+    /**
+     * @brief Move assignment
+     *
+     * @param other
+     * @return DynamicBitset&
+     */
     DynamicBitset& operator=(DynamicBitset&& other) {
         capacity = other.capacity;
         bytes = other.bytes;
         std::swap(this->bits, other.bits);
         return *this;
     }
+
+    /**
+     * @brief Copy assignment
+     *
+     * @return DynamicBitset&
+     */
     DynamicBitset& operator=(const DynamicBitset&) = delete;
+
+    /**
+     * @brief Destroy the Dynamic Bitset object
+     *
+     */
     ~DynamicBitset() = default;
 
+    /**
+     * @brief Returns the capacity in bits of the bitset
+     *
+     * @return std::size_t
+     */
     std::size_t size() const { return capacity; }
 
+    /**
+     * @brief Returns the number of bytes stored in the bitset
+     *
+     * @return std::size_t
+     */
     std::size_t numBytes() const { return bytes; }
 
+    /**
+     * @brief Tests if all of the bits contained in the dynamic bitset is set.
+     *
+     * @return true
+     * @return false
+     */
     bool all() const {
         for (auto&& elem : bits) {
             if (elem != 255U) {
@@ -50,6 +99,12 @@ class DynamicBitset {
         return true;
     }
 
+    /**
+     * @brief Tests if none of the bits contained in the dynamic bitset is set.
+     *
+     * @return true
+     * @return false
+     */
     bool none() const {
         for (auto&& elem : bits) {
             if (elem != 0) {
@@ -59,12 +114,24 @@ class DynamicBitset {
         return true;
     }
 
+    /**
+     * @brief Sets a single bit. Cannot overwrite already set bits.
+     *
+     * @param n
+     */
     void setSingleBit(std::size_t n) {
         std::size_t index = n / bitsPerByte;
         std::size_t bit = n % bitsPerByte;
         bits[index] |= static_cast<uint8_t>(1U << bit);
     }
 
+    /**
+     * @brief Sets multiple bytes at once based on the provided input. Cannot overwrite already set bits.
+     *
+     * @tparam T
+     * @param x
+     * @param n
+     */
     template<typename T>
     void setByte(const T x, std::size_t n) {
         static_assert(std::is_unsigned<T>::value, "DynamicBitset is only supported for unsigned types");
@@ -92,6 +159,12 @@ class DynamicBitset {
         }
     }
 
+    /**
+     * @brief Copies the internal storage vector to the provided container
+     *
+     * @tparam T
+     * @param it
+     */
     template<typename T>
     void outputBytes(std::back_insert_iterator<T> it) const {
         for (auto&& elem : bits) {
@@ -99,8 +172,18 @@ class DynamicBitset {
         }
     }
 
+    /**
+     * @brief Moves the internal storage vector. The original Dynamic Bitset can not be used after this call!
+     *
+     * @return std::vector<uint8_t, AlignedAllocator<uint8_t>>
+     */
     std::vector<uint8_t, AlignedAllocator<uint8_t>> getStorageVec() { return std::move(bits); }
 
+    /**
+     * @brief Converts a DynamicBitset to a string representation
+     *
+     * @return std::string
+     */
     // NOLINTNEXTLINE
     std::string to_string() const {
         std::stringstream out;
@@ -120,8 +203,7 @@ class DynamicBitset {
      * @return DynamicBitset& merged bitset
      */
     friend DynamicBitset& operator|=(DynamicBitset& lhs, const DynamicBitset& rhs) {
-        // TODO(linusjun): More testing
-        std::transform(std::execution::par, lhs.bits.begin(), lhs.bits.end(), rhs.bits.begin(), lhs.bits.begin(), [](uint8_t& lhsByte, const uint8_t& rhsByte) { return lhsByte | rhsByte; });
+        std::transform(lhs.bits.begin(), lhs.bits.end(), rhs.bits.begin(), lhs.bits.begin(), [](uint8_t& lhsByte, const uint8_t& rhsByte) { return lhsByte | rhsByte; });
         return lhs;
     }
 };

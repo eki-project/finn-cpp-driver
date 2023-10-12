@@ -1,5 +1,6 @@
 #include <utils/Types.h>
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <iostream>
@@ -486,6 +487,72 @@ TEST(DataPacking, DynamicBitsetParallel) {
     }
     EXPECT_TRUE(bit.all());
 }
+
+TEST(DataPacking, UnpackingWrongSize) {
+    Finn::vector<uint8_t> inp(20, 0);
+    EXPECT_THROW((Finn::unpack<Finn::DatatypeUInt<7>, uint64_t>(inp)), std::runtime_error);
+    EXPECT_NO_THROW((Finn::unpack<Finn::DatatypeUInt<1>, uint32_t>(inp)));
+}
+
+TEST(DataPacking, UnpackingUnsignedTypes) {
+    Finn::vector<uint8_t> inp(20, 0);
+    std::iota(inp.begin(), inp.end(), 0);
+    auto ret = Finn::unpack<Finn::DatatypeUInt<8>, uint8_t>(inp);
+    EXPECT_EQ(inp, ret);
+
+    Finn::vector<uint16_t> inp2(inp.begin(), inp.end());
+    auto ret2 = Finn::unpack<Finn::DatatypeUInt<8>, uint16_t>(inp);
+    EXPECT_EQ(inp2, ret2);
+
+    Finn::vector<uint32_t> inp3(inp.begin(), inp.end());
+    auto ret3 = Finn::unpack<Finn::DatatypeUInt<8>, uint32_t>(inp);
+    EXPECT_EQ(inp3, ret3);
+
+    Finn::vector<uint8_t> inp64(24, 0);
+    std::iota(inp64.begin(), inp64.end(), 0);
+    Finn::vector<uint64_t> inp4(inp64.begin(), inp64.end());
+    auto ret4 = Finn::unpack<Finn::DatatypeUInt<8>, uint64_t>(inp64);
+    EXPECT_EQ(inp4, ret4);
+
+    Finn::vector<uint8_t> inp16 = {0, 0, 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 1, 0};
+    auto ret16 = Finn::unpack<Finn::DatatypeUInt<16>, uint16_t>(inp16);
+    Finn::vector<uint16_t> base16 = {0, 256, 512, 768, 1024, 1280, 1536, 1};
+    EXPECT_EQ(base16, ret16);
+
+    Finn::vector<uint8_t> inp32 = {0, 0, 0, 0, 1, 0, 0, 2, 0, 0, 3, 0, 0, 4, 0, 0, 5, 0, 0, 6, 0, 1, 0, 0};
+    auto ret32 = Finn::unpack<Finn::DatatypeUInt<32>, uint32_t>(inp32);
+    Finn::vector<uint32_t> base32 = {0, 33554433, 196608, 1024, 100663301, 256};
+    EXPECT_EQ(ret32, base32);
+}
+
+TEST(DataPacking, UnpackingSignedTypes) {
+    Finn::vector<uint8_t> inp = {21, 68, 255, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    Finn::vector<int8_t> int8 = {21, 68, -1, -128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    Finn::vector<int16_t> int16 = {17429, -32513, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    Finn::vector<int32_t> int24 = {-48107, 128, 0, 0, 0, 0, 0, 0};
+    Finn::vector<int32_t> int32 = {-2130754539, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    Finn::vector<int64_t> int64 = {2164212757, 0, 0, 0, 0, 0, 0, 0};
+
+    auto retInt8 = Finn::unpack<Finn::DatatypeInt<8>, int8_t>(inp);
+    EXPECT_EQ(retInt8, int8);
+    auto retInt16 = Finn::unpack<Finn::DatatypeInt<16>, int16_t>(inp);
+    EXPECT_EQ(retInt16, int16);
+    Finn::vector<uint8_t> inp1(inp.begin(), inp.begin() + 24);
+    auto retInt24 = Finn::unpack<Finn::DatatypeInt<24>, int32_t>(inp1);
+    EXPECT_EQ(retInt24, int24);
+    auto retInt32 = Finn::unpack<Finn::DatatypeInt<32>, int32_t>(inp);
+    EXPECT_EQ(retInt32, int32);
+    auto retInt64 = Finn::unpack<Finn::DatatypeInt<64>, int64_t>(inp);
+    EXPECT_EQ(retInt64, int64);
+}
+
+TEST(DataPacking, UnpackingFloatTypes) {
+    Finn::vector<uint8_t> inp(mat22.begin(), mat22.end());
+    auto retFloat = Finn::unpack<Finn::DatatypeFloat, float>(inp);
+    Finn::vector<float> base(inputMat7.begin(), inputMat7.end());
+    EXPECT_EQ(retFloat, base);
+}
+
 
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);

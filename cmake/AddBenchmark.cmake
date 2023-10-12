@@ -22,4 +22,6 @@ function(add_benchmark benchmark_name)
     OpenMP::OpenMP_CXX
   )
 
+  target_link_directories(${benchmark} PRIVATE ${BOOST_LIBRARYDIR})
+
 endfunction()

@@ -31,6 +31,12 @@ using backend_type = bl::sinks::text_file_backend;
 using sink_type = bl::sinks::synchronous_sink<backend_type>;
 namespace kw = bl::keywords;
 
+// NOLINTBEGIN
+#ifdef NDEBUG
+DevNull dev_null;
+#endif  // NDEBUG
+// NOLINTEND
+
 namespace Details {
     // NOLINTNEXTLINE
     logger_type boostLogger;

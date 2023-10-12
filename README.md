@@ -20,6 +20,7 @@ make -j $(nprocs)
 ```
 
 ### Getting Started on the N2 Cluster
+
 You will first have to load a few dependencies before being able to build the project:
 
 ```bash
@@ -31,6 +32,7 @@ ml devel/CMake/3.24.3-GCCcore-12.2.0
 ```
 
 To execute the driver on the boards, write a job script. The job script should look something like this:
+
 ```bash
 #!/bin/bash
 #SBATCH -t 0:07:00
@@ -48,16 +50,26 @@ ml compiler/GCC/12.2.0
 
 ./finn
 ```
+
 Execute it with ```sbatch write.sh```.
-Use ```xbutil``` to get information about the cards and configure them manually if necessary. 
+Use ```xbutil``` to get information about the cards and configure them manually if necessary.
 
 (Project name, resource usage, output filename, xrt version etc. are all examples and to bet set by the user themselves).
 
+### Setup
+
+```bash
+./buildDependencies.sh
+export LD_LIBRARY_PATH="$(pwd)/deps/finn_boost/stage/lib/boost/:$LD_LIBRARY_PATH"
+```
+
 ## TODO
+
 * Check if XRT frees the memory map itself
 * Does XRT ALWAYS take uint8? Even if not should we do it all the same?
 
 ## Structure
+
 ```
 Driver (bjarne)
     Accelerator (linus)
@@ -75,11 +87,13 @@ Driver (bjarne)
 ```
 
 ### Driver
+
 ```
 entrypoint?()
 ```
 
 ### DeviceHandler
+
 ```
 DeviceHandler()
 initializeDevice()
@@ -89,9 +103,10 @@ getDeviceBuffer()
 syncBuffers() (vlt. mehrere)
 ```
 
-
 ### DeviceBuffer
+
 (only ever write from ringBuffer, never manually!)
+
 ```
 Flag: IS_INPUT_OR_OUTPUT
 (Iterator für BOMap)
@@ -107,11 +122,11 @@ clear()
 ```
 
 ## Filetree
+
 * Filenames after class names, with UpperCamelCase
 * .h no template, .hpp templated
 * Split every non-template files into header and cpp file
 * utils.hpp only contains items that usable everywhere
-
 
 * utils: Utility functions and objects
 * utils - types.h: Enums and usings

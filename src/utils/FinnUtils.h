@@ -96,8 +96,7 @@ namespace FinnUtils {
      * @return constexpr T
      */
     template<FloatingPoint T>
-    constexpr T ceil(const T inFp)  // simpler version
-    {
+    constexpr T ceil(const T inFp) {
         if (isInf<T>(inFp) || isNaN<T>(inFp)) {
             return inFp;
         }

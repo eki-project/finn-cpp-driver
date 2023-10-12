@@ -379,6 +379,44 @@ namespace Finn {
         return pack<U>(foldedVec.begin(), foldedVec.end());
     }
 
+    template<IsDatatype U, typename T>
+    consteval bool IsCorrectFinnType() {
+        return std::is_floating_point_v<T> == !U().isInteger() && std::is_signed_v<T> == U().sign() && U().bitwidth() <= sizeof(T) * 8 && (U().isInteger() || std::is_same<float, T>::value) &&
+               (std::is_floating_point_v<T> || std::is_integral_v<T>);
+    }
+
+    template<IsDatatype U, typename T, typename = std::enable_if_t<IsCorrectFinnType<U, T>()>>
+    Finn::vector<T> unpack(const Finn::vector<uint8_t>& inp) {
+        static_assert(U().bitwidth() <= 64, "Finn Datatypes with more than 64 bit are not supported!");
+
+        constexpr std::size_t neededBytes = FinnUtils::ceil(U().bitwidth() / 8.0);
+
+        if (inp.size() * 8 % U().bitwidth() != 0 || inp.empty()) {
+            FinnUtils::logAndError<std::runtime_error>("Amount of input elements is not a multiple of output elements");
+        }
+
+        if constexpr (U().isFixedPoint()) {
+            return {};
+        } else {
+            if constexpr (U().bitwidth() / 8.0 == neededBytes) {  // complete Bytes
+                Finn::vector<T> ret(inp.size() / neededBytes, 0);
+                for (std::size_t i = 0; i < ret.size(); ++i) {
+                    const std::size_t offset = i * neededBytes;
+                    if constexpr (U().sign()) {  // TODO(linusjun): Test if this needs to be optimized or put into a seperate loop to allow vectorization.
+                        if ((-128 & inp[offset + neededBytes - 1]) != 0) {
+                            ret[i] = -1;
+                        }
+                    }
+                    std::memcpy(&ret.data()[i], &inp[offset], neededBytes);
+                }
+                return ret;
+
+            } else {
+                return {};
+            }
+        }
+    }
+
 }  // namespace Finn
 
 #endif  // DATAPACKING_HPP

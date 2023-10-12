@@ -19,8 +19,9 @@ function(add_unittest test_name)
     finnc_core_test
     xrt_mock
     OpenMP::OpenMP_CXX
-    # -Wl,--no-as-needed -lm -ldl
   )
+
+  target_link_directories(${test} PRIVATE ${BOOST_LIBRARYDIR})
 
   target_include_directories(${test} PRIVATE ${FINNC_SRC_DIR})
 

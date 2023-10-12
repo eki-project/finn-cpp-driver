@@ -217,7 +217,8 @@ namespace Finn {
 
          public:
         constexpr DatatypeFloat() = default;
-        constexpr ~DatatypeFloat() override = default;
+        // NOLINTNEXTLINE
+        constexpr ~DatatypeFloat() override{};  //{} instead of default because compiler bug
         constexpr DatatypeFloat(DatatypeFloat&&) noexcept = default;
         constexpr DatatypeFloat(DatatypeFloat const&) = default;
         DatatypeFloat& operator=(DatatypeFloat&&) noexcept = default;
@@ -279,7 +280,8 @@ namespace Finn {
 
          public:
         constexpr DatatypeInt() = default;
-        constexpr ~DatatypeInt() override = default;
+        // NOLINTNEXTLINE
+        constexpr ~DatatypeInt() override{};  //{} instead of default because compiler bug
         constexpr DatatypeInt(DatatypeInt<B>&&) noexcept = default;
         constexpr DatatypeInt(DatatypeInt<B> const&) = default;
         constexpr DatatypeInt<B>& operator=(DatatypeInt<B>&&) noexcept = default;
@@ -298,11 +300,11 @@ namespace Finn {
         /**
          * @brief @see Datatype
          */
-        constexpr double min() const override { return -static_cast<double>(1U << (B - 1)); }
+        constexpr double min() const override { return -static_cast<double>(1UL << (B - 1)); }
         /**
          * @brief @see Datatype
          */
-        constexpr double max() const override { return (1U << (B - 1)) - 1; }
+        constexpr double max() const override { return static_cast<double>((1UL << (B - 1)) - 1); }
 
         /**
          * @brief @see Datatype
@@ -341,7 +343,8 @@ namespace Finn {
 
          public:
         constexpr DatatypeFixed() = default;
-        constexpr ~DatatypeFixed() override = default;
+        // NOLINTNEXTLINE
+        constexpr ~DatatypeFixed() override{};  //{} instead of default because compiler bug
         constexpr DatatypeFixed(DatatypeFixed<B, I>&&) noexcept = default;
         constexpr DatatypeFixed(DatatypeFixed<B, I> const&) = default;
         constexpr DatatypeFixed<B, I>& operator=(DatatypeFixed<B, I>&&) noexcept = default;
@@ -416,7 +419,8 @@ namespace Finn {
 
          public:
         constexpr DatatypeUInt() = default;
-        constexpr ~DatatypeUInt() override = default;
+        // NOLINTNEXTLINE
+        constexpr ~DatatypeUInt() override{};  //{} instead of default because compiler bug
         constexpr DatatypeUInt(DatatypeUInt<B>&&) noexcept = default;
         constexpr DatatypeUInt(DatatypeUInt<B> const&) = default;
         constexpr DatatypeUInt<B>& operator=(DatatypeUInt<B>&&) noexcept = default;
@@ -439,7 +443,7 @@ namespace Finn {
         /**
          * @brief @see Datatype
          */
-        constexpr double max() const override { return (1U << B) - 1; }
+        constexpr double max() const override { return (1UL << B) - 1; }
 
         /**
          * @brief @see Datatype
@@ -482,7 +486,8 @@ namespace Finn {
 
          public:
         constexpr DatatypeBipolar() = default;
-        constexpr ~DatatypeBipolar() override = default;
+        // NOLINTNEXTLINE
+        constexpr ~DatatypeBipolar() override{};  //{} instead of default because compiler bug
         constexpr DatatypeBipolar(DatatypeBipolar&&) noexcept = default;
         constexpr DatatypeBipolar(DatatypeBipolar const&) = default;
         DatatypeBipolar& operator=(DatatypeBipolar&&) noexcept = default;
@@ -545,7 +550,8 @@ namespace Finn {
 
          public:
         constexpr DatatypeTernary() = default;
-        constexpr ~DatatypeTernary() override = default;
+        // NOLINTNEXTLINE
+        constexpr ~DatatypeTernary() override{};  //{} instead of default because compiler bug
         constexpr DatatypeTernary(DatatypeTernary&&) noexcept = default;
         constexpr DatatypeTernary(DatatypeTernary const&) = default;
         DatatypeTernary& operator=(DatatypeTernary&&) noexcept = default;

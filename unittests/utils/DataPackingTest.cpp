@@ -528,6 +528,11 @@ TEST(DataPacking, UnpackingUnsignedTypes) {
     auto ret10 = Finn::unpack<Finn::DatatypeUInt<10>>(inp);
     Finn::vector<uint16_t> base10 = {256, 128, 48, 16, 517, 449, 128, 36, 778, 770, 208, 56, 15, 68, 289, 76};
     EXPECT_EQ(base10, ret10);
+    Finn::vector<uint8_t> inp63 = {0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31,
+                                   32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62};
+    auto ret63 = Finn::unpack<Finn::DatatypeUInt<63>>(inp63);
+    Finn::vector<uint64_t> base63 = {506097522914230528, 2169637811237687824, 6654161153293829184, 8714721331369789632, 8242240712303841793, 7333449560590984452, 5588207430003346443, 2242403514504223771};
+    EXPECT_EQ(base63, ret63);
 }
 
 TEST(DataPacking, UnpackingSignedTypes) {
@@ -537,6 +542,7 @@ TEST(DataPacking, UnpackingSignedTypes) {
     Finn::vector<int32_t> int24 = {-48107, 128, 0, 0, 0, 0, 0, 0};
     Finn::vector<int32_t> int32 = {-2130754539, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     Finn::vector<int64_t> int64 = {2164212757, 0, 0, 0, 0, 0, 0, 0};
+
 
     auto retInt8 = Finn::unpack<Finn::DatatypeInt<8>>(inp);
     EXPECT_EQ(retInt8, int8);

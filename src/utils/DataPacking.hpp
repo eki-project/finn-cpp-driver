@@ -379,6 +379,10 @@ namespace Finn {
         return mask;
     }
 
+    /**
+     * @brief Namespace to autodeduce return type based on Finn Datatype
+     *
+     */
     namespace UnpackingAutoRetType {
         template<IsDatatype U>
         using FourBytesOrLongerSigned = std::conditional<U().bitwidth() <= 32, int32_t, int64_t>::type;
@@ -406,6 +410,15 @@ namespace Finn {
     }  // namespace UnpackingAutoRetType
 
 
+    /**
+     * @brief Unpacks a byte vector into a vector of T containing U.
+     *
+     * @tparam U FinnDatatype that is contained in byte array
+     * @tparam T Type of return vector. Is usually autodeduced, but it is also supported to use larger types for outputs: ex.: uint16_t instead of uint8_t is valid.
+     * @tparam typename Unnamed template param is used to enable the function only for supported types
+     * @param inp Byte vector
+     * @return Finn::vector<T> Vector of T containing U
+     */
     template<IsDatatype U, typename T = UnpackingAutoRetType::AutoRetType<U>, typename = std::enable_if_t<IsCorrectFinnType<U, T>()>>
     Finn::vector<T> unpack(const Finn::vector<uint8_t>& inp) {
         static_assert(U().bitwidth() <= 64, "Finn Datatypes with more than 64 bit are not supported!");
@@ -459,17 +472,16 @@ namespace Finn {
                 const std::size_t numBytes = upperBorderByte - lowerBorderByte + 1;
                 const std::size_t shiftOffset = lowerBit - (lowerBorderByte * 8);
 
-                BufferType buffer = 0;
-                std::memcpy(&buffer, &inp.data()[lowerBorderByte], numBytes);
-                buffer = static_cast<BufferType>(buffer >> shiftOffset);  // remove remaining bits from previous element
-                buffer &= mask;                                           // remove bits from next element
+                BufferType buffer = 0;                                         // This buffer is big enough to contain two FinnDatatype elements. Therefore no problem if one FinnDatatype element is shifted.
+                std::memcpy(&buffer, &inp.data()[lowerBorderByte], numBytes);  // Fill Buffer with from byte inputs
+                buffer = static_cast<BufferType>(buffer >> shiftOffset);       // remove remaining bits from previous element
+                buffer &= mask;                                                // remove bits from next element
 
                 if constexpr (U().sign()) {  // TODO(linusjun): Test if this needs to be optimized or put into a seperate loop to allow vectorization.
                     if (((BufferType(1U) << (bitwidth - 1)) & buffer) != 0) {
                         buffer |= ~mask;
                     }
                 }
-
                 ret[index] = static_cast<RetType>(buffer);
             }
 

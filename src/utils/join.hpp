@@ -1,6 +1,7 @@
 #ifndef JOIN_HPP
 #define JOIN_HPP
 
+#include <iostream>
 #include <iterator>
 #include <sstream>
 #include <string>
@@ -63,7 +64,13 @@ using is_iterable = decltype(detail::is_iterable_impl<T>(0));
 template<typename T>
 auto join(const T& p, const char* delimiter) -> typename std::enable_if<is_iterable<T>::value, std::string>::type {
     std::ostringstream s;
+    if constexpr (std::is_same<typename T::value_type, bool>::value) {
+        s << std::boolalpha;
+    }
     std::copy(p.begin(), p.end(), infix_ostream_iterator<typename T::value_type>(s, delimiter));
+    if constexpr (std::is_same<typename T::value_type, bool>::value) {
+        s << std::noboolalpha;
+    }
     return s.str();
 }
 

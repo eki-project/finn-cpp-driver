@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <iostream>
 #include <utils/DataPacking.hpp>
@@ -523,6 +524,10 @@ TEST(DataPacking, UnpackingUnsignedTypes) {
     auto ret32 = Finn::unpack<Finn::DatatypeUInt<32>, uint32_t>(inp32);
     Finn::vector<uint32_t> base32 = {0, 33554433, 196608, 1024, 100663301, 256};
     EXPECT_EQ(ret32, base32);
+
+    auto ret10 = Finn::unpack<Finn::DatatypeUInt<10>, uint16_t>(inp);
+    Finn::vector<uint16_t> base10 = {256, 128, 48, 16, 517, 449, 128, 36, 778, 770, 208, 56, 15, 68, 289, 76};
+    EXPECT_EQ(base10, ret10);
 }
 
 TEST(DataPacking, UnpackingSignedTypes) {
@@ -544,6 +549,42 @@ TEST(DataPacking, UnpackingSignedTypes) {
     EXPECT_EQ(retInt32, int32);
     auto retInt64 = Finn::unpack<Finn::DatatypeInt<64>, int64_t>(inp);
     EXPECT_EQ(retInt64, int64);
+    Finn::vector<uint8_t> inp10(20, 0);
+    std::iota(inp10.begin(), inp10.end(), 0);
+    Finn::vector<int16_t> base10 = {256, 128, 48, 16, -507, 449, 128, 36, -246, -254, 208, 56, 15, 68, 289, 76};
+    auto ret10 = Finn::unpack<Finn::DatatypeInt<10>, int16_t>(inp10);
+    EXPECT_EQ(base10, ret10);
+}
+
+template<typename T>
+bool approxEqual(const T& lhs, const T& rhs) {
+    constexpr float epsilon = 0.0015f;
+    return std::abs(lhs - rhs) <= epsilon;
+}
+
+
+TEST(DataPacking, UnpackingFixedPointTypes) {
+    Finn::vector<uint8_t> inp = {21, 68, 255, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    auto retFloat = Finn::unpack<Finn::DatatypeFixed<16, 10>, float>(inp);
+    Finn::vector<float> base1610 = {272.328, -508.016, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    EXPECT_TRUE(retFloat.size() == base1610.size());
+    std::vector<bool> ans;
+    std::transform(retFloat.begin(), retFloat.end(), base1610.begin(), std::back_inserter(ans), approxEqual<float>);
+    EXPECT_TRUE(std::all_of(ans.begin(), ans.end(), [](const auto& elem) { return elem; }));
+    retFloat = Finn::unpack<Finn::DatatypeFixed<16, 12>, float>(inp);
+    Finn::vector<float> base1612 = {1089.3125, -2032.0625, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    ans.clear();
+    EXPECT_TRUE(retFloat.size() == base1612.size());
+    std::transform(retFloat.begin(), retFloat.end(), base1612.begin(), std::back_inserter(ans), approxEqual<float>);
+    EXPECT_TRUE(std::all_of(ans.begin(), ans.end(), [](const auto& elem) { return elem; }));
+    Finn::vector<uint8_t> inp10(20, 0);
+    std::iota(inp10.begin(), inp10.end(), 0);
+    Finn::vector<float> base10 = {8.0, 4.0, 1.5, 0.5, -15.84375, 14.03125, 4.0, 1.125, -7.6875, -7.9375, 6.5, 1.75, 0.46875, 2.125, 9.03125, 2.375};
+    auto ret10 = Finn::unpack<Finn::DatatypeFixed<10, 5>, float>(inp10);
+    ans.clear();
+    EXPECT_TRUE(ret10.size() == base10.size());
+    std::transform(ret10.begin(), ret10.end(), base10.begin(), std::back_inserter(ans), approxEqual<float>);
+    EXPECT_TRUE(std::all_of(ans.begin(), ans.end(), [](const auto& elem) { return elem; }));
 }
 
 TEST(DataPacking, UnpackingFloatTypes) {

@@ -498,7 +498,7 @@ TEST(DataPacking, UnpackingWrongSize) {
 TEST(DataPacking, UnpackingUnsignedTypes) {
     Finn::vector<uint8_t> inp(20, 0);
     std::iota(inp.begin(), inp.end(), 0);
-    auto ret = Finn::unpack<Finn::DatatypeUInt<8>, uint8_t>(inp);
+    auto ret = Finn::unpack<Finn::DatatypeUInt<8>>(inp);
     EXPECT_EQ(inp, ret);
 
     Finn::vector<uint16_t> inp2(inp.begin(), inp.end());
@@ -516,16 +516,16 @@ TEST(DataPacking, UnpackingUnsignedTypes) {
     EXPECT_EQ(inp4, ret4);
 
     Finn::vector<uint8_t> inp16 = {0, 0, 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 1, 0};
-    auto ret16 = Finn::unpack<Finn::DatatypeUInt<16>, uint16_t>(inp16);
+    auto ret16 = Finn::unpack<Finn::DatatypeUInt<16>>(inp16);
     Finn::vector<uint16_t> base16 = {0, 256, 512, 768, 1024, 1280, 1536, 1};
     EXPECT_EQ(base16, ret16);
 
     Finn::vector<uint8_t> inp32 = {0, 0, 0, 0, 1, 0, 0, 2, 0, 0, 3, 0, 0, 4, 0, 0, 5, 0, 0, 6, 0, 1, 0, 0};
-    auto ret32 = Finn::unpack<Finn::DatatypeUInt<32>, uint32_t>(inp32);
+    auto ret32 = Finn::unpack<Finn::DatatypeUInt<32>>(inp32);
     Finn::vector<uint32_t> base32 = {0, 33554433, 196608, 1024, 100663301, 256};
     EXPECT_EQ(ret32, base32);
 
-    auto ret10 = Finn::unpack<Finn::DatatypeUInt<10>, uint16_t>(inp);
+    auto ret10 = Finn::unpack<Finn::DatatypeUInt<10>>(inp);
     Finn::vector<uint16_t> base10 = {256, 128, 48, 16, 517, 449, 128, 36, 778, 770, 208, 56, 15, 68, 289, 76};
     EXPECT_EQ(base10, ret10);
 }
@@ -538,21 +538,21 @@ TEST(DataPacking, UnpackingSignedTypes) {
     Finn::vector<int32_t> int32 = {-2130754539, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     Finn::vector<int64_t> int64 = {2164212757, 0, 0, 0, 0, 0, 0, 0};
 
-    auto retInt8 = Finn::unpack<Finn::DatatypeInt<8>, int8_t>(inp);
+    auto retInt8 = Finn::unpack<Finn::DatatypeInt<8>>(inp);
     EXPECT_EQ(retInt8, int8);
-    auto retInt16 = Finn::unpack<Finn::DatatypeInt<16>, int16_t>(inp);
+    auto retInt16 = Finn::unpack<Finn::DatatypeInt<16>>(inp);
     EXPECT_EQ(retInt16, int16);
     Finn::vector<uint8_t> inp1(inp.begin(), inp.begin() + 24);
-    auto retInt24 = Finn::unpack<Finn::DatatypeInt<24>, int32_t>(inp1);
+    auto retInt24 = Finn::unpack<Finn::DatatypeInt<24>>(inp1);
     EXPECT_EQ(retInt24, int24);
-    auto retInt32 = Finn::unpack<Finn::DatatypeInt<32>, int32_t>(inp);
+    auto retInt32 = Finn::unpack<Finn::DatatypeInt<32>>(inp);
     EXPECT_EQ(retInt32, int32);
-    auto retInt64 = Finn::unpack<Finn::DatatypeInt<64>, int64_t>(inp);
+    auto retInt64 = Finn::unpack<Finn::DatatypeInt<64>>(inp);
     EXPECT_EQ(retInt64, int64);
     Finn::vector<uint8_t> inp10(20, 0);
     std::iota(inp10.begin(), inp10.end(), 0);
     Finn::vector<int16_t> base10 = {256, 128, 48, 16, -507, 449, 128, 36, -246, -254, 208, 56, 15, 68, 289, 76};
-    auto ret10 = Finn::unpack<Finn::DatatypeInt<10>, int16_t>(inp10);
+    auto ret10 = Finn::unpack<Finn::DatatypeInt<10>>(inp10);
     EXPECT_EQ(base10, ret10);
 }
 
@@ -565,7 +565,7 @@ bool approxEqual(const T& lhs, const T& rhs) {
 
 TEST(DataPacking, UnpackingFixedPointTypes) {
     Finn::vector<uint8_t> inp = {21, 68, 255, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    auto retFloat = Finn::unpack<Finn::DatatypeFixed<16, 10>, float>(inp);
+    auto retFloat = Finn::unpack<Finn::DatatypeFixed<16, 10>>(inp);
     Finn::vector<float> base1610 = {272.328, -508.016, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     EXPECT_TRUE(retFloat.size() == base1610.size());
     std::vector<bool> ans;
@@ -589,7 +589,7 @@ TEST(DataPacking, UnpackingFixedPointTypes) {
 
 TEST(DataPacking, UnpackingFloatTypes) {
     Finn::vector<uint8_t> inp(mat22.begin(), mat22.end());
-    auto retFloat = Finn::unpack<Finn::DatatypeFloat, float>(inp);
+    auto retFloat = Finn::unpack<Finn::DatatypeFloat>(inp);
     Finn::vector<float> base(inputMat7.begin(), inputMat7.end());
     EXPECT_EQ(retFloat, base);
 }

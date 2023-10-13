@@ -379,8 +379,34 @@ namespace Finn {
         return mask;
     }
 
+    namespace UnpackingAutoRetType {
+        template<IsDatatype U>
+        using FourBytesOrLongerSigned = std::conditional<U().bitwidth() <= 32, int32_t, int64_t>::type;
 
-    template<IsDatatype U, typename T, typename = std::enable_if_t<IsCorrectFinnType<U, T>()>>
+        template<IsDatatype U>
+        using TwoBytesOrLongerSigned = std::conditional<U().bitwidth() <= 16, int16_t, FourBytesOrLongerSigned<U>>::type;
+
+        template<IsDatatype U>
+        using SignedRetType = std::conditional<U().bitwidth() <= 8, int8_t, TwoBytesOrLongerSigned<U>>::type;
+
+        template<IsDatatype U>
+        using FourBytesOrLongerUnsigned = std::conditional<U().bitwidth() <= 32, uint32_t, uint64_t>::type;
+
+        template<IsDatatype U>
+        using TwoBytesOrLongerUnsigned = std::conditional<U().bitwidth() <= 16, uint16_t, FourBytesOrLongerUnsigned<U>>::type;
+
+        template<IsDatatype U>
+        using UnsignedRetType = std::conditional<U().bitwidth() <= 8, uint8_t, TwoBytesOrLongerUnsigned<U>>::type;
+
+        template<IsDatatype U>
+        using IntegralType = std::conditional<U().sign(), SignedRetType<U>, UnsignedRetType<U>>::type;
+
+        template<IsDatatype U>
+        using AutoRetType = std::conditional<U().isInteger(), IntegralType<U>, float>::type;
+    }  // namespace UnpackingAutoRetType
+
+
+    template<IsDatatype U, typename T = UnpackingAutoRetType::AutoRetType<U>, typename = std::enable_if_t<IsCorrectFinnType<U, T>()>>
     Finn::vector<T> unpack(const Finn::vector<uint8_t>& inp) {
         static_assert(U().bitwidth() <= 64, "Finn Datatypes with more than 64 bit are not supported!");
 

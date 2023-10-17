@@ -18,7 +18,7 @@ static void BM_PackUINT8_1M(benchmark::State& state) {
         auto ret = Finn::pack<Finn::DatatypeUInt<8>>(inp.begin(), inp.end());
 }
 // Register the function as a benchmark
-// BENCHMARK(BM_PackUINT8_1M)->Iterations(1000);
+BENCHMARK(BM_PackUINT8_1M)->Iterations(1000);
 
 static void BM_PackINT3_1M(benchmark::State& state) {
     std::uniform_int_distribution<int8_t> dist{-3, 3};
@@ -29,7 +29,7 @@ static void BM_PackINT3_1M(benchmark::State& state) {
         auto ret = Finn::pack<Finn::DatatypeInt<3>>(inp.begin(), inp.end());
 }
 // Register the function as a benchmark
-// BENCHMARK(BM_PackINT3_1M)->Iterations(1000);
+BENCHMARK(BM_PackINT3_1M)->Iterations(1000);
 
 static void BM_PackINT4_1M(benchmark::State& state) {
     std::uniform_int_distribution<int8_t> dist{-8, 8};
@@ -40,7 +40,7 @@ static void BM_PackINT4_1M(benchmark::State& state) {
         auto ret = Finn::pack<Finn::DatatypeInt<4>>(inp.begin(), inp.end());
 }
 // Register the function as a benchmark
-// BENCHMARK(BM_PackINT4_1M)->Iterations(1000);
+BENCHMARK(BM_PackINT4_1M)->Iterations(1000);
 
 static void BM_PackINT7_1M(benchmark::State& state) {
     std::uniform_int_distribution<int8_t> dist{-8, 8};
@@ -51,7 +51,7 @@ static void BM_PackINT7_1M(benchmark::State& state) {
         auto ret = Finn::pack<Finn::DatatypeInt<7>>(inp.begin(), inp.end());
 }
 // Register the function as a benchmark
-// BENCHMARK(BM_PackINT7_1M)->Iterations(1000);
+BENCHMARK(BM_PackINT7_1M)->Iterations(1000);
 
 static void BM_PackINT7_600(benchmark::State& state) {
     std::uniform_int_distribution<int8_t> dist{-8, 8};
@@ -62,7 +62,7 @@ static void BM_PackINT7_600(benchmark::State& state) {
         auto ret = Finn::pack<Finn::DatatypeInt<7>>(inp.begin(), inp.end());
 }
 // Register the function as a benchmark
-// BENCHMARK(BM_PackINT7_600)->Iterations(10000);
+BENCHMARK(BM_PackINT7_600)->Iterations(10000);
 
 static void BM_PackINT32_1M(benchmark::State& state) {
     std::uniform_int_distribution<int32_t> dist{-1000, 1000};
@@ -73,7 +73,7 @@ static void BM_PackINT32_1M(benchmark::State& state) {
         auto ret = Finn::pack<Finn::DatatypeInt<32>>(inp.begin(), inp.end());
 }
 // Register the function as a benchmark
-// BENCHMARK(BM_PackINT32_1M)->Iterations(1000);
+BENCHMARK(BM_PackINT32_1M)->Iterations(1000);
 
 static void BM_PackFLOAT32_F_1M(benchmark::State& state) {
     std::uniform_real_distribution<> dist{-1000, 1000};
@@ -84,7 +84,7 @@ static void BM_PackFLOAT32_F_1M(benchmark::State& state) {
         auto ret = Finn::pack<Finn::DatatypeFloat>(inp.begin(), inp.end());
 }
 // Register the function as a benchmark
-// BENCHMARK(BM_PackFLOAT32_F_1M)->Iterations(1000);
+BENCHMARK(BM_PackFLOAT32_F_1M)->Iterations(1000);
 
 static void BM_PackFLOAT32_D_1M(benchmark::State& state) {
     std::uniform_real_distribution<> dist{-1000, 1000};
@@ -95,7 +95,7 @@ static void BM_PackFLOAT32_D_1M(benchmark::State& state) {
         auto ret = Finn::pack<Finn::DatatypeFloat>(inp.begin(), inp.end());
 }
 // Register the function as a benchmark
-// BENCHMARK(BM_PackFLOAT32_D_1M)->Iterations(1000);
+BENCHMARK(BM_PackFLOAT32_D_1M)->Iterations(1000);
 
 static void BM_PackFLOAT32_D_500K(benchmark::State& state) {
     std::uniform_real_distribution<> dist{-1000, 1000};
@@ -106,7 +106,7 @@ static void BM_PackFLOAT32_D_500K(benchmark::State& state) {
         auto ret = Finn::pack<Finn::DatatypeFloat>(inp.begin(), inp.end());
 }
 // Register the function as a benchmark
-// BENCHMARK(BM_PackFLOAT32_D_500K)->Iterations(1000);
+BENCHMARK(BM_PackFLOAT32_D_500K)->Iterations(1000);
 
 static void BM_PackFLOAT32_D_250K(benchmark::State& state) {
     std::uniform_real_distribution<> dist{-1000, 1000};
@@ -117,7 +117,7 @@ static void BM_PackFLOAT32_D_250K(benchmark::State& state) {
         auto ret = Finn::pack<Finn::DatatypeFloat>(inp.begin(), inp.end());
 }
 // Register the function as a benchmark
-// BENCHMARK(BM_PackFLOAT32_D_250K)->Iterations(1000);
+BENCHMARK(BM_PackFLOAT32_D_250K)->Iterations(1000);
 
 static void BM_PackFLOAT32_D_600(benchmark::State& state) {
     std::uniform_real_distribution<> dist{-1000, 1000};
@@ -139,7 +139,7 @@ static void BM_UnpackUINT8_1M(benchmark::State& state) {
         auto ret = Finn::unpack<Finn::DatatypeUInt<8>>(inp);
 }
 // Register the function as a benchmark
-// BENCHMARK(BM_UnpackUINT8_1M)->Iterations(1000);
+BENCHMARK(BM_UnpackUINT8_1M)->Iterations(1000);
 
 static void BM_UnpackUINT16_1M(benchmark::State& state) {
     std::uniform_int_distribution<uint8_t> dist{0, 255};
@@ -150,7 +150,7 @@ static void BM_UnpackUINT16_1M(benchmark::State& state) {
         auto ret = Finn::unpack<Finn::DatatypeUInt<16>>(inp);
 }
 // Register the function as a benchmark
-// BENCHMARK(BM_UnpackUINT16_1M)->Iterations(1000);
+BENCHMARK(BM_UnpackUINT16_1M)->Iterations(1000);
 
 static void BM_UnpackINT10_1M(benchmark::State& state) {
     std::uniform_int_distribution<uint8_t> dist{0, 255};
@@ -161,7 +161,7 @@ static void BM_UnpackINT10_1M(benchmark::State& state) {
         auto ret = Finn::unpack<Finn::DatatypeInt<10>>(inp);
 }
 // Register the function as a benchmark
-// BENCHMARK(BM_UnpackINT10_1M)->Iterations(1000);
+BENCHMARK(BM_UnpackINT10_1M)->Iterations(1000);
 
 static void BM_UnpackINT16_1M(benchmark::State& state) {
     std::uniform_int_distribution<uint8_t> dist{0, 255};
@@ -172,7 +172,7 @@ static void BM_UnpackINT16_1M(benchmark::State& state) {
         auto ret = Finn::unpack<Finn::DatatypeInt<16>>(inp);
 }
 // Register the function as a benchmark
-// BENCHMARK(BM_UnpackINT16_1M)->Iterations(1000);
+BENCHMARK(BM_UnpackINT16_1M)->Iterations(1000);
 
 static void BM_UnpackUINT64_1M(benchmark::State& state) {
     std::uniform_int_distribution<uint8_t> dist{0, 255};
@@ -183,7 +183,7 @@ static void BM_UnpackUINT64_1M(benchmark::State& state) {
         auto ret = Finn::unpack<Finn::DatatypeUInt<64>>(inp);
 }
 // Register the function as a benchmark
-// BENCHMARK(BM_UnpackUINT64_1M)->Iterations(1000);
+BENCHMARK(BM_UnpackUINT64_1M)->Iterations(1000);
 
 static void BM_UnpackFLOAT_1M(benchmark::State& state) {
     std::uniform_int_distribution<uint8_t> dist{0, 255};
@@ -194,7 +194,7 @@ static void BM_UnpackFLOAT_1M(benchmark::State& state) {
         auto ret = Finn::unpack<Finn::DatatypeFloat>(inp);
 }
 // Register the function as a benchmark
-// BENCHMARK(BM_UnpackFLOAT_1M)->Iterations(1000);
+BENCHMARK(BM_UnpackFLOAT_1M)->Iterations(1000);
 
 static void BM_UnpackFLOAT_600(benchmark::State& state) {
     std::uniform_int_distribution<uint8_t> dist{0, 255};
@@ -205,7 +205,7 @@ static void BM_UnpackFLOAT_600(benchmark::State& state) {
         auto ret = Finn::unpack<Finn::DatatypeFloat>(inp);
 }
 // Register the function as a benchmark
-// BENCHMARK(BM_UnpackFLOAT_600)->Iterations(10000);
+BENCHMARK(BM_UnpackFLOAT_600)->Iterations(10000);
 
 static void BM_UnpackINT10_600(benchmark::State& state) {
     std::uniform_int_distribution<uint8_t> dist{0, 255};
@@ -216,7 +216,7 @@ static void BM_UnpackINT10_600(benchmark::State& state) {
         auto ret = Finn::unpack<Finn::DatatypeInt<10>>(inp);
 }
 // Register the function as a benchmark
-// BENCHMARK(BM_UnpackINT10_600)->Iterations(10000);
+BENCHMARK(BM_UnpackINT10_600)->Iterations(10000);
 
 
 BENCHMARK_MAIN();

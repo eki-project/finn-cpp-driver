@@ -1,12 +1,9 @@
 #ifndef DATAPACKING_HPP
 #define DATAPACKING_HPP
 
-#include <omp.h>
 
 #include <algorithm>
 #include <bit>
-#include <bitset>
-#include <boost/dynamic_bitset.hpp>
 #include <concepts>
 #include <cstdint>
 #include <iostream>
@@ -114,6 +111,45 @@ namespace Finn {
     }  // namespace bitshuffling
 
     /**
+     * @brief Namespace to autodeduce return type based on Finn Datatype
+     *
+     */
+    namespace UnpackingAutoRetType {
+        template<IsDatatype U>
+        using FourBytesOrLongerSigned = std::conditional<U().bitwidth() <= 32, int32_t, int64_t>::type;
+
+        template<IsDatatype U>
+        using TwoBytesOrLongerSigned = std::conditional<U().bitwidth() <= 16, int16_t, FourBytesOrLongerSigned<U>>::type;
+
+        template<IsDatatype U>
+        using SignedRetType = std::conditional<U().bitwidth() <= 8, int8_t, TwoBytesOrLongerSigned<U>>::type;
+
+        template<IsDatatype U>
+        using FourBytesOrLongerUnsigned = std::conditional<U().bitwidth() <= 32, uint32_t, uint64_t>::type;
+
+        template<IsDatatype U>
+        using TwoBytesOrLongerUnsigned = std::conditional<U().bitwidth() <= 16, uint16_t, FourBytesOrLongerUnsigned<U>>::type;
+
+        template<IsDatatype U>
+        using UnsignedRetType = std::conditional<U().bitwidth() <= 8, uint8_t, TwoBytesOrLongerUnsigned<U>>::type;
+
+        template<IsDatatype U>
+        using IntegralType = std::conditional<U().sign(), SignedRetType<U>, UnsignedRetType<U>>::type;
+
+        template<IsDatatype U>
+        using AutoRetType = std::conditional<U().isInteger(), IntegralType<U>, float>::type;
+    }  // namespace UnpackingAutoRetType
+
+    template<typename T>
+    consteval T createMask(std::size_t bits) {
+        T mask = 0;
+        for (std::size_t i = 0; i < bits; ++i) {
+            mask = mask | static_cast<T>((T(1U) << i));
+        }
+        return mask;
+    }
+
+    /**
      * @brief Internal implementations. Should not be used by user.
      *
      */
@@ -130,7 +166,7 @@ namespace Finn {
          * @return Finn::vector<std::bitset<U().bitwidth()>> vector of bitsets containing bit representations of inputs
          */
         template<IsDatatype U, bool invertBytes = true, bool reverseBits = true, typename IteratorType>
-        Finn::vector<std::bitset<U().bitwidth()>> toBitsetImpl(IteratorType first, IteratorType last) {
+        Finn::vector<UnpackingAutoRetType::UnsignedRetType<U>> toBitsetImpl(IteratorType first, IteratorType last) {
             using T = std::iterator_traits<IteratorType>::value_type;
             if constexpr (reverseBits) {
                 constexpr std::size_t shift = (sizeof(T) * 8 - U().bitwidth());
@@ -146,11 +182,13 @@ namespace Finn {
                     std::transform(first, last, first, [](const T& val) { return (val + 1) >> 1; });  // This converts bipolar to binary
                 }
             }
+            constexpr T mask = createMask<T>(U().bitwidth());
+            std::transform(first, last, first, [](const T& val) { return val & mask; });  // Cut away all bits larger than U().bitwidth()
             if constexpr (invertBytes) {
-                Finn::vector<std::bitset<U().bitwidth()>> ret(first, last);
+                Finn::vector<UnpackingAutoRetType::UnsignedRetType<U>> ret(first, last);
                 return ret;
             } else {
-                Finn::vector<std::bitset<U().bitwidth()>> ret(std::make_reverse_iterator(last), std::make_reverse_iterator(first));
+                Finn::vector<UnpackingAutoRetType::UnsignedRetType<U>> ret(std::make_reverse_iterator(last), std::make_reverse_iterator(first));
                 return ret;
             }
         }
@@ -169,7 +207,7 @@ namespace Finn {
      * @return Finn::vector<std::bitset<U().bitwidth()>> vector of bitsets containing bit representations of inputs
      */
     template<IsDatatype U, bool invertBytes = true, bool reverseBits = true, typename IteratorType, typename = std::enable_if_t<std::is_integral<typename std::iterator_traits<IteratorType>::value_type>::value>>
-    Finn::vector<std::bitset<U().bitwidth()>> toBitset(IteratorType first, IteratorType last) {
+    Finn::vector<UnpackingAutoRetType::UnsignedRetType<U>> toBitset(IteratorType first, IteratorType last) {
         using T = std::iterator_traits<IteratorType>::value_type;
         static_assert(sizeof(T) <= 8, "Datatypes with more than 8 bytes are currently not supported!");
         if constexpr (std::is_signed_v<T>) {  // Needs to be casted to an unsigned input type to avoid undefined behavior of shift operations on negative values
@@ -196,7 +234,7 @@ namespace Finn {
      * @return Finn::vector<std::bitset<U().bitwidth()>> vector of bitsets containing bit representations of inputs
      */
     template<IsDatatype U, bool invertBytes = true, bool reverseBits = true, std::integral V>
-    Finn::vector<std::bitset<U().bitwidth()>> toBitset(Finn::vector<V>& input) {
+    Finn::vector<UnpackingAutoRetType::UnsignedRetType<U>> toBitset(Finn::vector<V>& input) {
         return toBitset<U, invertBytes, reverseBits, typename Finn::vector<V>::iterator>(input.begin(), input.end());
     }
 
@@ -213,7 +251,7 @@ namespace Finn {
      * @return DynamicBitset Merged bitset
      */
     template<IsDatatype U>
-    DynamicBitset mergeBitsets(const Finn::vector<std::bitset<U().bitwidth()>>& input) {
+    DynamicBitset mergeBitsets(const Finn::vector<UnpackingAutoRetType::UnsignedRetType<U>>& input) {
         constexpr std::size_t bits = U().bitwidth();
         const std::size_t outputSize = input.size() * bits;
         // const std::size_t numThreads = std::min(static_cast<std::size_t>(omp_get_num_procs()), input.size() / 100);
@@ -221,7 +259,7 @@ namespace Finn {
 
         // #pragma omp parallel for schedule(guided) shared(input, outputSize) reduction(bitsetOR : ret) default(none) num_threads(numThreads) if (input.size() > (static_cast<std::size_t>(omp_get_num_procs()) * 100))
         for (std::size_t i = 0; i < input.size(); ++i) {
-            ret.setByte(input[i].to_ulong(), i * bits);
+            ret.setByte(input[i], i * bits);
         }
         return ret;
     }
@@ -361,45 +399,6 @@ namespace Finn {
         return std::is_floating_point_v<T> == !U().isInteger() && std::is_signed_v<T> == U().sign() && U().bitwidth() <= sizeof(T) * 8 && (U().isInteger() || std::is_same<float, T>::value) &&
                (std::is_floating_point_v<T> || std::is_integral_v<T>);
     }
-
-    template<typename T>
-    consteval T createMask(std::size_t bits) {
-        T mask = 0;
-        for (std::size_t i = 0; i < bits; ++i) {
-            mask = mask | static_cast<T>((T(1U) << i));
-        }
-        return mask;
-    }
-
-    /**
-     * @brief Namespace to autodeduce return type based on Finn Datatype
-     *
-     */
-    namespace UnpackingAutoRetType {
-        template<IsDatatype U>
-        using FourBytesOrLongerSigned = std::conditional<U().bitwidth() <= 32, int32_t, int64_t>::type;
-
-        template<IsDatatype U>
-        using TwoBytesOrLongerSigned = std::conditional<U().bitwidth() <= 16, int16_t, FourBytesOrLongerSigned<U>>::type;
-
-        template<IsDatatype U>
-        using SignedRetType = std::conditional<U().bitwidth() <= 8, int8_t, TwoBytesOrLongerSigned<U>>::type;
-
-        template<IsDatatype U>
-        using FourBytesOrLongerUnsigned = std::conditional<U().bitwidth() <= 32, uint32_t, uint64_t>::type;
-
-        template<IsDatatype U>
-        using TwoBytesOrLongerUnsigned = std::conditional<U().bitwidth() <= 16, uint16_t, FourBytesOrLongerUnsigned<U>>::type;
-
-        template<IsDatatype U>
-        using UnsignedRetType = std::conditional<U().bitwidth() <= 8, uint8_t, TwoBytesOrLongerUnsigned<U>>::type;
-
-        template<IsDatatype U>
-        using IntegralType = std::conditional<U().sign(), SignedRetType<U>, UnsignedRetType<U>>::type;
-
-        template<IsDatatype U>
-        using AutoRetType = std::conditional<U().isInteger(), IntegralType<U>, float>::type;
-    }  // namespace UnpackingAutoRetType
 
 
     /**

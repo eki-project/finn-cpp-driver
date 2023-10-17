@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <bitset>
 #include <cmath>
 #include <cstdint>
 #include <iostream>
@@ -426,22 +427,22 @@ TEST(DataPacking, IntegralToBitsetTest) {
     Finn::vector<uint8_t> inp = {0, 1, 2, 3, 4, 5, 6, 7};
     auto ret = Finn::toBitset<Finn::DatatypeUInt<3>, true, false>(inp);
     Finn::vector<uint8_t> retElems;
-    std::transform(ret.begin(), ret.end(), std::back_inserter(retElems), [](const std::bitset<3>& bit) { return bit.to_ulong(); });
-    EXPECT_TRUE(inp.size() == retElems.size() && std::equal(inp.begin(), inp.end(), retElems.begin()));
+    // std::transform(ret.begin(), ret.end(), std::back_inserter(retElems), [](const uint8_t& bit) { return bit.to_ulong(); });
+    EXPECT_TRUE(inp.size() == ret.size() && std::equal(inp.begin(), inp.end(), ret.begin()));
 
     inp = {0, 1};
     ret = Finn::toBitset<Finn::DatatypeUInt<3>, true, true>(inp);
     Finn::vector<uint8_t> groundTruth = {0, 4};
     retElems.clear();
-    std::transform(ret.begin(), ret.end(), std::back_inserter(retElems), [](const std::bitset<3>& bit) { return bit.to_ulong(); });
-    EXPECT_EQ(groundTruth, retElems);
+    // std::transform(ret.begin(), ret.end(), std::back_inserter(retElems), [](const uint8_t& bit) { return bit.to_ulong(); });
+    EXPECT_EQ(groundTruth, ret);
 
     Finn::vector<int8_t> inp2 = {2, 3, -2, -3};
     ret = Finn::toBitset<Finn::DatatypeInt<3>, true, true>(inp2);
     groundTruth = {2, 6, 3, 5};
     retElems.clear();
-    std::transform(ret.begin(), ret.end(), std::back_inserter(retElems), [](const std::bitset<3>& bit) { return bit.to_ulong(); });
-    EXPECT_EQ(groundTruth, retElems);
+    // std::transform(ret.begin(), ret.end(), std::back_inserter(retElems), [](const uint8_t& bit) { return bit.to_ulong(); });
+    EXPECT_EQ(groundTruth, ret);
 }
 
 TEST(DataPacking, MergeBitsets) {
@@ -466,6 +467,7 @@ TEST(DataPacking, MergeBitsets) {
 
     Finn::vector<int64_t> inp64s = {0, -1, -2, -3, 4, 5, 6, 7};
     auto rets = Finn::toBitset<Finn::DatatypeInt<4>, true, false>(inp64s);
+    std::vector<int> retint(rets.begin(), rets.end());
     ret2 = Finn::mergeBitsets<Finn::DatatypeInt<4>>(rets);
     EXPECT_STREQ(ret2.to_string().c_str(), "01110110010101001101111011110000");
 }

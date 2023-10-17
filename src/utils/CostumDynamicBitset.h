@@ -1,6 +1,8 @@
 #ifndef COSTUMDYNAMICBITSET_H
 #define COSTUMDYNAMICBITSET_H
 
+#include <utils/FinnUtils.h>
+
 #include <algorithm>
 #include <array>
 #include <cstdint>
@@ -126,7 +128,7 @@ class DynamicBitset {
     }
 
     /**
-     * @brief Sets multiple bytes at once based on the provided input. Cannot overwrite already set bits.
+     * @brief Sets multiple bytes at once based on the provided input. Cannot overwrite already set bits. Always assumes that n is still in vector.
      *
      * @tparam T
      * @param x
@@ -157,14 +159,14 @@ class DynamicBitset {
         const std::size_t cpySize = bytes - byte;
         uint8_t* bytePtr = bits.data();
         bytePtr[byte] |= input[0];
+        if (cpySize <= 1) {
+            return;
+        }
         if (inputSize > cpySize) {
             std::memcpy(&bytePtr[byte + 1], &input.data()[1], cpySize - 1);
         } else {
             std::memcpy(&bytePtr[byte + 1], &input.data()[1], inputSize - 1);
         }
-        // const uint8_t limit = static_cast<uint8_t>(std::min(inputSize, bytes - byte));
-
-        // std::memcpy(&bytePtr[byte + 1], &input.data()[1], limit - 1);
     }
 
     /**

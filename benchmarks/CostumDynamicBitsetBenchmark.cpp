@@ -4,6 +4,7 @@
 #include <utils/CostumDynamicBitset.h>
 
 #include <bitset>
+#include <boost/dynamic_bitset.hpp>
 #include <utils/DataPacking.hpp>
 #include <vector>
 

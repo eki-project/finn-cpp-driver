@@ -7,14 +7,13 @@
 
 
 TEST(CostumDynamicBitsetTest, SettingBits) {
-    std::string testString = "0000000000000000000000000000000000000000000000000000000001010101";
-    for (std::size_t i = 0; i <= 57; ++i) {
+    std::string testString = "0000000000000000000000000000000000000000000000000000001000110001";
+    for (std::size_t i = 0; i <= 53; ++i) {
         DynamicBitset set(64);
         uint32_t x = 1;
         x |= (1 << 4);
         set.setByte(x, i);
-        x = x << 2;
-        set.setByte(x, i);
+        set.setByte(x, i + 5);
         EXPECT_EQ(testString, set.to_string());
         std::rotate(testString.begin(), testString.begin() + 1, testString.end());
     }

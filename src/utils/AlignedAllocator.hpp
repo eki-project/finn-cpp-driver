@@ -49,13 +49,13 @@ class AlignedAllocator {
         using other = AlignedAllocator<U, TALIGN>;
     };
 
-    inline void static construct(T* const p, const T& t) {
-        void* const ptrv = static_cast<void*>(p);
+    // inline void static construct(T* const p, const T& t) {
+    //     void* const ptrv = static_cast<void*>(p);
 
-        new (ptrv) T(t);
-    }
+    //     new (ptrv) T(t);
+    // }
 
-    inline void static destroy(T* const p) { p->~T(); }
+    // inline void static destroy(T* const p) { p->~T(); }
 
     // Returns true if and only if storage allocated from *this
     // can be deallocated from other, and vice versa.

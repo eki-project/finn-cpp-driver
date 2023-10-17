@@ -216,20 +216,12 @@ namespace Finn {
     DynamicBitset mergeBitsets(const Finn::vector<std::bitset<U().bitwidth()>>& input) {
         constexpr std::size_t bits = U().bitwidth();
         const std::size_t outputSize = input.size() * bits;
-        const std::size_t numThreads = std::min(static_cast<std::size_t>(omp_get_num_procs()), input.size() / 100);
+        // const std::size_t numThreads = std::min(static_cast<std::size_t>(omp_get_num_procs()), input.size() / 100);
         DynamicBitset ret(outputSize);
 
-#pragma omp parallel for schedule(guided) shared(input, outputSize) reduction(bitsetOR : ret) default(none) num_threads(numThreads) if (input.size() > (static_cast<std::size_t>(omp_get_num_procs()) * 100))
+        // #pragma omp parallel for schedule(guided) shared(input, outputSize) reduction(bitsetOR : ret) default(none) num_threads(numThreads) if (input.size() > (static_cast<std::size_t>(omp_get_num_procs()) * 100))
         for (std::size_t i = 0; i < input.size(); ++i) {
             ret.setByte(input[i].to_ulong(), i * bits);
-            // #pragma omp simd
-            //             for (std::size_t j = 0; j < bits; ++j) {
-            //                 if constexpr (invertDirection) {
-            //                     ret[outputSize - 1 - (i * bits + j)] = input[i][j];
-            //                 } else {
-            //                     ret[i * bits + j] = input[i][j];
-            //                 }
-            //             }
         }
         return ret;
     }

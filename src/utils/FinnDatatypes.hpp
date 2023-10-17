@@ -443,7 +443,7 @@ namespace Finn {
         /**
          * @brief @see Datatype
          */
-        constexpr double max() const override { return static_cast<double>((1UL << B) - 1); }
+        constexpr double max() const override { return static_cast<double>((static_cast<__uint128_t>(1U) << B) - 1); }
 
         /**
          * @brief @see Datatype

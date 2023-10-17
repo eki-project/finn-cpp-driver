@@ -19,21 +19,21 @@
  *
  */
 class DynamicBitset {
+     private:
+    constexpr static std::size_t bitsPerByte = 8;
+    size_t bytes;
+    size_t capacity;
+
+
      public:
     std::vector<uint8_t, AlignedAllocator<uint8_t>> bits;
 
-     private:
-    constexpr static std::size_t bitsPerByte = 8;
-    size_t capacity;
-    size_t bytes;
-
-     public:
     /**
      * @brief Construct a new Dynamic Bitset
      *
      * @param n Number of bits that should be stored
      */
-    DynamicBitset(const std::size_t& n) : bits(((n / bitsPerByte) + ((n % bitsPerByte != 0) ? 1 : 0)), 0), capacity(bits.size() * bitsPerByte), bytes(bits.size()) {}
+    DynamicBitset(const std::size_t& n) : bytes(((n / bitsPerByte) + ((n % bitsPerByte != 0) ? 1 : 0))), capacity(bytes * bitsPerByte), bits(bytes, 0) {}
     /**
      * @brief Move constructor
      *
@@ -139,24 +139,32 @@ class DynamicBitset {
         const std::size_t bitOffset = n % bitsPerByte;
         const std::size_t byte = n / bitsPerByte;
         const std::size_t bitShift = sizeof(T) * bitsPerByte - bitOffset;
+        constexpr std::size_t inputSize = sizeof(T);
         if (bitOffset != 0) {
             // handle overflow nach links beim shiften
             const T bitMask = static_cast<T>(0xFF) << bitShift;
             const T overflow = (bitMask & x);
             if (overflow != 0) {
                 auto overflowConverted = static_cast<uint8_t>(overflow >> bitShift);
-                bits[byte + input.size()] |= overflowConverted;
+                bits[byte + inputSize] |= overflowConverted;
             }
+            const T x2 = x << bitOffset;
+            std::memcpy(input.data(), &x2, sizeof(T));
+        } else {
+            std::memcpy(input.data(), &x, sizeof(T));
         }
 
-        const T x2 = x << bitOffset;
-        std::memcpy(input.data(), &x2, sizeof(T));
-
-        for (std::size_t i = 0; i < input.size(); ++i) {
-            if (input[i] != 0) {
-                bits[byte + i] |= input[i];
-            }
+        const std::size_t cpySize = bytes - byte;
+        uint8_t* bytePtr = bits.data();
+        bytePtr[byte] |= input[0];
+        if (inputSize > cpySize) {
+            std::memcpy(&bytePtr[byte + 1], &input.data()[1], cpySize - 1);
+        } else {
+            std::memcpy(&bytePtr[byte + 1], &input.data()[1], inputSize - 1);
         }
+        // const uint8_t limit = static_cast<uint8_t>(std::min(inputSize, bytes - byte));
+
+        // std::memcpy(&bytePtr[byte + 1], &input.data()[1], limit - 1);
     }
 
     /**

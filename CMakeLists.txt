@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake")
+SET(FINNC_SRC_DIR "${CMAKE_SOURCE_DIR}/src")
 SET(CMAKE_COLOR_MAKEFILE ON)
 
 
@@ -36,7 +37,17 @@ FetchContent_Declare(
   googletest
   GIT_REPOSITORY https://github.com/google/googletest.git
   GIT_TAG        main
+  GIT_SHALLOW     TRUE
 )
+
+FetchContent_Declare(
+  googlebenchmark
+  GIT_REPOSITORY  https://github.com/google/benchmark.git
+  GIT_TAG         main
+  GIT_SHALLOW     TRUE
+
+)
+set(BENCHMARK_ENABLE_TESTING OFF)
 
 include(cmake/CheckSubmodules.cmake)
 
@@ -115,14 +126,17 @@ include_directories(SYSTEM external/json/include/)
 # Include before clang-tidy inclusion to exclude folder from clang-tidy
 
 set(FINNC_ENABLE_TESTING "Build all tests (default is ON)" ON)
-FetchContent_MakeAvailable(googletest)
+FetchContent_MakeAvailable(googletest googlebenchmark)
 include(cmake/AddUnittest.cmake)
+include(cmake/AddBenchmark.cmake)
 enable_testing()
 set(ENV{GTEST_OUTPUT} "json")
 
 if (FINNC_ENABLE_TESTING)
   message(STATUS "Finn C++ unittests:")
   add_subdirectory(unittests)
+  message(STATUS "Finn C++ benchmarks:")
+  add_subdirectory(benchmarks)
 endif()
 
 # Add integration tests
@@ -187,12 +201,16 @@ OPTION(FINNC_ENABLE_SANITIZERS "Enable default analyzers" ON)
 OPTION(FINNC_ENABLE_THREAD_SANITIZERS "Enable thread analyzer" OFF)
 OPTION(FINNC_ENABLE_MEMORY_SANITIZERS "Enable memory analyzer" OFF)
 
+if (FINNC_ENABLE_SANITIZERS)
 finncpp_enable_sanitizers(finnc_options
                          ${FINNC_ENABLE_SANITIZERS}
                          ${FINNC_ENABLE_SANITIZERS}
                          ${FINNC_ENABLE_SANITIZERS}
                          ${FINNC_ENABLE_THREAD_SANITIZERS}
                          ${FINNC_ENABLE_MEMORY_SANITIZERS})
+else()
+message(STATUS "All Sanitizers disabled.")
+endif()
 
 message(STATUS "Checks:")
 list(APPEND CMAKE_MESSAGE_INDENT "  ") #indent +1

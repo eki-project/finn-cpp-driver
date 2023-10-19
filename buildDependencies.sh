@@ -22,7 +22,7 @@ else
   rm -rf "../../deps/finn_boost"/*
 fi
 
-./dist/bin/bcp --namespace=finnBoost log build boost_install config predef program_options thread filesystem circular_buffer ../../deps/finn_boost/ || exit 1 
+./dist/bin/bcp --namespace=finnBoost log build boost_install config predef program_options thread circular_buffer dynamic_bitset filesystem ../../deps/finn_boost/ || exit 1 
 cp boostcpp.jam ../../deps/finn_boost/
 cp boost-build.jam ../../deps/finn_boost/
 cp project-config.jam ../../deps/finn_boost/
@@ -38,7 +38,7 @@ cd ../../deps/finn_boost
 
 #Build new finnBoost Version
 ./bootstrap.sh || exit 1  #bootstrap b2 build system for finnBoost
-./b2 --without-python || exit 1 
+./b2 --without-python release || exit 1 
 mv stage/lib/boost-* stage/lib/boost 2>/dev/null || true
 
 echo "Dependecies successfully build!"

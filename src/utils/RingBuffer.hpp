@@ -1,5 +1,5 @@
-#ifndef RINGBUFFER_H
-#define RINGBUFFER_H
+#ifndef RINGBUFFER_HPP
+#define RINGBUFFER_HPP
 
 #include <algorithm>
 #include <boost/circular_buffer.hpp>
@@ -13,7 +13,7 @@
 #include <tuple>
 #include <type_traits>
 
-#include "FinnDatatypes.hpp"
+#include "FinnUtils.h"
 #include "Logger.h"
 #include "Types.h"
 
@@ -375,4 +375,4 @@ class RingBuffer {
 #endif
 };
 
-#endif  // RINGBUFFER_H
+#endif  // RINGBUFFER_HPP

@@ -30,7 +30,7 @@ namespace Finn {
      */
     template<typename D>
     class Datatype {
-        public:
+         public:
         /**
          * @brief Query whether type is signed type.
          *
@@ -45,6 +45,19 @@ namespace Finn {
          * @return constexpr std::size_t Bitwidth
          */
         constexpr virtual std::size_t bitwidth() const = 0;
+
+        // /**
+        //  * @brief Queries the bitwidth of data that can be stored in the type
+        //  *
+        //  * @return constexpr std::size_t
+        //  */
+        // constexpr virtual std::size_t dataBitwidth() const {
+        //     if constexpr (sign()) {
+        //         return bitwidth() - 1;
+        //     } else {
+        //         return bitwidth();
+        //     }
+        // }
 
         /**
          * @brief Minimum value that can be stored in the datatype
@@ -111,10 +124,7 @@ namespace Finn {
                 return 1;
             }
             // NOLINTNEXTLINE(clang-diagnostic-implicit-int-float-conversion)
-            return static_cast<unsigned int>(
-                FinnUtils::ceil(
-                    static_cast<float>(bitwidth()) / (static_cast<float>(sizeof(T)) * 8.0F))
-            );
+            return static_cast<unsigned int>(FinnUtils::ceil(static_cast<float>(bitwidth()) / (static_cast<float>(sizeof(T)) * 8.0F)));
         }
 
         /**
@@ -149,9 +159,9 @@ namespace Finn {
          * @brief Destroy the Datatype object
          *
          */
-        virtual ~Datatype() = default;
+        constexpr virtual ~Datatype() = default;
 
-        protected:
+         protected:
         /**
          * @brief Construct a new Datatype object (Move construction)
          *
@@ -175,7 +185,7 @@ namespace Finn {
          */
         Datatype& operator=(const Datatype&) = default;
 
-        private:
+         private:
         /**
          * @brief Construct a new Datatype object; Some somewhat hacky code to make sure that CRTP is implemented correctly by all Derived classes -> creates error if for class A : public Base<B> A!=B
          *
@@ -202,10 +212,18 @@ namespace Finn {
      *
      */
     class DatatypeFloat : public Datatype<DatatypeFloat> {
-        private:
+         private:
         friend class Datatype<DatatypeFloat>;
 
-        public:
+         public:
+        constexpr DatatypeFloat() = default;
+        // NOLINTNEXTLINE
+        constexpr ~DatatypeFloat() override{};  //{} instead of default because compiler bug
+        constexpr DatatypeFloat(DatatypeFloat&&) noexcept = default;
+        constexpr DatatypeFloat(DatatypeFloat const&) = default;
+        DatatypeFloat& operator=(DatatypeFloat&&) noexcept = default;
+        DatatypeFloat& operator=(const DatatypeFloat&) = default;
+
         /**
          * @brief @see Datatype
          */
@@ -235,7 +253,7 @@ namespace Finn {
          */
         constexpr bool isFixedPoint() const override { return false; }
 
-        private:
+         private:
         /**
          * @brief Implementation of the allowed method. Is implemented by each subclass individually.
          *
@@ -257,10 +275,18 @@ namespace Finn {
      */
     template<std::size_t B>
     class DatatypeInt : public Datatype<DatatypeInt<B>> {
-        private:
+         private:
         friend class Datatype<DatatypeInt<B>>;
 
-        public:
+         public:
+        constexpr DatatypeInt() = default;
+        // NOLINTNEXTLINE
+        constexpr ~DatatypeInt() override{};  //{} instead of default because compiler bug
+        constexpr DatatypeInt(DatatypeInt<B>&&) noexcept = default;
+        constexpr DatatypeInt(DatatypeInt<B> const&) = default;
+        constexpr DatatypeInt<B>& operator=(DatatypeInt<B>&&) noexcept = default;
+        constexpr DatatypeInt<B>& operator=(const DatatypeInt<B>&) = default;
+
         /**
          * @brief @see Datatype
          */
@@ -274,11 +300,11 @@ namespace Finn {
         /**
          * @brief @see Datatype
          */
-        constexpr double min() const override { return -static_cast<double>(1U << (B - 1)); }
+        constexpr double min() const override { return -static_cast<double>(1UL << (B - 1)); }
         /**
          * @brief @see Datatype
          */
-        constexpr double max() const override { return (1U << (B - 1)) - 1; }
+        constexpr double max() const override { return static_cast<double>((1UL << (B - 1)) - 1); }
 
         /**
          * @brief @see Datatype
@@ -289,7 +315,7 @@ namespace Finn {
          */
         constexpr bool isFixedPoint() const override { return false; }
 
-        private:
+         private:
         /**
          * @brief Implementation of the allowed method. Is implemented by each subclass individually.
          *
@@ -312,10 +338,17 @@ namespace Finn {
      */
     template<std::size_t B, std::size_t I>
     class DatatypeFixed : public Datatype<DatatypeFixed<B, I>> {
-        private:
+         private:
         friend class Datatype<DatatypeFixed<B, I>>;
 
-        public:
+         public:
+        constexpr DatatypeFixed() = default;
+        // NOLINTNEXTLINE
+        constexpr ~DatatypeFixed() override{};  //{} instead of default because compiler bug
+        constexpr DatatypeFixed(DatatypeFixed<B, I>&&) noexcept = default;
+        constexpr DatatypeFixed(DatatypeFixed<B, I> const&) = default;
+        constexpr DatatypeFixed<B, I>& operator=(DatatypeFixed<B, I>&&) noexcept = default;
+        constexpr DatatypeFixed<B, I>& operator=(const DatatypeFixed<B, I>&) = default;
         /**
          * @brief @see Datatype
          */
@@ -338,7 +371,7 @@ namespace Finn {
         /**
          * @brief @see Datatype
          */
-        constexpr double scaleFactor() const { return 1.0 / (1U << I); }
+        constexpr double scaleFactor() const { return 1.0 / (1U << fracBits()); }
 
         /**
          * @brief @see Datatype
@@ -358,7 +391,7 @@ namespace Finn {
          */
         constexpr bool isFixedPoint() const override { return true; }
 
-        private:
+         private:
         /**
          * @brief Implementation of the allowed method. Is implemented by each subclass individually.
          *
@@ -381,10 +414,18 @@ namespace Finn {
      */
     template<std::size_t B>
     class DatatypeUInt : public Datatype<DatatypeUInt<B>> {
-        private:
+         private:
         friend class Datatype<DatatypeUInt<B>>;
 
-        public:
+         public:
+        constexpr DatatypeUInt() = default;
+        // NOLINTNEXTLINE
+        constexpr ~DatatypeUInt() override{};  //{} instead of default because compiler bug
+        constexpr DatatypeUInt(DatatypeUInt<B>&&) noexcept = default;
+        constexpr DatatypeUInt(DatatypeUInt<B> const&) = default;
+        constexpr DatatypeUInt<B>& operator=(DatatypeUInt<B>&&) noexcept = default;
+        constexpr DatatypeUInt<B>& operator=(const DatatypeUInt<B>&) = default;
+
         /**
          * @brief @see Datatype
          */
@@ -402,7 +443,7 @@ namespace Finn {
         /**
          * @brief @see Datatype
          */
-        constexpr double max() const override { return (1U << B) - 1; }
+        constexpr double max() const override { return static_cast<double>((static_cast<__uint128_t>(1U) << B) - 1); }
 
         /**
          * @brief @see Datatype
@@ -414,7 +455,7 @@ namespace Finn {
          */
         constexpr bool isFixedPoint() const override { return false; }
 
-        private:
+         private:
         /**
          * @brief Implementation of the allowed method. Is implemented by each subclass individually.
          *
@@ -440,10 +481,17 @@ namespace Finn {
      *
      */
     class DatatypeBipolar : public Datatype<DatatypeBipolar> {
-        private:
+         private:
         friend class Datatype<DatatypeBipolar>;
 
-        public:
+         public:
+        constexpr DatatypeBipolar() = default;
+        // NOLINTNEXTLINE
+        constexpr ~DatatypeBipolar() override{};  //{} instead of default because compiler bug
+        constexpr DatatypeBipolar(DatatypeBipolar&&) noexcept = default;
+        constexpr DatatypeBipolar(DatatypeBipolar const&) = default;
+        DatatypeBipolar& operator=(DatatypeBipolar&&) noexcept = default;
+        DatatypeBipolar& operator=(const DatatypeBipolar&) = default;
         /**
          * @brief @see Datatype
          */
@@ -477,7 +525,7 @@ namespace Finn {
          */
         constexpr double getNumPossibleValues() const override { return 2; }
 
-        private:
+         private:
         /**
          * @brief Implementation of the allowed method. Is implemented by each subclass individually.
          *
@@ -497,10 +545,17 @@ namespace Finn {
      *
      */
     class DatatypeTernary : public Datatype<DatatypeTernary> {
-        private:
+         private:
         friend class Datatype<DatatypeTernary>;
 
-        public:
+         public:
+        constexpr DatatypeTernary() = default;
+        // NOLINTNEXTLINE
+        constexpr ~DatatypeTernary() override{};  //{} instead of default because compiler bug
+        constexpr DatatypeTernary(DatatypeTernary&&) noexcept = default;
+        constexpr DatatypeTernary(DatatypeTernary const&) = default;
+        DatatypeTernary& operator=(DatatypeTernary&&) noexcept = default;
+        DatatypeTernary& operator=(const DatatypeTernary&) = default;
         /**
          * @brief @see Datatype
          */
@@ -534,7 +589,7 @@ namespace Finn {
          */
         constexpr double getNumPossibleValues() const override { return 3; }
 
-        private:
+         private:
         /**
          * @brief Implementation of the allowed method. Is implemented by each subclass individually.
          *
@@ -548,6 +603,6 @@ namespace Finn {
             return (val == -1 || val == 1 || val == 0);
         }
     };
-} // namespace Finn
+}  // namespace Finn
 
 #endif  // DATATYPE_H

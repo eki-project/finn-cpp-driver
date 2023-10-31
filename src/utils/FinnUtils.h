@@ -28,7 +28,7 @@ namespace FinnUtils {
          public:
         BufferFiller(uint8_t min, uint8_t max) : sampler(std::uniform_int_distribution<uint8_t>(min, max)) {}
 
-        static BufferFiller create(uint8_t min, uint8_t max) { return BufferFiller(min, max); }
+        static BufferFiller create(uint8_t min, uint8_t max) { return {min, max}; }
 
         void fillRandom(std::vector<uint8_t>& vec) {
             std::transform(vec.begin(), vec.end(), vec.begin(), [this]([[maybe_unused]] uint8_t x) { return sampler(engine); });
@@ -131,26 +131,17 @@ namespace FinnUtils {
      */
     inline size_t getActualBufferSize(size_t requiredBytes) { return static_cast<size_t>(std::max(4096.0, pow(2, ceil(log2(static_cast<double>(requiredBytes)))))); }
 
-    // TODO: Rework and integrate with new packing algorithm
     /**
-     * @brief Get the number of elements required to represent S elements of FINN datatype F in C++ datatypes DT in the datatype T.
-     * Example:
-     * F = DatatypeUint<14>
-     * T = uint8_t
-     * DT = uint16_t
-     * S = 10
-     *
-     * This would require 2 T per one F.
+     * @brief Get the number of elements required to represent S elements of FINN datatype F in the datatype T.
      *
      * @tparam T
      * @tparam F
-     * @tparam DT
      * @tparam S
      * @return constexpr size_t
      */
-    template<typename T, typename F, typename DT, size_t S>
+    template<typename T = uint8_t, typename F, size_t S>
     constexpr size_t getPackedElementSize() {
-        return S * static_cast<size_t>(ceil(F().bitwidth() / (sizeof(T) * 8.0F)));
+        return static_cast<size_t>(ceil(S * (F().bitwidth() / (sizeof(T) * 8.0F))));
     }
 
     /**
@@ -211,7 +202,7 @@ namespace FinnUtils {
      * @param pShape
      * @return size_t
      */
-    inline size_t shapeToElements(const shape_t& pShape) { return (pShape.size() == 0) ? 0 : static_cast<size_t>(std::accumulate(pShape.begin(), pShape.end(), 1, std::multiplies<>())); }
+    inline size_t shapeToElements(const shape_t& pShape) { return (pShape.empty()) ? 0 : static_cast<size_t>(std::accumulate(pShape.begin(), pShape.end(), 1, std::multiplies<>())); }
 
     template<typename T, size_t S>
     constexpr size_t shapeToElementsConstexpr(std::array<T, S> pShape) {

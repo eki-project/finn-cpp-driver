@@ -18,13 +18,13 @@ class DBTest : public ::testing::Test {
     xrt::kernel kernel;
     Finn::DeviceInputBuffer<uint8_t> buffer = Finn::DeviceInputBuffer<uint8_t>("TestBuffer", device, kernel, FinnUnittest::myShapePacked, FinnUnittest::parts);
     Finn::DeviceOutputBuffer<uint8_t> outputBuffer = Finn::DeviceOutputBuffer<uint8_t>("tester", device, kernel, FinnUnittest::myShapePacked, FinnUnittest::parts);
-    FinnUtils::BufferFiller filler = FinnUtils::BufferFiller(0,255);
+    FinnUtils::BufferFiller filler = FinnUtils::BufferFiller(0, 255);
     std::vector<std::vector<uint8_t>> storedDatas;
     std::vector<uint8_t> data;
-    size_t bufferParts; 
-    size_t bufferElemPerPart; 
+    size_t bufferParts;
+    size_t bufferElemPerPart;
     void SetUp() override {
-        device = xrt::device();
+        // device = xrt::device();
         kernel = xrt::kernel();
         data = std::vector<uint8_t>();
         data.resize(buffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
@@ -34,12 +34,12 @@ class DBTest : public ::testing::Test {
     }
 
     /**
-     * @brief Utility function to completely fill a ringBuffer or a deviceinput/output buffer. 
-     * 
-     * This function uses the data vector to fill the entire rb of type T with random data, based on it's size. 
+     * @brief Utility function to completely fill a ringBuffer or a deviceinput/output buffer.
+     *
+     * This function uses the data vector to fill the entire rb of type T with random data, based on it's size.
      * storedDatas gets all data used pushed back.
-     * 
-     * @param fast Whether to use fast store methods (no mutex locking, no length checks) 
+     *
+     * @param fast Whether to use fast store methods (no mutex locking, no length checks)
      * @param ref Whether to use references (true) or iterators (false)
      * @param isInput If true use the input buffer, else the output buffer
      */
@@ -64,8 +64,8 @@ class DBTest : public ::testing::Test {
     }
 
     /**
-     * @brief Utility function to read out every part of the input buffer (writing it into map, this also checks loading) and checks for order and correctness 
-     * 
+     * @brief Utility function to read out every part of the input buffer (writing it into map, this also checks loading) and checks for order and correctness
+     *
      */
     void readAndCompare() {
         for (unsigned int part = 0; part < bufferParts; part++) {
@@ -74,17 +74,14 @@ class DBTest : public ::testing::Test {
         }
     }
 
-    void clearStoredDatas() {
-        storedDatas.resize(0);
-    }
+    void clearStoredDatas() { storedDatas.resize(0); }
 
     void TearDown() override {}
 };
 
-auto filler = FinnUtils::BufferFiller(0,255);
+auto filler = FinnUtils::BufferFiller(0, 255);
 
-TEST_F(DBTest, DBSharedTest) {
-}
+TEST_F(DBTest, DBSharedTest) {}
 
 TEST_F(DBTest, DBStoreLoadMapTest) {
     auto initialMapData = buffer.testGetMap();
@@ -100,17 +97,16 @@ TEST_F(DBTest, DBStoreLoadMapTest) {
     fillCompletely(true, false);
     readAndCompare();
     clearStoredDatas();
-    
+
     // Slow + Reference
     fillCompletely(false, true);
     readAndCompare();
     clearStoredDatas();
-    
+
     // Fast + Reference
     fillCompletely(true, true);
     readAndCompare();
     clearStoredDatas();
-    
 }
 
 TEST_F(DBTest, DBOutputTest) {

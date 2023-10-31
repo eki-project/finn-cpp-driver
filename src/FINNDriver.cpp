@@ -17,8 +17,10 @@
 
 // Created by FINN during compilation
 // Use the default testing Driver type when none is specified. Normally this is set by the FINN compiler and available together with the xclbin.
-#define MSTR(x) #x
+// NOLINTBEGIN
+#define MSTR(x)    #x
 #define STRNGFY(x) MSTR(x)
+// NOLINTEND
 
 #ifndef FINN_HEADER_LOCATION
     #include "config/FinnDriverUsedDatatypes.h"
@@ -34,13 +36,11 @@
 using std::string;
 
 /**
- * @brief A short prefix usable with the logger to determine the source of the log write 
- * 
- * @return std::string 
+ * @brief A short prefix usable with the logger to determine the source of the log write
+ *
+ * @return std::string
  */
-std::string finnMainLogPrefix() {
-    return "[FINNDriver] ";
-}
+std::string finnMainLogPrefix() { return "[FINNDriver] "; }
 
 /**
  * @brief Log some initial information about the device and the kernels used
@@ -103,15 +103,15 @@ void runFiletest(Finn::Driver& baseDriver, logger_type& logger) {
     // Print Results
     int counter = 0;
     for (auto& resultVector : results) {
-        FinnUtils::logResults<uint8_t>(logger, resultVector, 8, finnMainLogPrefix() + "Vec " + std::to_string(counter++)); 
+        FinnUtils::logResults<uint8_t>(logger, resultVector, 8, finnMainLogPrefix() + "Vec " + std::to_string(counter++));
     }
 }
 
 /**
- * @brief Run a test inference and save input and output data in a file which can be checked for results 
- * 
- * @param baseDriver 
- * @param logger 
+ * @brief Run a test inference and save input and output data in a file which can be checked for results
+ *
+ * @param baseDriver
+ * @param logger
  */
 void runIntegrationTest(Finn::Driver& baseDriver, logger_type& logger) {
     std::fstream resultfile("integration_test_outputs.txt", std::fstream::out);
@@ -129,8 +129,8 @@ void runIntegrationTest(Finn::Driver& baseDriver, logger_type& logger) {
     auto results = baseDriver.inferRaw(data, 0, "StreamingDataflowPartition_0:{idma0}", 0, "StreamingDataflowPartition_2:{odma0}", 1, true);
 
     // Write data to result file. One line per data, ending with an empty space and a newline
-    // TODO: Check if "uniq" registers the newline too
-    // TODO: Introduce checks for everything 
+    // TODO(bwintermann): Check if "uniq" registers the newline too
+    // TODO(bwintermann): Introduce checks for everything
     for (auto val : data) {
         resultfile << val << " ";
     }

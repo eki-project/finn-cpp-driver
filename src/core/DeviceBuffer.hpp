@@ -106,6 +106,7 @@ namespace Finn {
          * @param buf
          */
         //! NOT THREAD SAFE
+        // cppcheck-suppress missingMemberCopy
         DeviceInputBuffer(DeviceInputBuffer&& buf) noexcept
             : DeviceBuffer<T>(buf.name, buf.shapePacked, buf.mapSize, buf.internalBo, buf.associatedKernel, buf.map, buf.ringBuffer),
               ioMode(buf.ioMode),
@@ -152,7 +153,7 @@ namespace Finn {
          * @brief Load data from the ring buffer into the memory map of the device.
          *
          * @attention Invalidates the data that was moved to map
-         * 
+         *
          * @return true
          * @return false
          */
@@ -172,23 +173,21 @@ namespace Finn {
 
         /**
          * @brief Stores data without size checks and without guarding mutexes!
-         * @attention This function is NOT THREAD SAFE! 
-         * 
-         * @param data 
-         * @return true 
-         * @return false 
+         * @attention This function is NOT THREAD SAFE!
+         *
+         * @param data
+         * @return true
+         * @return false
          */
-        bool storeFast(const std::vector<T>& data) {
-            return this->ringBuffer.storeFast(data);
-        }
+        bool storeFast(const std::vector<T>& data) { return this->ringBuffer.storeFast(data); }
 
         /**
          * @brief Stores data without size checks and without guarding mutexes!
-         * @attention This function is NOT THREAD SAFE! 
-         * 
-         * @param first 
-         * @param last 
-         * @return tempate<typename IteratorType> 
+         * @attention This function is NOT THREAD SAFE!
+         *
+         * @param first
+         * @param last
+         * @return tempate<typename IteratorType>
          */
         template<typename IteratorType>
         bool storeFast(IteratorType first, IteratorType last) {
@@ -277,13 +276,11 @@ namespace Finn {
         shape_t& getPackedShape() { return this->shapePacked; }
 
         /**
-         * @brief Reserve enough storage for the expectedEntries number of entries. Note however that because this is a vec of vecs, this only allocates memory for the pointers, not the data itself. 
-         * 
-         * @param expectedEntries 
+         * @brief Reserve enough storage for the expectedEntries number of entries. Note however that because this is a vec of vecs, this only allocates memory for the pointers, not the data itself.
+         *
+         * @param expectedEntries
          */
-        void allocateLongTermStorage(unsigned int expectedEntries) {
-            longTermStorage.reserve(expectedEntries);
-        }
+        void allocateLongTermStorage(unsigned int expectedEntries) { longTermStorage.reserve(expectedEntries); }
 
         /**
          * @brief Get the the kernel timeout in miliseconds
@@ -351,7 +348,7 @@ namespace Finn {
          *
          * @return std::vector<std::vector<T>>
          */
-        std::vector<std::vector<T>> retrieveArchive() { 
+        std::vector<std::vector<T>> retrieveArchive() {
             std::vector<std::vector<T>> tmp = longTermStorage;
             clearArchive();
             return tmp;
@@ -407,7 +404,7 @@ namespace Finn {
             if (data.size() != this->mapSize) {
                 FinnUtils::logAndError<std::length_error>("Error setting test map. Sizes dont match");
             }
-            for (unsigned int i = 0; i < data.size(); i++ ) {
+            for (unsigned int i = 0; i < data.size(); i++) {
                 this->map[i] = data[i];
             }
         }

@@ -16,9 +16,7 @@ namespace Finn {
         std::transform(deviceDefinitions.begin(), deviceDefinitions.end(), std::back_inserter(devices), [hostBufferSize](const DeviceWrapper& dew) { return DeviceHandler(dew, hostBufferSize); });
     }
 
-    std::string Accelerator::loggerPrefix() {
-        return "[Accelerator] ";
-    }
+    std::string Accelerator::loggerPrefix() { return "[Accelerator] "; }
 
     /****** GETTER / SETTER ******/
     DeviceHandler& Accelerator::getDeviceHandler(unsigned int deviceIndex) {
@@ -37,13 +35,9 @@ namespace Finn {
         return std::count_if(devices.begin(), devices.end(), [deviceIndex](const DeviceHandler& dh) { return dh.getDeviceIndex() == deviceIndex; }) > 0;
     }
 
-    std::vector<DeviceHandler>::iterator Accelerator::begin() {
-        return devices.begin();
-    }
+    std::vector<DeviceHandler>::iterator Accelerator::begin() { return devices.begin(); }
 
-    std::vector<DeviceHandler>::iterator Accelerator::end() {
-        return devices.end();
-    }
+    std::vector<DeviceHandler>::iterator Accelerator::end() { return devices.end(); }
 
 
     /****** USER METHODS ******/
@@ -60,11 +54,12 @@ namespace Finn {
         }
     }
 
+    // cppcheck-suppress unusedFunction
     [[maybe_unused]] UncheckedStore Accelerator::storeFactory(const unsigned int deviceIndex, const std::string& inputBufferKernelName) {
         if (containsDevice(deviceIndex)) {
             DeviceHandler& devHand = getDeviceHandler(deviceIndex);
             if (devHand.containsBuffer(inputBufferKernelName, IO::INPUT)) {
-                return { devHand, inputBufferKernelName };
+                return {devHand, inputBufferKernelName};
             }
         }
         FinnUtils::logAndError<std::runtime_error>("Tried creating a store-closure on a deviceIndex or kernelBufferName which don't exist!");

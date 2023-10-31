@@ -3,15 +3,15 @@
 
 #include <algorithm>
 #include <boost/circular_buffer.hpp>
+#include <execution>
 #include <functional>
-#include <vector>
-#include <numeric>
 #include <iterator>
 #include <mutex>
+#include <numeric>
 #include <span>
-#include <execution>
 #include <tuple>
 #include <type_traits>
+#include <vector>
 
 #include "FinnUtils.h"
 #include "Logger.h"
@@ -82,6 +82,7 @@ class RingBuffer {
      *
      * @param other
      */
+    // cppcheck-suppress missingMemberCopy
     RingBuffer(RingBuffer&& other) noexcept
         : buffer(std::move(other.buffer)), validParts(std::move(other.validParts)), parts(other.parts), elementsPerPart(other.elementsPerPart), headPart(other.headPart), readPart(other.readPart), logger(Logger::getLogger()) {
         for (size_t i = 0; i < parts; ++i) {
@@ -188,8 +189,8 @@ class RingBuffer {
                     std::lock_guard<std::mutex> guardPartMutex(*partMutexes[indexP]);
                     std::lock_guard<std::mutex> guardHeadMutex(headPartMutex);
                     std::lock_guard<std::mutex> guardValidPartMutex(validPartMutex);
-                    
-                    //? Check again if part is still free to avoid collision of 2 threads. Maybe solve this by acquiring validPartMutex before searching? 
+
+                    //? Check again if part is still free to avoid collision of 2 threads. Maybe solve this by acquiring validPartMutex before searching?
                     if (validParts[indexP]) {
                         return false;
                     }
@@ -208,57 +209,57 @@ class RingBuffer {
 
     /**
      * @brief This does the same as store(), but does _not_ check on the length of the passed vector and does NOT provide mutexes (i.e. thread safety)
-     * @attention This function is NOT THEAD SAFE! 
-     * 
-     * @param data 
-     * @return true 
-     * @return false 
+     * @attention This function is NOT THEAD SAFE!
+     *
+     * @param data
+     * @return true
+     * @return false
      */
     bool storeFast(const std::vector<T>& data) {
         index_t indexP = 0;
         auto bufferSize = buffer.size();
-        index_t elementIndex = headPart * elementsPerPart;
+        index_t lElementIndex = headPart * elementsPerPart;
         for (unsigned int i = 0; i < parts; ++i) {
             indexP = (headPart + i) % parts;
             if (!validParts[indexP]) {
                 for (size_t j = 0; j < data.size(); ++j) {
-                    buffer[elementIndex++] = data[j];
+                    buffer[lElementIndex++] = data[j];
                 }
                 validParts[indexP] = true;
                 headPart = (indexP + 1) % parts;
                 return true;
             }
-            elementIndex = (elementIndex + elementsPerPart) % bufferSize;
+            lElementIndex = (lElementIndex + elementsPerPart) % bufferSize;
         }
         return false;
     }
 
     /**
      * @brief This does the same as store(), but does _not_ check on the length of the passed vector and does NOT provide mutexes (i.e. thread safety)
-     * @attention This function is NOT THEAD SAFE! 
-     * 
-     * @tparam IteratorType 
-     * @param first 
-     * @param last 
-     * @return true 
-     * @return false 
+     * @attention This function is NOT THEAD SAFE!
+     *
+     * @tparam IteratorType
+     * @param first
+     * @param last
+     * @return true
+     * @return false
      */
     template<typename IteratorType>
     bool storeFast(IteratorType first, IteratorType last) {
         index_t indexP = 0;
         auto bufferSize = buffer.size();
-        index_t elementIndex = headPart * elementsPerPart;
+        index_t lElementIndex = headPart * elementsPerPart;
         for (unsigned int i = 0; i < parts; ++i) {
             indexP = (headPart + i) % parts;
             if (!validParts[indexP]) {
                 for (auto it = first; it != last; ++it) {
-                    buffer[elementIndex++] = *it;
+                    buffer[lElementIndex++] = *it;
                 }
                 validParts[indexP] = true;
                 headPart = (indexP + 1) % parts;
                 return true;
             }
-            elementIndex = (elementIndex + elementsPerPart) % bufferSize;
+            lElementIndex = (lElementIndex + elementsPerPart) % bufferSize;
         }
         return false;
     }
@@ -297,7 +298,7 @@ class RingBuffer {
 
     /**
      * @brief Read the ring buffer and write out the first valid entry into the provided storage container. If no valid part is found, false is returned
-     * 
+     *
      * @attention Invalidates the read data!
      *
      * @param outData
@@ -305,23 +306,19 @@ class RingBuffer {
      * @return true
      * @return false
      */
-    bool readToVector(std::vector<T>& outData, size_t datasize) {
-        return read<std::vector<T>&>(outData, datasize);
-    }
+    bool readToVector(std::vector<T>& outData, size_t datasize) { return read<std::vector<T>&>(outData, datasize); }
 
     /**
      * @brief Read the ring buffer and write out the first valid entry into the provided storage container. If no valid part is found, false is returned
      *
      * @attention Invalidates the read data!
-     * 
+     *
      * @param outData
      * @param datasize
      * @return true
      * @return false
      */
-    bool readToArray(T* outData, size_t datasize) {
-        return read<T*>(outData, datasize);
-    }
+    bool readToArray(T* outData, size_t datasize) { return read<T*>(outData, datasize); }
 
      private:
     /**

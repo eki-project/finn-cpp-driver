@@ -1,12 +1,24 @@
+/**
+ * @file FinnDatatypes.hpp
+ * @author Linus Jungemann (linus.jungemann@uni-paderborn.de) and others
+ * @brief Implements a (mostly) constexpr typesystem for FINN Datatypes
+ * @version 0.1
+ * @date 2023-10-31
+ *
+ * @copyright Copyright (c) 2023
+ * @license All rights reserved. This program and the accompanying materials are made available under the terms of the MIT license.
+ *
+ */
+
 #ifndef DATATYPE_H
 #define DATATYPE_H
+
+#include <FINNCppDriver/utils/FinnUtils.h>
 
 #include <concepts>
 #include <limits>
 #include <type_traits>
 #include <utility>
-
-#include "FinnUtils.h"
 
 namespace Finn {
     template<class T>

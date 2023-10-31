@@ -1,21 +1,22 @@
+/**
+ * @file DeviceHandler.h
+ * @author Linus Jungemann (linus.jungemann@uni-paderborn.de) and others
+ * @brief Encapsulates and manages a complete FPGA device
+ * @version 0.1
+ * @date 2023-10-31
+ *
+ * @copyright Copyright (c) 2023
+ * @license All rights reserved. This program and the accompanying materials are made available under the terms of the MIT license.
+ *
+ */
+
 #ifndef DEVICEHANDLER_H
 #define DEVICEHANDLER_H
-// #include <filesystem>
-// #include <string>
-// #include <unordered_map>
-// #include <vector>
 
-// // XRT
-// #include "xrt.h"
-// #include "xrt/xrt_bo.h"
-// #include "xrt/xrt_device.h"
-// #include "xrt/xrt_kernel.h"
-
-// // FINN
-// #include "../utils/Types.h"
-// #include "DeviceBuffer.hpp"
-
-#include <xrt/xrt_uuid.h>  // for uuid
+#include <FINNCppDriver/utils/ConfigurationStructs.h>  // for DeviceWrapper, DeviceHandler
+#include <FINNCppDriver/utils/Logger.h>                // for logging
+#include <FINNCppDriver/utils/Types.h>                 // for shape_t
+#include <xrt/xrt_uuid.h>                              // for uuid
 
 #include <cstddef>        // for size_t
 #include <cstdint>        // for uint8_t
@@ -27,10 +28,7 @@
 #include <utility>        // for shared_ptr
 #include <vector>         // for vector
 
-#include "../utils/ConfigurationStructs.h"
-#include "../utils/Logger.h"  // for logging
-#include "../utils/Types.h"   // for shape_t
-#include "DeviceBuffer.hpp"   // for DeviceInputBuffer, DeviceOutputBuffer
+#include "DeviceBuffer.hpp"  // for DeviceInputBuffer, DeviceOutputBuffer
 #include "ert.h"
 #include "xrt/xrt_device.h"  // for device
 
@@ -243,7 +241,7 @@ namespace Finn {
 
         //* UNSAFE + FAST + REFERENCE
         bool storeUncheckedFast(const std::vector<uint8_t>& data, const std::string& inputBufferKernelName);
-        
+
         //* UNSAFE + FAST + ITERATOR
         template<typename IteratorType>
         bool storeUncheckedFast(IteratorType first, IteratorType last, const std::string& inputBufferKernelName) {
@@ -261,9 +259,9 @@ namespace Finn {
 
         /**
          * @brief Get the Output Buffer from this device by its name
-         * 
-         * @param name 
-         * @return DeviceOutputBuffer<uint8_t>& 
+         *
+         * @param name
+         * @return DeviceOutputBuffer<uint8_t>&
          */
         DeviceOutputBuffer<uint8_t>& getOutputBuffer(const std::string& name);
 

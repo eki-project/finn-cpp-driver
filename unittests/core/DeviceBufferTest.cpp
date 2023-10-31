@@ -1,9 +1,22 @@
+/**
+ * @file DeviceBufferTest.cpp
+ * @author Bjarne Wintermann (bjarne.wintermann@uni-paderborn.de) and others
+ * @brief Unittest for the Device Buffer
+ * @version 0.1
+ * @date 2023-10-31
+ *
+ * @copyright Copyright (c) 2023
+ * @license All rights reserved. This program and the accompanying materials are made available under the terms of the MIT license.
+ *
+ */
+
+#include <FINNCppDriver/utils/Logger.h>
+
+#include <FINNCppDriver/core/DeviceBuffer.hpp>
+#include <FINNCppDriver/utils/FinnDatatypes.hpp>
 #include <random>
 #include <span>
 
-#include "../../src/core/DeviceBuffer.hpp"
-#include "../../src/utils/FinnDatatypes.hpp"
-#include "../../src/utils/Logger.h"
 #include "gtest/gtest.h"
 #include "xrt/xrt_device.h"
 #include "xrt/xrt_kernel.h"

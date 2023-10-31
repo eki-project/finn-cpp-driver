@@ -1,3 +1,15 @@
+/**
+ * @file FinnDriver.cpp
+ * @author Linus Jungemann (linus.jungemann@uni-paderborn.de), Bjarne Wintermann (bjarne.wintermann@uni-paderborn.de) and others
+ * @brief Main file for the pre packaged C++ FINN driver
+ * @version 0.1
+ * @date 2023-10-31
+ *
+ * @copyright Copyright (c) 2023
+ * @license All rights reserved. This program and the accompanying materials are made available under the terms of the MIT license.
+ *
+ */
+
 // #include <concepts>
 // #include <iostream>
 // #include <numeric>

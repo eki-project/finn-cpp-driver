@@ -1,11 +1,21 @@
-#ifndef COSTUMDYNAMICBITSETBENCHMARK_CPP
-#define COSTUMDYNAMICBITSETBENCHMARK_CPP
-#include <benchmark/benchmark.h>
-#include <utils/CostumDynamicBitset.h>
+/**
+ * @file CustomDynamicBitsetBenchmark.cpp
+ * @author Linus Jungemann (linus.jungemann@uni-paderborn.de) and others
+ * @brief Benchmark for the Custom Dynamic Bitset
+ * @version 0.1
+ * @date 2023-10-31
+ *
+ * @copyright Copyright (c) 2023
+ * @license All rights reserved. This program and the accompanying materials are made available under the terms of the MIT license.
+ *
+ */
 
+#include <FINNCppDriver/utils/CustomDynamicBitset.h>
+#include <benchmark/benchmark.h>
+
+#include <FINNCppDriver/utils/DataPacking.hpp>
 #include <bitset>
 #include <boost/dynamic_bitset.hpp>
-#include <utils/DataPacking.hpp>
 #include <vector>
 
 static void BM_Boost_DynBitset(benchmark::State& state) {
@@ -56,5 +66,3 @@ BENCHMARK(BM_Boost_DynBitset2)->Iterations(1000);
 
 
 BENCHMARK_MAIN();
-
-#endif  // COSTUMDYNAMICBITSETBENCHMARK_CPP

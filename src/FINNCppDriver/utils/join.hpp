@@ -1,3 +1,15 @@
+/**
+ * @file join.hpp
+ * @author Linus Jungemann (linus.jungemann@uni-paderborn.de) and others
+ * @brief Provides functionality to join any stl like container into a string for printing using a provided delimiter
+ * @version 0.1
+ * @date 2023-10-31
+ *
+ * @copyright Copyright (c) 2023
+ * @license All rights reserved. This program and the accompanying materials are made available under the terms of the MIT license.
+ *
+ */
+
 #ifndef JOIN_HPP
 #define JOIN_HPP
 

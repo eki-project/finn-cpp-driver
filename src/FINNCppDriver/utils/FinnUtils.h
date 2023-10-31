@@ -1,5 +1,20 @@
+/**
+ * @file FinnUtils.h
+ * @author Linus Jungemann (linus.jungemann@uni-paderborn.de), Bjarne Wintermann (bjarne.wintermann@uni-paderborn.de) and others
+ * @brief Provides various helper functions
+ * @version 0.1
+ * @date 2023-10-31
+ *
+ * @copyright Copyright (c) 2023
+ * @license All rights reserved. This program and the accompanying materials are made available under the terms of the MIT license.
+ *
+ */
+
 #ifndef FINN_UTILS_H
 #define FINN_UTILS_H
+
+#include <FINNCppDriver/utils/Logger.h>
+#include <FINNCppDriver/utils/Types.h>
 
 #include <algorithm>
 #include <bit>
@@ -9,9 +24,6 @@
 #include <limits>
 #include <numeric>
 #include <random>
-
-#include "Logger.h"
-#include "Types.h"
 
 namespace FinnUtils {
 

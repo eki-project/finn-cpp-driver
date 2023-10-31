@@ -1,12 +1,24 @@
-#include <utils/CostumDynamicBitset.h>
+/**
+ * @file CustomDynamicBitsetTest.cpp
+ * @author Linus Jungemann (linus.jungemann@uni-paderborn.de) and others
+ * @brief
+ * @version 0.1
+ * @date 2023-10-31
+ *
+ * @copyright Copyright (c) 2023
+ * @license All rights reserved. This program and the accompanying materials are made available under the terms of the MIT license.
+ *
+ */
 
+#include <FINNCppDriver/utils/CustomDynamicBitset.h>
+
+#include <FINNCppDriver/utils/join.hpp>
 #include <algorithm>
-#include <utils/join.hpp>
 
 #include "gtest/gtest.h"
 
 
-TEST(CostumDynamicBitsetTest, SettingBits) {
+TEST(CustomDynamicBitsetTest, SettingBits) {
     std::string testString = "0000000000000000000000000000000000000000000000000000001000110001";
     for (std::size_t i = 0; i <= 53; ++i) {
         DynamicBitset set(64);
@@ -19,7 +31,7 @@ TEST(CostumDynamicBitsetTest, SettingBits) {
     }
 }
 
-TEST(CostumDynamicBitsetTest, OutputTest) {
+TEST(CustomDynamicBitsetTest, OutputTest) {
     DynamicBitset set(64);
     uint32_t x = 1;
     x |= (1 << 4);
@@ -31,7 +43,7 @@ TEST(CostumDynamicBitsetTest, OutputTest) {
     std::vector<uint8_t> base = {0, 0, 0, 0, 0, 0, 0, 85};
 }
 
-TEST(CostumDynamicBitsetTest, MergeTest) {
+TEST(CustomDynamicBitsetTest, MergeTest) {
     std::string testString = "0000000000000000000000000000000000000000000000000000000001010101";
 
     DynamicBitset set(64);

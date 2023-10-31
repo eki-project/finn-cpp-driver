@@ -1,9 +1,15 @@
 /**
  * @file AlignedAllocator.hpp
+ * @author Linus Jungemann (linus.jungemann@uni-paderborn.de) and others
  * @brief Implements an allocator that allocates memory aligned to a configured
  * alignment. This allocator is compatible to the aligned allocators provided by
  * libraries such as Intel MKL and OpenBLAS.
  *
+ * @version 0.1
+ * @date 2023-10-31
+ *
+ * @copyright Copyright (c) 2023
+ * @license All rights reserved. This program and the accompanying materials are made available under the terms of the MIT license.
  */
 
 #ifndef ALIGNEDALLOCATOR_HPP

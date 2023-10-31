@@ -1,3 +1,15 @@
+/**
+ * @file Logger.cpp
+ * @author Linus Jungemann (linus.jungemann@uni-paderborn.de) and others
+ * @brief Provides a easy to use logger for the FINN driver
+ * @version 0.1
+ * @date 2023-10-31
+ *
+ * @copyright Copyright (c) 2023
+ * @license All rights reserved. This program and the accompanying materials are made available under the terms of the MIT license.
+ *
+ */
+
 #include "Logger.h"
 
 #include <boost/core/enable_if.hpp>                       // for lazy_enable...

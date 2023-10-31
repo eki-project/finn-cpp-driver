@@ -1,6 +1,19 @@
+/**
+ * @file Types.h
+ * @author Bjarne Wintermann (bjarne.wintermann@uni-paderborn.de), Linus Jungemann (linus.jungemann@uni-paderborn.de) and others
+ * @brief Various type definitions used in the FINN C++ driver
+ * @version 0.1
+ * @date 2023-10-31
+ *
+ * @copyright Copyright (c) 2023
+ * @license All rights reserved. This program and the accompanying materials are made available under the terms of the MIT license.
+ *
+ */
+
 #ifndef TYPES_H
 #define TYPES_H
 
+#include <FINNCppDriver/utils/AlignedAllocator.hpp>
 #include <cctype>
 #include <fstream>
 #include <memory>
@@ -8,8 +21,6 @@
 #include <string>
 #include <variant>
 #include <vector>
-
-#include "AlignedAllocator.hpp"
 
 namespace Finn {
     template<typename T>

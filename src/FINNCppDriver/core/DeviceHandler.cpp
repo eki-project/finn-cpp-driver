@@ -1,7 +1,21 @@
-#include "DeviceHandler.h"
+/**
+ * @file DeviceHandler.cpp
+ * @author Linus Jungemann (linus.jungemann@uni-paderborn.de) and others
+ * @brief Encapsulates and manages a complete FPGA device
+ * @version 0.1
+ * @date 2023-10-31
+ *
+ * @copyright Copyright (c) 2023
+ * @license All rights reserved. This program and the accompanying materials are made available under the terms of the MIT license.
+ *
+ */
 
-#include <xrt/xrt_device.h>  // for device
-#include <xrt/xrt_kernel.h>  // for kernel
+#include <FINNCppDriver/core/DeviceHandler.h>
+#include <FINNCppDriver/utils/ConfigurationStructs.h>
+#include <FINNCppDriver/utils/Logger.h>  // for operator<<, FINN_LOG, FINN_DEBUG_LOG
+#include <FINNCppDriver/utils/Types.h>   // for shape_t
+#include <xrt/xrt_device.h>              // for device
+#include <xrt/xrt_kernel.h>              // for kernel
 
 #include <boost/cstdint.hpp>  // for uint8_t
 #include <chrono>
@@ -9,10 +23,6 @@
 #include <memory>
 #include <stdexcept>
 #include <system_error>
-
-#include "../utils/ConfigurationStructs.h"
-#include "../utils/Logger.h"  // for operator<<, FINN_LOG, FINN_DEBUG_LOG
-#include "../utils/Types.h"   // for shape_t
 
 
 namespace fs = std::filesystem;
@@ -92,10 +102,8 @@ namespace Finn {
     }
 
     /****** GETTER / SETTER ******/
-    // cppcheck-suppress unusedFunction
     [[maybe_unused]] xrt::device& DeviceHandler::getDevice() { return device; }
 
-    // cppcheck-suppress unusedFunction
     [[maybe_unused]] bool DeviceHandler::containsBuffer(const std::string& kernelBufferName, IO ioMode) {
         if (ioMode == IO::INPUT) {
             return inputBufferMap.contains(kernelBufferName);
@@ -105,16 +113,12 @@ namespace Finn {
         return false;
     }
 
-    // cppcheck-suppress unusedFunction
     [[maybe_unused]] std::unordered_map<std::string, DeviceInputBuffer<uint8_t>>& DeviceHandler::getInputBufferMap() { return inputBufferMap; }
 
-    // cppcheck-suppress unusedFunction
     [[maybe_unused]] std::unordered_map<std::string, DeviceOutputBuffer<uint8_t>>& DeviceHandler::getOutputBufferMap() { return outputBufferMap; }
 
-    // cppcheck-suppress unusedFunction
     [[maybe_unused]] DeviceInputBuffer<uint8_t>& DeviceHandler::getInputBuffer(const std::string& name) { return inputBufferMap.at(name); }
 
-    // cppcheck-suppress unusedFunction
     [[maybe_unused]] DeviceOutputBuffer<uint8_t>& DeviceHandler::getOutputBuffer(const std::string& name) { return outputBufferMap.at(name); }
 
     /****** USER METHODS ******/
@@ -130,13 +134,11 @@ namespace Finn {
     }
 
     //* UNSAFE + REFERENCE
-    // cppcheck-suppress unusedFunction
     bool DeviceHandler::storeUnchecked(const std::vector<uint8_t>& data, const std::string& inputBufferKernelName) { return inputBufferMap.at(inputBufferKernelName).store(data); }
 
     //* UNSAFE + FAST + REFERENCE
     bool DeviceHandler::storeUncheckedFast(const std::vector<uint8_t>& data, const std::string& inputBufferKernelName) { return inputBufferMap.at(inputBufferKernelName).storeFast(data); }
 
-    // cppcheck-suppress unusedFunction
     [[maybe_unused]] unsigned int DeviceHandler::getDeviceIndex() const { return xrtDeviceIndex; }
 
     bool DeviceHandler::run(const std::string& inputBufferKernelName) {
@@ -149,7 +151,6 @@ namespace Finn {
         return inputBufferMap.at(inputBufferKernelName).run();
     }
 
-    // cppcheck-suppress unusedFunction
     [[maybe_unused]] std::vector<std::vector<uint8_t>> DeviceHandler::retrieveResults(const std::string& outputBufferKernelName, bool forceArchival) {
         if (!outputBufferMap.contains(outputBufferKernelName)) {
             auto newlineFold = [](std::string a, const auto& b) { return std::move(a) + '\n' + std::move(b.first); };

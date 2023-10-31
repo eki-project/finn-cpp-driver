@@ -1,4 +1,16 @@
-#include "../../src/utils/Types.h"
+/**
+ * @file ConfigTest.cpp
+ * @author Linus Jungemann (linus.jungemann@uni-paderborn.de) and others
+ * @brief Unittest for the FINN Runtime config
+ * @version 0.1
+ * @date 2023-10-31
+ *
+ * @copyright Copyright (c) 2023
+ * @license All rights reserved. This program and the accompanying materials are made available under the terms of the MIT license.
+ *
+ */
+#include <FINNCppDriver/utils/Types.h>
+
 #include "gtest/gtest.h"
 
 /*

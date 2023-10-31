@@ -1,8 +1,20 @@
-#ifndef COSTUMDYNAMICBITSET_H
-#define COSTUMDYNAMICBITSET_H
+/**
+ * @file CustomDynamicBitset.h
+ * @author Linus Jungemann (linus.jungemann@uni-paderborn.de) and others
+ * @brief A custom and extremely fast dynamic bitset implementation
+ * @version 0.1
+ * @date 2023-10-31
+ *
+ * @copyright Copyright (c) 2023
+ * @license All rights reserved. This program and the accompanying materials are made available under the terms of the MIT license.
+ *
+ */
+#ifndef CUSTOMDYNAMICBITSET_H
+#define CUSTOMDYNAMICBITSET_H
 
-#include <utils/FinnUtils.h>
+#include <FINNCppDriver/utils/FinnUtils.h>
 
+#include <FINNCppDriver/utils/AlignedAllocator.hpp>
 #include <algorithm>
 #include <array>
 #include <cstdint>
@@ -13,7 +25,6 @@
 #include <sstream>
 #include <tuple>
 #include <type_traits>
-#include <utils/AlignedAllocator.hpp>
 #include <vector>
 
 /**
@@ -218,4 +229,4 @@ class DynamicBitset {
     }
 };
 
-#endif  // COSTUMDYNAMICBITSET_H
+#endif  // CUSTOMDYNAMICBITSET_H

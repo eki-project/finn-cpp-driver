@@ -1,5 +1,21 @@
+/**
+ * @file RingBuffer.hpp
+ * @author Bjarne Wintermann (bjarne.wintermann@uni-paderborn.de) and others
+ * @brief Implements a wrapper for the circular buffer of boost
+ * @version 0.1
+ * @date 2023-10-31
+ *
+ * @copyright Copyright (c) 2023
+ * @license All rights reserved. This program and the accompanying materials are made available under the terms of the MIT license.
+ *
+ */
+
 #ifndef RINGBUFFER_HPP
 #define RINGBUFFER_HPP
+
+#include <FINNCppDriver/utils/FinnUtils.h>
+#include <FINNCppDriver/utils/Logger.h>
+#include <FINNCppDriver/utils/Types.h>
 
 #include <algorithm>
 #include <boost/circular_buffer.hpp>
@@ -12,10 +28,6 @@
 #include <tuple>
 #include <type_traits>
 #include <vector>
-
-#include "FinnUtils.h"
-#include "Logger.h"
-#include "Types.h"
 
 /**
  * @brief Wrapper class for boost::circular_buffer, which handles abstraction.

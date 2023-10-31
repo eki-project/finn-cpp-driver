@@ -1,7 +1,25 @@
+/**
+ * @file DataPacking.hpp
+ * @author Linus Jungemann (linus.jungemann@uni-paderborn.de) and others
+ * @brief Implements data packing and unpacking efficiently
+ * @version 0.1
+ * @date 2023-10-31
+ *
+ * @copyright Copyright (c) 2023
+ * @license All rights reserved. This program and the accompanying materials are made available under the terms of the MIT license.
+ *
+ */
+
 #ifndef DATAPACKING_HPP
 #define DATAPACKING_HPP
 
+#include <FINNCppDriver/utils/CustomDynamicBitset.h>
+#include <FINNCppDriver/utils/FinnUtils.h>
+#include <FINNCppDriver/utils/Types.h>
 
+#include <FINNCppDriver/utils/AlignedAllocator.hpp>
+#include <FINNCppDriver/utils/FinnDatatypes.hpp>
+#include <FINNCppDriver/utils/join.hpp>
 #include <algorithm>
 #include <bit>
 #include <concepts>
@@ -9,13 +27,6 @@
 #include <iostream>
 #include <iterator>
 #include <vector>
-
-#include "AlignedAllocator.hpp"
-#include "CostumDynamicBitset.h"
-#include "FinnDatatypes.hpp"
-#include "FinnUtils.h"
-#include "Types.h"
-#include "join.hpp"
 
 namespace Finn {
     /**

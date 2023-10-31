@@ -1,5 +1,19 @@
+/**
+ * @file ConfigurationStructs.h
+ * @author Linus Jungemann (linus.jungemann@uni-paderborn.de) and others
+ * @brief Provides functionality to (de)serialize configuration JSON files at runtime
+ * @version 0.1
+ * @date 2023-10-31
+ *
+ * @copyright Copyright (c) 2023
+ * @license All rights reserved. This program and the accompanying materials are made available under the terms of the MIT license.
+ *
+ */
+
 #ifndef CONFIGURATION_STRUCTS_H
 #define CONFIGURATION_STRUCTS_H
+
+#include <FINNCppDriver/utils/Types.h>
 
 #include <cctype>
 #include <fstream>
@@ -8,8 +22,6 @@
 #include <string>
 #include <variant>
 #include <vector>
-
-#include "Types.h"
 
 using json = nlohmann::json;
 

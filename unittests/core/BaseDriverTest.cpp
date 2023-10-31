@@ -1,13 +1,28 @@
-#include "../../src/core/DeviceBuffer.hpp"
-#include "../../src/core/BaseDriver.hpp"
-#include "../../src/utils/FinnDatatypes.hpp"
-#include "../../src/utils/Logger.h"
-#include "../../src/utils/Types.h"
+/**
+ * @file BaseDriverTest.cpp
+ * @author Bjarne Wintermann (bjarne.wintermann@uni-paderborn.de) and others
+ * @brief Unittest for the base driver
+ * @version 0.1
+ * @date 2023-10-31
+ *
+ * @copyright Copyright (c) 2023
+ * @license All rights reserved. This program and the accompanying materials are made available under the terms of the MIT license.
+ *
+ */
+
+
+#include <FINNCppDriver/config/FinnDriverUsedDatatypes.h>
+#include <FINNCppDriver/utils/FinnUtils.h>
+#include <FINNCppDriver/utils/Logger.h>
+#include <FINNCppDriver/utils/Types.h>
+
+#include <FINNCppDriver/core/BaseDriver.hpp>
+#include <FINNCppDriver/core/DeviceBuffer.hpp>
+#include <FINNCppDriver/utils/FinnDatatypes.hpp>
+
 #include "gtest/gtest.h"
 #include "xrt/xrt_device.h"
 #include "xrt/xrt_kernel.h"
-#include "../../src/utils/FinnUtils.h"
-#include "../../src/config/FinnDriverUsedDatatypes.h"
 
 // Provides config and shapes
 #include "UnittestConfig.h"
@@ -47,9 +62,7 @@ TEST_F(BaseDriverTest, BasicBaseDriverTest) {
     // Check output process
     EXPECT_EQ(results[0], data);
     // Check input process
-    EXPECT_EQ(driver.getDeviceHandler(0).getInputBuffer(inputDmaName).testGetMap(), data); 
-
-
+    EXPECT_EQ(driver.getDeviceHandler(0).getInputBuffer(inputDmaName).testGetMap(), data);
 }
 
 int main(int argc, char** argv) {

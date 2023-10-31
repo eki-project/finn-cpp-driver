@@ -1,13 +1,26 @@
-#include <benchmark/benchmark.h>
-#include "../src/core/DeviceBuffer.hpp"
-#include "../src/utils/FinnDatatypes.hpp"
-#include "../src/utils/Logger.h"
-#include "xrt/xrt_device.h"
-#include "xrt/xrt_kernel.h"
+/**
+ * @file DeviceBufferBenchmark.cpp
+ * @author Bjarne Wintermann (bjarne.wintermann@uni-paderborn.de)
+ * @brief Benchmark for the Device Buffer Benchmark
+ * @version 0.1
+ * @date 2023-10-31
+ *
+ * @copyright Copyright (c) 2023
+ * @license All rights reserved. This program and the accompanying materials are made available under the terms of the MIT license.
+ *
+ */
 
+#include <FINNCppDriver/utils/Logger.h>
+#include <benchmark/benchmark.h>
+
+#include <FINNCppDriver/core/DeviceBuffer.hpp>
+#include <FINNCppDriver/utils/FinnDatatypes.hpp>
 #include <chrono>
 #include <fstream>
 #include <thread>
+
+#include "xrt/xrt_device.h"
+#include "xrt/xrt_kernel.h"
 
 // Provides config and shapes for testing
 #include "../unittests/core/UnittestConfig.h"
@@ -68,7 +81,7 @@ static void BM_StoreSVRP(benchmark::State& state) {
         for (unsigned int i = 0; i < benchmarkBufferSize; i++) {
             filler.fillRandom(data);
             idb.store(data.begin(), data.end());
-        } 
+        }
     }
 }
 BENCHMARK(BM_StoreSVRP)->Iterations(iterations);
@@ -116,7 +129,7 @@ static void BM_StoreFCVRP(benchmark::State& state) {
     data.resize(idb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
     for (auto _ : state) {
         for (unsigned int i = 0; i < benchmarkBufferSize; i++) {
-            idb.storeFast(data);        
+            idb.storeFast(data);
         }
     }
 }
@@ -133,7 +146,7 @@ static void BM_StoreFCVIP(benchmark::State& state) {
     data.resize(idb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
     for (auto _ : state) {
         for (unsigned int i = 0; i < benchmarkBufferSize; i++) {
-            idb.storeFast(data.begin(), data.end());        
+            idb.storeFast(data.begin(), data.end());
         }
     }
 }
@@ -183,7 +196,6 @@ static void BM_StoreMultithreaded_CVRP(benchmark::State& state) {
     }
 }
 BENCHMARK(BM_StoreMultithreaded_CVRP)->Iterations(iterations);
-
 
 
 BENCHMARK_MAIN();

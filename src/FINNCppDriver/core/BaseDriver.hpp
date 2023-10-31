@@ -1,17 +1,30 @@
+/**
+ * @file BaseDriver.hpp
+ * @author Bjarne Wintermann (bjarne.wintermann@uni-paderborn.de), Linus Jungemann (linus.jungemann@uni-paderborn.de) and others
+ * @brief Implements the base driver for FINN
+ * @version 0.1
+ * @date 2023-10-31
+ *
+ * @copyright Copyright (c) 2023
+ * @license All rights reserved. This program and the accompanying materials are made available under the terms of the MIT license.
+ *
+ */
+
 #ifndef BASEDRIVER_HPP
 #define BASEDRIVER_HPP
 
+#include <FINNCppDriver/utils/ConfigurationStructs.h>
+#include <FINNCppDriver/utils/FinnUtils.h>
+#include <FINNCppDriver/utils/Logger.h>
+#include <FINNCppDriver/utils/Types.h>
+
+#include <FINNCppDriver/utils/FinnDatatypes.hpp>
 #include <cinttypes>  // for uint8_t
 #include <filesystem>
 #include <fstream>
 #include <iterator>
 #include <memory>
 
-#include "../utils/ConfigurationStructs.h"
-#include "../utils/FinnDatatypes.hpp"
-#include "../utils/FinnUtils.h"
-#include "../utils/Logger.h"
-#include "../utils/Types.h"
 #include "Accelerator.h"
 #include "ert.h"
 
@@ -105,6 +118,14 @@ namespace Finn {
          * @return size_t
          */
         size_t size(SIZE_SPECIFIER ss, unsigned int deviceIndex, const std::string& bufferName) { return accelerator.size(ss, deviceIndex, bufferName); }
+
+        // template<typename T>
+        // Finn::vector<T> inferSynchronous(const Finn::vector<T>& data) {}
+
+        // template<typename T, typename U, typename IteratorType>
+        // Finn::vector<T> inferSynchronous(IteratorType first, IteratorType last) {
+
+        // }
 
         // #ifndef UNITTEST
         //          protected:

@@ -1,13 +1,25 @@
+/**
+ * @file Accelerator.h
+ * @author Linus Jungemann (linus.jungemann@uni-paderborn.de), Bjarne Wintermann (bjarne.wintermann@uni-paderborn.de) and others
+ * @brief Implements a wrapper to hide away details of FPGA implementation
+ * @version 0.1
+ * @date 2023-10-31
+ *
+ * @copyright Copyright (c) 2023
+ * @license All rights reserved. This program and the accompanying materials are made available under the terms of the MIT license.
+ *
+ */
+
 #ifndef ACCELERATOR_H
 #define ACCELERATOR_H
+
+#include <FINNCppDriver/core/DeviceHandler.h>  // for BufferDescriptor, DeviceHandler
 
 #include <cinttypes>   // for uint8_t
 #include <filesystem>  // for path
 #include <string>      // for string
 #include <vector>      // for vector
 
-#include "../utils/ConfigurationStructs.h"
-#include "DeviceHandler.h"  // for BufferDescriptor, DeviceHandler
 #include "ert.h"
 
 

@@ -1,12 +1,25 @@
+/**
+ * @file RingBufferTest.cpp
+ * @author Bjarne Wintermann (bjarne.wintermann@uni-paderborn.de) and others
+ * @brief Unittest for the Ring Buffer
+ * @version 0.1
+ * @date 2023-10-31
+ *
+ * @copyright Copyright (c) 2023
+ * @license All rights reserved. This program and the accompanying materials are made available under the terms of the MIT license.
+ *
+ */
+
+#include <FINNCppDriver/utils/FinnUtils.h>
+#include <FINNCppDriver/utils/Logger.h>
+
+#include <FINNCppDriver/utils/RingBuffer.hpp>
 #include <algorithm>
 #include <functional>
 #include <random>
 #include <thread>
 #include <vector>
 
-#include "../../src/utils/FinnUtils.h"
-#include "../../src/utils/Logger.h"
-#include "../../src/utils/RingBuffer.hpp"
 #include "UnittestConfig.h"
 #include "gtest/gtest.h"
 #include "xrt/xrt_device.h"
@@ -27,7 +40,7 @@ class RBTest : public ::testing::Test {
     RB rb = RB(parts, elementsPerPart);
     std::vector<uint8_t> data;
     std::vector<std::vector<uint8_t>> storedDatas;
-    FinnUtils::BufferFiller filler = FinnUtils::BufferFiller(0,255);
+    FinnUtils::BufferFiller filler = FinnUtils::BufferFiller(0, 255);
     void SetUp() override {
         data = std::vector<uint8_t>();
         data.resize(rb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
@@ -35,12 +48,12 @@ class RBTest : public ::testing::Test {
     }
 
     /**
-     * @brief Utility function to completely fill a ringBuffer or a deviceinput/output buffer. 
-     * 
-     * This function uses the data vector to fill the entire rb of type T with random data, based on it's size. 
+     * @brief Utility function to completely fill a ringBuffer or a deviceinput/output buffer.
+     *
+     * This function uses the data vector to fill the entire rb of type T with random data, based on it's size.
      * storedDatas gets all data used pushed back.
-     * 
-     * @param fast Whether to use fast store methods (no mutex locking, no length checks) 
+     *
+     * @param fast Whether to use fast store methods (no mutex locking, no length checks)
      * @param ref Whether to use references (true) or iterators (false)
      */
     void fillCompletely(bool fast, bool ref) {
@@ -65,7 +78,6 @@ class RBTest : public ::testing::Test {
 
     void TearDown() override {}
 };
-
 
 
 TEST(RBTestManual, RBInitTest) {
@@ -104,7 +116,7 @@ TEST_F(RBTest, RBStoreReadTestIterator) {
     filler.fillRandom(data);
     EXPECT_FALSE(rb.store(data.begin(), data.end()));
 
-    // Test that the valid data was not changed 
+    // Test that the valid data was not changed
     EXPECT_EQ(rb.testGetAsVector(0), current);
 
     // Read two entries
@@ -132,7 +144,7 @@ TEST_F(RBTest, RBFastStoreTestIterator) {
     filler.fillRandom(data);
     EXPECT_FALSE(rb.storeFast(data.begin(), data.end()));
 
-    // Test that the valid data was not changed 
+    // Test that the valid data was not changed
     EXPECT_EQ(rb.testGetAsVector(0), current);
 
     // Read two entries
@@ -160,7 +172,7 @@ TEST_F(RBTest, RBStoreReadTestReference) {
     filler.fillRandom(data);
     EXPECT_FALSE(rb.store(data, data.size()));
 
-    // Test that the valid data was not changed 
+    // Test that the valid data was not changed
     EXPECT_EQ(rb.testGetAsVector(0), current);
 
     // Read two entries
@@ -188,7 +200,7 @@ TEST_F(RBTest, RBFastStoreTestReference) {
     filler.fillRandom(data);
     EXPECT_FALSE(rb.storeFast(data));
 
-    // Test that the valid data was not changed 
+    // Test that the valid data was not changed
     EXPECT_EQ(rb.testGetAsVector(0), current);
 
     // Read two entries
@@ -239,7 +251,7 @@ TEST_F(RBTest, RBUtilFuncsTest) {
     EXPECT_EQ(rb.size(SIZE_SPECIFIER::BYTES), elementsPerPart * 1 * parts);
     EXPECT_EQ(rb.size(SIZE_SPECIFIER::ELEMENTS), elementsPerPart * parts);
 
-    // Check validity flags    
+    // Check validity flags
     fillCompletely(true, true);
     EXPECT_TRUE(rb.isFull());
     EXPECT_EQ(rb.countValidParts(), rb.size(SIZE_SPECIFIER::PARTS));
@@ -267,14 +279,14 @@ TEST_F(RBTest, RBValidityTest) {
 
     rb.setPartValidityMutexed(0, false);
     EXPECT_FALSE(rb.testGetValidity(0));
-    
+
     rb.setPartValidityMutexed(3, true);
     EXPECT_TRUE(rb.testGetValidity(3));
-    
+
     //! Run test twice to see that the value does not get flipped instead of set after a set call
     rb.setPartValidityMutexed(0, false);
     EXPECT_FALSE(rb.testGetValidity(0));
-    
+
     rb.setPartValidityMutexed(3, true);
     EXPECT_TRUE(rb.testGetValidity(3));
 }

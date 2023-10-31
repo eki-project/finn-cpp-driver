@@ -1,6 +1,5 @@
 #include "xrt_bo.h"
 
-#include "../../../src/utils/Logger.h"
 #include "../xrt.h"
 #include "xrt_device.h"
 

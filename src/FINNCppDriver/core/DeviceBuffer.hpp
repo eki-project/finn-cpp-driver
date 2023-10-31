@@ -1,14 +1,27 @@
+/**
+ * @file DeviceBuffer.hpp
+ * @author Bjarne Wintermann (bjarne.wintermann@uni-paderborn.de) and others
+ * @brief Implements a wrapper to get data easier to and from the FPGAs
+ * @version 0.1
+ * @date 2023-10-31
+ *
+ * @copyright Copyright (c) 2023
+ * @license All rights reserved. This program and the accompanying materials are made available under the terms of the MIT license.
+ *
+ */
+
 #ifndef DEVICEBUFFER_H
 #define DEVICEBUFFER_H
 
+#include <FINNCppDriver/utils/Logger.h>
+#include <FINNCppDriver/utils/Types.h>
+
+#include <FINNCppDriver/utils/FinnDatatypes.hpp>
+#include <FINNCppDriver/utils/RingBuffer.hpp>
 #include <boost/circular_buffer.hpp>
 #include <cstdlib>
 #include <limits>
 
-#include "../utils/FinnDatatypes.hpp"
-#include "../utils/Logger.h"
-#include "../utils/RingBuffer.hpp"
-#include "../utils/Types.h"
 #include "ert.h"
 #include "xrt.h"
 #include "xrt/xrt_bo.h"

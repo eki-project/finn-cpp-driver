@@ -1,7 +1,8 @@
 #ifndef XRT_BO_H
 #define XRT_BO_H
 
-#include "../../../src/utils/Logger.h"
+#include <FINNCppDriver/utils/Logger.h>
+
 #include "../xrt.h"
 #include "xrt_device.h"
 

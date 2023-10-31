@@ -1,20 +1,20 @@
+/**
+ * @file Logger.h
+ * @author Linus Jungemann (linus.jungemann@uni-paderborn.de) and others
+ * @brief Provides a easy to use logger for the FINN driver
+ * @version 0.1
+ * @date 2023-10-31
+ *
+ * @copyright Copyright (c) 2023
+ * @license All rights reserved. This program and the accompanying materials are made available under the terms of the MIT license.
+ *
+ */
+
 #ifndef LOGGING_H
 #define LOGGING_H
 
 // NOLINTNEXTLINE
 #define BOOST_LOG_DYN_LINK 1
-
-// #include <boost/log/detail/config.hpp>
-// #include <boost/log/sinks.hpp>
-// #include <boost/log/sources/severity_feature.hpp>
-// #include <boost/log/sources/severity_logger.hpp>
-// #include <boost/log/trivial.hpp>
-// #include <boost/log/utility/setup/common_attributes.hpp>
-// #include <boost/log/utility/setup/console.hpp>
-// #include <boost/log/utility/setup/formatter_parser.hpp>
-// #include <boost/smart_ptr/intrusive_ptr.hpp>
-// #include <boost/smart_ptr/intrusive_ref_counter.hpp>
-// #include <string>
 
 #include <boost/log/detail/config.hpp>                // for log
 #include <boost/log/sources/severity_feature.hpp>     // for BOOST_LOG_SEV

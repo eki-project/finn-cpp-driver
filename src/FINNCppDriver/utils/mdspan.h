@@ -1,3 +1,15 @@
+/**
+ * @file mdspan.h
+ * @author Linus Jungemann (linus.jungemann@uni-paderborn.de) and others
+ * @brief Provides the C++23 functionality of mdspan
+ * @version 0.1
+ * @date 2023-10-31
+ *
+ * @copyright Copyright (c) 2023
+ * @license All rights reserved. This program and the accompanying materials are made available under the terms of the MIT license.
+ *
+ */
+
 #ifndef MDSPAN_H
 #define MDSPAN_H
 

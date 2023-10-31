@@ -1,14 +1,27 @@
-#include "../../src/utils/FinnDatatypes.hpp"
-#include "../../src/utils/Types.h"
-#include "../../src/utils/FinnUtils.h"
-#include "../../src/utils/ConfigurationStructs.h"
-#include "../../src/utils/Logger.h"
-#include <vector>
-#include <array>
-#include <memory>
-#include <filesystem>
+/**
+ * @file UnittestConfig.h
+ * @author Bjarne Wintermann (bjarne.wintermann@uni-paderborn.de) and others
+ * @brief Compile time config used in unittests
+ * @version 0.1
+ * @date 2023-10-31
+ *
+ * @copyright Copyright (c) 2023
+ * @license All rights reserved. This program and the accompanying materials are made available under the terms of the MIT license.
+ *
+ */
 
-#define MSTR(x) #x
+#include <FINNCppDriver/utils/ConfigurationStructs.h>
+#include <FINNCppDriver/utils/FinnUtils.h>
+#include <FINNCppDriver/utils/Logger.h>
+#include <FINNCppDriver/utils/Types.h>
+
+#include <FINNCppDriver/utils/FinnDatatypes.hpp>
+#include <array>
+#include <filesystem>
+#include <memory>
+#include <vector>
+
+#define MSTR(x)    #x
 #define STRNGFY(x) MSTR(x)
 
 namespace FinnUnittest {
@@ -30,4 +43,4 @@ namespace FinnUnittest {
     const unsigned int hostBufferSize = 10;
     const size_t elementsPerPart = FinnUtils::shapeToElements(myShapePacked);
     const size_t parts = 10;
-}
+}  // namespace FinnUnittest

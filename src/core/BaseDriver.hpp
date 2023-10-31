@@ -15,6 +15,7 @@
 #include "Accelerator.h"
 #include "ert.h"
 
+
 namespace Finn {
     /**
      * @brief A class to represent a basic FINN-Driver
@@ -51,12 +52,10 @@ namespace Finn {
 
         /**
          * @brief Create a new base driver based on an existing configuration
-         * 
-         * @param pConfig 
+         *
+         * @param pConfig
          */
-        BaseDriver(const Config& pConfig, unsigned int hostBufferSize) : configuration(pConfig), logger(Logger::getLogger()) {
-            accelerator = Accelerator(configuration.deviceWrappers, hostBufferSize);
-        }
+        BaseDriver(const Config& pConfig, unsigned int hostBufferSize) : configuration(pConfig), logger(Logger::getLogger()) { accelerator = Accelerator(configuration.deviceWrappers, hostBufferSize); }
 
         BaseDriver(BaseDriver&&) noexcept = default;
         BaseDriver(const BaseDriver&) noexcept = delete;
@@ -98,45 +97,21 @@ namespace Finn {
         DeviceInputBuffer<uint8_t>& getInputBuffer(unsigned int deviceIndex, const std::string& bufferName) { return getDeviceHandler(deviceIndex).getInputBuffer(bufferName); }
 
         /**
+         * @brief Return the size (type specified by SIZE_SPECIFIER) at the given device at the given buffer
          *
-         * @brief Do an inference with the given data. This assumes already flattened data in uint8_t's. Specify inputs and outputs.
-         *
-         * @param data
-         * @param inputDeviceIndex
-         * @param inputBufferKernelName
-         * @param outputDeviceIndex
-         * @param outputBufferKernelName
-         * @param samples
-         * @param forceArchival If true, the data gets written to LTS either way, ensuring that there is data to be read!
-         * @return std::vector<std::vector<uint8_t>>
+         * @param ss
+         * @param deviceIndex
+         * @param bufferName
+         * @return size_t
          */
-        [[nodiscard]] std::vector<std::vector<uint8_t>> inferRaw(const std::vector<uint8_t>& data, unsigned int inputDeviceIndex, const std::string& inputBufferKernelName, unsigned int outputDeviceIndex,
-                                                                 const std::string& outputBufferKernelName, unsigned int samples, bool forceArchival) {
-            FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "Starting inference (raw data)";
-            auto storeFunc = accelerator.storeFactory(inputDeviceIndex, inputBufferKernelName);
+        size_t size(SIZE_SPECIFIER ss, unsigned int deviceIndex, const std::string& bufferName) { return accelerator.size(ss, deviceIndex, bufferName); }
 
-            bool stored = storeFunc(data);
-            bool ran = accelerator.run(inputDeviceIndex, inputBufferKernelName);
-
-#ifdef UNITTEST
-            FINN_LOG(logger, loglevel::info) << "Readback from device buffer confirming data was written to board successfully: " << isSyncedDataEquivalent(inputDeviceIndex, inputBufferKernelName, data);
-#endif
-
-            if (stored && ran) {
-                FINN_LOG_DEBUG(logger, loglevel::info) << "Reading out buffers";
-                ert_cmd_state resultState = accelerator.read(outputDeviceIndex, outputBufferKernelName, samples);
-
-                // If the kernel run is completed (success or by timeout (more reads than were in the pipeline)), return the data
-                if (resultState == ERT_CMD_STATE_COMPLETED || resultState == ERT_CMD_STATE_TIMEOUT || resultState == ERT_CMD_STATE_NEW) {
-                    return accelerator.retrieveResults(outputDeviceIndex, outputBufferKernelName, forceArchival);
-                } else {
-                    FinnUtils::logAndError<std::runtime_error>("Unspecifiable error during inference (ert_cmd_state is " + std::to_string(resultState) + ")!");
-                }
-            } else {
-                FinnUtils::logAndError<std::runtime_error>("Data either couldnt be stored or there was no data to execute!");
-            }
-        }
-
+        // #ifndef UNITTEST
+        //          protected:
+        // #else
+        //          public:
+        // #endif
+         public:
         /**
          *
          * @brief Do an inference with the given data. This assumes already flattened data in uint8_t's. Specify inputs and outputs.
@@ -159,6 +134,12 @@ namespace Finn {
 
             bool stored = storeFunc(first, last);
             bool ran = accelerator.run(inputDeviceIndex, inputBufferKernelName);
+
+#ifdef UNITTEST
+            std::vector<uint8_t> data(first, last);
+            FINN_LOG(logger, loglevel::info) << "Readback from device buffer confirming data was written to board successfully: " << isSyncedDataEquivalent(inputDeviceIndex, inputBufferKernelName, data);
+#endif
+
             if (stored && ran) {
                 FINN_LOG_DEBUG(logger, loglevel::info) << "Reading out buffers";
                 ert_cmd_state resultState = accelerator.read(outputDeviceIndex, outputBufferKernelName, samples);
@@ -172,6 +153,24 @@ namespace Finn {
             } else {
                 FinnUtils::logAndError<std::runtime_error>("Data either couldnt be stored or there was no data to execute!");
             }
+        }
+
+        /**
+         *
+         * @brief Do an inference with the given data. This assumes already flattened data in uint8_t's. Specify inputs and outputs.
+         *
+         * @param data
+         * @param inputDeviceIndex
+         * @param inputBufferKernelName
+         * @param outputDeviceIndex
+         * @param outputBufferKernelName
+         * @param samples
+         * @param forceArchival If true, the data gets written to LTS either way, ensuring that there is data to be read!
+         * @return std::vector<std::vector<uint8_t>>
+         */
+        [[nodiscard]] std::vector<std::vector<uint8_t>> inferRaw(const std::vector<uint8_t>& data, unsigned int inputDeviceIndex, const std::string& inputBufferKernelName, unsigned int outputDeviceIndex,
+                                                                 const std::string& outputBufferKernelName, unsigned int samples, bool forceArchival) {
+            return inferRaw(data.begin(), data.end(), inputDeviceIndex, inputBufferKernelName, outputDeviceIndex, outputBufferKernelName, samples, forceArchival);
         }
 
         /**
@@ -224,35 +223,8 @@ namespace Finn {
          */
         [[nodiscard]] std::vector<std::vector<uint8_t>> infer(const std::vector<uint8_t>& data, unsigned int inputDeviceIndex, const std::string& inputBufferKernelName, unsigned int outputDeviceIndex,
                                                               const std::string& outputBufferKernelName, unsigned int samples, bool forceArchival) {
-            FINN_LOG_DEBUG(logger, loglevel::info) << "Starting inference";
-            bool stored = accelerator.store(data, inputDeviceIndex, inputBufferKernelName);
-            FINN_LOG_DEBUG(logger, loglevel::info) << "Running kernels";
-            bool ran = accelerator.run(inputDeviceIndex, inputBufferKernelName);
-            if (stored && ran) {
-                FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "Reading out buffers";
-                ert_cmd_state resultState = accelerator.read(outputDeviceIndex, outputBufferKernelName, samples);
-
-                // If the kernel run is completed (success or by timeout (more reads than were in the pipeline)), return the data
-                if (resultState == ERT_CMD_STATE_COMPLETED || resultState == ERT_CMD_STATE_TIMEOUT || resultState == ERT_CMD_STATE_NEW) {
-                    return accelerator.retrieveResults(outputDeviceIndex, outputBufferKernelName, forceArchival);
-                } else {
-                    FinnUtils::logAndError<std::runtime_error>("Unspecifiable error during inference (ert_cmd_state is " + std::to_string(resultState) + ")!");
-                }
-            } else {
-                FinnUtils::logAndError<std::runtime_error>("Data either couldnt be stored or there was no data to execute!");
-            }
+            return infer(data.begin(), data.end(), inputDeviceIndex, inputBufferKernelName, outputDeviceIndex, outputBufferKernelName, samples, forceArchival);
         }
-
-        /**
-         * @brief Return the size (type specified by SIZE_SPECIFIER) at the given device at the given buffer
-         *
-         * @param ss
-         * @param deviceIndex
-         * @param bufferName
-         * @return size_t
-         */
-        size_t size(SIZE_SPECIFIER ss, unsigned int deviceIndex, const std::string& bufferName) { return accelerator.size(ss, deviceIndex, bufferName); }
-
 
 #ifdef UNITTEST
         /**

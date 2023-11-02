@@ -123,7 +123,7 @@ namespace Finn {
 
     /****** USER METHODS ******/
     //* SAFE + REFERENCE
-    bool DeviceHandler::store(const std::vector<uint8_t>& data, const std::string& inputBufferKernelName) {
+    bool DeviceHandler::store(const Finn::vector<uint8_t>& data, const std::string& inputBufferKernelName) {
         if (!inputBufferMap.contains(inputBufferKernelName)) {
             auto newlineFold = [](std::string a, const auto& b) { return std::move(a) + '\n' + std::move(b.first); };
             std::string existingNames = "Existing buffer names:";
@@ -134,10 +134,10 @@ namespace Finn {
     }
 
     //* UNSAFE + REFERENCE
-    bool DeviceHandler::storeUnchecked(const std::vector<uint8_t>& data, const std::string& inputBufferKernelName) { return inputBufferMap.at(inputBufferKernelName).store(data); }
+    bool DeviceHandler::storeUnchecked(const Finn::vector<uint8_t>& data, const std::string& inputBufferKernelName) { return inputBufferMap.at(inputBufferKernelName).store(data); }
 
     //* UNSAFE + FAST + REFERENCE
-    bool DeviceHandler::storeUncheckedFast(const std::vector<uint8_t>& data, const std::string& inputBufferKernelName) { return inputBufferMap.at(inputBufferKernelName).storeFast(data); }
+    bool DeviceHandler::storeUncheckedFast(const Finn::vector<uint8_t>& data, const std::string& inputBufferKernelName) { return inputBufferMap.at(inputBufferKernelName).storeFast(data); }
 
     [[maybe_unused]] unsigned int DeviceHandler::getDeviceIndex() const { return xrtDeviceIndex; }
 
@@ -151,7 +151,7 @@ namespace Finn {
         return inputBufferMap.at(inputBufferKernelName).run();
     }
 
-    [[maybe_unused]] std::vector<std::vector<uint8_t>> DeviceHandler::retrieveResults(const std::string& outputBufferKernelName, bool forceArchival) {
+    [[maybe_unused]] Finn::vector<uint8_t> DeviceHandler::retrieveResults(const std::string& outputBufferKernelName, bool forceArchival) {
         if (!outputBufferMap.contains(outputBufferKernelName)) {
             auto newlineFold = [](std::string a, const auto& b) { return std::move(a) + '\n' + std::move(b.first); };
             std::string existingNames = "Existing buffer names:";

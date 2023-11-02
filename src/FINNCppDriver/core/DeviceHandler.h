@@ -154,9 +154,9 @@ namespace Finn {
          * @param outputBufferKernelName
          * @param forceArchive If true, the data gets copied from the buffer to the long term storage immediately. If false, the newest read data might not actually be returned by this function
          * @param samples Number of samples to read
-         * @return std::vector<std::vector<uint8_t>>
+         * @return Finn::vector<uint8_t>
          */
-        std::vector<std::vector<uint8_t>> retrieveResults(const std::string& outputBufferKernelName, bool forceArchival);
+        Finn::vector<uint8_t> retrieveResults(const std::string& outputBufferKernelName, bool forceArchival);
 
         /**
          * @brief Execute the output kernel and return it's result. If a run fails, the function returns early.
@@ -218,7 +218,7 @@ namespace Finn {
 
          public:
         //* SAFE + REFERENCE
-        bool store(const std::vector<uint8_t>& data, const std::string& inputBufferKernelName);
+        bool store(const Finn::vector<uint8_t>& data, const std::string& inputBufferKernelName);
 
         //* SAFE + ITERATOR
         template<typename IteratorType>
@@ -230,7 +230,7 @@ namespace Finn {
         }
 
         //* UNSAFE + REFERENCE
-        bool storeUnchecked(const std::vector<uint8_t>& data, const std::string& inputBufferKernelName);
+        bool storeUnchecked(const Finn::vector<uint8_t>& data, const std::string& inputBufferKernelName);
 
         //* UNSAFE + ITERATOR
         template<typename IteratorType>
@@ -240,7 +240,7 @@ namespace Finn {
         }
 
         //* UNSAFE + FAST + REFERENCE
-        bool storeUncheckedFast(const std::vector<uint8_t>& data, const std::string& inputBufferKernelName);
+        bool storeUncheckedFast(const Finn::vector<uint8_t>& data, const std::string& inputBufferKernelName);
 
         //* UNSAFE + FAST + ITERATOR
         template<typename IteratorType>
@@ -291,7 +291,7 @@ namespace Finn {
          */
         UncheckedStore(DeviceHandler& pDev, const std::string& pInputBufferName) : dev(pDev), inputBufferName(pInputBufferName) {}
 
-        bool operator()(const std::vector<uint8_t>& data) { return dev.storeUncheckedFast(data, inputBufferName); }
+        bool operator()(const Finn::vector<uint8_t>& data) { return dev.storeUncheckedFast(data, inputBufferName); }
 
         template<typename IteratorType>
         bool operator()(IteratorType first, IteratorType last) {

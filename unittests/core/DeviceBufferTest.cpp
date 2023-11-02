@@ -32,16 +32,14 @@ class DBTest : public ::testing::Test {
     Finn::DeviceInputBuffer<uint8_t> buffer = Finn::DeviceInputBuffer<uint8_t>("TestBuffer", device, kernel, FinnUnittest::myShapePacked, FinnUnittest::parts);
     Finn::DeviceOutputBuffer<uint8_t> outputBuffer = Finn::DeviceOutputBuffer<uint8_t>("tester", device, kernel, FinnUnittest::myShapePacked, FinnUnittest::parts);
     FinnUtils::BufferFiller filler = FinnUtils::BufferFiller(0, 255);
-    std::vector<std::vector<uint8_t>> storedDatas;
-    std::vector<uint8_t> data;
+    std::vector<Finn::vector<uint8_t>> storedDatas;
+    Finn::vector<uint8_t> data;
     size_t bufferParts;
     size_t bufferElemPerPart;
     void SetUp() override {
         // device = xrt::device();
         kernel = xrt::kernel();
-        data = std::vector<uint8_t>();
         data.resize(buffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
-        storedDatas = std::vector<std::vector<uint8_t>>();
         bufferParts = buffer.size(SIZE_SPECIFIER::PARTS);
         bufferElemPerPart = buffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART);
     }
@@ -58,7 +56,7 @@ class DBTest : public ::testing::Test {
      */
     void fillCompletely(bool fast, bool ref) {
         for (size_t i = 0; i < buffer.size(SIZE_SPECIFIER::PARTS); i++) {
-            filler.fillRandom(data);
+            filler.fillRandom(data.begin(), data.end());
             storedDatas.push_back(data);
             if (fast) {
                 if (ref) {
@@ -134,19 +132,19 @@ TEST_F(DBTest, DBOutputTest) {
     EXPECT_EQ(outputBuffer.getMsExecuteTimeout(), 1000);
 
     // Test data in and out readout
-    filler.fillRandom(data);
+    filler.fillRandom(data.begin(), data.end());
     storedDatas.push_back(data);
     outputBuffer.testSetMap(data);
     outputBuffer.saveMap();
 
-    outputBuffer.testGetRingBuffer().readToVector(data, data.size());
+    outputBuffer.testGetRingBuffer().read(data.begin());
     EXPECT_EQ(data, storedDatas[0]);
 }
 
 TEST_F(DBTest, DBLTSTest) {
     // Write too many entries into the ring buffer
     for (unsigned int i = 0; i < outputBuffer.size(SIZE_SPECIFIER::PARTS) + 2; i++) {
-        filler.fillRandom(data);
+        filler.fillRandom(data.begin(), data.end());
         storedDatas.push_back(data);
         outputBuffer.testSetMap(data);
 
@@ -160,12 +158,14 @@ TEST_F(DBTest, DBLTSTest) {
 
     // Check integrity of data
     auto results = outputBuffer.retrieveArchive();
-    for (unsigned int i = 0; i < results.size(); i++) {
-        EXPECT_EQ(results[i], storedDatas[i]);
-    }
+    // for (unsigned int i = 0; i < results.size(); i++) {
+    //     EXPECT_EQ(results[i], storedDatas[i]);
+    // }
+
     // Check the data that is still in the buffer
-    EXPECT_EQ(storedDatas[outputBuffer.size(SIZE_SPECIFIER::PARTS)], outputBuffer.testGetRingBuffer().testGetAsVector(0));
-    EXPECT_EQ(storedDatas[outputBuffer.size(SIZE_SPECIFIER::PARTS) + 1], outputBuffer.testGetRingBuffer().testGetAsVector(1));
+    // EXPECT_EQ(storedDatas[outputBuffer.size(SIZE_SPECIFIER::PARTS)], outputBuffer.testGetRingBuffer().testGetAsVector(0));
+    // EXPECT_EQ(storedDatas[outputBuffer.size(SIZE_SPECIFIER::PARTS) + 1], outputBuffer.testGetRingBuffer().testGetAsVector(1));
+    EXPECT_TRUE(false);
 
     // Check that the LTS was cleared
     EXPECT_EQ(outputBuffer.testGetLTS().size(), 0);

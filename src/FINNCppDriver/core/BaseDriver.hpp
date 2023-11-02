@@ -18,6 +18,7 @@
 #include <FINNCppDriver/utils/Logger.h>
 #include <FINNCppDriver/utils/Types.h>
 
+#include <FINNCppDriver/utils/DataPacking.hpp>
 #include <FINNCppDriver/utils/FinnDatatypes.hpp>
 #include <cinttypes>  // for uint8_t
 #include <filesystem>
@@ -44,10 +45,12 @@ namespace Finn {
         Config configuration;
         logger_type& logger = Logger::getLogger();
 
-        unsigned int defaultInputDeviceIndex = 0;
-        unsigned int defaultOutputDeviceIndex = 0;
+        uint defaultInputDeviceIndex = 0;
         std::string defaultInputKernelName;
+        uint defaultOutputDeviceIndex = 0;
         std::string defaultOutputKernelName;
+        uint batchElements = 1;
+        bool forceAchieval = false;
 
          public:
         /**
@@ -56,7 +59,7 @@ namespace Finn {
          * @param configPath
          * @param hostBufferSize
          */
-        BaseDriver(const std::filesystem::path& configPath, unsigned int hostBufferSize) : configuration(createConfigFromPath(configPath)), logger(Logger::getLogger()) {
+        BaseDriver(const std::filesystem::path& configPath, uint hostBufferSize) : configuration(createConfigFromPath(configPath)), logger(Logger::getLogger()) {
             accelerator = Accelerator(configuration.deviceWrappers, hostBufferSize);
 #ifdef UNITTEST
             logDriver();
@@ -68,13 +71,68 @@ namespace Finn {
          *
          * @param pConfig
          */
-        BaseDriver(const Config& pConfig, unsigned int hostBufferSize) : configuration(pConfig), logger(Logger::getLogger()) { accelerator = Accelerator(configuration.deviceWrappers, hostBufferSize); }
+        BaseDriver(const Config& pConfig, uint hostBufferSize) : configuration(pConfig), logger(Logger::getLogger()) { accelerator = Accelerator(configuration.deviceWrappers, hostBufferSize); }
+
+        BaseDriver(const Config& pConfig, uint hostBufferSize, uint inputDeviceIndex, const std::string& inputKernelName, uint outputDeviceIndex, const std::string& outputKernelName, uint batchSize, bool pForceAchieval)
+            : configuration(pConfig),
+              logger(Logger::getLogger()),
+              defaultInputDeviceIndex(inputDeviceIndex),
+              defaultInputKernelName(inputKernelName),
+              defaultOutputDeviceIndex(outputDeviceIndex),
+              defaultOutputKernelName(outputKernelName),
+              batchElements(batchSize),
+              forceAchieval(pForceAchieval) {
+            accelerator = Accelerator(configuration.deviceWrappers, hostBufferSize);
+        }
+
 
         BaseDriver(BaseDriver&&) noexcept = default;
         BaseDriver(const BaseDriver&) noexcept = delete;
         BaseDriver& operator=(BaseDriver&&) noexcept = default;
         BaseDriver& operator=(const BaseDriver&) = delete;
         virtual ~BaseDriver() = default;
+
+        /**
+         * @brief Set the Default Input Device Index
+         *
+         * @param index
+         */
+        void setDefaultInputDeviceIndex(uint index) { defaultInputDeviceIndex = index; }
+
+        /**
+         * @brief Set the Default Output Device Index
+         *
+         * @param index
+         */
+        void setDefaultOutputDeviceIndex(uint index) { defaultOutputDeviceIndex = index; }
+
+        /**
+         * @brief Set the Default Input Kernel Name
+         *
+         * @param kernelName
+         */
+        void setDefaultInputKernelName(const std::string& kernelName) { defaultInputKernelName = kernelName; }
+
+        /**
+         * @brief Set the Default Output Kernel Name
+         *
+         * @param kernelName
+         */
+        void setDefaultOutputKernelName(const std::string& kernelName) { defaultInputKernelName = kernelName; }
+
+        /**
+         * @brief Set the Batch Size
+         *
+         * @param elements
+         */
+        void setBatchSize(uint elements) { batchElements = elements; }
+
+        /**
+         * @brief Set the Force Achieval
+         *
+         * @param force
+         */
+        void setForceAchieval(bool force) { forceAchieval = force; }
 
         /**
          * @brief A logger prefix to determine the source of a log write
@@ -98,7 +156,7 @@ namespace Finn {
          * @param index
          * @return DeviceHandler&
          */
-        DeviceHandler& getDeviceHandler(unsigned int index) { return accelerator.getDeviceHandler(index); }
+        DeviceHandler& getDeviceHandler(uint index) { return accelerator.getDeviceHandler(index); }
 
         /**
          * @brief Get a specific buffer object specified by its name and the device it is on
@@ -107,7 +165,7 @@ namespace Finn {
          * @param bufferName
          * @return DeviceInputBuffer<uint8_t>
          */
-        DeviceInputBuffer<uint8_t>& getInputBuffer(unsigned int deviceIndex, const std::string& bufferName) { return getDeviceHandler(deviceIndex).getInputBuffer(bufferName); }
+        DeviceInputBuffer<uint8_t>& getInputBuffer(uint deviceIndex, const std::string& bufferName) { return getDeviceHandler(deviceIndex).getInputBuffer(bufferName); }
 
         /**
          * @brief Return the size (type specified by SIZE_SPECIFIER) at the given device at the given buffer
@@ -117,22 +175,38 @@ namespace Finn {
          * @param bufferName
          * @return size_t
          */
-        size_t size(SIZE_SPECIFIER ss, unsigned int deviceIndex, const std::string& bufferName) { return accelerator.size(ss, deviceIndex, bufferName); }
+        size_t size(SIZE_SPECIFIER ss, uint deviceIndex, const std::string& bufferName) { return accelerator.size(ss, deviceIndex, bufferName); }
 
-        // template<typename T>
-        // Finn::vector<T> inferSynchronous(const Finn::vector<T>& data) {}
+        template<typename IteratorType, typename V = Finn::UnpackingAutoRetType::AutoRetType<S>>
+        Finn::vector<V> inferSynchronous(IteratorType first, IteratorType last, uint inputDeviceIndex, const std::string& inputBufferKernelName, uint outputDeviceIndex, const std::string& outputBufferKernelName, uint samples,
+                                         bool forceArchival) {
+            auto packed = Finn::pack<F>(first, last);
+            auto result = inferRaw(packed.begin(), packed.end(), inputDeviceIndex, inputBufferKernelName, outputDeviceIndex, outputBufferKernelName, samples, forceArchival);
+            return unpack<S, V>(result);
+        }
+
+        template<typename IteratorType, typename V = Finn::UnpackingAutoRetType::AutoRetType<S>>
+        Finn::vector<V> inferSynchronous(IteratorType first, IteratorType last) {
+            return inferSynchronous(first, last, defaultInputDeviceIndex, defaultInputKernelName, defaultOutputDeviceIndex, defaultOutputKernelName, batchElements, forceAchieval);
+        }
+
+        template<typename U, typename V = Finn::UnpackingAutoRetType::AutoRetType<S>>
+        Finn::vector<V> inferSynchronous(const Finn::vector<U>& data, uint inputDeviceIndex, const std::string& inputBufferKernelName, uint outputDeviceIndex, const std::string& outputBufferKernelName, uint samples, bool forceArchival) {
+            return inferSynchronous(data.begin(), data.end(), inputDeviceIndex, inputBufferKernelName, outputDeviceIndex, outputBufferKernelName, samples, forceAchieval);
+        }
+
+        template<typename U, typename V = Finn::UnpackingAutoRetType::AutoRetType<S>>
+        Finn::vector<V> inferSynchronous(const Finn::vector<U>& data) {
+            return inferSynchronous(data, defaultInputDeviceIndex, defaultInputKernelName, defaultOutputDeviceIndex, defaultOutputKernelName, batchElements, forceAchieval);
+        }
 
         // template<typename T, typename U, typename IteratorType>
         // Finn::vector<T> inferSynchronous(IteratorType first, IteratorType last) {
 
         // }
 
-        // #ifndef UNITTEST
-        //          protected:
-        // #else
-        //          public:
-        // #endif
-         public:
+
+         protected:
         /**
          *
          * @brief Do an inference with the given data. This assumes already flattened data in uint8_t's. Specify inputs and outputs.
@@ -145,11 +219,11 @@ namespace Finn {
          * @param outputBufferKernelName
          * @param samples
          * @param forceArchival If true, the data gets written to LTS either way, ensuring that there is data to be read!
-         * @return std::vector<std::vector<uint8_t>>
+         * @return Finn::vector<uint8_t>
          */
         template<typename IteratorType>
-        [[nodiscard]] std::vector<std::vector<uint8_t>> inferRaw(IteratorType first, IteratorType last, unsigned int inputDeviceIndex, const std::string& inputBufferKernelName, unsigned int outputDeviceIndex,
-                                                                 const std::string& outputBufferKernelName, unsigned int samples, bool forceArchival) {
+        [[nodiscard]] Finn::vector<uint8_t> inferRaw(IteratorType first, IteratorType last, uint inputDeviceIndex, const std::string& inputBufferKernelName, uint outputDeviceIndex, const std::string& outputBufferKernelName, uint samples,
+                                                     bool forceArchival) {
             FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "Starting inference (raw data)";
             auto storeFunc = accelerator.storeFactory(inputDeviceIndex, inputBufferKernelName);
 
@@ -157,7 +231,7 @@ namespace Finn {
             bool ran = accelerator.run(inputDeviceIndex, inputBufferKernelName);
 
 #ifdef UNITTEST
-            std::vector<uint8_t> data(first, last);
+            Finn::vector<uint8_t> data(first, last);
             FINN_LOG(logger, loglevel::info) << "Readback from device buffer confirming data was written to board successfully: " << isSyncedDataEquivalent(inputDeviceIndex, inputBufferKernelName, data);
 #endif
 
@@ -187,10 +261,10 @@ namespace Finn {
          * @param outputBufferKernelName
          * @param samples
          * @param forceArchival If true, the data gets written to LTS either way, ensuring that there is data to be read!
-         * @return std::vector<std::vector<uint8_t>>
+         * @return Finn::vector<uint8_t>
          */
-        [[nodiscard]] std::vector<std::vector<uint8_t>> inferRaw(const std::vector<uint8_t>& data, unsigned int inputDeviceIndex, const std::string& inputBufferKernelName, unsigned int outputDeviceIndex,
-                                                                 const std::string& outputBufferKernelName, unsigned int samples, bool forceArchival) {
+        [[nodiscard]] Finn::vector<uint8_t> inferRaw(const Finn::vector<uint8_t>& data, uint inputDeviceIndex, const std::string& inputBufferKernelName, uint outputDeviceIndex, const std::string& outputBufferKernelName, uint samples,
+                                                     bool forceArchival) {
             return inferRaw(data.begin(), data.end(), inputDeviceIndex, inputBufferKernelName, outputDeviceIndex, outputBufferKernelName, samples, forceArchival);
         }
 
@@ -206,11 +280,11 @@ namespace Finn {
          * @param outputBufferKernelName
          * @param samples
          * @param forceArchival
-         * @return std::vector<std::vector<uint8_t>>
+         * @return Finn::vector<uint8_t>
          */
         template<typename IteratorType>
-        [[nodiscard]] std::vector<std::vector<uint8_t>> infer(IteratorType first, IteratorType last, unsigned int inputDeviceIndex, const std::string& inputBufferKernelName, unsigned int outputDeviceIndex,
-                                                              const std::string& outputBufferKernelName, unsigned int samples, bool forceArchival) {
+        [[nodiscard]] Finn::vector<uint8_t> infer(IteratorType first, IteratorType last, uint inputDeviceIndex, const std::string& inputBufferKernelName, uint outputDeviceIndex, const std::string& outputBufferKernelName, uint samples,
+                                                  bool forceArchival) {
             FINN_LOG_DEBUG(logger, loglevel::info) << "Starting inference";
             bool stored = accelerator.store(first, last, inputDeviceIndex, inputBufferKernelName);
             FINN_LOG_DEBUG(logger, loglevel::info) << "Running kernels";
@@ -242,8 +316,8 @@ namespace Finn {
          * @param forceArchival
          * @return std::vector<std::vector<uint8_t>>
          */
-        [[nodiscard]] std::vector<std::vector<uint8_t>> infer(const std::vector<uint8_t>& data, unsigned int inputDeviceIndex, const std::string& inputBufferKernelName, unsigned int outputDeviceIndex,
-                                                              const std::string& outputBufferKernelName, unsigned int samples, bool forceArchival) {
+        [[nodiscard]] std::vector<std::vector<uint8_t>> infer(const std::vector<uint8_t>& data, uint inputDeviceIndex, const std::string& inputBufferKernelName, uint outputDeviceIndex, const std::string& outputBufferKernelName,
+                                                              uint samples, bool forceArchival) {
             return infer(data.begin(), data.end(), inputDeviceIndex, inputBufferKernelName, outputDeviceIndex, outputBufferKernelName, samples, forceArchival);
         }
 
@@ -257,7 +331,7 @@ namespace Finn {
          * @return true
          * @return false
          */
-        bool isSyncedDataEquivalent(unsigned int deviceIndex, const std::string& bufferName, const std::vector<uint8_t>& data) {
+        bool isSyncedDataEquivalent(uint deviceIndex, const std::string& bufferName, const Finn::vector<uint8_t>& data) {
             DeviceInputBuffer<uint8_t>& devInBuf = getInputBuffer(deviceIndex, bufferName);
             devInBuf.testSyncBackFromDevice();
             return devInBuf.testGetMap() == data;

@@ -152,7 +152,10 @@ namespace Finn {
      * @return Config
      */
     inline Config createConfigFromPath(const std::filesystem::path& configPath) {
-        std::ifstream file(configPath.string());
+        if (!std::filesystem::exists(configPath) || !std::filesystem::is_regular_file(configPath)) {
+            throw std::filesystem::filesystem_error("File " + configPath.string() + " not found. Abort.", std::error_code());
+        }
+        std::ifstream file(configPath);
         json dataJson = json::parse(file);
         Config config;
         for (auto& fpgaDevice : dataJson) {

@@ -127,28 +127,28 @@ namespace Finn {
      */
     namespace UnpackingAutoRetType {
         template<IsDatatype U>
-        using FourBytesOrLongerSigned = std::conditional<U().bitwidth() <= 32, int32_t, int64_t>::type;
+        using FourBytesOrLongerSigned = typename std::conditional<U().bitwidth() <= 32, int32_t, int64_t>::type;
 
         template<IsDatatype U>
-        using TwoBytesOrLongerSigned = std::conditional<U().bitwidth() <= 16, int16_t, FourBytesOrLongerSigned<U>>::type;
+        using TwoBytesOrLongerSigned = typename std::conditional<U().bitwidth() <= 16, int16_t, FourBytesOrLongerSigned<U>>::type;
 
         template<IsDatatype U>
-        using SignedRetType = std::conditional<U().bitwidth() <= 8, int8_t, TwoBytesOrLongerSigned<U>>::type;
+        using SignedRetType = typename std::conditional<U().bitwidth() <= 8, int8_t, TwoBytesOrLongerSigned<U>>::type;
 
         template<IsDatatype U>
-        using FourBytesOrLongerUnsigned = std::conditional<U().bitwidth() <= 32, uint32_t, uint64_t>::type;
+        using FourBytesOrLongerUnsigned = typename std::conditional<U().bitwidth() <= 32, uint32_t, uint64_t>::type;
 
         template<IsDatatype U>
-        using TwoBytesOrLongerUnsigned = std::conditional<U().bitwidth() <= 16, uint16_t, FourBytesOrLongerUnsigned<U>>::type;
+        using TwoBytesOrLongerUnsigned = typename std::conditional<U().bitwidth() <= 16, uint16_t, FourBytesOrLongerUnsigned<U>>::type;
 
         template<IsDatatype U>
-        using UnsignedRetType = std::conditional<U().bitwidth() <= 8, uint8_t, TwoBytesOrLongerUnsigned<U>>::type;
+        using UnsignedRetType = typename std::conditional<U().bitwidth() <= 8, uint8_t, TwoBytesOrLongerUnsigned<U>>::type;
 
         template<IsDatatype U>
-        using IntegralType = std::conditional<U().sign(), SignedRetType<U>, UnsignedRetType<U>>::type;
+        using IntegralType = typename std::conditional<U().sign(), SignedRetType<U>, UnsignedRetType<U>>::type;
 
         template<IsDatatype U>
-        using AutoRetType = std::conditional<U().isInteger(), IntegralType<U>, float>::type;
+        using AutoRetType = typename std::conditional<U().isInteger(), IntegralType<U>, float>::type;
     }  // namespace UnpackingAutoRetType
 
     template<typename T>
@@ -178,7 +178,7 @@ namespace Finn {
          */
         template<IsDatatype U, bool invertBytes = true, bool reverseBits = true, typename IteratorType>
         Finn::vector<UnpackingAutoRetType::UnsignedRetType<U>> toBitsetImpl(IteratorType first, IteratorType last) {
-            using T = std::iterator_traits<IteratorType>::value_type;
+            using T = typename std::iterator_traits<IteratorType>::value_type;
             if constexpr (reverseBits) {
                 constexpr std::size_t shift = (sizeof(T) * 8 - U().bitwidth());
                 bitshuffling::Wrapper wrap{};
@@ -219,12 +219,12 @@ namespace Finn {
      */
     template<IsDatatype U, bool invertBytes = true, bool reverseBits = true, typename IteratorType, typename = std::enable_if_t<std::is_integral<typename std::iterator_traits<IteratorType>::value_type>::value>>
     Finn::vector<UnpackingAutoRetType::UnsignedRetType<U>> toBitset(IteratorType first, IteratorType last) {
-        using T = std::iterator_traits<IteratorType>::value_type;
+        using T = typename std::iterator_traits<IteratorType>::value_type;
         static_assert(sizeof(T) <= 8, "Datatypes with more than 8 bytes are currently not supported!");
         if constexpr (std::is_signed_v<T>) {  // Needs to be casted to an unsigned input type to avoid undefined behavior of shift operations on negative values
-            using FourBytesOrLonger = std::conditional<sizeof(T) <= 4, uint32_t, uint64_t>::type;
-            using TwoBytesOrLonger = std::conditional<sizeof(T) == 2, uint16_t, FourBytesOrLonger>::type;
-            using OneByteOrLonger = std::conditional<sizeof(T) == 1, uint8_t, TwoBytesOrLonger>::type;
+            using FourBytesOrLonger = typename std::conditional<sizeof(T) <= 4, uint32_t, uint64_t>::type;
+            using TwoBytesOrLonger = typename std::conditional<sizeof(T) == 2, uint16_t, FourBytesOrLonger>::type;
+            using OneByteOrLonger = typename std::conditional<sizeof(T) == 1, uint8_t, TwoBytesOrLonger>::type;
 
             Finn::vector<OneByteOrLonger> vec(first, last);
             return detail::toBitsetImpl<U, invertBytes, reverseBits>(vec.begin(), vec.end());
@@ -326,7 +326,7 @@ namespace Finn {
      */
     template<IsDatatype U, typename IteratorType>
     Finn::vector<uint8_t> pack(IteratorType first, IteratorType last) {
-        using T = std::iterator_traits<IteratorType>::value_type;
+        using T = typename std::iterator_traits<IteratorType>::value_type;
         if constexpr (std::endian::native == std::endian::big) {
             []<bool flag = false>() { static_assert(flag, "Big-endian architectures are currently not supported!"); }
             ();
@@ -340,16 +340,16 @@ namespace Finn {
                 }
 
                 // Use smallest possible datatype for storing data
-                using FourBytesOrLonger = std::conditional<bytes <= 4, uint32_t, uint64_t>::type;
-                using TwoBytesOrLonger = std::conditional<bytes == 2, uint16_t, FourBytesOrLonger>::type;
-                using OneByteOrLonger = std::conditional<bytes == 1, uint8_t, TwoBytesOrLonger>::type;
+                using FourBytesOrLonger = typename std::conditional<bytes <= 4, uint32_t, uint64_t>::type;
+                using TwoBytesOrLonger = typename std::conditional<bytes == 2, uint16_t, FourBytesOrLonger>::type;
+                using OneByteOrLonger = typename std::conditional<bytes == 1, uint8_t, TwoBytesOrLonger>::type;
 
                 Finn::vector<OneByteOrLonger> vec(first, last);
                 return detail::packImpl<DatatypeInt<U().bitwidth()>>(vec.begin(), vec.end());
             } else if constexpr (std::is_floating_point_v<T> && U().isInteger()) {  // Datatype is integer number stored in floating point inputs
                 // Use smallest possible datatype for storing data
                 if constexpr (sizeof(T) >= 4 || sizeof(T) <= 8) {
-                    using VecType = std::conditional<sizeof(T) == 4, uint32_t, uint64_t>::type;
+                    using VecType = typename std::conditional<sizeof(T) == 4, uint32_t, uint64_t>::type;
                     Finn::vector<VecType> input(first, last);
                     return detail::packImpl<U>(input.begin(), input.end());
                 } else {
@@ -427,10 +427,10 @@ namespace Finn {
 
         constexpr std::size_t neededBytes = FinnUtils::ceil(U().bitwidth() / 8.0);
 
-        using FourBytesOrLonger = std::conditional<neededBytes <= 4, int32_t, int64_t>::type;
-        using TwoBytesOrLonger = std::conditional<neededBytes == 2, int16_t, FourBytesOrLonger>::type;
-        using FixedPointType = std::conditional<neededBytes == 1, int8_t, TwoBytesOrLonger>::type;
-        using RetType = std::conditional<U().isFixedPoint(), FixedPointType, T>::type;
+        using FourBytesOrLonger = typename std::conditional<neededBytes <= 4, int32_t, int64_t>::type;
+        using TwoBytesOrLonger = typename std::conditional<neededBytes == 2, int16_t, FourBytesOrLonger>::type;
+        using FixedPointType = typename std::conditional<neededBytes == 1, int8_t, TwoBytesOrLonger>::type;
+        using RetType = typename std::conditional<U().isFixedPoint(), FixedPointType, T>::type;
 
         if (inp.size() * 8 % U().bitwidth() != 0 || inp.empty()) {
             FinnUtils::logAndError<std::runtime_error>("Amount of input elements is not a multiple of output elements");
@@ -459,9 +459,9 @@ namespace Finn {
         } else {
             constexpr std::size_t bitwidth = U().bitwidth();
 
-            using FourBytesOrLongerUnsigned = std::conditional<bitwidth <= 32, uint64_t, __uint128_t>::type;
-            using TwoBytesOrLongerUnsigned = std::conditional<bitwidth <= 16, uint32_t, FourBytesOrLongerUnsigned>::type;
-            using BufferType = std::conditional<bitwidth <= 8, uint16_t, TwoBytesOrLongerUnsigned>::type;
+            using FourBytesOrLongerUnsigned = typename std::conditional<bitwidth <= 32, uint64_t, __uint128_t>::type;
+            using TwoBytesOrLongerUnsigned = typename std::conditional<bitwidth <= 16, uint32_t, FourBytesOrLongerUnsigned>::type;
+            using BufferType = typename std::conditional<bitwidth <= 8, uint16_t, TwoBytesOrLongerUnsigned>::type;
 
             constexpr BufferType mask = createMask<BufferType>(bitwidth);
             const std::size_t elementsInInput = inp.size() * 8 / U().bitwidth();

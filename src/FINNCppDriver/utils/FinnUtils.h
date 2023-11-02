@@ -42,17 +42,21 @@ namespace FinnUtils {
 
         static BufferFiller create(uint8_t min, uint8_t max) { return {min, max}; }
 
-        void fillRandom(std::vector<uint8_t>& vec) {
-            std::transform(vec.begin(), vec.end(), vec.begin(), [this]([[maybe_unused]] uint8_t x) { return sampler(engine); });
+        template<typename IteratorType>
+        void fillRandom(IteratorType first, IteratorType last) {
+            std::transform(first, last, first, [this]([[maybe_unused]] uint8_t x) { return sampler(engine); });
         }
+
+        void fillRandom(std::vector<uint8_t>& vec) { fillRandom(vec.begin(), vec.end()); }
     };
 
 
     template<typename T>
-    concept FloatingPoint = std::is_floating_point_v<T> && (sizeof(T) == 4 || sizeof(T) == 8) &&  // Only 32/64 bit allowed. 80 bit fp not allowed
-                            sizeof(float) == 4 && sizeof(double) == 8 &&                          // float must be 32 bit fp while double must be 64 bit fp
-                            std::numeric_limits<T>::is_iec559 &&                                  // Only IEEE 754 fp allowed
-                            std::endian::native == std::endian::little;
+    concept FloatingPoint = std::is_floating_point_v<T> &&(sizeof(T) == 4 || sizeof(T) == 8) &&  // Only 32/64 bit allowed. 80 bit fp not allowed
+                            sizeof(float) == 4 && sizeof(double) == 8 &&                         // float must be 32 bit fp while double must be 64 bit fp
+                            std::numeric_limits<T>::is_iec559&&                                  // Only IEEE 754 fp allowed
+                                std::endian::native
+                                == std::endian::little;
 
     /**
      * @brief Helper function for ceil. Checks if param is inf. Based on https://codereview.stackexchange.com/questions/248169/two-constexpr-ceil-functions
@@ -257,6 +261,34 @@ namespace FinnUtils {
     #endif
 #endif
     }
+
+    template<typename T>
+    class ptr_iterator {
+        using iterator = ptr_iterator<T>;
+        using iterator_category = std::forward_iterator_tag;
+        using difference_type = std::ptrdiff_t;
+        using value_type = T;
+        using pointer = T*;    // or also value_type*
+        using reference = T&;  // or also value_type&
+
+        pointer pos;
+
+         public:
+        ptr_iterator() : pos(nullptr) {}
+        ptr_iterator(T* v) : pos(v) {}
+        ~ptr_iterator() {}
+
+        iterator operator++(int) /* postfix */ { return pos++; }
+        iterator& operator++() /* prefix */ {
+            ++pos;
+            return *this;
+        }
+        reference operator*() { return *pos; }
+        pointer operator->() { return pos; }
+        iterator operator+(difference_type v) { return pos + v; }
+        friend bool operator==(const iterator& a, const iterator& b) { return a.pos == b.pos; };
+        friend bool operator!=(const iterator& a, const iterator& b) { return a.pos != b.pos; };
+    };
 
 }  // namespace FinnUtils
 

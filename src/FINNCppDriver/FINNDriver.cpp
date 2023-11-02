@@ -109,14 +109,14 @@ void runFiletest(Finn::Driver& baseDriver, logger_type& logger) {
     filler.fillRandom(data);
     FinnUtils::logResults<uint8_t>(logger, data, 5000, "INPUT DATA: ");
 
-    auto results = baseDriver.inferRaw(data, 0, "StreamingDataflowPartition_0:{idma0}", 0, "StreamingDataflowPartition_2:{odma0}", 9, true);
-    FINN_LOG(logger, loglevel::info) << finnMainLogPrefix() << "Received " << results.size() << " results!";
+    // auto results = baseDriver.inferRaw(data, 0, "StreamingDataflowPartition_0:{idma0}", 0, "StreamingDataflowPartition_2:{odma0}", 9, true);
+    // FINN_LOG(logger, loglevel::info) << finnMainLogPrefix() << "Received " << results.size() << " results!";
 
-    // Print Results
-    int counter = 0;
-    for (auto& resultVector : results) {
-        FinnUtils::logResults<uint8_t>(logger, resultVector, 8, finnMainLogPrefix() + "Vec " + std::to_string(counter++));
-    }
+    // // Print Results
+    // int counter = 0;
+    // for (auto& resultVector : results) {
+    //     FinnUtils::logResults<uint8_t>(logger, resultVector, 8, finnMainLogPrefix() + "Vec " + std::to_string(counter++));
+    // }
 }
 
 /**
@@ -138,21 +138,21 @@ void runIntegrationTest(Finn::Driver& baseDriver, logger_type& logger) {
 
     // Do a test run with random data and raw inference (no packing no folding)
     filler.fillRandom(data);
-    auto results = baseDriver.inferRaw(data, 0, "StreamingDataflowPartition_0:{idma0}", 0, "StreamingDataflowPartition_2:{odma0}", 1, true);
+    // auto results = baseDriver.inferRaw(data, 0, "StreamingDataflowPartition_0:{idma0}", 0, "StreamingDataflowPartition_2:{odma0}", 1, true);
 
-    // Write data to result file. One line per data, ending with an empty space and a newline
-    // TODO(bwintermann): Check if "uniq" registers the newline too
-    // TODO(bwintermann): Introduce checks for everything
-    for (auto val : data) {
-        resultfile << val << " ";
-    }
-    resultfile << "\n";
+    // // Write data to result file. One line per data, ending with an empty space and a newline
+    // // TODO(bwintermann): Check if "uniq" registers the newline too
+    // // TODO(bwintermann): Introduce checks for everything
+    // for (auto val : data) {
+    //     resultfile << val << " ";
+    // }
+    // resultfile << "\n";
 
-    for (auto val : results[0]) {
-        resultfile << val << " ";
-    }
-    resultfile << "\n";
-    resultfile.close();
+    // for (auto val : results[0]) {
+    //     resultfile << val << " ";
+    // }
+    // resultfile << "\n";
+    // resultfile.close();
 }
 
 /**

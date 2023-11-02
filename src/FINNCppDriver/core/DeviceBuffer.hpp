@@ -170,7 +170,7 @@ namespace Finn {
          * @return true
          * @return false
          */
-        bool loadMap() { return this->ringBuffer.readToArray(this->map, this->mapSize); }
+        bool loadMap() { return this->ringBuffer.read(FinnUtils::ptr_iterator(this->map)); }
 
         /**
          * @brief Store the given vector of data in the ring buffer
@@ -179,9 +179,9 @@ namespace Finn {
          * @return true
          * @return false
          */
-        bool store(const std::vector<T>& data) {
+        bool store(const Finn::vector<T>& data) {
             // TODO(bwintermann): Enable support to write multiple parts from one vector, which has then to be a multiple of elementsPerPart large
-            return this->ringBuffer.template store<std::vector<T>>(data, data.size());
+            return this->ringBuffer.template store<Finn::vector<T>>(data, data.size());
         }
 
         /**
@@ -192,7 +192,7 @@ namespace Finn {
          * @return true
          * @return false
          */
-        bool storeFast(const std::vector<T>& data) { return this->ringBuffer.storeFast(data); }
+        bool storeFast(const Finn::vector<T>& data) { return this->ringBuffer.storeFast(data); }
 
         /**
          * @brief Stores data without size checks and without guarding mutexes!
@@ -249,8 +249,8 @@ namespace Finn {
 
 
 #ifdef UNITTEST
-        std::vector<T> testGetMap() {
-            std::vector<T> temp;
+        Finn::vector<T> testGetMap() {
+            Finn::vector<T> temp;
             for (size_t i = 0; i < this->mapSize; i++) {
                 temp.push_back(this->map[i]);
             }
@@ -265,7 +265,8 @@ namespace Finn {
     template<typename T>
     class DeviceOutputBuffer : DeviceBuffer<T> {
         const IO ioMode = IO::OUTPUT;
-        std::vector<std::vector<T>> longTermStorage;
+        // std::vector<std::vector<T>> longTermStorage;
+        Finn::vector<T> longTermStorage;
         unsigned int msExecuteTimeout = 1000;
 
         using DeviceBuffer<T>::DeviceBuffer;
@@ -293,7 +294,7 @@ namespace Finn {
          *
          * @param expectedEntries
          */
-        void allocateLongTermStorage(unsigned int expectedEntries) { longTermStorage.reserve(expectedEntries); }
+        void allocateLongTermStorage(unsigned int expectedEntries) { longTermStorage.reserve(expectedEntries * this->ringBuffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART)); }
 
         /**
          * @brief Get the the kernel timeout in miliseconds
@@ -342,36 +343,30 @@ namespace Finn {
          * @note This function can be executed manually instead of wait for it to be called by read() when the ring buffer is full.
          *
          */
-        //? This should be done more efficiently maybe?
-        //? Implement a variant for iterators?
         void archiveValidBufferParts() {
             FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "Archiving data from ring buffer to long term storage";
-            for (index_t i = 0; i < this->ringBuffer.size(SIZE_SPECIFIER::PARTS); i++) {
-                auto tmp = std::vector<T>();
-                tmp.resize(this->ringBuffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
-                auto dataStored = this->ringBuffer.readToVector(tmp, this->ringBuffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
-                if (dataStored) {
-                    longTermStorage.push_back(tmp);
-                }
+            longTermStorage.reserve(longTermStorage.size() + this->ringBuffer.size(SIZE_SPECIFIER::PARTS) * this->ringBuffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
+            for (index_t i = 0; i < this->ringBuffer.size(SIZE_SPECIFIER::PARTS); ++i) {
+                this->ringBuffer.read(std::back_inserter(longTermStorage));
             }
         }
 
         /**
          * @brief Return the archive.
          *
-         * @return std::vector<std::vector<T>>
+         * @return Finn::vector<T>
          */
-        std::vector<std::vector<T>> retrieveArchive() {
-            std::vector<std::vector<T>> tmp = longTermStorage;
+        Finn::vector<T> retrieveArchive() {
+            Finn::vector<T> tmp(longTermStorage);
             clearArchive();
             return tmp;
         }
 
         /**
-         * @brief Clear the archive of all it's entries by resizing it to 0.
+         * @brief Clear the archive of all it's entries
          *
          */
-        void clearArchive() { longTermStorage.resize(0); }
+        void clearArchive() { longTermStorage.clear(); }
 
         /**
          * @brief Read the specified number of samples. If a read fails, immediately return. If all are successfull, the kernel state of the last run is returned
@@ -413,18 +408,25 @@ namespace Finn {
             }
             return temp;
         }
-        void testSetMap(const std::vector<T>& data) {
-            if (data.size() != this->mapSize) {
+
+        template<typename IteratorType>
+        void testSetMap(IteratorType first, IteratorType last) {
+            if (std::distance(first, last) != this->mapSize) {
                 FinnUtils::logAndError<std::length_error>("Error setting test map. Sizes dont match");
             }
-            for (unsigned int i = 0; i < data.size(); i++) {
-                this->map[i] = data[i];
+            for (unsigned int i = 0; i < std::distance(first, last); ++i) {
+                this->map[i] = first[i];
             }
         }
+
+        void testSetMap(const std::vector<T>& data) { testSetMap(data.begin(), data.end()); }
+
+        void testSetMap(const Finn::vector<T>& data) { testSetMap(data.begin(), data.end()); }
+
         unsigned int testGetLongTermStorageSize() const { return longTermStorage.size(); }
         xrt::bo& testGetInternalBO() { return this->interalBo; }
         RingBuffer<T>& testGetRingBuffer() { return this->ringBuffer; }
-        std::vector<std::vector<uint8_t>>& testGetLTS() { return longTermStorage; }
+        Finn::vector<uint8_t>& testGetLTS() { return longTermStorage; }
 #endif
     };
 }  // namespace Finn

@@ -227,7 +227,7 @@ class RingBuffer {
      * @return true
      * @return false
      */
-    bool storeFast(const std::vector<T>& data) {
+    bool storeFast(const Finn::vector<T>& data) {
         index_t indexP = 0;
         auto bufferSize = buffer.size();
         index_t lElementIndex = headPart * elementsPerPart;
@@ -308,45 +308,45 @@ class RingBuffer {
         return false;
     }
 
+    // /**
+    //  * @brief Read the ring buffer and write out the first valid entry into the provided storage container. If no valid part is found, false is returned
+    //  *
+    //  * @attention Invalidates the read data!
+    //  *
+    //  * @param outData
+    //  * @param datasize
+    //  * @return true
+    //  * @return false
+    //  */
+    // bool readToVector(std::vector<T>& outData /*, size_t datasize*/) { return read<std::vector<T>&>(outData /*, datasize*/); }
+
+    // /**
+    //  * @brief Read the ring buffer and write out the first valid entry into the provided storage container. If no valid part is found, false is returned
+    //  *
+    //  * @attention Invalidates the read data!
+    //  *
+    //  * @param outData
+    //  * @param datasize
+    //  * @return true
+    //  * @return false
+    //  */
+    // bool readToArray(T* outData /*, size_t datasize*/) { return read<T*>(outData /*, datasize*/); }
+
+    //  private:
     /**
      * @brief Read the ring buffer and write out the first valid entry into the provided storage container. If no valid part is found, false is returned
-     *
-     * @attention Invalidates the read data!
-     *
-     * @param outData
-     * @param datasize
-     * @return true
-     * @return false
-     */
-    bool readToVector(std::vector<T>& outData, size_t datasize) { return read<std::vector<T>&>(outData, datasize); }
-
-    /**
-     * @brief Read the ring buffer and write out the first valid entry into the provided storage container. If no valid part is found, false is returned
-     *
-     * @attention Invalidates the read data!
-     *
-     * @param outData
-     * @param datasize
-     * @return true
-     * @return false
-     */
-    bool readToArray(T* outData, size_t datasize) { return read<T*>(outData, datasize); }
-
-     private:
-    /**
-     * @brief Private internal read method called by the two variants in the public namespace
      *
      * @tparam C
      * @param outData
-     * @param datasize
      * @return true
      * @return false
      */
-    template<typename C>
-    bool read(C outData, size_t datasize) {
-        if (datasize != elementsPerPart) {
-            FinnUtils::logAndError<std::length_error>("Size mismatch when reading vector from Ring Buffer (got " + std::to_string(datasize) + ", expected " + std::to_string(elementsPerPart) + ")!");
-        }
+    // TODO(linusjun): Iterator concepts
+    template<typename IteratorType>
+    bool read(IteratorType outputIt /*, size_t datasize*/) {
+        // if (datasize != elementsPerPart) {
+        //     FinnUtils::logAndError<std::length_error>("Size mismatch when reading vector from Ring Buffer (got " + std::to_string(datasize) + ", expected " + std::to_string(elementsPerPart) + ")!");
+        // }
         index_t indexP = 0;
         for (unsigned int i = 0; i < parts; ++i) {
             indexP = (readPart + i) % parts;
@@ -354,12 +354,12 @@ class RingBuffer {
                 //! Only now set mutex. Even if the spot just became free during the loop we'll take it, but now data has to be preserved.
                 std::lock_guard<std::mutex> guardPartMutex(*partMutexes[indexP]);
                 std::lock_guard<std::mutex> guardHeadMutex(headPartMutex);
-                for (size_t j = 0; j < elementsPerPart; ++j) {
-                    outData[j] = buffer[elementIndex(indexP, j)];
+                for (size_t j = 0; j < elementsPerPart; ++j, ++outputIt) {
+                    *outputIt = buffer[elementIndex(indexP, j)];
                 }
                 validParts[indexP] = false;
                 readPart = (indexP + 1) % parts;
-                assert((outData[0] == buffer[indexP * elementsPerPart + 0]));
+                assert((outputIt[0] == buffer[indexP * elementsPerPart + 0]));
                 return true;
             }
         }

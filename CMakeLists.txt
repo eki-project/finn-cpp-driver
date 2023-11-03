@@ -129,6 +129,7 @@ set(FINNC_ENABLE_TESTING "Build all tests (default is ON)" ON)
 FetchContent_MakeAvailable(googletest googlebenchmark)
 include(cmake/AddUnittest.cmake)
 include(cmake/AddBenchmark.cmake)
+include(cmake/AddIntegrationtest.cmake)
 
 enable_testing()
 set(ENV{GTEST_OUTPUT} "json")
@@ -138,12 +139,9 @@ if (FINNC_ENABLE_TESTING)
   add_subdirectory(unittests)
   message(STATUS "Finn C++ benchmarks:")
   add_subdirectory(benchmarks)
+  message(STATUS "Finn C++ integrationtests:")
+  add_subdirectory(integrationtest)
 endif()
-
-
-
-# Add integration tests
-add_subdirectory(integrationtest)
 
 #Compiler Options
 add_library(finnc_options INTERFACE)

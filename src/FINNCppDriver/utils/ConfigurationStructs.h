@@ -20,6 +20,7 @@
 #include <memory>
 #include <nlohmann/json.hpp>
 #include <string>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -165,6 +166,14 @@ namespace Finn {
         }
         return config;
     }
+
+    inline std::tuple<shape_t, shape_t, shape_t> getConfigShapes(const Config& conf, uint device = 0, uint dma = 0) {
+        auto myShapeNormal = (*std::dynamic_pointer_cast<Finn::ExtendedBufferDescriptor>(conf.deviceWrappers.at(device).idmas.at(dma))).normalShape;
+        auto myShapeFolded = (*std::dynamic_pointer_cast<Finn::ExtendedBufferDescriptor>(conf.deviceWrappers[device].idmas[dma])).foldedShape;
+        auto myShapePacked = (*std::dynamic_pointer_cast<Finn::ExtendedBufferDescriptor>(conf.deviceWrappers[device].idmas[dma])).packedShape;
+        return {myShapeNormal, myShapeFolded, myShapePacked};
+    }
+
 
 }  // namespace Finn
 

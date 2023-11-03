@@ -66,6 +66,18 @@ namespace Finn {
 #endif
         };
 
+        BaseDriver(const std::filesystem::path& configPath, uint hostBufferSize, uint inputDeviceIndex, const std::string& inputKernelName, uint outputDeviceIndex, const std::string& outputKernelName, uint batchSize, bool pForceAchieval)
+            : configuration(createConfigFromPath(configPath)),
+              logger(Logger::getLogger()),
+              defaultInputDeviceIndex(inputDeviceIndex),
+              defaultInputKernelName(inputKernelName),
+              defaultOutputDeviceIndex(outputDeviceIndex),
+              defaultOutputKernelName(outputKernelName),
+              batchElements(batchSize),
+              forceAchieval(pForceAchieval) {
+            accelerator = Accelerator(configuration.deviceWrappers, hostBufferSize);
+        }
+
         /**
          * @brief Create a new base driver based on an existing configuration
          *

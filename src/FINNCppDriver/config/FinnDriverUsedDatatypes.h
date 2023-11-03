@@ -6,5 +6,5 @@ using InputFinnType = Finn::DatatypeInt<2>;
 using OutputFinnType = Finn::DatatypeBinary;
 
 namespace Finn {
-    using Driver = Finn::BaseDriver<InputFinnType, OutputFinnType, uint8_t>;
+    using Driver = Finn::BaseDriver<InputFinnType, OutputFinnType>;
 }  // namespace Finn

@@ -15,13 +15,11 @@
 
 #include <FINNCppDriver/utils/Types.h>
 
-#include <cctype>
 #include <fstream>
 #include <memory>
 #include <nlohmann/json.hpp>
 #include <string>
 #include <utility>
-#include <variant>
 #include <vector>
 
 using json = nlohmann::json;
@@ -37,6 +35,7 @@ namespace nlohmann {
                 j = nullptr;
             }
         }
+
         // NOLINTNEXTLINE
         static void from_json(const json& j, std::shared_ptr<T>& opt) {
             if (j.is_null()) {

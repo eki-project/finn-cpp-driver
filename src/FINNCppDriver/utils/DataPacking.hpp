@@ -19,14 +19,10 @@
 
 #include <FINNCppDriver/utils/AlignedAllocator.hpp>
 #include <FINNCppDriver/utils/FinnDatatypes.hpp>
-#include <FINNCppDriver/utils/join.hpp>
 #include <algorithm>
-#include <bit>
 #include <concepts>
 #include <cstdint>
-#include <iostream>
 #include <iterator>
-#include <vector>
 
 namespace Finn {
     /**
@@ -174,7 +170,7 @@ namespace Finn {
          * @tparam IteratorType
          * @param first iterator pointing to first element of input
          * @param last iterator pointing to last element of input
-         * @return Finn::vector<std::bitset<U().bitwidth()>> vector of bitsets containing bit representations of inputs
+         * @return Finn::vector<UnpackingAutoRetType::UnsignedRetType<U>> vector of bitsets containing bit representations of inputs
          */
         template<IsDatatype U, bool invertBytes = true, bool reverseBits = true, typename IteratorType>
         Finn::vector<UnpackingAutoRetType::UnsignedRetType<U>> toBitsetImpl(IteratorType first, IteratorType last) {
@@ -215,7 +211,7 @@ namespace Finn {
      * @tparam IteratorType
      * @param first iterator pointing to first element of input
      * @param last iterator pointing to last element of input
-     * @return Finn::vector<std::bitset<U().bitwidth()>> vector of bitsets containing bit representations of inputs
+     * @return Finn::vector<UnpackingAutoRetType::UnsignedRetType<U>> vector of bitsets containing bit representations of inputs
      */
     template<IsDatatype U, bool invertBytes = true, bool reverseBits = true, typename IteratorType, typename = std::enable_if_t<std::is_integral<typename std::iterator_traits<IteratorType>::value_type>::value>>
     Finn::vector<UnpackingAutoRetType::UnsignedRetType<U>> toBitset(IteratorType first, IteratorType last) {
@@ -242,7 +238,7 @@ namespace Finn {
      * @tparam reverseBits Flag to reverse bit direction
      * @tparam V
      * @param input Vector to be converted to vector of bitset
-     * @return Finn::vector<std::bitset<U().bitwidth()>> vector of bitsets containing bit representations of inputs
+     * @return Finn::vector<UnpackingAutoRetType::UnsignedRetType<U>> vector of bitsets containing bit representations of inputs
      */
     template<IsDatatype U, bool invertBytes = true, bool reverseBits = true, std::integral V>
     Finn::vector<UnpackingAutoRetType::UnsignedRetType<U>> toBitset(Finn::vector<V>& input) {

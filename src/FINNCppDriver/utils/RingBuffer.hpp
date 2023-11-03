@@ -297,7 +297,6 @@ class RingBuffer {
      * @return true
      * @return false
      */
-    // TODO(linusjun): Iterator concepts
     template<typename IteratorType>
     bool read(IteratorType outputIt) {
         index_t indexP = 0;

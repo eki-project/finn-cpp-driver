@@ -23,6 +23,7 @@
 #include <memory>
 #include <stdexcept>
 #include <system_error>
+#include <cerrno>
 
 
 namespace fs = std::filesystem;
@@ -42,10 +43,10 @@ namespace Finn {
     void DeviceHandler::checkDeviceWrapper(const DeviceWrapper& devWrap) {
         // Execute tests on filepath for xclbin in release mode!
         if (devWrap.xclbin.empty()) {
-            throw fs::filesystem_error("Empty filepath to xclbin. Abort.", std::error_code());
+            throw fs::filesystem_error("Empty filepath to xclbin. Abort.", std::error_code(ENOENT, std::generic_category()));
         }
         if (!fs::exists(devWrap.xclbin) || !fs::is_regular_file(devWrap.xclbin)) {
-            throw fs::filesystem_error("File " + std::string(devWrap.xclbin.c_str()) + " not found. Abort.", std::error_code());
+            throw fs::filesystem_error("File " + std::string(fs::absolute(devWrap.xclbin).c_str()) + " not found. Abort.", std::error_code(ENOENT, std::generic_category()));
         }
         if (devWrap.idmas.empty()) {
             throw std::invalid_argument("Empty input kernel list. Abort.");

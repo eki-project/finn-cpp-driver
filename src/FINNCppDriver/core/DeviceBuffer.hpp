@@ -82,6 +82,18 @@ namespace Finn {
         DeviceBuffer& operator=(DeviceBuffer&& buf) = delete;
         DeviceBuffer& operator=(const DeviceBuffer& buf) = delete;
 
+        /**
+         * @brief Return the size of the buffer as specified by the argument. Bytes returns all bytes the buffer takes up, elements returns the number of T-values, numbers the number of F-values.
+         *
+         * @param ss
+         * @return size_t
+         */
+        size_t size(SIZE_SPECIFIER ss) { 
+            if (ss==SIZE_SPECIFIER::VALUES_PER_INPUT){
+                return FinnUtils::shapeToElements(this->shapePacked);
+            }
+            return this->ringBuffer.size(ss); }
+
 
          protected:
         /**
@@ -101,7 +113,7 @@ namespace Finn {
 
 
     template<typename T>
-    class DeviceInputBuffer : DeviceBuffer<T> {
+    class DeviceInputBuffer : public  DeviceBuffer<T> {
         std::mutex runMutex;
         const IO ioMode = IO::INPUT;
         bool executeAutomatically = false;
@@ -180,9 +192,9 @@ namespace Finn {
          * @return false
          */
         bool store(const Finn::vector<T>& data) {
-            if (data.size() % this->ringBuffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART) != 0) {
-                FinnUtils::logAndError<std::runtime_error>("Tried to store uncomplete batch. The input data is not a multiple size of element in a batch.");
-            }
+            // if (data.size() % this->ringBuffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART) != 0) {
+            //     FinnUtils::logAndError<std::runtime_error>("Tried to store uncomplete batch. The input data is not a multiple size of element in a batch.");
+            // }
             return this->ringBuffer.template store<Finn::vector<T>>(data, data.size());
         }
 
@@ -241,14 +253,6 @@ namespace Finn {
             return true;
         }
 
-        /**
-         * @brief Return the size of the buffer as specified by the argument. Bytes returns all bytes the buffer takes up, elements returns the number of T-values, numbers the number of F-values.
-         *
-         * @param ss
-         * @return size_t
-         */
-        size_t size(SIZE_SPECIFIER ss) { return this->ringBuffer.size(ss); }
-
 
 #ifdef UNITTEST
         Finn::vector<T> testGetMap() {
@@ -265,7 +269,7 @@ namespace Finn {
     };
 
     template<typename T>
-    class DeviceOutputBuffer : DeviceBuffer<T> {
+    class DeviceOutputBuffer : public  DeviceBuffer<T> {
         const IO ioMode = IO::OUTPUT;
         // std::vector<std::vector<T>> longTermStorage;
         Finn::vector<T> longTermStorage;
@@ -345,11 +349,20 @@ namespace Finn {
          * @note This function can be executed manually instead of wait for it to be called by read() when the ring buffer is full.
          *
          */
+        //TODO(linusjun): This can be optimised. Why loop through all parts here and in read too? Just dont return after the first found part and return all valid ones at once.
+        //TODO(linusjun): Also, read should only return elementsCount number of values per part, the remaining values are unused anyway.
         void archiveValidBufferParts() {
             FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "Archiving data from ring buffer to long term storage";
-            longTermStorage.reserve(longTermStorage.size() + this->ringBuffer.size(SIZE_SPECIFIER::PARTS) * this->ringBuffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
+            static const std::size_t elementsCount = FinnUtils::shapeToElements(this->shapePacked);
+            longTermStorage.reserve(longTermStorage.size() + this->ringBuffer.size(SIZE_SPECIFIER::PARTS) * elementsCount);
+            Finn::vector<uint8_t> tmp;
+            tmp.reserve((this->ringBuffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART)));
             for (index_t i = 0; i < this->ringBuffer.size(SIZE_SPECIFIER::PARTS); ++i) {
-                this->ringBuffer.read(std::back_inserter(longTermStorage));
+                if(!this->ringBuffer.read(std::back_inserter(tmp))){
+                    continue;
+                }
+                std::copy(tmp.begin(), tmp.begin() + static_cast<long int>(elementsCount),std::back_inserter(longTermStorage));
+                tmp.clear();
             }
         }
 
@@ -392,14 +405,6 @@ namespace Finn {
             }
             return outExecuteResult;
         }
-
-        /**
-         * @brief Return the size of the buffer as specified by the argument. Bytes returns all bytes the buffer takes up, elements returns the number of T-values, numbers the number of F-values.
-         *
-         * @param ss
-         * @return size_t
-         */
-        size_t size(SIZE_SPECIFIER ss) { return this->ringBuffer.size(ss); }
 
 
 #ifdef UNITTEST

@@ -126,7 +126,7 @@ TEST_F(DBTest, DBOutputTest) {
 
     // LTS Allocation
     outputBuffer.allocateLongTermStorage(100);
-    EXPECT_EQ(outputBuffer.testGetLTS().capacity(), 100);
+    EXPECT_EQ(outputBuffer.testGetLTS().capacity(), 100 * outputBuffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
 
     // Test that timeout is set to a good default value
     EXPECT_EQ(outputBuffer.getMsExecuteTimeout(), 1000);
@@ -154,25 +154,26 @@ TEST_F(DBTest, DBLTSTest) {
     // Expected: Buffer was full at max capacity. All entries were valid and put into the LTS, and the two new entries are in the buffer
     EXPECT_FALSE(outputBuffer.testGetRingBuffer().isFull());
     EXPECT_EQ(outputBuffer.testGetRingBuffer().countValidParts(), 2);
-    EXPECT_EQ(outputBuffer.testGetLTS().size(), outputBuffer.size(SIZE_SPECIFIER::PARTS));
+    EXPECT_EQ(outputBuffer.testGetLTS().size(), outputBuffer.size(SIZE_SPECIFIER::PARTS) * outputBuffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
 
     // Check integrity of data
     auto results = outputBuffer.retrieveArchive();
-    // for (unsigned int i = 0; i < results.size(); i++) {
-    //     EXPECT_EQ(results[i], storedDatas[i]);
-    // }
+    auto startIt = results.begin();
+    for (unsigned int i = 0; i < results.size() / outputBuffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART); i++) {
+        EXPECT_TRUE(
+            std::equal(startIt + (i * static_cast<long int>(outputBuffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART))), startIt + ((i + 1) * static_cast<long int>(outputBuffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART))), storedDatas[i].begin()));
+    }
 
     // Check the data that is still in the buffer
-    // EXPECT_EQ(storedDatas[outputBuffer.size(SIZE_SPECIFIER::PARTS)], outputBuffer.testGetRingBuffer().testGetAsVector(0));
-    // EXPECT_EQ(storedDatas[outputBuffer.size(SIZE_SPECIFIER::PARTS) + 1], outputBuffer.testGetRingBuffer().testGetAsVector(1));
-    EXPECT_TRUE(false);
+    EXPECT_EQ(storedDatas[outputBuffer.size(SIZE_SPECIFIER::PARTS)], outputBuffer.testGetRingBuffer().testGetAsVector(0));
+    EXPECT_EQ(storedDatas[outputBuffer.size(SIZE_SPECIFIER::PARTS) + 1], outputBuffer.testGetRingBuffer().testGetAsVector(1));
 
     // Check that the LTS was cleared
     EXPECT_EQ(outputBuffer.testGetLTS().size(), 0);
 
     // Manual transfer to LTS
     outputBuffer.archiveValidBufferParts();
-    EXPECT_EQ(outputBuffer.testGetLTS().size(), 2);
+    EXPECT_EQ(outputBuffer.testGetLTS().size(), 2 * outputBuffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
     EXPECT_EQ(outputBuffer.testGetRingBuffer().countValidParts(), 0);
 }
 

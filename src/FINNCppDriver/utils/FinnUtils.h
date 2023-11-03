@@ -262,34 +262,6 @@ namespace FinnUtils {
 #endif
     }
 
-    template<typename T>
-    class ptr_iterator {
-        using iterator = ptr_iterator<T>;
-        using iterator_category = std::forward_iterator_tag;
-        using difference_type = std::ptrdiff_t;
-        using value_type = T;
-        using pointer = T*;    // or also value_type*
-        using reference = T&;  // or also value_type&
-
-        pointer pos;
-
-         public:
-        ptr_iterator() : pos(nullptr) {}
-        ptr_iterator(T* v) : pos(v) {}
-        ~ptr_iterator() {}
-
-        iterator operator++(int) /* postfix */ { return pos++; }
-        iterator& operator++() /* prefix */ {
-            ++pos;
-            return *this;
-        }
-        reference operator*() { return *pos; }
-        pointer operator->() { return pos; }
-        iterator operator+(difference_type v) { return pos + v; }
-        friend bool operator==(const iterator& a, const iterator& b) { return a.pos == b.pos; };
-        friend bool operator!=(const iterator& a, const iterator& b) { return a.pos != b.pos; };
-    };
-
 }  // namespace FinnUtils
 
 #endif

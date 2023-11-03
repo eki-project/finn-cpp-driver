@@ -187,61 +187,32 @@ class RingBuffer {
      * @return true
      * @return false Returned if either no spot is found, or two threads tried writing to the same spot in the buffer. This results in ONE thread successfully writing the data and the other failing to do so, returning false here.
      */
-    template<typename C>
+    template<typename C, typename = std::enable_if_t<std::is_same<C, T*>::value || std::is_same<C, Finn::vector<T>>::value>>
     bool store(const C data, size_t datasize) {
-        if constexpr (std::is_same<C, T*>::value || std::is_same<C, std::vector<T>>::value) {
-            if (datasize != elementsPerPart) {
-                FinnUtils::logAndError<std::length_error>("Size mismatch when storing vector in Ring Buffer (got " + std::to_string(datasize) + ", expected " + std::to_string(elementsPerPart) + ")!");
-            }
-            index_t indexP = 0;
-            for (unsigned int i = 0; i < parts; ++i) {
-                indexP = (headPart + i) % parts;
-                if (!validParts[indexP]) {
-                    //! Only now set mutex. Even if the spot just became free during the loop we'll take it, but now data has to be preserved.
-                    std::lock_guard<std::mutex> guardPartMutex(*partMutexes[indexP]);
-                    std::lock_guard<std::mutex> guardHeadMutex(headPartMutex);
-                    std::lock_guard<std::mutex> guardValidPartMutex(validPartMutex);
-
-                    //? Check again if part is still free to avoid collision of 2 threads. Maybe solve this by acquiring validPartMutex before searching?
-                    if (validParts[indexP]) {
-                        return false;
-                    }
-                    for (size_t j = 0; j < datasize; ++j) {
-                        buffer[elementIndex(indexP, j)] = data[j];
-                    }
-                    validParts[indexP] = true;
-                    headPart = (indexP + 1) % parts;
-                    assert((buffer[indexP * elementsPerPart + 0] == data[0]));
-                    return true;
-                }
-            }
+        if (datasize != elementsPerPart) {
+            FinnUtils::logAndError<std::length_error>("Size mismatch when storing vector in Ring Buffer (got " + std::to_string(datasize) + ", expected " + std::to_string(elementsPerPart) + ")!");
         }
-        return false;
-    }
-
-    /**
-     * @brief This does the same as store(), but does _not_ check on the length of the passed vector and does NOT provide mutexes (i.e. thread safety)
-     * @attention This function is NOT THEAD SAFE!
-     *
-     * @param data
-     * @return true
-     * @return false
-     */
-    bool storeFast(const Finn::vector<T>& data) {
         index_t indexP = 0;
-        auto bufferSize = buffer.size();
-        index_t lElementIndex = headPart * elementsPerPart;
         for (unsigned int i = 0; i < parts; ++i) {
             indexP = (headPart + i) % parts;
             if (!validParts[indexP]) {
-                for (size_t j = 0; j < data.size(); ++j) {
-                    buffer[lElementIndex++] = data[j];
+                //! Only now set mutex. Even if the spot just became free during the loop we'll take it, but now data has to be preserved.
+                std::lock_guard<std::mutex> guardPartMutex(*partMutexes[indexP]);
+                std::lock_guard<std::mutex> guardHeadMutex(headPartMutex);
+                std::lock_guard<std::mutex> guardValidPartMutex(validPartMutex);
+
+                //? Check again if part is still free to avoid collision of 2 threads. Maybe solve this by acquiring validPartMutex before searching?
+                if (validParts[indexP]) {
+                    return false;
+                }
+                for (size_t j = 0; j < datasize; ++j) {
+                    buffer[elementIndex(indexP, j)] = data[j];
                 }
                 validParts[indexP] = true;
                 headPart = (indexP + 1) % parts;
+                assert((buffer[indexP * elementsPerPart + 0] == data[0]));
                 return true;
             }
-            lElementIndex = (lElementIndex + elementsPerPart) % bufferSize;
         }
         return false;
     }
@@ -277,6 +248,16 @@ class RingBuffer {
     }
 
     /**
+     * @brief This does the same as store(), but does _not_ check on the length of the passed vector and does NOT provide mutexes (i.e. thread safety)
+     * @attention This function is NOT THEAD SAFE!
+     *
+     * @param data
+     * @return true
+     * @return false
+     */
+    bool storeFast(const Finn::vector<T>& data) { return storeFast(data.begin(), data.end()); }
+
+    /**
      * @brief Searches from the position of the head pointer to the first free (invalid data) spot and stores the data, setting the head pointer to this point+1. If no free spot is found, fase is returned
      *
      * @param data
@@ -308,31 +289,6 @@ class RingBuffer {
         return false;
     }
 
-    // /**
-    //  * @brief Read the ring buffer and write out the first valid entry into the provided storage container. If no valid part is found, false is returned
-    //  *
-    //  * @attention Invalidates the read data!
-    //  *
-    //  * @param outData
-    //  * @param datasize
-    //  * @return true
-    //  * @return false
-    //  */
-    // bool readToVector(std::vector<T>& outData /*, size_t datasize*/) { return read<std::vector<T>&>(outData /*, datasize*/); }
-
-    // /**
-    //  * @brief Read the ring buffer and write out the first valid entry into the provided storage container. If no valid part is found, false is returned
-    //  *
-    //  * @attention Invalidates the read data!
-    //  *
-    //  * @param outData
-    //  * @param datasize
-    //  * @return true
-    //  * @return false
-    //  */
-    // bool readToArray(T* outData /*, size_t datasize*/) { return read<T*>(outData /*, datasize*/); }
-
-    //  private:
     /**
      * @brief Read the ring buffer and write out the first valid entry into the provided storage container. If no valid part is found, false is returned
      *
@@ -343,10 +299,7 @@ class RingBuffer {
      */
     // TODO(linusjun): Iterator concepts
     template<typename IteratorType>
-    bool read(IteratorType outputIt /*, size_t datasize*/) {
-        // if (datasize != elementsPerPart) {
-        //     FinnUtils::logAndError<std::length_error>("Size mismatch when reading vector from Ring Buffer (got " + std::to_string(datasize) + ", expected " + std::to_string(elementsPerPart) + ")!");
-        // }
+    bool read(IteratorType outputIt) {
         index_t indexP = 0;
         for (unsigned int i = 0; i < parts; ++i) {
             indexP = (readPart + i) % parts;
@@ -369,10 +322,10 @@ class RingBuffer {
 
 #ifdef UNITTEST
      public:
-    std::vector<T> testGetAsVector(index_t partIndex) {
-        std::vector<T> temp;
+    Finn::vector<T> testGetAsVector(index_t partIndex) {
+        Finn::vector<T> temp;
         for (size_t i = 0; i < elementsPerPart; i++) {
-            temp.push_back(buffer[elementIndex(partIndex, i)]);
+            temp.emplace_back(buffer[elementIndex(partIndex, i)]);
         }
         return temp;
     }

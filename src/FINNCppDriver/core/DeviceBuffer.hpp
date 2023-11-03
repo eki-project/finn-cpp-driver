@@ -170,7 +170,7 @@ namespace Finn {
          * @return true
          * @return false
          */
-        bool loadMap() { return this->ringBuffer.read(FinnUtils::ptr_iterator(this->map)); }
+        bool loadMap() { return this->ringBuffer.read(this->map); }
 
         /**
          * @brief Store the given vector of data in the ring buffer
@@ -180,7 +180,9 @@ namespace Finn {
          * @return false
          */
         bool store(const Finn::vector<T>& data) {
-            // TODO(bwintermann): Enable support to write multiple parts from one vector, which has then to be a multiple of elementsPerPart large
+            if (data.size() % this->ringBuffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART) != 0) {
+                FinnUtils::logAndError<std::runtime_error>("Tried to store uncomplete batch. The input data is not a multiple size of element in a batch.");
+            }
             return this->ringBuffer.template store<Finn::vector<T>>(data, data.size());
         }
 

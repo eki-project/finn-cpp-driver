@@ -469,8 +469,8 @@ namespace Finn {
 
             for (std::size_t index = 0; index < elementsInInput; ++index) {
                 const std::size_t lowerBit = index * bitwidth;
-                const std::size_t lowerBorderByte = lowerBit / 8;                // Intentionally rounding down
-                const std::size_t upperBorderByte = (index + 1) * bitwidth / 8;  // Intentionally rounding down
+                const std::size_t lowerBorderByte = lowerBit / 8;                   // Intentionally rounding down
+                const std::size_t upperBorderByte = (lowerBit + bitwidth - 1) / 8;  // Intentionally rounding down
                 const std::size_t numBytes = upperBorderByte - lowerBorderByte + 1;
                 const std::size_t shiftOffset = lowerBit - (lowerBorderByte * 8);
 

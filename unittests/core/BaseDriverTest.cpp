@@ -76,15 +76,9 @@ TEST_F(BaseDriverTest, BasicBaseDriverTest) {
 }
 
 TEST_F(BaseDriverTest, syncInferenceTest) {
-    auto filler = FinnUtils::BufferFiller(0, 255);
     auto driver = Finn::Driver(unittestConfig, hostBufferSize, 0, inputDmaName, 0, outputDmaName, 1, 1);
 
-    Finn::vector<uint8_t> data;
-    Finn::vector<uint8_t> backupData;
-    data.resize(driver.size(SIZE_SPECIFIER::ELEMENTS_PER_PART, 0, inputDmaName));
-
-    filler.fillRandom(data.begin(), data.end());
-    backupData = data;
+    Finn::vector<uint8_t> data(driver.size(SIZE_SPECIFIER::ELEMENTS_PER_PART, 0, inputDmaName), 1);
 
     // Setup fake output data
     driver.getDeviceHandler(0).getOutputBuffer(outputDmaName).testSetMap(data);
@@ -92,12 +86,15 @@ TEST_F(BaseDriverTest, syncInferenceTest) {
     // Run inference
     auto results = driver.inferSynchronous(data.begin(), data.end());
 
+    Finn::vector<uint8_t> expected(driver.size(SIZE_SPECIFIER::ELEMENTS_PER_PART, 0, inputDmaName) * 8, 0);
 
-    // // Checks: That input and output data is the same is just for convenience, in application this does not need to be
-    // // Check output process
-    // EXPECT_EQ(results[0], data);
-    // // Check input process
-    // EXPECT_EQ(driver.getDeviceHandler(0).getInputBuffer(inputDmaName).testGetMap(), data);
+    for (std::size_t i = 0; i < expected.size(); ++i) {
+        if (i % 8 == 0) {
+            expected[i] = 1;
+        }
+    }
+
+    EXPECT_EQ(results, expected);
 }
 
 int main(int argc, char** argv) {

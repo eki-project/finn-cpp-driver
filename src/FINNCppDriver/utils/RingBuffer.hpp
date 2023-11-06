@@ -318,6 +318,36 @@ class RingBuffer {
         return false;
     }
 
+    /**
+     * @brief Read the ring buffer and write out the valid entries into the provided storage container. If no valid part is found, false is returned
+     *
+     * @tparam C
+     * @param outData
+     * @return true
+     * @return false
+     */
+    template<typename IteratorType>
+    bool readAllValidParts(IteratorType outputIt, uint valuesPerElement) {
+        index_t indexP = 0;
+        bool ret = false;
+        for (unsigned int i = 0; i < parts; ++i) {
+            indexP = (readPart + i) % parts;
+            if (validParts[indexP]) {
+                //! Only now set mutex. Even if the spot just became free during the loop we'll take it, but now data has to be preserved.
+                std::lock_guard<std::mutex> guardPartMutex(*partMutexes[indexP]);
+                std::lock_guard<std::mutex> guardHeadMutex(headPartMutex);
+                for (size_t j = 0; j < valuesPerElement; ++j, ++outputIt) {
+                    *outputIt = buffer[elementIndex(indexP, j)];
+                }
+                validParts[indexP] = false;
+                readPart = (indexP + 1) % parts;
+                assert((outputIt[0] == buffer[indexP * elementsPerPart + 0]));
+                ret = true;
+            }
+        }
+        return ret;
+    }
+
 
 #ifdef UNITTEST
      public:

@@ -88,11 +88,12 @@ namespace Finn {
          * @param ss
          * @return size_t
          */
-        size_t size(SIZE_SPECIFIER ss) { 
-            if (ss==SIZE_SPECIFIER::VALUES_PER_INPUT){
+        size_t size(SIZE_SPECIFIER ss) {
+            if (ss == SIZE_SPECIFIER::VALUES_PER_INPUT) {
                 return FinnUtils::shapeToElements(this->shapePacked);
             }
-            return this->ringBuffer.size(ss); }
+            return this->ringBuffer.size(ss);
+        }
 
 
          protected:
@@ -113,7 +114,7 @@ namespace Finn {
 
 
     template<typename T>
-    class DeviceInputBuffer : public  DeviceBuffer<T> {
+    class DeviceInputBuffer : public DeviceBuffer<T> {
         std::mutex runMutex;
         const IO ioMode = IO::INPUT;
         bool executeAutomatically = false;
@@ -269,7 +270,7 @@ namespace Finn {
     };
 
     template<typename T>
-    class DeviceOutputBuffer : public  DeviceBuffer<T> {
+    class DeviceOutputBuffer : public DeviceBuffer<T> {
         const IO ioMode = IO::OUTPUT;
         // std::vector<std::vector<T>> longTermStorage;
         Finn::vector<T> longTermStorage;
@@ -349,21 +350,16 @@ namespace Finn {
          * @note This function can be executed manually instead of wait for it to be called by read() when the ring buffer is full.
          *
          */
-        //TODO(linusjun): This can be optimised. Why loop through all parts here and in read too? Just dont return after the first found part and return all valid ones at once.
-        //TODO(linusjun): Also, read should only return elementsCount number of values per part, the remaining values are unused anyway.
+        // TODO(linusjun): This can be optimised. Why loop through all parts here and in read too? Just dont return after the first found part and return all valid ones at once.
+        // TODO(linusjun): Also, read should only return elementsCount number of values per part, the remaining values are unused anyway.
         void archiveValidBufferParts() {
             FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "Archiving data from ring buffer to long term storage";
             static const std::size_t elementsCount = FinnUtils::shapeToElements(this->shapePacked);
             longTermStorage.reserve(longTermStorage.size() + this->ringBuffer.size(SIZE_SPECIFIER::PARTS) * elementsCount);
             Finn::vector<uint8_t> tmp;
-            tmp.reserve((this->ringBuffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART)));
-            for (index_t i = 0; i < this->ringBuffer.size(SIZE_SPECIFIER::PARTS); ++i) {
-                if(!this->ringBuffer.read(std::back_inserter(tmp))){
-                    continue;
-                }
-                std::copy(tmp.begin(), tmp.begin() + static_cast<long int>(elementsCount),std::back_inserter(longTermStorage));
-                tmp.clear();
-            }
+            tmp.reserve(this->ringBuffer.size(SIZE_SPECIFIER::PARTS) * elementsCount);
+            this->ringBuffer.readAllValidParts(std::back_inserter(tmp), elementsCount);
+            std::copy(tmp.begin(), tmp.begin() + static_cast<long int>(tmp.size()), std::back_inserter(longTermStorage));
         }
 
         /**

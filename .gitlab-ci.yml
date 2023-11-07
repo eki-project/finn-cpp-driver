@@ -1,0 +1,6 @@
+test:
+  stage: build
+  variables:
+    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 0:05:00"
+  script:
+    - echo "Hello from " $(hostname)

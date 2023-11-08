@@ -27,7 +27,6 @@ build-job:
     - ml devel/Doxygen/1.9.5-GCCcore-12.2.0
     - ml compiler/GCC/12.2.0
     - ml devel/CMake/3.24.3-GCCcore-12.2.0
-    - ./buildDependencies.sh
     - mkdir build && cd build
     - cmake -DCMAKE_BUILD_TYPE=Release ..
     - make -j 64
@@ -50,9 +49,8 @@ run-unittests:
     - ml compiler/GCC/12.2.0
     - ml devel/CMake/3.24.3-GCCcore-12.2.0
     - cd build
-    - ctest --output-on-failure
+    - ctest --output-on-failure --output-junit ctest-results.xml
   artifacts:
     paths:
-      - "build/"
-      - "deps/"
+      - build/ctest-results.xml
     expire_in: 1 week

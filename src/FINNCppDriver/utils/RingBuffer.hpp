@@ -340,7 +340,6 @@ class RingBuffer {
                     *outputIt = buffer[elementIndex(indexP, j)];
                 }
                 validParts[indexP] = false;
-                readPart = (indexP + 1) % parts;
                 assert((outputIt[0] == buffer[indexP * elementsPerPart + 0]));
                 ret = true;
             }

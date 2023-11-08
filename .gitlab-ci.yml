@@ -26,6 +26,7 @@ build-job:
   variables:
     SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 1:00:00 -N 1 -n 1 --cpus-per-task=128"
   script:
+    - ls
     - ml vis/Graphviz/2.50.0-GCCcore-11.2.0
     - ml fpga
     - ml xilinx/xrt/2.14

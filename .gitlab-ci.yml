@@ -2,19 +2,31 @@ stages:
   - build
   - test
 
-build-job:
+build-dependencies:
   stage: build
   variables:
     SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 1:00:00 -N 1 -n 1 --cpus-per-task=128"
   script:
-    - ml
-  #  - ml vis/Graphviz/2.50.0-GCCcore-11.2.0
+    - ml compiler/GCC/12.2.0
+    - ./buildDependencies.sh
+  artifacts:
+    paths:
+      - "deps/"
+    expire_in: 1 week
+
+build-job:
+  stage: build
+  dependencies:
+    - build-dependencies
+  variables:
+    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 1:00:00 -N 1 -n 1 --cpus-per-task=128"
+  script:
+    - ml vis/Graphviz/2.50.0-GCCcore-11.2.0
     - ml fpga
     - ml xilinx/xrt/2.14
     - ml devel/Doxygen/1.9.5-GCCcore-12.2.0
     - ml compiler/GCC/12.2.0
     - ml devel/CMake/3.24.3-GCCcore-12.2.0
-    - ml
     - ./buildDependencies.sh
     - mkdir build && cd build
     - cmake -DCMAKE_BUILD_TYPE=Release ..
@@ -23,26 +35,24 @@ build-job:
   artifacts:
     paths:
       - "build/"
-      - "deps/"
+    expire_in: 1 week
 
 run-unittests:
   stage: test
   dependencies:
     - build-job
+    - build-dependencies
   variables:
     SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 0:30:00 -N 1 -n 1 --cpus-per-task=2 --mem-per-cpu=2G"
   script:
-    #- ml vis/Graphviz/2.50.0-GCCcore-11.2.0
     - ml fpga
     - ml xilinx/xrt/2.14
-    - ml devel/Doxygen/1.9.5-GCCcore-12.2.0
     - ml compiler/GCC/12.2.0
     - ml devel/CMake/3.24.3-GCCcore-12.2.0
-    - ls
     - cd build
-    - ls unittests/core/
     - ctest --output-on-failure
   artifacts:
     paths:
       - "build/"
       - "deps/"
+    expire_in: 1 week

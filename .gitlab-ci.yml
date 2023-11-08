@@ -54,7 +54,7 @@ run-unittests:
     - ml compiler/GCC/12.2.0
     - ml devel/CMake/3.24.3-GCCcore-12.2.0
     - cd build
-    - ctest
+    - ctest --output-on-failure
   artifacts:
     paths:
       - "build/"

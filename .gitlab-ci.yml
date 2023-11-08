@@ -19,7 +19,7 @@ build-job:
     - mkdir build && cd build
     - cmake -DCMAKE_BUILD_TYPE=Release ..
     - make -j 64
-    - ctest --output-on-failure
+    - ctest --output-on-failure || /bin/true
   artifacts:
     paths:
       - "build/"
@@ -57,7 +57,9 @@ run-unittests:
     - ml devel/Doxygen/1.9.5-GCCcore-12.2.0
     - ml compiler/GCC/12.2.0
     - ml devel/CMake/3.24.3-GCCcore-12.2.0
+    - ls
     - cd build
+    - ls unittests/core/
     - ctest --output-on-failure
   artifacts:
     paths:

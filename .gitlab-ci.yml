@@ -36,7 +36,7 @@ build-integrationtests-job:
     - ./buildDependencies.sh
     - mkdir build && cd build
     - cmake -DCMAKE_BUILD_TYPE=Release ..
-    - make Integrationstests -j 64
+    - make Integrationtests -j 64
   artifacts:
     paths:
       - "build/"

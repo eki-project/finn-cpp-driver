@@ -52,11 +52,10 @@ namespace FinnUtils {
 
 
     template<typename T>
-    concept FloatingPoint = std::is_floating_point_v<T> &&(sizeof(T) == 4 || sizeof(T) == 8) &&  // Only 32/64 bit allowed. 80 bit fp not allowed
-                            sizeof(float) == 4 && sizeof(double) == 8 &&                         // float must be 32 bit fp while double must be 64 bit fp
-                            std::numeric_limits<T>::is_iec559&&                                  // Only IEEE 754 fp allowed
-                                std::endian::native
-                                == std::endian::little;
+    concept FloatingPoint = std::is_floating_point_v<T> && (sizeof(T) == 4 || sizeof(T) == 8) &&  // Only 32/64 bit allowed. 80 bit fp not allowed
+                            sizeof(float) == 4 && sizeof(double) == 8 &&                          // float must be 32 bit fp while double must be 64 bit fp
+                            std::numeric_limits<T>::is_iec559 &&                                  // Only IEEE 754  fp allowed
+                            std::endian::native == std::endian::little;
 
     /**
      * @brief Helper function for ceil. Checks if param is inf. Based on https://codereview.stackexchange.com/questions/248169/two-constexpr-ceil-functions

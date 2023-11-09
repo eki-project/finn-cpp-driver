@@ -1,11 +1,9 @@
-A C/C++ Driver for FINN generated accelerators
-==============================================
+# A C/C++ Driver for FINN generated accelerators
 
 [![C++ Standard](https://img.shields.io/badge/C++_Standard-C%2B%2B20-blue.svg?style=flat&logo=c%2B%2B)](https://isocpp.org/)
 [![GitHub license](https://img.shields.io/badge/license-MIT-blueviolet.svg)](LICENSE)
 
-Getting Started
----------------
+## Getting Started
 
 * Install XRT Runtime and development packages [Download](https://www.xilinx.com/support/download/index.html/content/xilinx/en/downloadNav/alveo/u280.html)
 * If you use a non default install directory for XRT (default: ```/opt/xilinx/xrt```) set the XRT env var to your XRT development package installation ```export XILINX_XRT=<path>```.
@@ -20,15 +18,17 @@ make -j $(nprocs)
 ```
 
 ## FINN Pipeline
+
 Doing the build like shown above will produce a build with placeholder configurations. To actually use the driver it has to be compiled for the network it should use.
 During the FINN pipeline (or of course it can also be done manually afterwards), the project has to be compiled.
-The driver requires two types of configurations: 
+The driver requires two types of configurations:
 
 * A header file which defines the type of the driver. The driver depends on which FINN-datatypes are used in the network for input and output, and can run a little faster by optimizing this at compile time
-* A configuration file in the JSON format. This specifies the path to the .xclbin produced by FINN, the devices by their XRT device indices, their inputs and outputs and how they are shaped, which is needed for the folding and packing operations. Note that this is passed during the _runtime_! This means that the location of the xclbin for example does not need to be fixed. 
+* A configuration file in the JSON format. This specifies the path to the .xclbin produced by FINN, the devices by their XRT device indices, their inputs and outputs and how they are shaped, which is needed for the folding and packing operations. Note that this is passed during the _runtime_! This means that the location of the xclbin for example does not need to be fixed.
 
-If you ever need help on which arguments the driver requires, simply use the ```--help``` flag on the driver. 
-```
+If you ever need help on which arguments the driver requires, simply use the ```--help``` flag on the driver.
+
+```console
 $ ./finn --help
   -h [ --help ]                  Display help
   -m [ --mode ] arg (=test)      Mode of execution (file or test)
@@ -40,25 +40,24 @@ $ ./finn --help
                                  supposed to be
 ```
 
-
 The header file location be passed by letting cmake set the macro
 
-```
+```bash
 FINN_HEADER_LOCATION
 ```
 
-If left undefined, the path will be ```config/FinnDriverUsedDatatypes.h``` (as included from ```./src/FINNDriver.cpp```). 
+If left undefined, the path will be ```config/FinnDriverUsedDatatypes.h``` (as included from ```./src/FINNDriver.cpp```).
 
 For unittest, the used configuration (meaning the runtime-JSON-config) can also be changed (because when running unittests, the JSON is actually needed at compile time). This can be done by setting
 
-```
+```bash
 FINN_CUSTOM_UNITTEST_CONFIG
 ```
 
 If left undefined, the path will be ```../../src/config/exampleConfig.json``` (as included from ```./unittests/core/UnittestConfig.h```).
 
-
 ## Manual Building
+
 ### Getting Started on the N2 Cluster
 
 You will first have to load a few dependencies before being able to build the project:
@@ -96,11 +95,6 @@ Use ```xbutil``` to get information about the cards and configure them manually 
 
 (Project name, resource usage, output filename, xrt version etc. are all examples and to bet set by the user themselves).
 
-## Running Integration Tests
-To run integration tests either use the predefined cmake target, or go into ```integrationtest``` and run ```run_test.sh``` yourself. Note that the script makes certain assumptions on it's environment,
-and it may very well be that you have to tweak it in advance to run it. The script receives the directory in which ```config.json``` and ```finn-accel.xclbin``` reside. After compiling the driver with the specified header, the finished executable will be moved there as well. It is then executed in a special test mode, emitting the input and output data into a file. The shell script then checks if the input and output are equivalent and returns the result. 
-
-__TODO: In the future, this test should be runnable with custom data inputs and outputs__
 ### Setup
 
 ```bash
@@ -108,14 +102,25 @@ __TODO: In the future, this test should be runnable with custom data inputs and 
 export LD_LIBRARY_PATH="$(pwd)/deps/finn_boost/stage/lib/boost/:$LD_LIBRARY_PATH"
 ```
 
+### Developer Documentation
+
+If you want to contribute some changes to the C++ driver for FINN, please make sure you have the pre-commit git hook installed before you commit a pull-request.
+
+It can be installed using the following command:
+
+```shell
+./scripts/install_precommit.sh
+```
+
+Without this precommit hook it is very likely that your code can not be merged, because it is blocked by our linter.
+
 ## TODO
 
 * Check if XRT frees the memory map itself
-* Does XRT ALWAYS take uint8? Even if not should we do it all the same?
 
 ## Structure
 
-```
+```none
 Driver (bjarne)
     Accelerator (linus)
         DeviceHandler<uint8>[] OR DeviceHandler<InputType, OutputType>[] (linus)
@@ -133,13 +138,13 @@ Driver (bjarne)
 
 ### Driver
 
-```
+```cpp
 entrypoint?()
 ```
 
 ### DeviceHandler
 
-```
+```cpp
 DeviceHandler()
 initializeDevice()
 initializerDeviceBuffers()
@@ -152,7 +157,7 @@ syncBuffers() (vlt. mehrere)
 
 (only ever write from ringBuffer, never manually!)
 
-```
+```cpp
 Flag: IS_INPUT_OR_OUTPUT
 (Iterator für BOMap)
 fillBOMapRandom()
@@ -176,7 +181,7 @@ clear()
 * utils: Utility functions and objects
 * utils - types.h: Enums and usings
 
-```
+```none
 src
     FinnDriverUsercode.cpp
     config

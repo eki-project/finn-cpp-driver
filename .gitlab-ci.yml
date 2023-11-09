@@ -68,7 +68,9 @@ lint:
     - ml lang
     - ml Python/3.10.4-GCCcore-11.3.0
     - command -v clang-format >/dev/null 2>&1 || pip3 install --user clang-format
-    - find . \( -name \*.cpp -o -name \*.h -o -name \*.hpp \) -print0 | xargs -0 -n 1 /pc2/users/e/ekiappci/.local/bin/clang-format -style=file --Werror -n --verbose
+    - find ./src \( -name \*.cpp -o -name \*.h -o -name \*.hpp \) -print0 | xargs -0 -n 1 /pc2/users/e/ekiappci/.local/bin/clang-format -style=file --Werror -n --verbose
+    - find ./unittests \( -name \*.cpp -o -name \*.h -o -name \*.hpp \) -print0 | xargs -0 -n 1 /pc2/users/e/ekiappci/.local/bin/clang-format -style=file --Werror -n --verbose
+    - find ./benchmarks \( -name \*.cpp -o -name \*.h -o -name \*.hpp \) -print0 | xargs -0 -n 1 /pc2/users/e/ekiappci/.local/bin/clang-format -style=file --Werror -n --verbose
 
 run-unittests:
   stage: test

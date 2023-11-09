@@ -94,6 +94,7 @@ run-integrationtests:
     - ml xilinx/xrt/2.14
     - ml compiler/GCC/12.2.0
     - ml devel/CMake/3.24.3-GCCcore-12.2.0
+    - cp example_networks/identity_net/* build/integrationtest
     - cd build/integrationtest
     - ./SyncInference
 

@@ -49,6 +49,12 @@ class TestDriver : public Finn::Driver {
                                  bool forceArchival) {
         return inferRaw(data, inputDeviceIndex, inputBufferKernelName, outputDeviceIndex, outputBufferKernelName, samples, forceArchival);
     }
+
+    template<typename IterType>
+    Finn::vector<uint8_t> inferR(IterType first, IterType last, unsigned int inputDeviceIndex, const std::string& inputBufferKernelName, unsigned int outputDeviceIndex, const std::string& outputBufferKernelName, unsigned int samples,
+                                 bool forceArchival) {
+        return inferRaw(first, last, inputDeviceIndex, inputBufferKernelName, outputDeviceIndex, outputBufferKernelName, samples, forceArchival);
+    }
 };
 
 TEST_F(BaseDriverTest, BasicBaseDriverTest) {
@@ -66,20 +72,22 @@ TEST_F(BaseDriverTest, BasicBaseDriverTest) {
     driver.getDeviceHandler(0).getOutputBuffer(outputDmaName).testSetMap(data);
 
     // Run inference
-    auto results = driver.inferR(data, 0, inputDmaName, 0, outputDmaName, 1, 1);
+    auto results = driver.inferR(data.begin(), data.begin() + 80, 0, inputDmaName, 0, outputDmaName, 1, 1);
 
-    Finn::vector<uint8_t> base(data.begin(), data.begin() + driver.size(SIZE_SPECIFIER::VALUES_PER_INPUT, 0, outputDmaName));
+    Finn::vector<uint8_t> base(data.begin(), data.begin() + static_cast<long int>(driver.size(SIZE_SPECIFIER::VALUES_PER_INPUT, 0, outputDmaName)));
 
 
     // Checks: That input and output data is the same is just for convenience, in application this does not need to be
     // Check output process
+    EXPECT_EQ(results.size(), base.size());
     EXPECT_EQ(results, base);
     // Check input process
-    EXPECT_EQ(driver.getDeviceHandler(0).getInputBuffer(inputDmaName).testGetMap(), data);
+    auto testMap = driver.getDeviceHandler(0).getInputBuffer(inputDmaName).testGetMap();
+    EXPECT_TRUE(std::equal(testMap.begin(), testMap.begin() + 80, data.begin()));
 }
 
 TEST_F(BaseDriverTest, syncInferenceTest) {
-    auto driver = Finn::Driver(unittestConfig, hostBufferSize, 0, inputDmaName, 0, outputDmaName, 1, 1);
+    auto driver = Finn::Driver(unittestConfig, hostBufferSize, 0, inputDmaName, 0, outputDmaName, 1, true);
 
     Finn::vector<uint8_t> data(driver.size(SIZE_SPECIFIER::ELEMENTS_PER_PART, 0, inputDmaName), 1);
 
@@ -87,7 +95,7 @@ TEST_F(BaseDriverTest, syncInferenceTest) {
     driver.getDeviceHandler(0).getOutputBuffer(outputDmaName).testSetMap(data);
 
     // Run inference
-    auto results = driver.inferSynchronous(data.begin(), data.end());
+    auto results = driver.inferSynchronous(data.begin(), data.begin() + static_cast<long int>(driver.size(SIZE_SPECIFIER::VALUES_PER_INPUT, 0, inputDmaName) * 4 /*Needed because the input is interpreted as int2 and packed*/));
 
     Finn::vector<uint8_t> expected(driver.size(SIZE_SPECIFIER::VALUES_PER_INPUT, 0, outputDmaName) * 8, 0);
 

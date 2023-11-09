@@ -23,6 +23,7 @@
 #include <cinttypes>  // for uint8_t
 #include <filesystem>
 #include <fstream>
+#include <iostream>
 #include <iterator>
 #include <memory>
 
@@ -190,10 +191,10 @@ namespace Finn {
         size_t size(SIZE_SPECIFIER ss, uint deviceIndex, const std::string& bufferName) { return accelerator.size(ss, deviceIndex, bufferName); }
 
         template<typename IteratorType, typename V = Finn::UnpackingAutoRetType::AutoRetType<S>>
-        Finn::vector<V> inferSynchronous(IteratorType first, IteratorType last, uint inputDeviceIndex, const std::string& inputBufferKernelName, uint outputDeviceIndex, const std::string& outputBufferKernelName, uint samples,
+        Finn::vector<V> inferSynchronous(IteratorType first, IteratorType last, uint inputDeviceIndex, const std::string& inputBufferKernelName, uint outputDeviceIndex, const std::string& outputBufferKernelName, uint batchSize,
                                          bool forceArchival) {
             auto packed = Finn::pack<F>(first, last);
-            auto result = inferRaw(packed.begin(), packed.end(), inputDeviceIndex, inputBufferKernelName, outputDeviceIndex, outputBufferKernelName, samples, forceArchival);
+            auto result = inferRaw(packed.begin(), packed.end(), inputDeviceIndex, inputBufferKernelName, outputDeviceIndex, outputBufferKernelName, batchSize, forceArchival);
             return unpack<S, V>(result);
         }
 
@@ -203,8 +204,8 @@ namespace Finn {
         }
 
         template<typename U, typename V = Finn::UnpackingAutoRetType::AutoRetType<S>>
-        Finn::vector<V> inferSynchronous(const Finn::vector<U>& data, uint inputDeviceIndex, const std::string& inputBufferKernelName, uint outputDeviceIndex, const std::string& outputBufferKernelName, uint samples, bool forceArchival) {
-            return inferSynchronous(data.begin(), data.end(), inputDeviceIndex, inputBufferKernelName, outputDeviceIndex, outputBufferKernelName, samples, forceAchieval);
+        Finn::vector<V> inferSynchronous(const Finn::vector<U>& data, uint inputDeviceIndex, const std::string& inputBufferKernelName, uint outputDeviceIndex, const std::string& outputBufferKernelName, uint batchSize, bool forceArchival) {
+            return inferSynchronous(data.begin(), data.end(), inputDeviceIndex, inputBufferKernelName, outputDeviceIndex, outputBufferKernelName, batchSize, forceArchival);
         }
 
         template<typename U, typename V = Finn::UnpackingAutoRetType::AutoRetType<S>>
@@ -229,15 +230,21 @@ namespace Finn {
          * @param inputBufferKernelName
          * @param outputDeviceIndex
          * @param outputBufferKernelName
-         * @param samples
+         * @param batchSize
          * @param forceArchival If true, the data gets written to LTS either way, ensuring that there is data to be read!
          * @return Finn::vector<uint8_t>
          */
         template<typename IteratorType>
-        [[nodiscard]] Finn::vector<uint8_t> inferRaw(IteratorType first, IteratorType last, uint inputDeviceIndex, const std::string& inputBufferKernelName, uint outputDeviceIndex, const std::string& outputBufferKernelName, uint samples,
+        [[nodiscard]] Finn::vector<uint8_t> inferRaw(IteratorType first, IteratorType last, uint inputDeviceIndex, const std::string& inputBufferKernelName, uint outputDeviceIndex, const std::string& outputBufferKernelName, uint batchSize,
                                                      bool forceArchival) {
             FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "Starting inference (raw data)";
             auto storeFunc = accelerator.storeFactory(inputDeviceIndex, inputBufferKernelName);
+
+            if (std::abs(std::distance(first, last)) != size(SIZE_SPECIFIER::VALUES_PER_INPUT, inputDeviceIndex, inputBufferKernelName) * batchSize) {
+                FinnUtils::logAndError<std::runtime_error>("Input length (" + std::to_string(std::abs(std::distance(first, last))) + ") does not match up with batches*inputsize_per_batch (" +
+                                                           std::to_string(size(SIZE_SPECIFIER::VALUES_PER_INPUT, inputDeviceIndex, inputBufferKernelName)) + "*" + std::to_string(batchSize) + "=" +
+                                                           std::to_string(size(SIZE_SPECIFIER::VALUES_PER_INPUT, inputDeviceIndex, inputBufferKernelName) * batchSize) + ")");
+            }
 
             bool stored = storeFunc(first, last);
             bool ran = accelerator.run(inputDeviceIndex, inputBufferKernelName);
@@ -249,7 +256,7 @@ namespace Finn {
 
             if (stored && ran) {
                 FINN_LOG_DEBUG(logger, loglevel::info) << "Reading out buffers";
-                ert_cmd_state resultState = accelerator.read(outputDeviceIndex, outputBufferKernelName, samples);
+                ert_cmd_state resultState = accelerator.read(outputDeviceIndex, outputBufferKernelName, 1 /*Maybe this can be used to put more than one batch element on the FPGA, ignored for now.*/);
 
                 // If the kernel run is completed (success or by timeout (more reads than were in the pipeline)), return the data
                 if (resultState == ERT_CMD_STATE_COMPLETED || resultState == ERT_CMD_STATE_TIMEOUT || resultState == ERT_CMD_STATE_NEW) {
@@ -271,13 +278,13 @@ namespace Finn {
          * @param inputBufferKernelName
          * @param outputDeviceIndex
          * @param outputBufferKernelName
-         * @param samples
+         * @param batchSize
          * @param forceArchival If true, the data gets written to LTS either way, ensuring that there is data to be read!
          * @return Finn::vector<uint8_t>
          */
-        [[nodiscard]] Finn::vector<uint8_t> inferRaw(const Finn::vector<uint8_t>& data, uint inputDeviceIndex, const std::string& inputBufferKernelName, uint outputDeviceIndex, const std::string& outputBufferKernelName, uint samples,
+        [[nodiscard]] Finn::vector<uint8_t> inferRaw(const Finn::vector<uint8_t>& data, uint inputDeviceIndex, const std::string& inputBufferKernelName, uint outputDeviceIndex, const std::string& outputBufferKernelName, uint batchSize,
                                                      bool forceArchival) {
-            return inferRaw(data.begin(), data.end(), inputDeviceIndex, inputBufferKernelName, outputDeviceIndex, outputBufferKernelName, samples, forceArchival);
+            return inferRaw(data.begin(), data.end(), inputDeviceIndex, inputBufferKernelName, outputDeviceIndex, outputBufferKernelName, batchSize, forceArchival);
         }
 
         /**
@@ -290,12 +297,12 @@ namespace Finn {
          * @param inputBufferKernelName
          * @param outputDeviceIndex
          * @param outputBufferKernelName
-         * @param samples
+         * @param batchSize
          * @param forceArchival
          * @return Finn::vector<uint8_t>
          */
         template<typename IteratorType>
-        [[nodiscard]] Finn::vector<uint8_t> infer(IteratorType first, IteratorType last, uint inputDeviceIndex, const std::string& inputBufferKernelName, uint outputDeviceIndex, const std::string& outputBufferKernelName, uint samples,
+        [[nodiscard]] Finn::vector<uint8_t> infer(IteratorType first, IteratorType last, uint inputDeviceIndex, const std::string& inputBufferKernelName, uint outputDeviceIndex, const std::string& outputBufferKernelName, uint batchSize,
                                                   bool forceArchival) {
             FINN_LOG_DEBUG(logger, loglevel::info) << "Starting inference";
             bool stored = accelerator.store(first, last, inputDeviceIndex, inputBufferKernelName);
@@ -303,7 +310,7 @@ namespace Finn {
             bool ran = accelerator.run(inputDeviceIndex, inputBufferKernelName);
             if (stored && ran) {
                 FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "Reading out buffers";
-                ert_cmd_state resultState = accelerator.read(outputDeviceIndex, outputBufferKernelName, samples);
+                ert_cmd_state resultState = accelerator.read(outputDeviceIndex, outputBufferKernelName, 1);
 
                 // If the kernel run is completed (success or by timeout (more reads than were in the pipeline)), return the data
                 if (resultState == ERT_CMD_STATE_COMPLETED || resultState == ERT_CMD_STATE_TIMEOUT || resultState == ERT_CMD_STATE_NEW) {
@@ -324,13 +331,13 @@ namespace Finn {
          * @param inputBufferKernelName
          * @param outputDeviceIndex
          * @param outputBufferKernelName
-         * @param samples
+         * @param batchSize
          * @param forceArchival
          * @return std::vector<std::vector<uint8_t>>
          */
         [[nodiscard]] std::vector<std::vector<uint8_t>> infer(const std::vector<uint8_t>& data, uint inputDeviceIndex, const std::string& inputBufferKernelName, uint outputDeviceIndex, const std::string& outputBufferKernelName,
-                                                              uint samples, bool forceArchival) {
-            return infer(data.begin(), data.end(), inputDeviceIndex, inputBufferKernelName, outputDeviceIndex, outputBufferKernelName, samples, forceArchival);
+                                                              uint batchSize, bool forceArchival) {
+            return infer(data.begin(), data.end(), inputDeviceIndex, inputBufferKernelName, outputDeviceIndex, outputBufferKernelName, batchSize, forceArchival);
         }
 
 #ifdef UNITTEST

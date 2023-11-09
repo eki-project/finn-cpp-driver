@@ -1,6 +1,8 @@
 #include "xrt_kernel.h"
-#include "../ert.h"
+
 #include <iostream>
+
+#include "../ert.h"
 
 namespace xrt {
     kernel::kernel(const xrt::device& device, const xrt::uuid& xclbin_id, const std::string& name, cu_access_mode mode) {
@@ -18,7 +20,5 @@ namespace xrt {
     ert_cmd_state run::state() { return ERT_CMD_STATE_COMPLETED; }
 
 
-    std::string kernel::get_name() const {
-        return "testkernel";
-    }
+    std::string kernel::get_name() const { return "testkernel"; }
 }  // namespace xrt

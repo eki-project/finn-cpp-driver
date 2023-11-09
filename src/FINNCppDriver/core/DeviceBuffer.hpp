@@ -350,8 +350,6 @@ namespace Finn {
          * @note This function can be executed manually instead of wait for it to be called by read() when the ring buffer is full.
          *
          */
-        // TODO(linusjun): This can be optimised. Why loop through all parts here and in read too? Just dont return after the first found part and return all valid ones at once.
-        // TODO(linusjun): Also, read should only return elementsCount number of values per part, the remaining values are unused anyway.
         void archiveValidBufferParts() {
             FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "Archiving data from ring buffer to long term storage";
             static const std::size_t elementsCount = FinnUtils::shapeToElements(this->shapePacked);

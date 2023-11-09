@@ -5,21 +5,21 @@
 #include <memory>
 #include <vector>
 
+#include "../ert.h"
 #include "../experimental/xclbin.h"
+#include "xrt_bo.h"
 #include "xrt_device.h"
 #include "xrt_uuid.h"
-#include "xrt_bo.h"
-#include "../ert.h"
 
 namespace xrt {
 
     class run {
-        public:
+         public:
         run() = default;
         void start();
         void wait();
         void wait(unsigned int);
-        ert_cmd_state state(); 
+        ert_cmd_state state();
     };
 
     /*!
@@ -130,14 +130,9 @@ namespace xrt {
         /// @cond
         // const std::shared_ptr<kernel_impl>& get_handle() const { return handle; }
         /// @endcond
-        run operator()(xrt::bo& buffer) {
-            return run();
-        }
+        run operator()(xrt::bo& buffer) { return run(); }
 
-        run operator()(xrt::bo& buffer, int batchsize) {
-            return run();
-        }
-
+        run operator()(xrt::bo& buffer, int batchsize) { return run(); }
     };
 
 }  // namespace xrt

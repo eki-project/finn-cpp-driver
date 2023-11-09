@@ -65,8 +65,10 @@ lint:
   variables:
     SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 0:30:00 -N 1 -n 1 --cpus-per-task=2 --mem-per-cpu=2G"
   script:
-    - command -v clang-format >/dev/null 2>&1 || { ml lang; ml Python/3.10.4-GCCcore-11.3.0; pip3 install --user clang-format; }
-    - find . \( -name \*.cpp -o -name \*.h -o -name \*.hpp \) -print0 | xargs -0 -n 1 clang-format -style=file --Werror -n --verbose
+    - ml lang
+    - ml Python/3.10.4-GCCcore-11.3.0
+    - command -v clang-format >/dev/null 2>&1 || {pip3 install --user clang-format; }
+    - find . \( -name \*.cpp -o -name \*.h -o -name \*.hpp \) -print0 | xargs -0 -n 1 /pc2/users/e/ekiappci/.local/bin/clang-format -style=file --Werror -n --verbose
 
 run-unittests:
   stage: test

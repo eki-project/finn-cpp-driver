@@ -7,7 +7,6 @@ build-dependencies:
   variables:
     SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 1:00:00 -N 1 -n 1 --cpus-per-task=128"
   script:
-    #- ml vis/Graphviz/2.50.0-GCCcore-11.2.0
     - ml fpga
     - ml xilinx/xrt/2.14
     - ml devel/Doxygen/1.9.5-GCCcore-12.2.0
@@ -34,8 +33,7 @@ build-job:
     - ml devel/CMake/3.24.3-GCCcore-12.2.0
     - mkdir build && cd build
     - cmake -DCMAKE_BUILD_TYPE=Release ..
-    - make -j 64
-    #- ctest --output-on-failure
+    - make -j $procs
   artifacts:
     paths:
       - "build/"
@@ -56,12 +54,19 @@ build-integrationtests:
     - ml devel/CMake/3.24.3-GCCcore-12.2.0
     - mkdir build && cd build
     - cmake -DCMAKE_BUILD_TYPE=Release ..
-    - make Integrationtests -j 64
-    #- ctest --output-on-failure
+    - make Integrationtests -j $procs
   artifacts:
     paths:
       - "build/"
     expire_in: 1 week
+
+lint:
+  stage: test
+  variables:
+    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 0:30:00 -N 1 -n 1 --cpus-per-task=2 --mem-per-cpu=2G"
+  script:
+    - command -v clang-format >/dev/null 2>&1 || { ml lang; ml Python/3.10.4-GCCcore-11.3.0; pip3 install --user clang-format; }
+    - find . \( -name \*.cpp -o -name \*.h -o -name \*.hpp \) -print0 | xargs -0 -n 1 clang-format -style=file --Werror -n --verbose
 
 run-unittests:
   stage: test
@@ -81,6 +86,9 @@ run-unittests:
     paths:
       - build/ctest-results.xml
     expire_in: 1 week
+    reports:
+      junit: build/ctest-results.xml
+
 
 run-integrationtests:
   stage: test

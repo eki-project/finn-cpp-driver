@@ -26,7 +26,6 @@ build-job:
   variables:
     SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 1:00:00 -N 1 -n 1 --cpus-per-task=128"
   script:
-    - ls
     - ml vis/Graphviz/2.50.0-GCCcore-11.2.0
     - ml fpga
     - ml xilinx/xrt/2.14
@@ -36,6 +35,28 @@ build-job:
     - mkdir build && cd build
     - cmake -DCMAKE_BUILD_TYPE=Release ..
     - make -j 64
+    #- ctest --output-on-failure
+  artifacts:
+    paths:
+      - "build/"
+    expire_in: 1 week
+
+build-integrationtests:
+  stage: build
+  needs:
+    - build-dependencies
+  variables:
+    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 1:00:00 -N 1 -n 1 --cpus-per-task=128"
+  script:
+    - ml vis/Graphviz/2.50.0-GCCcore-11.2.0
+    - ml fpga
+    - ml xilinx/xrt/2.14
+    - ml devel/Doxygen/1.9.5-GCCcore-12.2.0
+    - ml compiler/GCC/12.2.0
+    - ml devel/CMake/3.24.3-GCCcore-12.2.0
+    - mkdir build && cd build
+    - cmake -DCMAKE_BUILD_TYPE=Release ..
+    - make Integrationtests -j 64
     #- ctest --output-on-failure
   artifacts:
     paths:
@@ -60,3 +81,19 @@ run-unittests:
     paths:
       - build/ctest-results.xml
     expire_in: 1 week
+
+run-integrationtests:
+ stage: test
+  dependencies:
+    - build-integrationtests
+    - build-dependencies
+  variables:
+    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p fpga  -t 0:30:00 --constraint=xilinx_u280_xrt2.14"
+  script:
+    - ml fpga
+    - ml xilinx/xrt/2.14
+    - ml compiler/GCC/12.2.0
+    - ml devel/CMake/3.24.3-GCCcore-12.2.0
+    - cd build/integrationtest
+    - ./SyncInference
+

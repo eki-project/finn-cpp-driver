@@ -83,7 +83,7 @@ run-unittests:
     expire_in: 1 week
 
 run-integrationtests:
- stage: test
+  stage: test
   dependencies:
     - build-integrationtests
     - build-dependencies

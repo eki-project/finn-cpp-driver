@@ -18,12 +18,12 @@
 #include <xrt/xrt_kernel.h>              // for kernel
 
 #include <boost/cstdint.hpp>  // for uint8_t
+#include <cerrno>
 #include <chrono>
 #include <iosfwd>
 #include <memory>
 #include <stdexcept>
 #include <system_error>
-#include <cerrno>
 
 
 namespace fs = std::filesystem;

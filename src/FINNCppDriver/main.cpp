@@ -1,5 +1,4 @@
 #include <algorithm>
 #include <iostream>
 
-int main() {
-}
+int main() {}

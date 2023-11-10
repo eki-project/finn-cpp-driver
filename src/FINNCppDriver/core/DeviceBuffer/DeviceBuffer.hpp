@@ -137,7 +137,7 @@ namespace Finn {
 
         template<typename InputIt>
         bool store(InputIt first, InputIt last) {
-            // return static_cast<const D*>(this)->template storeImpl<InputIt>(first, last);
+            // TODO(linusjun): benchmark and possibly replace iterator interface with span
             auto ptr = dynamic_cast<SyncDeviceInputBuffer<T>*>(this);
             if (ptr) {
                 return ptr->template storeImpl<InputIt>(first, last);
@@ -169,6 +169,7 @@ namespace Finn {
          private:
         template<typename InputIt>
         static bool storeImpl(InputIt first, InputIt last) {
+            FinnUtils::logAndError<std::runtime_error>("Base Implementation called! This should not happen.");
             return false;
         }
 

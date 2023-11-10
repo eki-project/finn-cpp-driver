@@ -108,5 +108,8 @@ run-integrationtests:
     - ml devel/CMake/3.24.3-GCCcore-12.2.0
     - cp example_networks/identity_net/* build/integrationtest
     - cd build/integrationtest
+    - xbutil reset -d 0000:a1:00.1
+    - xbutil reset -d 0000:81:00.1
+    - xbutil reset -d 0000:01:00.1
     - ./SyncInference
 

@@ -14,6 +14,7 @@
 #define SYNCDEVICEBUFFERS
 
 #include <FINNCppDriver/core/DeviceBuffer/DeviceBuffer.hpp>
+#include <FINNCppDriver/utils/join.hpp>
 
 #include "ert.h"
 
@@ -56,6 +57,10 @@ namespace Finn {
         template<typename InputIt>
         bool storeImpl(InputIt first, InputIt last) {
             static_assert(std::is_same<typename std::iterator_traits<InputIt>::value_type, T>::value);
+#ifdef UNITTEST
+            Finn::vector<int> data(first, last);
+            FINN_LOG(this->logger, loglevel::info) << "Data to FPGA:" << join(data, ",") << "\n";
+#endif
             return this->ringBuffer.storeFast(first, last);
         }
 

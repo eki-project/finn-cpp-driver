@@ -19,11 +19,11 @@
 
 namespace Finn {
     template<typename T>
-    class SyncDeviceInputBuffer : public DeviceInputBuffer<T> {
+    class AsyncDeviceInputBuffer : public DeviceInputBuffer<T> {
         std::mutex runMutex;
 
          public:
-        SyncDeviceInputBuffer(const std::string& pName, xrt::device& device, xrt::kernel& pAssociatedKernel, const shapePacked_t& pShapePacked, unsigned int ringBufferSizeFactor)
+        AsyncDeviceInputBuffer(const std::string& pName, xrt::device& device, xrt::kernel& pAssociatedKernel, const shapePacked_t& pShapePacked, unsigned int ringBufferSizeFactor)
             : DeviceInputBuffer<T>(pName, device, pAssociatedKernel, pShapePacked, ringBufferSizeFactor){};
         /**
          * @brief Move Constructor
@@ -33,12 +33,12 @@ namespace Finn {
          */
         //! NOT THREAD SAFE
         // cppcheck-suppress missingMemberCopy
-        SyncDeviceInputBuffer(SyncDeviceInputBuffer&& buf) noexcept : DeviceInputBuffer<T>(buf.name, buf.shapePacked, buf.mapSize, buf.internalBo, buf.associatedKernel, buf.map, buf.ringBuffer){};
+        AsyncDeviceInputBuffer(AsyncDeviceInputBuffer&& buf) noexcept : DeviceInputBuffer<T>(buf.name, buf.shapePacked, buf.mapSize, buf.internalBo, buf.associatedKernel, buf.map, buf.ringBuffer){};
 
-        SyncDeviceInputBuffer(const SyncDeviceInputBuffer& buf) noexcept = delete;
-        ~SyncDeviceInputBuffer() override = default;
-        SyncDeviceInputBuffer& operator=(SyncDeviceInputBuffer&& buf) = delete;
-        SyncDeviceInputBuffer& operator=(const SyncDeviceInputBuffer& buf) = delete;
+        AsyncDeviceInputBuffer(const AsyncDeviceInputBuffer& buf) noexcept = delete;
+        ~AsyncDeviceInputBuffer() override = default;
+        AsyncDeviceInputBuffer& operator=(AsyncDeviceInputBuffer&& buf) = delete;
+        AsyncDeviceInputBuffer& operator=(const AsyncDeviceInputBuffer& buf) = delete;
 
          private:
         friend class DeviceInputBuffer<T>;
@@ -87,9 +87,9 @@ namespace Finn {
     };
 
     template<typename T>
-    class SyncDeviceOutputBuffer : public DeviceOutputBuffer<T> {
+    class AsyncDeviceOutputBuffer : public DeviceOutputBuffer<T> {
          public:
-        SyncDeviceOutputBuffer(const std::string& pName, xrt::device& device, xrt::kernel& pAssociatedKernel, const shapePacked_t& pShapePacked, unsigned int ringBufferSizeFactor)
+        AsyncDeviceOutputBuffer(const std::string& pName, xrt::device& device, xrt::kernel& pAssociatedKernel, const shapePacked_t& pShapePacked, unsigned int ringBufferSizeFactor)
             : DeviceOutputBuffer<T>(pName, device, pAssociatedKernel, pShapePacked, ringBufferSizeFactor){};
 
          public:

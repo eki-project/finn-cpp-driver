@@ -263,9 +263,11 @@ namespace Finn {
                     return accelerator.retrieveResults(outputDeviceIndex, outputBufferKernelName, forceArchival);
                 } else {
                     FinnUtils::logAndError<std::runtime_error>("Unspecifiable error during inference (ert_cmd_state is " + std::to_string(resultState) + ")!");
+                    return {};
                 }
             } else {
                 FinnUtils::logAndError<std::runtime_error>("Data either couldnt be stored or there was no data to execute!");
+                return {};
             }
         }
 
@@ -317,9 +319,11 @@ namespace Finn {
                     return accelerator.retrieveResults(outputDeviceIndex, outputBufferKernelName, forceArchival);
                 } else {
                     FinnUtils::logAndError<std::runtime_error>("Unspecifiable error during inference (ert_cmd_state is " + std::to_string(resultState) + ")!");
+                    return {};
                 }
             } else {
                 FinnUtils::logAndError<std::runtime_error>("Data either couldnt be stored or there was no data to execute!");
+                return {};
             }
         }
 

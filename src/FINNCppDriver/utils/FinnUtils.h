@@ -198,17 +198,6 @@ namespace FinnUtils {
         FINN_LOG(logger, loglevel::info) << str;
     }
 
-    /**
-     * @brief First log the message as an error into the logger, then throw the passed error!
-     *
-     * @tparam E
-     * @param msg
-     */
-    template<typename E>
-    [[noreturn]] void logAndError(const std::string& msg) {
-        FINN_LOG(Logger::getLogger(), loglevel::error) << msg;
-        throw E(msg);
-    }
 
     /**
      * @brief Calculates the number of elements in a tensor given its shape.
@@ -259,6 +248,18 @@ namespace FinnUtils {
         __assume(false);
     #endif
 #endif
+    }
+
+    /**
+     * @brief First log the message as an error into the logger, then throw the passed error!
+     *
+     * @tparam E
+     * @param msg
+     */
+    template<typename E>
+    [[noreturn]] void logAndError(const std::string& msg) {
+        FINN_LOG(Logger::getLogger(), loglevel::error) << msg;
+        throw E(msg);
     }
 
 }  // namespace FinnUtils

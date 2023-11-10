@@ -17,7 +17,7 @@
 #include <FINNCppDriver/utils/Types.h>
 
 #include <FINNCppDriver/core/BaseDriver.hpp>
-#include <FINNCppDriver/core/DeviceBuffer.hpp>
+#include <FINNCppDriver/core/DeviceBuffer/SyncDeviceBuffers.hpp>
 #include <FINNCppDriver/utils/FinnDatatypes.hpp>
 #include <FINNCppDriver/utils/join.hpp>
 

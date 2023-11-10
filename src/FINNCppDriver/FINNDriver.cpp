@@ -20,12 +20,13 @@
 #include <thread>
 
 // Helper
+#include <FINNCppDriver/utils/Logger.h>
+
+#include <FINNCppDriver/core/BaseDriver.hpp>
+#include <FINNCppDriver/core/DeviceBuffer/SyncDeviceBuffers.hpp>
+#include <FINNCppDriver/utils/FinnDatatypes.hpp>
 #include <boost/program_options.hpp>
 
-#include "core/BaseDriver.hpp"
-#include "core/DeviceBuffer.hpp"
-#include "utils/FinnDatatypes.hpp"
-#include "utils/Logger.h"
 
 // Created by FINN during compilation
 // Use the default testing Driver type when none is specified. Normally this is set by the FINN compiler and available together with the xclbin.

@@ -18,6 +18,7 @@
 #include <FINNCppDriver/utils/Types.h>                 // for shape_t
 #include <xrt/xrt_uuid.h>                              // for uuid
 
+#include <FINNCppDriver/core/DeviceBuffer/SyncDeviceBuffers.hpp>
 #include <cstddef>        // for size_t
 #include <cstdint>        // for uint8_t
 #include <filesystem>     // for path
@@ -28,7 +29,6 @@
 #include <utility>        // for shared_ptr
 #include <vector>         // for vector
 
-#include "DeviceBuffer.hpp"  // for DeviceInputBuffer, DeviceOutputBuffer
 #include "ert.h"
 #include "xrt/xrt_device.h"  // for device
 

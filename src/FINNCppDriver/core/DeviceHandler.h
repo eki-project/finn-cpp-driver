@@ -64,13 +64,13 @@ namespace Finn {
          * @brief Map containing all DeviceInputBuffers for this device
          *
          */
-        std::unordered_map<std::string, DeviceInputBuffer<uint8_t>> inputBufferMap;
+        std::unordered_map<std::string, std::shared_ptr<DeviceInputBuffer<uint8_t>>> inputBufferMap;
 
         /**
          * @brief Map containing all DeviceOutputBuffers for this device
          *
          */
-        std::unordered_map<std::string, DeviceOutputBuffer<uint8_t>> outputBufferMap;
+        std::unordered_map<std::string, std::shared_ptr<DeviceOutputBuffer<uint8_t>>> outputBufferMap;
 
 
          public:
@@ -127,16 +127,16 @@ namespace Finn {
         /**
          * @brief Get the Input Buffer Map
          *
-         * @return std::unordered_map<std::string, DeviceInputBuffer<uint8_t>>&
+         * @return std::unordered_map<std::string, std::shared_ptr<DeviceInputBuffer<uint8_t>>>&
          */
-        std::unordered_map<std::string, DeviceInputBuffer<uint8_t>>& getInputBufferMap();
+        std::unordered_map<std::string, std::shared_ptr<DeviceInputBuffer<uint8_t>>>& getInputBufferMap();
 
         /**
          * @brief Get the Output Buffer Map
          *
-         * @return std::unordered_map<std::string, DeviceOutputBuffer<uint8_t>>&
+         * @return std::unordered_map<std::string, std::shared_ptr<DeviceOutputBuffer<uint8_t>>>&
          */
-        std::unordered_map<std::string, DeviceOutputBuffer<uint8_t>>& getOutputBufferMap();
+        std::unordered_map<std::string, std::shared_ptr<DeviceOutputBuffer<uint8_t>>>& getOutputBufferMap();
 
 
         /**
@@ -226,7 +226,7 @@ namespace Finn {
             if (!inputBufferMap.contains(inputBufferKernelName)) {
                 FinnUtils::logAndError<std::runtime_error>("Tried accessing kernel/buffer with name " + inputBufferKernelName + " but this kernel / buffer does not exist!");
             }
-            return inputBufferMap.at(inputBufferKernelName).store(first, last);
+            return inputBufferMap.at(inputBufferKernelName)->store(first, last);
         }
 
         //* UNSAFE + REFERENCE
@@ -236,34 +236,24 @@ namespace Finn {
         template<typename IteratorType>
         bool storeUnchecked(IteratorType first, IteratorType last, const std::string& inputBufferKernelName) {
             static_assert(std::is_same<typename std::iterator_traits<IteratorType>::value_type, uint8_t>::value);
-            return inputBufferMap.at(inputBufferKernelName).store(first, last);
-        }
-
-        //* UNSAFE + FAST + REFERENCE
-        bool storeUncheckedFast(const Finn::vector<uint8_t>& data, const std::string& inputBufferKernelName);
-
-        //* UNSAFE + FAST + ITERATOR
-        template<typename IteratorType>
-        bool storeUncheckedFast(IteratorType first, IteratorType last, const std::string& inputBufferKernelName) {
-            static_assert(std::is_same<typename std::iterator_traits<IteratorType>::value_type, uint8_t>::value);
-            return inputBufferMap.at(inputBufferKernelName).storeFast(first, last);
+            return inputBufferMap.at(inputBufferKernelName)->store(first, last);
         }
 
         /**
          * @brief Get an input buffer from this device based on its name
          *
          * @param name
-         * @return DeviceInputBuffer<uint8_t>&
+         * @return std::shared_ptr<DeviceInputBuffer<uint8_t>>&
          */
-        DeviceInputBuffer<uint8_t>& getInputBuffer(const std::string& name);
+        std::shared_ptr<DeviceInputBuffer<uint8_t>>& getInputBuffer(const std::string& name);
 
         /**
          * @brief Get the Output Buffer from this device by its name
          *
          * @param name
-         * @return DeviceOutputBuffer<uint8_t>&
+         * @return std::shared_ptr<DeviceOutputBuffer<uint8_t>>&
          */
-        DeviceOutputBuffer<uint8_t>& getOutputBuffer(const std::string& name);
+        std::shared_ptr<DeviceOutputBuffer<uint8_t>>& getOutputBuffer(const std::string& name);
 
 #ifndef NDEBUG
         /**
@@ -291,11 +281,11 @@ namespace Finn {
          */
         UncheckedStore(DeviceHandler& pDev, const std::string& pInputBufferName) : dev(pDev), inputBufferName(pInputBufferName) {}
 
-        bool operator()(const Finn::vector<uint8_t>& data) { return dev.storeUncheckedFast(data, inputBufferName); }
+        bool operator()(const Finn::vector<uint8_t>& data) { return dev.storeUnchecked(data, inputBufferName); }
 
         template<typename IteratorType>
         bool operator()(IteratorType first, IteratorType last) {
-            return dev.storeUncheckedFast(first, last, inputBufferName);
+            return dev.storeUnchecked(first, last, inputBufferName);
         }
     };
 

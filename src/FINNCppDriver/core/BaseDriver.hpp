@@ -178,7 +178,7 @@ namespace Finn {
          * @param bufferName
          * @return DeviceInputBuffer<uint8_t>
          */
-        DeviceInputBuffer<uint8_t>& getInputBuffer(uint deviceIndex, const std::string& bufferName) { return getDeviceHandler(deviceIndex).getInputBuffer(bufferName); }
+        std::shared_ptr<DeviceInputBuffer<uint8_t>> getInputBuffer(uint deviceIndex, const std::string& bufferName) { return getDeviceHandler(deviceIndex).getInputBuffer(bufferName); }
 
         /**
          * @brief Return the size (type specified by SIZE_SPECIFIER) at the given device at the given buffer
@@ -351,9 +351,9 @@ namespace Finn {
          * @return false
          */
         bool isSyncedDataEquivalent(uint deviceIndex, const std::string& bufferName, const Finn::vector<uint8_t>& data) {
-            DeviceInputBuffer<uint8_t>& devInBuf = getInputBuffer(deviceIndex, bufferName);
-            devInBuf.testSyncBackFromDevice();
-            return devInBuf.testGetMap() == data;
+            auto devInBuf = getInputBuffer(deviceIndex, bufferName);
+            devInBuf->testSyncBackFromDevice();
+            return devInBuf->testGetMap() == data;
         }
 
         /**
@@ -366,17 +366,17 @@ namespace Finn {
                 FINN_LOG(logger, loglevel::info) << "\tDevice Index: " << devHandler.getDeviceIndex();
                 for (auto& keyValuePair : devHandler.getInputBufferMap()) {
                     FINN_LOG(logger, loglevel::info) << "\t\tInput buffers: ";
-                    FINN_LOG(logger, loglevel::info) << "\t\t\tName: " << keyValuePair.second.getName() << " (in hashmap as " << keyValuePair.first << ")";
-                    FINN_LOG(logger, loglevel::info) << "\t\t\tShape packed: " << FinnUtils::shapeToString(keyValuePair.second.getPackedShape());
-                    FINN_LOG(logger, loglevel::info) << "\t\t\tElements of type T (usually uint8_t) per sample: " << keyValuePair.second.size(SIZE_SPECIFIER::ELEMENTS_PER_PART);
-                    FINN_LOG(logger, loglevel::info) << "\t\t\tElements of type T (usually uint8_t) in buffer overall: " << keyValuePair.second.size(SIZE_SPECIFIER::ELEMENTS);
+                    FINN_LOG(logger, loglevel::info) << "\t\t\tName: " << keyValuePair.second->getName() << " (in hashmap as " << keyValuePair.first << ")";
+                    FINN_LOG(logger, loglevel::info) << "\t\t\tShape packed: " << FinnUtils::shapeToString(keyValuePair.second->getPackedShape());
+                    FINN_LOG(logger, loglevel::info) << "\t\t\tElements of type T (usually uint8_t) per sample: " << keyValuePair.second->size(SIZE_SPECIFIER::ELEMENTS_PER_PART);
+                    FINN_LOG(logger, loglevel::info) << "\t\t\tElements of type T (usually uint8_t) in buffer overall: " << keyValuePair.second->size(SIZE_SPECIFIER::ELEMENTS);
                 }
                 for (auto& keyValuePair : devHandler.getOutputBufferMap()) {
                     FINN_LOG(logger, loglevel::info) << "\t\tOutput buffers: ";
-                    FINN_LOG(logger, loglevel::info) << "\t\t\tName: " << keyValuePair.second.getName() << " (in hashmap as " << keyValuePair.first << ")";
-                    FINN_LOG(logger, loglevel::info) << "\t\t\tShape packed: " << FinnUtils::shapeToString(keyValuePair.second.getPackedShape());
-                    FINN_LOG(logger, loglevel::info) << "\t\t\tElements of type T (usually uint8_t) per sample: " << keyValuePair.second.size(SIZE_SPECIFIER::ELEMENTS_PER_PART);
-                    FINN_LOG(logger, loglevel::info) << "\t\t\tElements of type T (usually uint8_t) in buffer overall: " << keyValuePair.second.size(SIZE_SPECIFIER::ELEMENTS);
+                    FINN_LOG(logger, loglevel::info) << "\t\t\tName: " << keyValuePair.second->getName() << " (in hashmap as " << keyValuePair.first << ")";
+                    FINN_LOG(logger, loglevel::info) << "\t\t\tShape packed: " << FinnUtils::shapeToString(keyValuePair.second->getPackedShape());
+                    FINN_LOG(logger, loglevel::info) << "\t\t\tElements of type T (usually uint8_t) per sample: " << keyValuePair.second->size(SIZE_SPECIFIER::ELEMENTS_PER_PART);
+                    FINN_LOG(logger, loglevel::info) << "\t\t\tElements of type T (usually uint8_t) in buffer overall: " << keyValuePair.second->size(SIZE_SPECIFIER::ELEMENTS);
                 }
             }
         }

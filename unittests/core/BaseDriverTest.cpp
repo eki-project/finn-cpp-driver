@@ -69,7 +69,7 @@ TEST_F(BaseDriverTest, BasicBaseDriverTest) {
     backupData = data;
 
     // Setup fake output data
-    driver.getDeviceHandler(0).getOutputBuffer(outputDmaName).testSetMap(data);
+    driver.getDeviceHandler(0).getOutputBuffer(outputDmaName)->testSetMap(data);
 
     // Run inference
     auto results = driver.inferR(data.begin(), data.begin() + 80, 0, inputDmaName, 0, outputDmaName, 1, 1);
@@ -82,7 +82,7 @@ TEST_F(BaseDriverTest, BasicBaseDriverTest) {
     EXPECT_EQ(results.size(), base.size());
     EXPECT_EQ(results, base);
     // Check input process
-    auto testMap = driver.getDeviceHandler(0).getInputBuffer(inputDmaName).testGetMap();
+    auto testMap = driver.getDeviceHandler(0).getInputBuffer(inputDmaName).get()->testGetMap();
     EXPECT_TRUE(std::equal(testMap.begin(), testMap.begin() + 80, data.begin()));
 }
 
@@ -92,7 +92,7 @@ TEST_F(BaseDriverTest, syncInferenceTest) {
     Finn::vector<uint8_t> data(driver.size(SIZE_SPECIFIER::ELEMENTS_PER_PART, 0, inputDmaName), 1);
 
     // Setup fake output data
-    driver.getDeviceHandler(0).getOutputBuffer(outputDmaName).testSetMap(data);
+    driver.getDeviceHandler(0).getOutputBuffer(outputDmaName)->testSetMap(data);
 
     // Run inference
     auto results = driver.inferSynchronous(data.begin(), data.begin() + static_cast<long int>(driver.size(SIZE_SPECIFIER::VALUES_PER_INPUT, 0, inputDmaName) * 4 /*Needed because the input is interpreted as int2 and packed*/));

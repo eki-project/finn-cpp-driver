@@ -14,6 +14,7 @@
 
 #include <FINNCppDriver/core/DeviceBuffer.hpp>
 #include <FINNCppDriver/utils/FinnDatatypes.hpp>
+#include <memory>
 #include <random>
 #include <span>
 
@@ -29,16 +30,14 @@ class DBTest : public ::testing::Test {
      protected:
     xrt::device device;
     xrt::kernel kernel;
-    Finn::DeviceInputBuffer<uint8_t> buffer = Finn::DeviceInputBuffer<uint8_t>("TestBuffer", device, kernel, FinnUnittest::myShapePacked, FinnUnittest::parts);
-    Finn::DeviceOutputBuffer<uint8_t> outputBuffer = Finn::DeviceOutputBuffer<uint8_t>("tester", device, kernel, FinnUnittest::myShapePacked, FinnUnittest::parts);
+    Finn::SyncDeviceInputBuffer<uint8_t> buffer = Finn::SyncDeviceInputBuffer<uint8_t>("TestBuffer", device, kernel, FinnUnittest::myShapePacked, FinnUnittest::parts);
+    Finn::SyncDeviceOutputBuffer<uint8_t> outputBuffer = Finn::SyncDeviceOutputBuffer<uint8_t>("tester", device, kernel, FinnUnittest::myShapePacked, FinnUnittest::parts);
     FinnUtils::BufferFiller filler = FinnUtils::BufferFiller(0, 255);
     std::vector<Finn::vector<uint8_t>> storedDatas;
     Finn::vector<uint8_t> data;
     size_t bufferParts;
     size_t bufferElemPerPart;
     void SetUp() override {
-        // device = xrt::device();
-        kernel = xrt::kernel();
         data.resize(buffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
         bufferParts = buffer.size(SIZE_SPECIFIER::PARTS);
         bufferElemPerPart = buffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART);
@@ -50,26 +49,18 @@ class DBTest : public ::testing::Test {
      * This function uses the data vector to fill the entire rb of type T with random data, based on it's size.
      * storedDatas gets all data used pushed back.
      *
-     * @param fast Whether to use fast store methods (no mutex locking, no length checks)
      * @param ref Whether to use references (true) or iterators (false)
      * @param isInput If true use the input buffer, else the output buffer
      */
-    void fillCompletely(bool fast, bool ref) {
+    void fillCompletely(bool ref) {
         for (size_t i = 0; i < buffer.size(SIZE_SPECIFIER::PARTS); i++) {
             filler.fillRandom(data.begin(), data.end());
             storedDatas.push_back(data);
-            if (fast) {
-                if (ref) {
-                    EXPECT_TRUE(buffer.storeFast(data));
-                } else {
-                    EXPECT_TRUE(buffer.storeFast(data.begin(), data.end()));
-                }
+
+            if (ref) {
+                EXPECT_TRUE(buffer.store(data));
             } else {
-                if (ref) {
-                    EXPECT_TRUE(buffer.store(data));
-                } else {
-                    EXPECT_TRUE(buffer.store(data.begin(), data.end()));
-                }
+                EXPECT_TRUE(buffer.store(data.begin(), data.end()));
             }
         }
     }
@@ -92,30 +83,17 @@ class DBTest : public ::testing::Test {
 
 auto filler = FinnUtils::BufferFiller(0, 255);
 
-TEST_F(DBTest, DBSharedTest) {}
-
 TEST_F(DBTest, DBStoreLoadMapTest) {
     auto initialMapData = buffer.testGetMap();
     //* Test if data is correctly put into the memory buffer
 
-    // Slow + Iterator
-    fillCompletely(false, false);
+    // Iterator
+    fillCompletely(false);
     readAndCompare();
     clearStoredDatas();
 
-
-    // Fast + Iterator
-    fillCompletely(true, false);
-    readAndCompare();
-    clearStoredDatas();
-
-    // Slow + Reference
-    fillCompletely(false, true);
-    readAndCompare();
-    clearStoredDatas();
-
-    // Fast + Reference
-    fillCompletely(true, true);
+    // Reference
+    fillCompletely(true);
     readAndCompare();
     clearStoredDatas();
 }

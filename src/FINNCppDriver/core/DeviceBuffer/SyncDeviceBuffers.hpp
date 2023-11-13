@@ -57,10 +57,10 @@ namespace Finn {
         template<typename InputIt>
         bool storeImpl(InputIt first, InputIt last) {
             static_assert(std::is_same<typename std::iterator_traits<InputIt>::value_type, T>::value);
-#ifdef UNITTEST
-            Finn::vector<int> data(first, last);
-            FINN_LOG(this->logger, loglevel::info) << "Data to FPGA:" << join(data, ",") << "\n";
-#endif
+            // #ifdef UNITTEST
+            //             Finn::vector<int> data(first, last);
+            //             FINN_LOG(this->logger, loglevel::info) << "Data to FPGA:" << join(data, ",") << "\n";
+            // #endif
             return this->ringBuffer.storeFast(first, last);
         }
 
@@ -89,7 +89,7 @@ namespace Finn {
             if (!loadMap()) {
                 return false;
             }
-            sync();
+            this->sync();
             execute();
             return true;
         }
@@ -200,7 +200,7 @@ namespace Finn {
                 if (outExecuteResult == ERT_CMD_STATE_ERROR || outExecuteResult == ERT_CMD_STATE_ABORT) {
                     return outExecuteResult;
                 }
-                sync();
+                this->sync();
                 saveMap();
                 if (this->ringBuffer.isFull()) {
                     archiveValidBufferParts();

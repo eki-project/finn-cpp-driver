@@ -9,7 +9,7 @@ if [ -f ".git/hooks/pre-commit" ]; then
   echo "Moved old pre-commit hook to .git/hooks/pre-commit.backup"
 fi
 
-command -v clang-format >/dev/null 2>&1 || pip3 install --user pre-commit
+command -v pre-commit >/dev/null 2>&1 || pip3 install --user pre-commit
 pre-commit install
 
 mv .git/hooks/pre-commit .git/hooks/pre-commit-internal

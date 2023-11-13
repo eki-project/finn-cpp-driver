@@ -10,7 +10,7 @@ function(add_integrationtest integrationtest_name)
   )
   add_dependencies(Integrationtests ${integrationtest})
 
-  target_compile_definitions(${integrationtest} PRIVATE UNITTEST=1)
+  #target_compile_definitions(${integrationtest} PRIVATE UNITTEST=1)
 
   target_include_directories(${integrationtest} SYSTEM PRIVATE ${XRT_INCLUDE_DIRS} ${FINNC_SRC_DIR})
   target_link_directories(${integrationtest} PRIVATE ${XRT_LIB_CORE_LOCATION} ${XRT_LIB_OCL_LOCATION} ${BOOST_LIBRARYDIR})

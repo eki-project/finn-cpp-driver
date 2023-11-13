@@ -14,10 +14,9 @@
 #include <FINNCppDriver/core/BaseDriver.hpp>
 #include <FINNCppDriver/utils/FinnDatatypes.hpp>
 #include <FINNCppDriver/utils/join.hpp>
+#include <numeric>
 
 #include "gtest/gtest.h"
-
-#include <numeric>
 
 namespace Finn {
     using Driver = BaseDriver<DatatypeInt<8>, DatatypeUInt<16>>;
@@ -33,12 +32,10 @@ TEST(SyncInference, syncInferenceTest) {
 
     std::iota(data.begin(), data.end(), -127);
 
-    //std::cout << "Input Size: " << data.size() << std::endl;
-
     // Run inference
     auto results = driver.inferSynchronous(data.begin(), data.end());
 
-    Finn::vector<uint16_t> expectedResults = {254,510,253,509,252};
+    Finn::vector<uint16_t> expectedResults = {254, 510, 253, 509, 252};
 
     EXPECT_EQ(results, expectedResults);
 }

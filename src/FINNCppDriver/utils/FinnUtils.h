@@ -42,16 +42,19 @@ namespace FinnUtils {
 
         static BufferFiller create(uint8_t min, uint8_t max) { return {min, max}; }
 
-        void fillRandom(std::vector<uint8_t>& vec) {
-            std::transform(vec.begin(), vec.end(), vec.begin(), [this]([[maybe_unused]] uint8_t x) { return sampler(engine); });
+        template<typename IteratorType>
+        void fillRandom(IteratorType first, IteratorType last) {
+            std::transform(first, last, first, [this]([[maybe_unused]] uint8_t x) { return sampler(engine); });
         }
+
+        void fillRandom(std::vector<uint8_t>& vec) { fillRandom(vec.begin(), vec.end()); }
     };
 
 
     template<typename T>
     concept FloatingPoint = std::is_floating_point_v<T> && (sizeof(T) == 4 || sizeof(T) == 8) &&  // Only 32/64 bit allowed. 80 bit fp not allowed
                             sizeof(float) == 4 && sizeof(double) == 8 &&                          // float must be 32 bit fp while double must be 64 bit fp
-                            std::numeric_limits<T>::is_iec559 &&                                  // Only IEEE 754 fp allowed
+                            std::numeric_limits<T>::is_iec559 &&                                  // Only IEEE 754  fp allowed
                             std::endian::native == std::endian::little;
 
     /**
@@ -195,17 +198,6 @@ namespace FinnUtils {
         FINN_LOG(logger, loglevel::info) << str;
     }
 
-    /**
-     * @brief First log the message as an error into the logger, then throw the passed error!
-     *
-     * @tparam E
-     * @param msg
-     */
-    template<typename E>
-    [[noreturn]] void logAndError(const std::string& msg) {
-        FINN_LOG(Logger::getLogger(), loglevel::error) << msg;
-        throw E(msg);
-    }
 
     /**
      * @brief Calculates the number of elements in a tensor given its shape.
@@ -256,6 +248,18 @@ namespace FinnUtils {
         __assume(false);
     #endif
 #endif
+    }
+
+    /**
+     * @brief First log the message as an error into the logger, then throw the passed error!
+     *
+     * @tparam E
+     * @param msg
+     */
+    template<typename E>
+    [[noreturn]] void logAndError(const std::string& msg) {
+        FINN_LOG(Logger::getLogger(), loglevel::error) << msg;
+        throw E(msg);
     }
 
 }  // namespace FinnUtils

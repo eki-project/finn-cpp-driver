@@ -14,12 +14,6 @@
 #define TYPES_H
 
 #include <FINNCppDriver/utils/AlignedAllocator.hpp>
-#include <cctype>
-#include <fstream>
-#include <memory>
-#include <nlohmann/json.hpp>
-#include <string>
-#include <variant>
 #include <vector>
 
 namespace Finn {
@@ -39,13 +33,9 @@ enum class TRANSFER_MODE { MEMORY_BUFFERED = 0, STREAMED = 1, INVALID = -1 };
 
 enum class IO { INPUT = 0, OUTPUT = 1, INOUT = 2, UNSPECIFIED = -1 };  // General purpose, no specific usecase
 
-enum class SIZE_SPECIFIER { BYTES = 0, ELEMENTS = 1, NUMBERS = 2, SAMPLES = 3, PARTS = 4, ELEMENTS_PER_PART = 5, INVALID = -1 };
+enum class SIZE_SPECIFIER { BYTES = 0, ELEMENTS = 1, NUMBERS = 2, SAMPLES = 3, PARTS = 4, ELEMENTS_PER_PART = 5, VALUES_PER_INPUT = 6, INVALID = -1 };
 
 enum class ENDIAN { LITTLE = 0, BIG = 1, UNSPECIFIED = -1 };
-
-// Forward Declarations
-template<typename T>
-struct MemoryMap;
 
 using shapeNormal_t = std::vector<unsigned int>;
 using shapeFolded_t = std::vector<unsigned int>;

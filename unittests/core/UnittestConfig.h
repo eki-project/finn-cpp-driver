@@ -26,7 +26,7 @@
 
 namespace FinnUnittest {
 #ifndef FINN_CUSTOM_UNITTEST_CONFIG
-    const std::string configFilePath = "../../src/config/exampleConfig.json";
+    const std::string configFilePath = "../../src/FINNCppDriver/config/exampleConfig.json";
 #else
     const std::string configFilePath = STRNGFY(FINN_CUSTOM_UNITTEST_CONFIG);
 #endif

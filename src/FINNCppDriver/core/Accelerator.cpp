@@ -54,7 +54,7 @@ namespace Finn {
 
     /****** USER METHODS ******/
     //! Make this either a factory or do the checks before calling store to save performance
-    bool Accelerator::store(const std::vector<uint8_t>& data, const unsigned int deviceIndex, const std::string& inputBufferKernelName) {
+    bool Accelerator::store(const Finn::vector<uint8_t>& data, const unsigned int deviceIndex, const std::string& inputBufferKernelName) {
         if (containsDevice(deviceIndex)) {
             return getDeviceHandler(deviceIndex).store(data, inputBufferKernelName);
         } else {
@@ -91,7 +91,7 @@ namespace Finn {
         }
     }
 
-    std::vector<std::vector<uint8_t>> Accelerator::retrieveResults(const unsigned int deviceIndex, const std::string& outputBufferKernelName, bool forceArchival) {
+    Finn::vector<uint8_t> Accelerator::retrieveResults(const unsigned int deviceIndex, const std::string& outputBufferKernelName, bool forceArchival) {
         if (containsDevice(deviceIndex)) {
             FINN_LOG_DEBUG(Logger::getLogger(), loglevel::info) << loggerPrefix() << "Retrieving results from the specified device index! [accelerator.retrueveResults()]";
             return getDeviceHandler(deviceIndex).retrieveResults(outputBufferKernelName, forceArchival);

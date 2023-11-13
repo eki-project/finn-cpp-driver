@@ -38,14 +38,10 @@ const size_t elementsPerPart = FinnUnittest::elementsPerPart;
 class RBTest : public ::testing::Test {
      protected:
     RB rb = RB(parts, elementsPerPart);
-    std::vector<uint8_t> data;
-    std::vector<std::vector<uint8_t>> storedDatas;
+    Finn::vector<uint8_t> data;
+    std::vector<Finn::vector<uint8_t>> storedDatas;
     FinnUtils::BufferFiller filler = FinnUtils::BufferFiller(0, 255);
-    void SetUp() override {
-        data = std::vector<uint8_t>();
-        data.resize(rb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
-        storedDatas = std::vector<std::vector<uint8_t>>();
-    }
+    void SetUp() override { data.resize(rb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART)); }
 
     /**
      * @brief Utility function to completely fill a ringBuffer or a deviceinput/output buffer.
@@ -58,7 +54,7 @@ class RBTest : public ::testing::Test {
      */
     void fillCompletely(bool fast, bool ref) {
         for (size_t i = 0; i < rb.size(SIZE_SPECIFIER::PARTS); i++) {
-            filler.fillRandom(data);
+            filler.fillRandom(data.begin(), data.end());
             storedDatas.push_back(data);
             if (fast) {
                 if (ref) {
@@ -113,7 +109,7 @@ TEST_F(RBTest, RBStoreReadTestIterator) {
     auto current = rb.testGetAsVector(0);
 
     // Confirm that no new data can be stored until some data is read
-    filler.fillRandom(data);
+    filler.fillRandom(data.begin(), data.end());
     EXPECT_FALSE(rb.store(data.begin(), data.end()));
 
     // Test that the valid data was not changed
@@ -121,8 +117,8 @@ TEST_F(RBTest, RBStoreReadTestIterator) {
 
     // Read two entries
     uint8_t* buf = new uint8_t[elementsPerPart];
-    EXPECT_TRUE(rb.readToArray(buf, elementsPerPart));
-    EXPECT_TRUE(rb.readToArray(buf, elementsPerPart));
+    EXPECT_TRUE(rb.read(buf));
+    EXPECT_TRUE(rb.read(buf));
 
     // Check pointer positions
     EXPECT_EQ(rb.testGetHeadPointer(), 0);
@@ -141,7 +137,7 @@ TEST_F(RBTest, RBFastStoreTestIterator) {
     auto current = rb.testGetAsVector(0);
 
     // Confirm that no new data can be stored until some data is read
-    filler.fillRandom(data);
+    filler.fillRandom(data.begin(), data.end());
     EXPECT_FALSE(rb.storeFast(data.begin(), data.end()));
 
     // Test that the valid data was not changed
@@ -149,8 +145,8 @@ TEST_F(RBTest, RBFastStoreTestIterator) {
 
     // Read two entries
     uint8_t* buf = new uint8_t[elementsPerPart];
-    EXPECT_TRUE(rb.readToArray(buf, elementsPerPart));
-    EXPECT_TRUE(rb.readToArray(buf, elementsPerPart));
+    EXPECT_TRUE(rb.read(buf));
+    EXPECT_TRUE(rb.read(buf));
 
     // Check pointer positions
     EXPECT_EQ(rb.testGetHeadPointer(), 0);
@@ -169,7 +165,7 @@ TEST_F(RBTest, RBStoreReadTestReference) {
     auto current = rb.testGetAsVector(0);
 
     // Confirm that no new data can be stored until some data is read
-    filler.fillRandom(data);
+    filler.fillRandom(data.begin(), data.end());
     EXPECT_FALSE(rb.store(data, data.size()));
 
     // Test that the valid data was not changed
@@ -177,8 +173,8 @@ TEST_F(RBTest, RBStoreReadTestReference) {
 
     // Read two entries
     uint8_t* buf = new uint8_t[elementsPerPart];
-    EXPECT_TRUE(rb.readToArray(buf, elementsPerPart));
-    EXPECT_TRUE(rb.readToArray(buf, elementsPerPart));
+    EXPECT_TRUE(rb.read(buf));
+    EXPECT_TRUE(rb.read(buf));
 
     // Check pointer positions
     EXPECT_EQ(rb.testGetHeadPointer(), 0);
@@ -197,7 +193,7 @@ TEST_F(RBTest, RBFastStoreTestReference) {
     auto current = rb.testGetAsVector(0);
 
     // Confirm that no new data can be stored until some data is read
-    filler.fillRandom(data);
+    filler.fillRandom(data.begin(), data.end());
     EXPECT_FALSE(rb.storeFast(data));
 
     // Test that the valid data was not changed
@@ -205,8 +201,8 @@ TEST_F(RBTest, RBFastStoreTestReference) {
 
     // Read two entries
     uint8_t* buf = new uint8_t[elementsPerPart];
-    EXPECT_TRUE(rb.readToArray(buf, elementsPerPart));
-    EXPECT_TRUE(rb.readToArray(buf, elementsPerPart));
+    EXPECT_TRUE(rb.read(buf));
+    EXPECT_TRUE(rb.read(buf));
 
     // Check pointer positions
     EXPECT_EQ(rb.testGetHeadPointer(), 0);
@@ -222,7 +218,7 @@ TEST_F(RBTest, RBReadTest) {
 
     // Check that the read data is equivalent to the saved data and read in the same order (important!)
     for (unsigned int i = 0; i < rb.size(SIZE_SPECIFIER::PARTS); i++) {
-        EXPECT_TRUE(rb.readToVector(data, data.size()));
+        EXPECT_TRUE(rb.read(data.begin()));
         EXPECT_EQ(storedDatas[i], data);
     }
 }
@@ -236,7 +232,7 @@ TEST_F(RBTest, RBReadTestArray) {
     // Check that the read data is equivalent to the saved data and read in the same order (important!)
     uint8_t* buf = new uint8_t[rb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART)];
     for (unsigned int i = 0; i < rb.size(SIZE_SPECIFIER::PARTS); i++) {
-        EXPECT_TRUE(rb.readToArray(buf, rb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART)));
+        EXPECT_TRUE(rb.read(buf));
         for (unsigned int j = 0; j < rb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART); j++) {
             EXPECT_EQ(storedDatas[i][j], buf[j]);
         }
@@ -256,14 +252,14 @@ TEST_F(RBTest, RBUtilFuncsTest) {
     EXPECT_TRUE(rb.isFull());
     EXPECT_EQ(rb.countValidParts(), rb.size(SIZE_SPECIFIER::PARTS));
 
-    EXPECT_TRUE(rb.readToVector(data, data.size()));
+    EXPECT_TRUE(rb.read(data.begin()));
     EXPECT_FALSE(rb.isFull());
     EXPECT_EQ(rb.countValidParts(), rb.size(SIZE_SPECIFIER::PARTS) - 1);
 }
 
 TEST_F(RBTest, RBValidityTest) {
     for (unsigned int i = 0; i < 3; i++) {
-        filler.fillRandom(data);
+        filler.fillRandom(data.begin(), data.end());
         EXPECT_TRUE(rb.storeFast(data));
     }
 

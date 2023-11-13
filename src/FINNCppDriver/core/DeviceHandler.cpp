@@ -18,6 +18,7 @@
 #include <xrt/xrt_kernel.h>              // for kernel
 
 #include <boost/cstdint.hpp>  // for uint8_t
+#include <cerrno>
 #include <chrono>
 #include <iosfwd>
 #include <memory>
@@ -42,10 +43,10 @@ namespace Finn {
     void DeviceHandler::checkDeviceWrapper(const DeviceWrapper& devWrap) {
         // Execute tests on filepath for xclbin in release mode!
         if (devWrap.xclbin.empty()) {
-            throw fs::filesystem_error("Empty filepath to xclbin. Abort.", std::error_code());
+            throw fs::filesystem_error("Empty filepath to xclbin. Abort.", std::error_code(ENOENT, std::generic_category()));
         }
         if (!fs::exists(devWrap.xclbin) || !fs::is_regular_file(devWrap.xclbin)) {
-            throw fs::filesystem_error("File " + std::string(devWrap.xclbin.c_str()) + " not found. Abort.", std::error_code());
+            throw fs::filesystem_error("File " + std::string(fs::absolute(devWrap.xclbin).c_str()) + " not found. Abort.", std::error_code(ENOENT, std::generic_category()));
         }
         if (devWrap.idmas.empty()) {
             throw std::invalid_argument("Empty input kernel list. Abort.");
@@ -88,11 +89,11 @@ namespace Finn {
                                                       << "Initializing buffer objects\n";
         for (auto&& ebdptr : devWrap.idmas) {
             auto tmpKern = xrt::kernel(device, uuid, ebdptr->kernelName, xrt::kernel::cu_access_mode::shared);
-            inputBufferMap.emplace(std::make_pair(ebdptr->kernelName, Finn::DeviceInputBuffer<uint8_t>(ebdptr->kernelName, device, tmpKern, ebdptr->packedShape, hostBufferSize)));
+            inputBufferMap.emplace(std::make_pair(ebdptr->kernelName, std::make_shared<Finn::SyncDeviceInputBuffer<uint8_t>>(ebdptr->kernelName, device, tmpKern, ebdptr->packedShape, hostBufferSize)));
         }
         for (auto&& ebdptr : devWrap.odmas) {
             auto tmpKern = xrt::kernel(device, uuid, ebdptr->kernelName, xrt::kernel::cu_access_mode::exclusive);
-            outputBufferMap.emplace(std::make_pair(ebdptr->kernelName, Finn::DeviceOutputBuffer<uint8_t>(ebdptr->kernelName, device, tmpKern, ebdptr->packedShape, hostBufferSize)));
+            outputBufferMap.emplace(std::make_pair(ebdptr->kernelName, std::make_shared<Finn::SyncDeviceOutputBuffer<uint8_t>>(ebdptr->kernelName, device, tmpKern, ebdptr->packedShape, hostBufferSize)));
         }
         FINN_LOG(Logger::getLogger(), loglevel::info) << loggerPrefix() << "Finished initializing buffer objects on device " << xrtDeviceIndex;
 
@@ -113,31 +114,31 @@ namespace Finn {
         return false;
     }
 
-    [[maybe_unused]] std::unordered_map<std::string, DeviceInputBuffer<uint8_t>>& DeviceHandler::getInputBufferMap() { return inputBufferMap; }
+    [[maybe_unused]] std::unordered_map<std::string, std::shared_ptr<DeviceInputBuffer<uint8_t>>>& DeviceHandler::getInputBufferMap() { return inputBufferMap; }
 
-    [[maybe_unused]] std::unordered_map<std::string, DeviceOutputBuffer<uint8_t>>& DeviceHandler::getOutputBufferMap() { return outputBufferMap; }
+    [[maybe_unused]] std::unordered_map<std::string, std::shared_ptr<DeviceOutputBuffer<uint8_t>>>& DeviceHandler::getOutputBufferMap() { return outputBufferMap; }
 
-    [[maybe_unused]] DeviceInputBuffer<uint8_t>& DeviceHandler::getInputBuffer(const std::string& name) { return inputBufferMap.at(name); }
+    [[maybe_unused]] std::shared_ptr<DeviceInputBuffer<uint8_t>>& DeviceHandler::getInputBuffer(const std::string& name) { return inputBufferMap.at(name); }
 
-    [[maybe_unused]] DeviceOutputBuffer<uint8_t>& DeviceHandler::getOutputBuffer(const std::string& name) { return outputBufferMap.at(name); }
+    [[maybe_unused]] std::shared_ptr<DeviceOutputBuffer<uint8_t>>& DeviceHandler::getOutputBuffer(const std::string& name) { return outputBufferMap.at(name); }
 
     /****** USER METHODS ******/
     //* SAFE + REFERENCE
-    bool DeviceHandler::store(const std::vector<uint8_t>& data, const std::string& inputBufferKernelName) {
+    bool DeviceHandler::store(const Finn::vector<uint8_t>& data, const std::string& inputBufferKernelName) {
         if (!inputBufferMap.contains(inputBufferKernelName)) {
             auto newlineFold = [](std::string a, const auto& b) { return std::move(a) + '\n' + std::move(b.first); };
             std::string existingNames = "Existing buffer names:";
             std::accumulate(inputBufferMap.begin(), inputBufferMap.end(), existingNames, newlineFold);
             FinnUtils::logAndError<std::runtime_error>("[store] Tried accessing kernel/buffer with name " + inputBufferKernelName + " but this kernel / buffer does not exist! " + existingNames);
         }
-        return inputBufferMap.at(inputBufferKernelName).store(data);
+        return inputBufferMap.at(inputBufferKernelName)->store(data);
     }
 
     //* UNSAFE + REFERENCE
-    bool DeviceHandler::storeUnchecked(const std::vector<uint8_t>& data, const std::string& inputBufferKernelName) { return inputBufferMap.at(inputBufferKernelName).store(data); }
+    bool DeviceHandler::storeUnchecked(const Finn::vector<uint8_t>& data, const std::string& inputBufferKernelName) { return inputBufferMap.at(inputBufferKernelName)->store(data); }
 
-    //* UNSAFE + FAST + REFERENCE
-    bool DeviceHandler::storeUncheckedFast(const std::vector<uint8_t>& data, const std::string& inputBufferKernelName) { return inputBufferMap.at(inputBufferKernelName).storeFast(data); }
+    // //* UNSAFE + FAST + REFERENCE
+    // bool DeviceHandler::storeUncheckedFast(const Finn::vector<uint8_t>& data, const std::string& inputBufferKernelName) { return inputBufferMap.at(inputBufferKernelName).storeFast(data); }
 
     [[maybe_unused]] unsigned int DeviceHandler::getDeviceIndex() const { return xrtDeviceIndex; }
 
@@ -148,10 +149,10 @@ namespace Finn {
             std::accumulate(inputBufferMap.begin(), inputBufferMap.end(), existingNames, newlineFold);
             FinnUtils::logAndError<std::runtime_error>("[run] Tried accessing kernel/buffer with name " + inputBufferKernelName + " but this kernel / buffer does not exist! " + existingNames);
         }
-        return inputBufferMap.at(inputBufferKernelName).run();
+        return inputBufferMap.at(inputBufferKernelName)->run();
     }
 
-    [[maybe_unused]] std::vector<std::vector<uint8_t>> DeviceHandler::retrieveResults(const std::string& outputBufferKernelName, bool forceArchival) {
+    [[maybe_unused]] Finn::vector<uint8_t> DeviceHandler::retrieveResults(const std::string& outputBufferKernelName, bool forceArchival) {
         if (!outputBufferMap.contains(outputBufferKernelName)) {
             auto newlineFold = [](std::string a, const auto& b) { return std::move(a) + '\n' + std::move(b.first); };
             std::string existingNames = "Existing buffer names:";
@@ -159,9 +160,9 @@ namespace Finn {
             FinnUtils::logAndError<std::runtime_error>("[retrieve] Tried accessing kernel/buffer with name " + outputBufferKernelName + " but this kernel / buffer does not exist! " + existingNames);
         }
         if (forceArchival) {
-            outputBufferMap.at(outputBufferKernelName).archiveValidBufferParts();
+            outputBufferMap.at(outputBufferKernelName)->archiveValidBufferParts();
         }
-        return outputBufferMap.at(outputBufferKernelName).retrieveArchive();
+        return outputBufferMap.at(outputBufferKernelName)->retrieveArchive();
     }
 
     ert_cmd_state DeviceHandler::read(const std::string& outputBufferKernelName, unsigned int samples) {
@@ -171,14 +172,14 @@ namespace Finn {
             std::accumulate(inputBufferMap.begin(), inputBufferMap.end(), existingNames, newlineFold);
             FinnUtils::logAndError<std::runtime_error>("[readread] Tried accessing kernel/buffer with name " + outputBufferKernelName + " but this kernel / buffer does not exist! " + existingNames);
         }
-        return outputBufferMap.at(outputBufferKernelName).read(samples);
+        return outputBufferMap.at(outputBufferKernelName)->read(samples);
     }
 
     size_t DeviceHandler::size(SIZE_SPECIFIER ss, const std::string& bufferName) {
         if (inputBufferMap.contains(bufferName)) {
-            return inputBufferMap.at(bufferName).size(ss);
+            return inputBufferMap.at(bufferName)->size(ss);
         } else if (outputBufferMap.contains(bufferName)) {
-            return outputBufferMap.at(bufferName).size(ss);
+            return outputBufferMap.at(bufferName)->size(ss);
         }
         return 0;
     }

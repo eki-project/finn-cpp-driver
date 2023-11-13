@@ -17,8 +17,9 @@
 #include <FINNCppDriver/utils/Types.h>
 
 #include <FINNCppDriver/core/BaseDriver.hpp>
-#include <FINNCppDriver/core/DeviceBuffer.hpp>
+#include <FINNCppDriver/core/DeviceBuffer/SyncDeviceBuffers.hpp>
 #include <FINNCppDriver/utils/FinnDatatypes.hpp>
+#include <FINNCppDriver/utils/join.hpp>
 
 #include "gtest/gtest.h"
 #include "xrt/xrt_device.h"
@@ -27,6 +28,7 @@
 // Provides config and shapes
 #include "UnittestConfig.h"
 using namespace FinnUnittest;
+
 
 class BaseDriverTest : public ::testing::Test {
      protected:
@@ -40,29 +42,70 @@ class BaseDriverTest : public ::testing::Test {
     void TearDown() override { std::filesystem::remove(fn); }
 };
 
+class TestDriver : public Finn::Driver {
+     public:
+    TestDriver(const Finn::Config& pConfig, unsigned int hostBufferSize) : Finn::Driver(pConfig, hostBufferSize) {}
+    Finn::vector<uint8_t> inferR(const Finn::vector<uint8_t>& data, unsigned int inputDeviceIndex, const std::string& inputBufferKernelName, unsigned int outputDeviceIndex, const std::string& outputBufferKernelName, unsigned int samples,
+                                 bool forceArchival) {
+        return inferRaw(data, inputDeviceIndex, inputBufferKernelName, outputDeviceIndex, outputBufferKernelName, samples, forceArchival);
+    }
+
+    template<typename IterType>
+    Finn::vector<uint8_t> inferR(IterType first, IterType last, unsigned int inputDeviceIndex, const std::string& inputBufferKernelName, unsigned int outputDeviceIndex, const std::string& outputBufferKernelName, unsigned int samples,
+                                 bool forceArchival) {
+        return inferRaw(first, last, inputDeviceIndex, inputBufferKernelName, outputDeviceIndex, outputBufferKernelName, samples, forceArchival);
+    }
+};
+
 TEST_F(BaseDriverTest, BasicBaseDriverTest) {
     auto filler = FinnUtils::BufferFiller(0, 255);
-    auto driver = Finn::Driver(unittestConfig, hostBufferSize);
+    auto driver = TestDriver(unittestConfig, hostBufferSize);
 
-    std::vector<uint8_t> data;
-    std::vector<uint8_t> backupData;
+    Finn::vector<uint8_t> data;
+    Finn::vector<uint8_t> backupData;
     data.resize(driver.size(SIZE_SPECIFIER::ELEMENTS_PER_PART, 0, inputDmaName));
 
-    filler.fillRandom(data);
+    filler.fillRandom(data.begin(), data.end());
     backupData = data;
 
     // Setup fake output data
-    driver.getDeviceHandler(0).getOutputBuffer(outputDmaName).testSetMap(data);
+    driver.getDeviceHandler(0).getOutputBuffer(outputDmaName)->testSetMap(data);
 
     // Run inference
-    auto results = driver.inferRaw(data, 0, inputDmaName, 0, outputDmaName, 1, 1);
+    auto results = driver.inferR(data.begin(), data.begin() + 80, 0, inputDmaName, 0, outputDmaName, 1, 1);
+
+    Finn::vector<uint8_t> base(data.begin(), data.begin() + static_cast<long int>(driver.size(SIZE_SPECIFIER::VALUES_PER_INPUT, 0, outputDmaName)));
 
 
     // Checks: That input and output data is the same is just for convenience, in application this does not need to be
     // Check output process
-    EXPECT_EQ(results[0], data);
+    EXPECT_EQ(results.size(), base.size());
+    EXPECT_EQ(results, base);
     // Check input process
-    EXPECT_EQ(driver.getDeviceHandler(0).getInputBuffer(inputDmaName).testGetMap(), data);
+    auto testMap = driver.getDeviceHandler(0).getInputBuffer(inputDmaName).get()->testGetMap();
+    EXPECT_TRUE(std::equal(testMap.begin(), testMap.begin() + 80, data.begin()));
+}
+
+TEST_F(BaseDriverTest, syncInferenceTest) {
+    auto driver = Finn::Driver(unittestConfig, hostBufferSize, 0, inputDmaName, 0, outputDmaName, 1, true);
+
+    Finn::vector<uint8_t> data(driver.size(SIZE_SPECIFIER::ELEMENTS_PER_PART, 0, inputDmaName), 1);
+
+    // Setup fake output data
+    driver.getDeviceHandler(0).getOutputBuffer(outputDmaName)->testSetMap(data);
+
+    // Run inference
+    auto results = driver.inferSynchronous(data.begin(), data.begin() + static_cast<long int>(driver.size(SIZE_SPECIFIER::VALUES_PER_INPUT, 0, inputDmaName) * 4 /*Needed because the input is interpreted as int2 and packed*/));
+
+    Finn::vector<uint8_t> expected(driver.size(SIZE_SPECIFIER::VALUES_PER_INPUT, 0, outputDmaName) * 8, 0);
+
+    for (std::size_t i = 0; i < expected.size(); ++i) {
+        if (i % 8 == 0) {
+            expected[i] = 1;
+        }
+    }
+
+    EXPECT_EQ(results, expected);
 }
 
 int main(int argc, char** argv) {

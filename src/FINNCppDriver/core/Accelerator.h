@@ -110,7 +110,7 @@ namespace Finn {
          * @return true The write was successfull
          * @return false The buffer is full and data needs to be run first
          */
-        bool store(const std::vector<uint8_t>& data, unsigned int deviceIndex, const std::string& inputBufferKernelName);
+        bool store(const Finn::vector<uint8_t>& data, unsigned int deviceIndex, const std::string& inputBufferKernelName);
 
         /**
          * @brief Run the given buffer. Returns false if no valid data was found to execute on.
@@ -131,7 +131,7 @@ namespace Finn {
          * @param forceArchive Whether or not to force a readout into archive. Necessary to get new data. Will be done automatically if a whole multiple of the buffer size is produced
          * @return std::vector<std::vector<uint8_t>>
          */
-        std::vector<std::vector<uint8_t>> retrieveResults(unsigned int deviceIndex, const std::string& outputBufferKernelName, bool forceArchival);
+        Finn::vector<uint8_t> retrieveResults(unsigned int deviceIndex, const std::string& outputBufferKernelName, bool forceArchival);
 
         /**
          * @brief Execute the output kernel and return it's result. If a run fails, the function returns early, with the corresponding ert_cmd_state.

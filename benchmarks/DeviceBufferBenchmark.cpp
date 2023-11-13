@@ -13,7 +13,7 @@
 #include <FINNCppDriver/utils/Logger.h>
 #include <benchmark/benchmark.h>
 
-#include <FINNCppDriver/core/DeviceBuffer.hpp>
+#include <FINNCppDriver/core/DeviceBuffer/SyncDeviceBuffers.hpp>
 #include <FINNCppDriver/utils/FinnDatatypes.hpp>
 #include <chrono>
 #include <fstream>
@@ -34,7 +34,7 @@ static void BM_VecCopyBase(benchmark::State& state) {
     auto filler = FinnUtils::BufferFiller(0, 255);
     auto device = xrt::device();
     auto kernel = xrt::kernel();
-    auto idb = Finn::DeviceInputBuffer<uint8_t>("Tester", device, kernel, myShapePacked, benchmarkBufferSize);
+    auto idb = Finn::SyncDeviceInputBuffer<uint8_t>("Tester", device, kernel, myShapePacked, benchmarkBufferSize);
     auto dat1 = std::vector<uint8_t>();
     auto dat2 = std::vector<uint8_t>();
     dat1.resize(idb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
@@ -57,12 +57,12 @@ static void BM_StoreCVRP(benchmark::State& state) {
     auto filler = FinnUtils::BufferFiller(0, 255);
     auto device = xrt::device();
     auto kernel = xrt::kernel();
-    auto idb = Finn::DeviceInputBuffer<uint8_t>("Tester", device, kernel, myShapePacked, benchmarkBufferSize);
-    std::vector<uint8_t> data;
+    auto idb = Finn::SyncDeviceInputBuffer<uint8_t>("Tester", device, kernel, myShapePacked, benchmarkBufferSize);
+    Finn::vector<uint8_t> data;
     data.resize(idb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
     for (auto _ : state) {
         for (unsigned int i = 0; i < benchmarkBufferSize; i++) {
-            filler.fillRandom(data);
+            filler.fillRandom(data.begin(), data.end());
             idb.store(data);
         }
     }
@@ -74,13 +74,13 @@ static void BM_StoreSVRP(benchmark::State& state) {
     auto filler = FinnUtils::BufferFiller(0, 255);
     auto device = xrt::device();
     auto kernel = xrt::kernel();
-    auto idb = Finn::DeviceInputBuffer<uint8_t>("Tester", device, kernel, myShapePacked, benchmarkBufferSize);
+    auto idb = Finn::SyncDeviceInputBuffer<uint8_t>("Tester", device, kernel, myShapePacked, benchmarkBufferSize);
     std::vector<uint8_t> data;
     data.resize(idb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
     for (auto _ : state) {
         for (unsigned int i = 0; i < benchmarkBufferSize; i++) {
             filler.fillRandom(data);
-            idb.store(data.begin(), data.end());
+            (&idb)->store(data.begin(), data.end());
         }
     }
 }
@@ -91,8 +91,8 @@ static void BM_StoreCVIP(benchmark::State& state) {
     auto filler = FinnUtils::BufferFiller(0, 255);
     auto device = xrt::device();
     auto kernel = xrt::kernel();
-    auto idb = Finn::DeviceInputBuffer<uint8_t>("Tester", device, kernel, myShapePacked, benchmarkBufferSize);
-    std::vector<uint8_t> data;
+    auto idb = Finn::SyncDeviceInputBuffer<uint8_t>("Tester", device, kernel, myShapePacked, benchmarkBufferSize);
+    Finn::vector<uint8_t> data;
     data.resize(idb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
     for (auto _ : state) {
         for (unsigned int i = 0; i < benchmarkBufferSize; i++) {
@@ -107,8 +107,8 @@ static void BM_StoreSVIP(benchmark::State& state) {
     auto filler = FinnUtils::BufferFiller(0, 255);
     auto device = xrt::device();
     auto kernel = xrt::kernel();
-    auto idb = Finn::DeviceInputBuffer<uint8_t>("Tester", device, kernel, myShapePacked, benchmarkBufferSize);
-    std::vector<uint8_t> data;
+    auto idb = Finn::SyncDeviceInputBuffer<uint8_t>("Tester", device, kernel, myShapePacked, benchmarkBufferSize);
+    Finn::vector<uint8_t> data;
     data.resize(idb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
     for (auto _ : state) {
         for (unsigned int i = 0; i < benchmarkBufferSize; i++) {
@@ -157,10 +157,10 @@ static void BM_StoreMultithreaded_CVRP(benchmark::State& state) {
     auto filler = FinnUtils::BufferFiller(0, 255);
     auto device = xrt::device();
     auto kernel = xrt::kernel();
-    auto idb = Finn::DeviceInputBuffer<uint8_t>("Tester", device, kernel, myShapePacked, benchmarkBufferSize * 10);
+    auto idb = Finn::SyncDeviceInputBuffer<uint8_t>("Tester", device, kernel, myShapePacked, benchmarkBufferSize * 10);
 
     // Prepare multithreading (allocate beforehand to improve vector performance)
-    using Sample = std::vector<uint8_t>;
+    using Sample = Finn::vector<uint8_t>;
     using MultipleSamples = std::vector<Sample>;
     unsigned int countThreads = 10;
     unsigned int countSamplesPerThread = benchmarkBufferSize * 10 / countThreads;
@@ -177,7 +177,7 @@ static void BM_StoreMultithreaded_CVRP(benchmark::State& state) {
         for (unsigned int j = 0; j < countSamplesPerThread; j++) {
             datas[i][j] = Sample();
             datas[i][j].resize(idb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
-            filler.fillRandom(datas[i][j]);
+            filler.fillRandom(datas[i][j].begin(), datas[i][j].end());
         }
     }
 

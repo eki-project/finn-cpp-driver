@@ -15,12 +15,11 @@
 
 #include <FINNCppDriver/utils/Types.h>
 
-#include <cctype>
 #include <fstream>
 #include <memory>
 #include <nlohmann/json.hpp>
 #include <string>
-#include <variant>
+#include <utility>
 #include <vector>
 
 using json = nlohmann::json;
@@ -36,6 +35,7 @@ namespace nlohmann {
                 j = nullptr;
             }
         }
+
         // NOLINTNEXTLINE
         static void from_json(const json& j, std::shared_ptr<T>& opt) {
             if (j.is_null()) {
@@ -152,7 +152,10 @@ namespace Finn {
      * @return Config
      */
     inline Config createConfigFromPath(const std::filesystem::path& configPath) {
-        std::ifstream file(configPath.string());
+        if (!std::filesystem::exists(configPath) || !std::filesystem::is_regular_file(configPath)) {
+            throw std::filesystem::filesystem_error("File " + configPath.string() + " not found. Abort.", std::error_code());
+        }
+        std::ifstream file(configPath);
         json dataJson = json::parse(file);
         Config config;
         for (auto& fpgaDevice : dataJson) {
@@ -162,6 +165,14 @@ namespace Finn {
         }
         return config;
     }
+
+    inline std::tuple<shape_t, shape_t, shape_t> getConfigShapes(const Config& conf, uint device = 0, uint dma = 0) {
+        auto myShapeNormal = (*std::dynamic_pointer_cast<Finn::ExtendedBufferDescriptor>(conf.deviceWrappers.at(device).idmas.at(dma))).normalShape;
+        auto myShapeFolded = (*std::dynamic_pointer_cast<Finn::ExtendedBufferDescriptor>(conf.deviceWrappers[device].idmas[dma])).foldedShape;
+        auto myShapePacked = (*std::dynamic_pointer_cast<Finn::ExtendedBufferDescriptor>(conf.deviceWrappers[device].idmas[dma])).packedShape;
+        return {myShapeNormal, myShapeFolded, myShapePacked};
+    }
+
 
 }  // namespace Finn
 

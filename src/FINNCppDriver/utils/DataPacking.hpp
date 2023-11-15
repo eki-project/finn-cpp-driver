@@ -190,6 +190,14 @@ namespace Finn {
                 }
             }
             constexpr T mask = createMask<T>(U().bitwidth());
+            std::cout << "Bits: " << U().bitwidth() << std::endl;
+            std::cout << "Mask: " << (int) mask << std::endl;
+            std::cout << "Distance: " << std::distance(first, last) << std::endl;
+            std::cout << "Input: ";
+            for (auto it = first; it != last; ++it) {
+                std::cout << (int) *it << ",";
+            }
+            std::cout << std::endl;
             std::transform(first, last, first, [](const T& val) { return val & mask; });  // Cut away all bits larger than U().bitwidth()
             if constexpr (invertBytes) {
                 Finn::vector<UnpackingAutoRetType::UnsignedRetType<U>> ret(first, last);

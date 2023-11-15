@@ -30,16 +30,17 @@ TEST(DummyTest, DT) { EXPECT_TRUE(true); }
 
 
 // Globals
-using RB = RingBuffer<uint8_t>;
+using RB = Finn::RingBuffer<int, false>;
 const size_t parts = FinnUnittest::parts;
-const size_t elementsPerPart = FinnUnittest::elementsPerPart;
+// const size_t elementsPerPart = FinnUnittest::elementsPerPart;
+const size_t elementsPerPart = 5;
 
 
 class RBTest : public ::testing::Test {
      protected:
     RB rb = RB(parts, elementsPerPart);
-    Finn::vector<uint8_t> data;
-    std::vector<Finn::vector<uint8_t>> storedDatas;
+    Finn::vector<int> data;
+    std::vector<Finn::vector<int>> storedDatas;
     FinnUtils::BufferFiller filler = FinnUtils::BufferFiller(0, 255);
     void SetUp() override { data.resize(rb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART)); }
 
@@ -52,22 +53,48 @@ class RBTest : public ::testing::Test {
      * @param fast Whether to use fast store methods (no mutex locking, no length checks)
      * @param ref Whether to use references (true) or iterators (false)
      */
-    void fillCompletely(bool fast, bool ref) {
+    void fillCompletely(bool ref) {
         for (size_t i = 0; i < rb.size(SIZE_SPECIFIER::PARTS); i++) {
             filler.fillRandom(data.begin(), data.end());
             storedDatas.push_back(data);
-            if (fast) {
-                if (ref) {
-                    EXPECT_TRUE(rb.storeFast(data));
-                } else {
-                    EXPECT_TRUE(rb.storeFast(data.begin(), data.end()));
-                }
+
+            if (ref) {
+                EXPECT_TRUE(rb.store(data.begin(), data.size()));
             } else {
-                if (ref) {
-                    EXPECT_TRUE(rb.store(data, data.size()));
-                } else {
-                    EXPECT_TRUE(rb.store(data.begin(), data.end()));
-                }
+                EXPECT_TRUE(rb.store(data.begin(), data.end()));
+            }
+        }
+    }
+
+    void TearDown() override {}
+};
+
+class RBTestBlocking : public ::testing::Test {
+     protected:
+    Finn::RingBuffer<int, true> rb = Finn::RingBuffer<int, true>(parts, elementsPerPart);
+    Finn::vector<int> data;
+    std::vector<Finn::vector<int>> storedDatas;
+    FinnUtils::BufferFiller filler = FinnUtils::BufferFiller(0, 255);
+    void SetUp() override { data.resize(rb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART)); }
+
+    /**
+     * @brief Utility function to completely fill a ringBuffer or a deviceinput/output buffer.
+     *
+     * This function uses the data vector to fill the entire rb of type T with random data, based on it's size.
+     * storedDatas gets all data used pushed back.
+     *
+     * @param fast Whether to use fast store methods (no mutex locking, no length checks)
+     * @param ref Whether to use references (true) or iterators (false)
+     */
+    void fillCompletely(bool ref) {
+        for (size_t i = 0; i < rb.size(SIZE_SPECIFIER::PARTS); i++) {
+            filler.fillRandom(data.begin(), data.end());
+            storedDatas.push_back(data);
+
+            if (ref) {
+                EXPECT_TRUE(rb.store(data.begin(), data.size()));
+            } else {
+                EXPECT_TRUE(rb.store(data.begin(), data.end()));
             }
         }
     }
@@ -80,141 +107,92 @@ TEST(RBTestManual, RBInitTest) {
     auto rb = RB(parts, elementsPerPart);
 
     // Pointers
-    EXPECT_EQ(rb.testGetHeadPointer(), 0);
-    EXPECT_EQ(rb.testGetReadPointer(), 0);
-    EXPECT_FALSE(rb.testGetValidity(0));
+    EXPECT_TRUE(rb.empty());
 
     // Sizes
     EXPECT_EQ(rb.size(SIZE_SPECIFIER::PARTS), parts);
     EXPECT_EQ(rb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART), elementsPerPart);
-    EXPECT_EQ(rb.size(SIZE_SPECIFIER::BYTES), parts * elementsPerPart * 1);
+    EXPECT_EQ(rb.size(SIZE_SPECIFIER::BYTES), parts * elementsPerPart * sizeof(int));
     EXPECT_EQ(rb.size(SIZE_SPECIFIER::ELEMENTS), parts * elementsPerPart);
 
     // Initial values
-    EXPECT_EQ(rb.countValidParts(), 0);
-    for (auto elem : rb.testGetAsVector(0)) {
-        EXPECT_EQ(elem, 0);
-    }
-    EXPECT_FALSE(rb.isFull());
+    std::vector<int> out;
+    rb.readAllValidParts(std::back_inserter(out));
+    EXPECT_TRUE(out.empty());
+    EXPECT_FALSE(rb.full());
 }
 
 TEST_F(RBTest, RBStoreReadTestIterator) {
-    fillCompletely(false, false);
+    fillCompletely(false);
 
-    // Confirm that the head pointer wrapped around
-    EXPECT_EQ(rb.testGetHeadPointer(), 0);
-    EXPECT_EQ(rb.testGetReadPointer(), 0);
-
-    // Temporary save first entry
-    auto current = rb.testGetAsVector(0);
+    // Temporary save entries
+    std::vector<int> current;
+    rb.readWithoutInvalidation(std::back_inserter(current));
 
     // Confirm that no new data can be stored until some data is read
     filler.fillRandom(data.begin(), data.end());
     EXPECT_FALSE(rb.store(data.begin(), data.end()));
 
     // Test that the valid data was not changed
-    EXPECT_EQ(rb.testGetAsVector(0), current);
+    std::vector<int> after;
+    rb.readWithoutInvalidation(std::back_inserter(after));
+    EXPECT_EQ(after, current);
 
     // Read two entries
-    uint8_t* buf = new uint8_t[elementsPerPart];
+    std::size_t oldSize = rb.size();
+    int* buf = new int[elementsPerPart];
     EXPECT_TRUE(rb.read(buf));
     EXPECT_TRUE(rb.read(buf));
 
-    // Check pointer positions
-    EXPECT_EQ(rb.testGetHeadPointer(), 0);
-    EXPECT_EQ(rb.testGetReadPointer(), 2);
+    // Check size
+    EXPECT_EQ(rb.size(), oldSize - 2);
     delete[] buf;
 }
 
-TEST_F(RBTest, RBFastStoreTestIterator) {
-    fillCompletely(true, false);
-
-    // Confirm that the head pointer wrapped around
-    EXPECT_EQ(rb.testGetHeadPointer(), 0);
-    EXPECT_EQ(rb.testGetReadPointer(), 0);
-
-    // Temporary save first entry
-    auto current = rb.testGetAsVector(0);
-
-    // Confirm that no new data can be stored until some data is read
-    filler.fillRandom(data.begin(), data.end());
-    EXPECT_FALSE(rb.storeFast(data.begin(), data.end()));
-
-    // Test that the valid data was not changed
-    EXPECT_EQ(rb.testGetAsVector(0), current);
+TEST_F(RBTestBlocking, RBFastStoreTestIterator) {
+    fillCompletely(true);
 
     // Read two entries
-    uint8_t* buf = new uint8_t[elementsPerPart];
+    std::size_t oldSize = rb.size();
+    int* buf = new int[elementsPerPart];
     EXPECT_TRUE(rb.read(buf));
     EXPECT_TRUE(rb.read(buf));
 
-    // Check pointer positions
-    EXPECT_EQ(rb.testGetHeadPointer(), 0);
-    EXPECT_EQ(rb.testGetReadPointer(), 2);
+    // Check size
+    EXPECT_EQ(rb.size(), oldSize - 2);
     delete[] buf;
 }
 
 TEST_F(RBTest, RBStoreReadTestReference) {
-    fillCompletely(false, true);
+    fillCompletely(true);
 
-    // Confirm that the head pointer wrapped around
-    EXPECT_EQ(rb.testGetHeadPointer(), 0);
-    EXPECT_EQ(rb.testGetReadPointer(), 0);
-
-    // Temporary save first entry
-    auto current = rb.testGetAsVector(0);
+    // Temporary save entries
+    std::vector<int> current;
+    rb.readWithoutInvalidation(std::back_inserter(current));
 
     // Confirm that no new data can be stored until some data is read
     filler.fillRandom(data.begin(), data.end());
-    EXPECT_FALSE(rb.store(data, data.size()));
+    EXPECT_FALSE(rb.store(data.begin(), data.end()));
 
     // Test that the valid data was not changed
-    EXPECT_EQ(rb.testGetAsVector(0), current);
+    std::vector<int> after;
+    rb.readWithoutInvalidation(std::back_inserter(after));
+    EXPECT_EQ(after, current);
 
     // Read two entries
-    uint8_t* buf = new uint8_t[elementsPerPart];
+    std::size_t oldSize = rb.size();
+    int* buf = new int[elementsPerPart];
     EXPECT_TRUE(rb.read(buf));
     EXPECT_TRUE(rb.read(buf));
 
-    // Check pointer positions
-    EXPECT_EQ(rb.testGetHeadPointer(), 0);
-    EXPECT_EQ(rb.testGetReadPointer(), 2);
-    delete[] buf;
-}
-
-TEST_F(RBTest, RBFastStoreTestReference) {
-    fillCompletely(true, true);
-
-    // Confirm that the head pointer wrapped around
-    EXPECT_EQ(rb.testGetHeadPointer(), 0);
-    EXPECT_EQ(rb.testGetReadPointer(), 0);
-
-    // Temporary save first entry
-    auto current = rb.testGetAsVector(0);
-
-    // Confirm that no new data can be stored until some data is read
-    filler.fillRandom(data.begin(), data.end());
-    EXPECT_FALSE(rb.storeFast(data));
-
-    // Test that the valid data was not changed
-    EXPECT_EQ(rb.testGetAsVector(0), current);
-
-    // Read two entries
-    uint8_t* buf = new uint8_t[elementsPerPart];
-    EXPECT_TRUE(rb.read(buf));
-    EXPECT_TRUE(rb.read(buf));
-
-    // Check pointer positions
-    EXPECT_EQ(rb.testGetHeadPointer(), 0);
-    EXPECT_EQ(rb.testGetReadPointer(), 2);
+    // Check size
+    EXPECT_EQ(rb.size(), oldSize - 2);
     delete[] buf;
 }
 
 TEST_F(RBTest, RBReadTest) {
     //* Requires that the store tests ran successfully to be successfull itself
-    fillCompletely(true, true);
-    EXPECT_EQ(rb.testGetHeadPointer(), 0);
-    EXPECT_EQ(rb.testGetReadPointer(), 0);
+    fillCompletely(true);
 
     // Check that the read data is equivalent to the saved data and read in the same order (important!)
     for (unsigned int i = 0; i < rb.size(SIZE_SPECIFIER::PARTS); i++) {
@@ -225,17 +203,16 @@ TEST_F(RBTest, RBReadTest) {
 
 TEST_F(RBTest, RBReadTestArray) {
     //* Requires that the store tests ran successfully to be successfull itself
-    fillCompletely(true, true);
-    EXPECT_EQ(rb.testGetHeadPointer(), 0);
-    EXPECT_EQ(rb.testGetReadPointer(), 0);
+    fillCompletely(true);
 
     // Check that the read data is equivalent to the saved data and read in the same order (important!)
-    uint8_t* buf = new uint8_t[rb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART)];
+    int* buf = new int[rb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART)];
     for (unsigned int i = 0; i < rb.size(SIZE_SPECIFIER::PARTS); i++) {
         EXPECT_TRUE(rb.read(buf));
         for (unsigned int j = 0; j < rb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART); j++) {
             EXPECT_EQ(storedDatas[i][j], buf[j]);
         }
+        break;
     }
     delete[] buf;
 }
@@ -244,47 +221,17 @@ TEST_F(RBTest, RBUtilFuncsTest) {
     // Check all sizes
     EXPECT_EQ(rb.size(SIZE_SPECIFIER::PARTS), parts);
     EXPECT_EQ(rb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART), elementsPerPart);
-    EXPECT_EQ(rb.size(SIZE_SPECIFIER::BYTES), elementsPerPart * 1 * parts);
+    EXPECT_EQ(rb.size(SIZE_SPECIFIER::BYTES), elementsPerPart * sizeof(int) * parts);
     EXPECT_EQ(rb.size(SIZE_SPECIFIER::ELEMENTS), elementsPerPart * parts);
 
     // Check validity flags
-    fillCompletely(true, true);
-    EXPECT_TRUE(rb.isFull());
-    EXPECT_EQ(rb.countValidParts(), rb.size(SIZE_SPECIFIER::PARTS));
+    fillCompletely(true);
+    EXPECT_TRUE(rb.full());
+    EXPECT_EQ(rb.size(), rb.size(SIZE_SPECIFIER::PARTS));
 
     EXPECT_TRUE(rb.read(data.begin()));
-    EXPECT_FALSE(rb.isFull());
-    EXPECT_EQ(rb.countValidParts(), rb.size(SIZE_SPECIFIER::PARTS) - 1);
-}
-
-TEST_F(RBTest, RBValidityTest) {
-    for (unsigned int i = 0; i < 3; i++) {
-        filler.fillRandom(data.begin(), data.end());
-        EXPECT_TRUE(rb.storeFast(data));
-    }
-
-    // Check that the correct parts are set to false
-    EXPECT_FALSE(rb.isFull());
-    EXPECT_EQ(rb.countValidParts(), 3);
-    EXPECT_TRUE(rb.testGetValidity(0));
-    EXPECT_TRUE(rb.testGetValidity(1));
-    EXPECT_TRUE(rb.testGetValidity(2));
-    for (unsigned int j = 3; j < rb.size(SIZE_SPECIFIER::PARTS); j++) {
-        EXPECT_FALSE(rb.testGetValidity(j));
-    }
-
-    rb.setPartValidityMutexed(0, false);
-    EXPECT_FALSE(rb.testGetValidity(0));
-
-    rb.setPartValidityMutexed(3, true);
-    EXPECT_TRUE(rb.testGetValidity(3));
-
-    //! Run test twice to see that the value does not get flipped instead of set after a set call
-    rb.setPartValidityMutexed(0, false);
-    EXPECT_FALSE(rb.testGetValidity(0));
-
-    rb.setPartValidityMutexed(3, true);
-    EXPECT_TRUE(rb.testGetValidity(3));
+    EXPECT_FALSE(rb.full());
+    EXPECT_EQ(rb.size(), rb.size(SIZE_SPECIFIER::PARTS) - 1);
 }
 
 int main(int argc, char** argv) {

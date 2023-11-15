@@ -42,7 +42,7 @@ namespace Finn {
         xrt::kernel associatedKernel;
         T* map;
         logger_type& logger;
-        RingBuffer<T> ringBuffer;
+        RingBuffer<T, false> ringBuffer;
 
          public:
         //* Normal Constructor
@@ -54,12 +54,16 @@ namespace Finn {
               associatedKernel(pAssociatedKernel),
               map(internalBo.template map<T*>()),
               logger(Logger::getLogger()),
-              ringBuffer(RingBuffer<T>(ringBufferSizeFactor, mapSize)) {
+              ringBuffer(RingBuffer<T, false>(ringBufferSizeFactor, FinnUtils::shapeToElements(pShapePacked))) {
             FINN_LOG(logger, loglevel::info) << "[DeviceBuffer] "
                                              << "Initializing DeviceBuffer " << name << " (SHAPE PACKED: " << FinnUtils::shapeToString(pShapePacked) << ", BUFFER SIZE: " << ringBufferSizeFactor
                                              << " inputs of the given shape, MAP SIZE: " << mapSize << ")\n";
             if (ringBufferSizeFactor == 0) {
                 FinnUtils::logAndError<std::runtime_error>("DeviceBuffer of size 0 cannot be constructed currently!");
+            }
+
+            for (std::size_t i = 0; i < mapSize; ++i) {
+                map[i] = 0;
             }
         }
 
@@ -177,7 +181,7 @@ namespace Finn {
          public:
         Finn::vector<T> testGetMap() {
             Finn::vector<T> temp;
-            for (size_t i = 0; i < this->mapSize; i++) {
+            for (size_t i = 0; i < FinnUtils::shapeToElements(this->shapePacked); i++) {
                 temp.push_back(this->map[i]);
             }
             return temp;
@@ -219,7 +223,7 @@ namespace Finn {
 #ifdef UNITTEST
         std::vector<T> testGetMap() {
             std::vector<T> temp;
-            for (size_t i = 0; i < this->mapSize; i++) {
+            for (size_t i = 0; i < FinnUtils::shapeToElements(this->shapePacked); ++i) {
                 temp.push_back(this->map[i]);
             }
             return temp;
@@ -227,7 +231,7 @@ namespace Finn {
 
         template<typename IteratorType>
         void testSetMap(IteratorType first, IteratorType last) {
-            if (std::distance(first, last) != this->mapSize) {
+            if (std::distance(first, last) > this->mapSize) {
                 FinnUtils::logAndError<std::length_error>("Error setting test map. Sizes dont match");
             }
             for (unsigned int i = 0; i < std::distance(first, last); ++i) {

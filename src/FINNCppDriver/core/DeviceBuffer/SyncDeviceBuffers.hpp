@@ -61,7 +61,7 @@ namespace Finn {
             //             Finn::vector<int> data(first, last);
             //             FINN_LOG(this->logger, loglevel::info) << "Data to FPGA:" << join(data, ",") << "\n";
             // #endif
-            return this->ringBuffer.storeFast(first, last);
+            return this->ringBuffer.store(first, last);
         }
 
          public:
@@ -150,7 +150,7 @@ namespace Finn {
          */
         void saveMap() override {
             //! Fix that if no space is available, the data will be discarded!
-            this->ringBuffer.template store<T*>(this->map, this->mapSize);
+            this->ringBuffer.template store<T*>(this->map, this->ringBuffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
         }
 
         /**
@@ -165,7 +165,7 @@ namespace Finn {
             this->longTermStorage.reserve(this->longTermStorage.size() + this->ringBuffer.size(SIZE_SPECIFIER::PARTS) * elementsCount);
             Finn::vector<uint8_t> tmp;
             tmp.reserve(this->ringBuffer.size(SIZE_SPECIFIER::PARTS) * elementsCount);
-            this->ringBuffer.readAllValidParts(std::back_inserter(tmp), elementsCount);
+            this->ringBuffer.readAllValidParts(std::back_inserter(tmp));
             std::copy(tmp.begin(), tmp.begin() + static_cast<long int>(tmp.size()), std::back_inserter(this->longTermStorage));
         }
 
@@ -202,7 +202,7 @@ namespace Finn {
                 }
                 this->sync();
                 saveMap();
-                if (this->ringBuffer.isFull()) {
+                if (this->ringBuffer.full()) {
                     archiveValidBufferParts();
                 }
             }

@@ -89,13 +89,15 @@ TEST_F(BaseDriverTest, BasicBaseDriverTest) {
 TEST_F(BaseDriverTest, syncInferenceTest) {
     auto driver = Finn::Driver(unittestConfig, hostBufferSize, 0, inputDmaName, 0, outputDmaName, 1, true);
 
-    Finn::vector<uint8_t> data(driver.size(SIZE_SPECIFIER::ELEMENTS_PER_PART, 0, inputDmaName), 1);
+    // The input has to be 4 times longer than the expected size of the FPGA, because uint8->int2 packing reduces size by factor 4
+    Finn::vector<uint8_t> data(driver.size(SIZE_SPECIFIER::ELEMENTS_PER_PART, 0, inputDmaName) * 4, 1);
+    Finn::vector<uint8_t> outdata(driver.size(SIZE_SPECIFIER::ELEMENTS_PER_PART, 0, outputDmaName), 1);
 
     // Setup fake output data
-    driver.getDeviceHandler(0).getOutputBuffer(outputDmaName)->testSetMap(data);
+    driver.getDeviceHandler(0).getOutputBuffer(outputDmaName)->testSetMap(outdata);
 
     // Run inference
-    auto results = driver.inferSynchronous(data.begin(), data.begin() + static_cast<long int>(driver.size(SIZE_SPECIFIER::VALUES_PER_INPUT, 0, inputDmaName) * 4 /*Needed because the input is interpreted as int2 and packed*/));
+    auto results = driver.inferSynchronous(data.begin(), data.end());
 
     Finn::vector<uint8_t> expected(driver.size(SIZE_SPECIFIER::VALUES_PER_INPUT, 0, outputDmaName) * 8, 0);
 

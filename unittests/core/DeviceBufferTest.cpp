@@ -38,9 +38,12 @@ class DBTest : public ::testing::Test {
     size_t bufferParts;
     size_t bufferElemPerPart;
     void SetUp() override {
+        std::cout << "ELEMENTS PER PART " << buffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART) << "\n";
+        std::cout << "data size: " << data.size() << "\n";
         data.resize(buffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
         bufferParts = buffer.size(SIZE_SPECIFIER::PARTS);
         bufferElemPerPart = buffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART);
+        std::cout << "data size post setup: " << data.size() << "\n";
     }
 
     /**
@@ -109,6 +112,8 @@ TEST_F(DBTest, DBOutputTest) {
     // Test that timeout is set to a good default value
     EXPECT_EQ(outputBuffer.getMsExecuteTimeout(), 1000);
 
+    std::cout << "Data size: " << data.size() << std::endl;
+
     // Test data in and out readout
     filler.fillRandom(data.begin(), data.end());
     storedDatas.push_back(data);
@@ -130,8 +135,8 @@ TEST_F(DBTest, DBLTSTest) {
     }
 
     // Expected: Buffer was full at max capacity. All entries were valid and put into the LTS, and the two new entries are in the buffer
-    EXPECT_FALSE(outputBuffer.testGetRingBuffer().isFull());
-    EXPECT_EQ(outputBuffer.testGetRingBuffer().countValidParts(), 2);
+    EXPECT_FALSE(outputBuffer.testGetRingBuffer().full());
+    EXPECT_EQ(outputBuffer.testGetRingBuffer().size(), 2);
     EXPECT_EQ(outputBuffer.testGetLTS().size(), outputBuffer.size(SIZE_SPECIFIER::PARTS) * outputBuffer.size(SIZE_SPECIFIER::VALUES_PER_INPUT));
 
     // Check integrity of data
@@ -143,8 +148,12 @@ TEST_F(DBTest, DBLTSTest) {
     }
 
     // Check the data that is still in the buffer
-    EXPECT_EQ(storedDatas[outputBuffer.size(SIZE_SPECIFIER::PARTS)], outputBuffer.testGetRingBuffer().testGetAsVector(0));
-    EXPECT_EQ(storedDatas[outputBuffer.size(SIZE_SPECIFIER::PARTS) + 1], outputBuffer.testGetRingBuffer().testGetAsVector(1));
+    Finn::vector<uint8_t> vec;
+    outputBuffer.testGetRingBuffer().readWithoutInvalidation(std::back_inserter(vec), 0);
+    EXPECT_EQ(storedDatas[outputBuffer.size(SIZE_SPECIFIER::PARTS)], vec);
+    vec.clear();
+    outputBuffer.testGetRingBuffer().readWithoutInvalidation(std::back_inserter(vec), 1);
+    EXPECT_EQ(storedDatas[outputBuffer.size(SIZE_SPECIFIER::PARTS) + 1], vec);
 
     // Check that the LTS was cleared
     EXPECT_EQ(outputBuffer.testGetLTS().size(), 0);
@@ -152,7 +161,7 @@ TEST_F(DBTest, DBLTSTest) {
     // Manual transfer to LTS
     outputBuffer.archiveValidBufferParts();
     EXPECT_EQ(outputBuffer.testGetLTS().size(), 2 * outputBuffer.size(SIZE_SPECIFIER::VALUES_PER_INPUT));
-    EXPECT_EQ(outputBuffer.testGetRingBuffer().countValidParts(), 0);
+    EXPECT_EQ(outputBuffer.testGetRingBuffer().size(), 0);
 }
 
 

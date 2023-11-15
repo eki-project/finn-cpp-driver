@@ -19,27 +19,59 @@
 #include "ert.h"
 
 namespace Finn {
-    template<typename T>
-    class SyncDeviceInputBuffer : public DeviceInputBuffer<T> {
-        std::mutex runMutex;
 
+    namespace detail {
+        template<typename T>
+        class SyncBufferWrapper {
+             protected:
+            RingBuffer<T, false> ringBuffer;
+
+            SyncBufferWrapper(unsigned int ringBufferSizeFactor, std::size_t elementsPerPart) : ringBuffer(RingBuffer<T, false>(ringBufferSizeFactor, elementsPerPart)) {
+                if (ringBufferSizeFactor == 0) {
+                    FinnUtils::logAndError<std::runtime_error>("DeviceBuffer of size 0 cannot be constructed!");
+                }
+                FINN_LOG(Logger::getLogger(), loglevel::info) << "[SyncDeviceBuffer] Max buffer size:" << ringBufferSizeFactor << "*" << elementsPerPart << "\n";
+            }
+
+            ~SyncBufferWrapper() = default;
+            SyncBufferWrapper(SyncBufferWrapper&& buf) noexcept : ringBuffer(std::move(buf.ringBuffer)) {}
+            SyncBufferWrapper(const SyncBufferWrapper& buf) noexcept = delete;
+#ifdef UNITTEST
+             public:
+            RingBuffer<T, false>& testGetRingBuffer() { return this->ringBuffer; }
+#endif
+        };
+    }  // namespace detail
+
+    template<typename T>
+    class SyncDeviceInputBuffer : public DeviceInputBuffer<T>, public detail::SyncBufferWrapper<T> {
          public:
         SyncDeviceInputBuffer(const std::string& pName, xrt::device& device, xrt::kernel& pAssociatedKernel, const shapePacked_t& pShapePacked, unsigned int ringBufferSizeFactor)
-            : DeviceInputBuffer<T>(pName, device, pAssociatedKernel, pShapePacked, ringBufferSizeFactor){};
-        /**
-         * @brief Move Constructor
-         * @attention This move constructor is NOT THREAD SAFE
-         *
-         * @param buf
-         */
-        //! NOT THREAD SAFE
-        // cppcheck-suppress missingMemberCopy
-        SyncDeviceInputBuffer(SyncDeviceInputBuffer&& buf) noexcept : DeviceInputBuffer<T>(buf.name, buf.shapePacked, buf.mapSize, buf.internalBo, buf.associatedKernel, buf.map, buf.ringBuffer){};
-
+            : DeviceInputBuffer<T>(pName, device, pAssociatedKernel, pShapePacked), detail::SyncBufferWrapper<T>(ringBufferSizeFactor, FinnUtils::shapeToElements(pShapePacked)) {
+            FINN_LOG(this->logger, loglevel::info) << "[SyncDeviceInputBuffer] "
+                                                   << "Initializing DeviceBuffer " << this->name << " (SHAPE PACKED: " << FinnUtils::shapeToString(pShapePacked) << " inputs of the given shape, MAP SIZE: " << this->mapSize << ")\n";
+        };
+        SyncDeviceInputBuffer(SyncDeviceInputBuffer&& buf) noexcept = default;
         SyncDeviceInputBuffer(const SyncDeviceInputBuffer& buf) noexcept = delete;
         ~SyncDeviceInputBuffer() override = default;
         SyncDeviceInputBuffer& operator=(SyncDeviceInputBuffer&& buf) = delete;
         SyncDeviceInputBuffer& operator=(const SyncDeviceInputBuffer& buf) = delete;
+
+#ifdef UNITTEST
+         public:
+#else
+         protected:
+#endif
+
+        /**
+         * @brief Load data from the ring buffer into the memory map of the device.
+         *
+         * @attention Invalidates the data that was moved to map
+         *
+         * @return true
+         * @return false
+         */
+        bool loadMap() { return this->ringBuffer.read(this->map); }
 
          private:
         friend class DeviceInputBuffer<T>;
@@ -57,24 +89,21 @@ namespace Finn {
         template<typename InputIt>
         bool storeImpl(InputIt first, InputIt last) {
             static_assert(std::is_same<typename std::iterator_traits<InputIt>::value_type, T>::value);
-            // #ifdef UNITTEST
-            //             Finn::vector<int> data(first, last);
-            //             FINN_LOG(this->logger, loglevel::info) << "Data to FPGA:" << join(data, ",") << "\n";
-            // #endif
             return this->ringBuffer.store(first, last);
         }
 
          public:
         /**
-         * @brief Start a run on the associated kernel and wait for it's result.
-         * @attention This method is blocking
+         * @brief Return the size of the buffer as specified by the argument. Bytes returns all bytes the buffer takes up, elements returns the number of T-values, numbers the number of F-values.
          *
+         * @param ss
+         * @return size_t
          */
-        ert_cmd_state execute() override {
-            // TODO(bwintermann): Make batch_size changeable from 1
-            auto runCall = this->associatedKernel(this->internalBo, 1);
-            runCall.wait();
-            return runCall.state();
+        size_t size(SIZE_SPECIFIER ss) override {
+            if (ss == SIZE_SPECIFIER::VALUES_PER_INPUT) {
+                return FinnUtils::shapeToElements(this->shapePacked);
+            }
+            return this->ringBuffer.size(ss);
         }
 
         /**
@@ -85,7 +114,6 @@ namespace Finn {
          */
         bool run() override {
             FINN_LOG_DEBUG(logger, loglevel::info) << this->loggerPrefix() << "DeviceBuffer (" << this->name << ") executing...";
-            std::lock_guard<std::mutex> guard(runMutex);
             if (!loadMap()) {
                 return false;
             }
@@ -94,30 +122,37 @@ namespace Finn {
             return true;
         }
 
+         protected:
         /**
-         * @brief Load data from the ring buffer into the memory map of the device.
+         * @brief Start a run on the associated kernel and wait for it's result.
+         * @attention This method is blocking
          *
-         * @attention Invalidates the data that was moved to map
-         *
-         * @return true
-         * @return false
          */
-        bool loadMap() override { return this->ringBuffer.read(this->map); }
+        ert_cmd_state execute() override {
+            auto runCall = this->associatedKernel(this->internalBo, 1);
+            runCall.wait();
+            return runCall.state();
+        }
     };
 
     template<typename T>
-    class SyncDeviceOutputBuffer : public DeviceOutputBuffer<T> {
+    class SyncDeviceOutputBuffer : public DeviceOutputBuffer<T>, public detail::SyncBufferWrapper<T> {
          public:
         SyncDeviceOutputBuffer(const std::string& pName, xrt::device& device, xrt::kernel& pAssociatedKernel, const shapePacked_t& pShapePacked, unsigned int ringBufferSizeFactor)
-            : DeviceOutputBuffer<T>(pName, device, pAssociatedKernel, pShapePacked, ringBufferSizeFactor){};
-
-         public:
+            : DeviceOutputBuffer<T>(pName, device, pAssociatedKernel, pShapePacked), detail::SyncBufferWrapper<T>(ringBufferSizeFactor, FinnUtils::shapeToElements(pShapePacked)){};
         /**
-         * @brief Reserve enough storage for the expectedEntries number of entries. Note however that because this is a vec of vecs, this only allocates memory for the pointers, not the data itself.
+         * @brief Return the size of the buffer as specified by the argument. Bytes returns all bytes the buffer takes up, elements returns the number of T-values, numbers the number of F-values.
          *
-         * @param expectedEntries
+         * @param ss
+         * @return size_t
          */
-        void allocateLongTermStorage(unsigned int expectedEntries) override { this->longTermStorage.reserve(expectedEntries * this->ringBuffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART)); }
+        size_t size(SIZE_SPECIFIER ss) override {
+            if (ss == SIZE_SPECIFIER::VALUES_PER_INPUT) {
+                return FinnUtils::shapeToElements(this->shapePacked);
+            }
+            return this->ringBuffer.size(ss);
+        }
+
 
         /**
          * @brief Get the the kernel timeout in miliseconds
@@ -132,26 +167,6 @@ namespace Finn {
          * @param val
          */
         void setMsExecuteTimeout(unsigned int val) override { this->msExecuteTimeout = val; }
-
-        /**
-         * @brief Execute the kernel and await it's return.
-         * @attention This function is blocking.
-         *
-         */
-        ert_cmd_state execute() override {
-            auto run = this->associatedKernel(this->internalBo, 1);
-            run.wait(this->msExecuteTimeout);
-            return run.state();
-        }
-
-        /**
-         * @brief Store the contents of the memory map into the ring buffer.
-         *
-         */
-        void saveMap() override {
-            //! Fix that if no space is available, the data will be discarded!
-            this->ringBuffer.template store<T*>(this->map, this->ringBuffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
-        }
 
         /**
          * @brief Put every valid read part of the ring buffer into the archive. This invalides them so that they are not put into the archive again.
@@ -181,12 +196,6 @@ namespace Finn {
         }
 
         /**
-         * @brief Clear the archive of all it's entries
-         *
-         */
-        void clearArchive() override { this->longTermStorage.clear(); }
-
-        /**
          * @brief Read the specified number of samples. If a read fails, immediately return. If all are successfull, the kernel state of the last run is returned
          *
          * @param samples
@@ -208,6 +217,45 @@ namespace Finn {
             }
             return outExecuteResult;
         }
+
+#ifdef UNITTEST
+         public:
+#else
+         protected:
+#endif
+        /**
+         * @brief Reserve enough storage for the expectedEntries number of entries. Note however that because this is a vec of vecs, this only allocates memory for the pointers, not the data itself.
+         *
+         * @param expectedEntries
+         */
+        void allocateLongTermStorage(unsigned int expectedEntries) override { this->longTermStorage.reserve(expectedEntries * this->ringBuffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART)); }
+
+        /**
+         * @brief Store the contents of the memory map into the ring buffer.
+         *
+         */
+        void saveMap() override {
+            //! Fix that if no space is available, the data will be discarded!
+            this->ringBuffer.template store<T*>(this->map, this->ringBuffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
+        }
+
+         protected:
+        /**
+         * @brief Execute the kernel and await it's return.
+         * @attention This function is blocking.
+         *
+         */
+        ert_cmd_state execute() override {
+            auto run = this->associatedKernel(this->internalBo, 1);
+            run.wait(this->msExecuteTimeout);
+            return run.state();
+        }
+
+        /**
+         * @brief Clear the archive of all it's entries
+         *
+         */
+        void clearArchive() override { this->longTermStorage.clear(); }
     };
 }  // namespace Finn
 

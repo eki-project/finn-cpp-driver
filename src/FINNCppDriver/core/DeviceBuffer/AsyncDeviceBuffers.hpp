@@ -13,27 +13,43 @@
 #ifndef ASYNCDEVICEBUFFERS
 #define ASYNCDEVICEBUFFERS
 
+#include <FINNCppDriver/utils/FinnUtils.h>
+
 #include <FINNCppDriver/core/DeviceBuffer/DeviceBuffer.hpp>
 
 #include "ert.h"
 
 namespace Finn {
-    template<typename T>
-    class AsyncDeviceInputBuffer : public DeviceInputBuffer<T> {
-        std::mutex runMutex;
 
+    namespace detail {
+        template<typename T>
+        class AsyncBufferWrapper {
+             protected:
+            RingBuffer<T, true> ringBuffer;
+
+            AsyncBufferWrapper(unsigned int ringBufferSizeFactor, std::size_t elementsPerPart) : ringBuffer(RingBuffer<T, true>(ringBufferSizeFactor, elementsPerPart)) {
+                if (ringBufferSizeFactor == 0) {
+                    FinnUtils::logAndError<std::runtime_error>("DeviceBuffer of size 0 cannot be constructed!");
+                }
+                FINN_LOG(Logger::getLogger(), loglevel::info) << "[SyncDeviceBuffer] Max buffer size:" << ringBufferSizeFactor << "*" << elementsPerPart << "\n";
+            }
+
+            ~AsyncBufferWrapper() = default;
+            AsyncBufferWrapper(AsyncBufferWrapper&& buf) noexcept : ringBuffer(std::move(buf.ringBuffer)) {}
+            AsyncBufferWrapper(const AsyncBufferWrapper& buf) noexcept = delete;
+#ifdef UNITTEST
+             public:
+            RingBuffer<T, true>& testGetRingBuffer() { return this->ringBuffer; }
+#endif
+        };
+    }  // namespace detail
+
+    template<typename T>
+    class AsyncDeviceInputBuffer : public DeviceInputBuffer<T>, public detail::AsyncBufferWrapper<T> {
          public:
         AsyncDeviceInputBuffer(const std::string& pName, xrt::device& device, xrt::kernel& pAssociatedKernel, const shapePacked_t& pShapePacked, unsigned int ringBufferSizeFactor)
-            : DeviceInputBuffer<T>(pName, device, pAssociatedKernel, pShapePacked, ringBufferSizeFactor){};
-        /**
-         * @brief Move Constructor
-         * @attention This move constructor is NOT THREAD SAFE
-         *
-         * @param buf
-         */
-        //! NOT THREAD SAFE
-        // cppcheck-suppress missingMemberCopy
-        AsyncDeviceInputBuffer(AsyncDeviceInputBuffer&& buf) noexcept : DeviceInputBuffer<T>(buf.name, buf.shapePacked, buf.mapSize, buf.internalBo, buf.associatedKernel, buf.map, buf.ringBuffer){};
+            : DeviceInputBuffer<T>(pName, device, pAssociatedKernel, pShapePacked), detail::AsyncBufferWrapper<T>(ringBufferSizeFactor, FinnUtils::shapeToElements(pShapePacked)){};
+        AsyncDeviceInputBuffer(AsyncDeviceInputBuffer&& buf) noexcept = default;
 
         AsyncDeviceInputBuffer(const AsyncDeviceInputBuffer& buf) noexcept = delete;
         ~AsyncDeviceInputBuffer() override = default;
@@ -73,7 +89,27 @@ namespace Finn {
          * @return true
          * @return false
          */
-        bool run() override { return false; }
+        bool run() override {
+            FINN_LOG_DEBUG(logger, loglevel::info) << this->loggerPrefix() << "DeviceBuffer (" << this->name << ") executing...";
+            if (!loadMap()) {
+                return false;
+            }
+            this->sync();
+            execute();
+            return true;
+        }
+
+         protected:
+        /**
+         * @brief Start a run on the associated kernel and wait for it's result.
+         * @attention This method is blocking
+         *
+         */
+        ert_cmd_state execute() override {
+            auto runCall = this->associatedKernel(this->internalBo, 1);
+            runCall.wait();
+            return runCall.state();
+        }
 
         /**
          * @brief Load data from the ring buffer into the memory map of the device.
@@ -83,7 +119,7 @@ namespace Finn {
          * @return true
          * @return false
          */
-        bool loadMap() override { return false; }
+        bool loadMap() { return this->ringBuffer.read(this->map); }
     };
 
     template<typename T>

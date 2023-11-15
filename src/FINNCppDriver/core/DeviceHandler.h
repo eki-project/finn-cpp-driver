@@ -18,6 +18,7 @@
 #include <FINNCppDriver/utils/Types.h>                 // for shape_t
 #include <xrt/xrt_uuid.h>                              // for uuid
 
+#include <FINNCppDriver/core/DeviceBuffer/AsyncDeviceBuffers.hpp>
 #include <FINNCppDriver/core/DeviceBuffer/SyncDeviceBuffers.hpp>
 #include <cstddef>        // for size_t
 #include <cstdint>        // for uint8_t

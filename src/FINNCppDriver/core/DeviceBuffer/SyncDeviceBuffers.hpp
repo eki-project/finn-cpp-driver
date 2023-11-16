@@ -36,6 +36,8 @@ namespace Finn {
             ~SyncBufferWrapper() = default;
             SyncBufferWrapper(SyncBufferWrapper&& buf) noexcept : ringBuffer(std::move(buf.ringBuffer)) {}
             SyncBufferWrapper(const SyncBufferWrapper& buf) noexcept = delete;
+            SyncBufferWrapper& operator=(SyncBufferWrapper&& buf) = delete;
+            SyncBufferWrapper& operator=(const SyncBufferWrapper& buf) = delete;
 #ifdef UNITTEST
              public:
             RingBuffer<T, false>& testGetRingBuffer() { return this->ringBuffer; }
@@ -140,6 +142,13 @@ namespace Finn {
          public:
         SyncDeviceOutputBuffer(const std::string& pName, xrt::device& device, xrt::kernel& pAssociatedKernel, const shapePacked_t& pShapePacked, unsigned int ringBufferSizeFactor)
             : DeviceOutputBuffer<T>(pName, device, pAssociatedKernel, pShapePacked), detail::SyncBufferWrapper<T>(ringBufferSizeFactor, FinnUtils::shapeToElements(pShapePacked)){};
+
+        SyncDeviceOutputBuffer(SyncDeviceOutputBuffer&& buf) noexcept = default;
+        SyncDeviceOutputBuffer(const SyncDeviceOutputBuffer& buf) noexcept = delete;
+        ~SyncDeviceOutputBuffer() override = default;
+        SyncDeviceOutputBuffer& operator=(SyncDeviceOutputBuffer&& buf) = delete;
+        SyncDeviceOutputBuffer& operator=(const SyncDeviceOutputBuffer& buf) = delete;
+
         /**
          * @brief Return the size of the buffer as specified by the argument. Bytes returns all bytes the buffer takes up, elements returns the number of T-values, numbers the number of F-values.
          *

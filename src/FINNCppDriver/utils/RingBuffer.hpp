@@ -53,6 +53,8 @@ namespace Finn {
          */
         std::string static loggerPrefix() { return "[RingBuffer] "; }
 
+        std::size_t freeSpaceNotLocked() const { return buffer.capacity() - buffer.size(); }
+
          public:
         /**
          * @brief Construct a new Ring Buffer object. It's size in terms of values of
@@ -77,9 +79,30 @@ namespace Finn {
         RingBuffer& operator=(RingBuffer&& other) = delete;
         RingBuffer& operator=(const RingBuffer& other) = delete;
 
-        bool empty() const { return buffer.empty(); }
-        bool full() const { return buffer.full(); }
-        std::size_t freeSpace() const { return buffer.capacity() - buffer.size(); }
+        bool empty() {
+            if constexpr (multiThreaded) {
+                std::lock_guard guard(readWriteMutex);
+                return buffer.empty();
+            } else {
+                return buffer.empty();
+            }
+        }
+        bool full() {
+            if constexpr (multiThreaded) {
+                std::lock_guard guard(readWriteMutex);
+                return buffer.full();
+            } else {
+                return buffer.full();
+            }
+        }
+        std::size_t freeSpace() {
+            if constexpr (multiThreaded) {
+                std::lock_guard guard(readWriteMutex);
+                return buffer.capacity() - buffer.size();
+            } else {
+                return buffer.capacity() - buffer.size();
+            }
+        }
 
         /**
          *
@@ -103,7 +126,14 @@ namespace Finn {
             }
         }
 
-        size_t size() const { return buffer.size() / elementsPerPart; }
+        size_t size() {
+            if constexpr (multiThreaded) {
+                std::lock_guard guard(readWriteMutex);
+                return buffer.size() / elementsPerPart;
+            } else {
+                return buffer.size() / elementsPerPart;
+            }
+        }
 
         /**
          * @brief Stores data in the ring buffer. In singlethreaded mode, it returns
@@ -128,9 +158,9 @@ namespace Finn {
             if constexpr (multiThreaded) {
                 // lock buffer
                 std::unique_lock lk(readWriteMutex);
-                if (datasize > freeSpace()) {
+                if (datasize > freeSpaceNotLocked()) {
                     // go to sleep and wait until enough space available
-                    cv.wait(lk, [&datasize, this] { return datasize <= freeSpace(); });
+                    cv.wait(lk, [&datasize, this] { return datasize <= freeSpaceNotLocked(); });
                 }
                 // put data into buffer
                 buffer.insert(buffer.end(), first, last);
@@ -142,7 +172,7 @@ namespace Finn {
                 return true;
 
             } else {
-                if (datasize > freeSpace()) {
+                if (datasize > freeSpaceNotLocked()) {
                     // Data could not be stored
                     return false;
                 }

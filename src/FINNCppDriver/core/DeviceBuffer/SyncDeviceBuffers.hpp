@@ -101,12 +101,7 @@ namespace Finn {
          * @param ss
          * @return size_t
          */
-        size_t size(SIZE_SPECIFIER ss) override {
-            if (ss == SIZE_SPECIFIER::VALUES_PER_INPUT) {
-                return FinnUtils::shapeToElements(this->shapePacked);
-            }
-            return this->ringBuffer.size(ss);
-        }
+        size_t size(SIZE_SPECIFIER ss) override { return this->ringBuffer.size(ss); }
 
         /**
          * @brief Execute the first valid data that is found in the buffer. Returns false if no valid data was found
@@ -155,12 +150,7 @@ namespace Finn {
          * @param ss
          * @return size_t
          */
-        size_t size(SIZE_SPECIFIER ss) override {
-            if (ss == SIZE_SPECIFIER::VALUES_PER_INPUT) {
-                return FinnUtils::shapeToElements(this->shapePacked);
-            }
-            return this->ringBuffer.size(ss);
-        }
+        size_t size(SIZE_SPECIFIER ss) override { return this->ringBuffer.size(ss); }
 
 
         /**

@@ -240,10 +240,10 @@ namespace Finn {
             FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "Starting inference (raw data)";
             auto storeFunc = accelerator.storeFactory(inputDeviceIndex, inputBufferKernelName);
 
-            if (std::abs(std::distance(first, last)) != size(SIZE_SPECIFIER::VALUES_PER_INPUT, inputDeviceIndex, inputBufferKernelName) * batchSize) {
+            if (std::abs(std::distance(first, last)) != size(SIZE_SPECIFIER::ELEMENTS_PER_PART, inputDeviceIndex, inputBufferKernelName) * batchSize) {
                 FinnUtils::logAndError<std::runtime_error>("Input length (" + std::to_string(std::abs(std::distance(first, last))) + ") does not match up with batches*inputsize_per_batch (" +
-                                                           std::to_string(size(SIZE_SPECIFIER::VALUES_PER_INPUT, inputDeviceIndex, inputBufferKernelName)) + "*" + std::to_string(batchSize) + "=" +
-                                                           std::to_string(size(SIZE_SPECIFIER::VALUES_PER_INPUT, inputDeviceIndex, inputBufferKernelName) * batchSize) + ")");
+                                                           std::to_string(size(SIZE_SPECIFIER::ELEMENTS_PER_PART, inputDeviceIndex, inputBufferKernelName)) + "*" + std::to_string(batchSize) + "=" +
+                                                           std::to_string(size(SIZE_SPECIFIER::ELEMENTS_PER_PART, inputDeviceIndex, inputBufferKernelName) * batchSize) + ")");
             }
 
             bool stored = storeFunc(first, last);

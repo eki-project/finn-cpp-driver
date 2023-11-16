@@ -137,7 +137,7 @@ TEST_F(DBTest, DBLTSTest) {
     // Expected: Buffer was full at max capacity. All entries were valid and put into the LTS, and the two new entries are in the buffer
     EXPECT_FALSE(outputBuffer.testGetRingBuffer().full());
     EXPECT_EQ(outputBuffer.testGetRingBuffer().size(), 2);
-    EXPECT_EQ(outputBuffer.testGetLTS().size(), outputBuffer.size(SIZE_SPECIFIER::PARTS) * outputBuffer.size(SIZE_SPECIFIER::VALUES_PER_INPUT));
+    EXPECT_EQ(outputBuffer.testGetLTS().size(), outputBuffer.size(SIZE_SPECIFIER::PARTS) * outputBuffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
 
     // Check integrity of data
     auto results = outputBuffer.retrieveArchive();
@@ -160,7 +160,7 @@ TEST_F(DBTest, DBLTSTest) {
 
     // Manual transfer to LTS
     outputBuffer.archiveValidBufferParts();
-    EXPECT_EQ(outputBuffer.testGetLTS().size(), 2 * outputBuffer.size(SIZE_SPECIFIER::VALUES_PER_INPUT));
+    EXPECT_EQ(outputBuffer.testGetLTS().size(), 2 * outputBuffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
     EXPECT_EQ(outputBuffer.testGetRingBuffer().size(), 0);
 }
 

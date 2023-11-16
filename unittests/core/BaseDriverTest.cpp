@@ -74,7 +74,7 @@ TEST_F(BaseDriverTest, BasicBaseDriverTest) {
     // Run inference
     auto results = driver.inferR(data.begin(), data.begin() + 80, 0, inputDmaName, 0, outputDmaName, 1, 1);
 
-    Finn::vector<uint8_t> base(data.begin(), data.begin() + static_cast<long int>(driver.size(SIZE_SPECIFIER::VALUES_PER_INPUT, 0, outputDmaName)));
+    Finn::vector<uint8_t> base(data.begin(), data.begin() + static_cast<long int>(driver.size(SIZE_SPECIFIER::ELEMENTS_PER_PART, 0, outputDmaName)));
 
 
     // Checks: That input and output data is the same is just for convenience, in application this does not need to be
@@ -99,7 +99,7 @@ TEST_F(BaseDriverTest, syncInferenceTest) {
     // Run inference
     auto results = driver.inferSynchronous(data.begin(), data.end());
 
-    Finn::vector<uint8_t> expected(driver.size(SIZE_SPECIFIER::VALUES_PER_INPUT, 0, outputDmaName) * 8, 0);
+    Finn::vector<uint8_t> expected(driver.size(SIZE_SPECIFIER::ELEMENTS_PER_PART, 0, outputDmaName) * 8, 0);
 
     for (std::size_t i = 0; i < expected.size(); ++i) {
         if (i % 8 == 0) {

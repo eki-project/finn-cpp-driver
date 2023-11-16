@@ -28,7 +28,7 @@ TEST(SyncInference, syncInferenceTest) {
 
     auto driver = Finn::Driver(conf, 10, 0, conf.deviceWrappers[0].idmas[0]->kernelName, 0, conf.deviceWrappers[0].odmas[0]->kernelName, 1, true);
 
-    Finn::vector<int8_t> data(driver.size(SIZE_SPECIFIER::VALUES_PER_INPUT, 0, conf.deviceWrappers[0].idmas[0]->kernelName), 1);
+    Finn::vector<int8_t> data(driver.size(SIZE_SPECIFIER::ELEMENTS_PER_PART, 0, conf.deviceWrappers[0].idmas[0]->kernelName), 1);
 
     std::iota(data.begin(), data.end(), -127);
 

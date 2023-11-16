@@ -192,6 +192,61 @@ namespace Finn {
          */
         size_t size(SIZE_SPECIFIER ss, uint deviceIndex, const std::string& bufferName) { return accelerator.size(ss, deviceIndex, bufferName); }
 
+
+        /**
+         * @brief Store input into the driver for asynchronous inference
+         *
+         * @tparam IteratorType
+         * @param first
+         * @param last
+         * @param inputDeviceIndex FPGA device to be used for inference
+         * @param inputBufferKernelName Identifier of the input kernel
+         * @param batchSize Batch size contained in the input
+         */
+        template<typename IteratorType>
+        void input(IteratorType first, IteratorType last, uint inputDeviceIndex, const std::string& inputBufferKernelName, uint batchSize) {
+            FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "Store data for asynchronous inference.";
+            auto packed = Finn::pack<F>(first, last);
+            auto storeFunc = accelerator.storeFactory(inputDeviceIndex, inputBufferKernelName);
+
+            if (std::abs(std::distance(packed.begin(), packed.end())) != size(SIZE_SPECIFIER::ELEMENTS_PER_PART, inputDeviceIndex, inputBufferKernelName) * batchSize) {
+                FinnUtils::logAndError<std::runtime_error>("Input length (" + std::to_string(std::abs(std::distance(packed.begin(), packed.end()))) + ") does not match up with batches*inputsize_per_batch (" +
+                                                           std::to_string(size(SIZE_SPECIFIER::ELEMENTS_PER_PART, inputDeviceIndex, inputBufferKernelName)) + "*" + std::to_string(batchSize) + "=" +
+                                                           std::to_string(size(SIZE_SPECIFIER::ELEMENTS_PER_PART, inputDeviceIndex, inputBufferKernelName) * batchSize) + ")");
+            }
+
+            storeFunc(packed.begin(), packed.end());
+        }
+
+        template<typename IteratorType>
+        void input(IteratorType first, IteratorType last) {
+            input(first, last, defaultInputDeviceIndex, defaultInputKernelName, batchElements);
+        }
+
+        /**
+         * @brief Get the results of a asynchronous inference
+         *
+         * @tparam V
+         * @param outputDeviceIndex FPGA device from which data should be received
+         * @param outputBufferKernelName Identifier of the output kernel
+         * @param forceAchival Should data be explicitly polled?
+         * @return Finn::vector<V>
+         */
+        template<typename V = Finn::UnpackingAutoRetType::AutoRetType<S>>
+        Finn::vector<V> getResults(uint outputDeviceIndex, const std::string& outputBufferKernelName, bool forceArchival) {
+            // TODO(linusjun): maybe this method should block until data is available?
+            auto result = accelerator.retrieveResults(outputDeviceIndex, outputBufferKernelName, forceArchival);
+            return unpack<S, V>(result);
+        }
+
+        template<typename V = Finn::UnpackingAutoRetType::AutoRetType<S>>
+        Finn::vector<V> getResults() {
+            // TODO(linusjun): maybe this method should block until data is available?
+            auto result = accelerator.retrieveResults(defaultOutputDeviceIndex, defaultOutputKernelName, forceAchieval);
+            return unpack<S, V>(result);
+        }
+
+
         template<typename IteratorType, typename V = Finn::UnpackingAutoRetType::AutoRetType<S>>
         Finn::vector<V> inferSynchronous(IteratorType first, IteratorType last, uint inputDeviceIndex, const std::string& inputBufferKernelName, uint outputDeviceIndex, const std::string& outputBufferKernelName, uint batchSize,
                                          bool forceArchival) {

@@ -175,12 +175,8 @@ namespace Finn {
          */
         void archiveValidBufferParts() override {
             FINN_LOG_DEBUG(logger, loglevel::info) << this->loggerPrefix() << "Archiving data from ring buffer to long term storage";
-            static const std::size_t elementsCount = FinnUtils::shapeToElements(this->shapePacked);
-            this->longTermStorage.reserve(this->longTermStorage.size() + this->ringBuffer.size(SIZE_SPECIFIER::PARTS) * elementsCount);
-            Finn::vector<uint8_t> tmp;
-            tmp.reserve(this->ringBuffer.size(SIZE_SPECIFIER::PARTS) * elementsCount);
-            this->ringBuffer.readAllValidParts(std::back_inserter(tmp));
-            std::copy(tmp.begin(), tmp.begin() + static_cast<long int>(tmp.size()), std::back_inserter(this->longTermStorage));
+            this->longTermStorage.reserve(this->longTermStorage.size() + this->ringBuffer.size());
+            this->ringBuffer.readAllValidParts(std::back_inserter(this->longTermStorage));
         }
 
         /**
@@ -217,11 +213,6 @@ namespace Finn {
             return outExecuteResult;
         }
 
-#ifdef UNITTEST
-         public:
-#else
-         protected:
-#endif
         /**
          * @brief Reserve enough storage for the expectedEntries number of entries. Note however that because this is a vec of vecs, this only allocates memory for the pointers, not the data itself.
          *
@@ -229,14 +220,17 @@ namespace Finn {
          */
         void allocateLongTermStorage(unsigned int expectedEntries) override { this->longTermStorage.reserve(expectedEntries * this->ringBuffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART)); }
 
+#ifdef UNITTEST
+         public:
+#else
+         protected:
+#endif
+
         /**
          * @brief Store the contents of the memory map into the ring buffer.
          *
          */
-        void saveMap() override {
-            //! Fix that if no space is available, the data will be discarded!
-            this->ringBuffer.template store<T*>(this->map, this->ringBuffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
-        }
+        void saveMap() override { this->ringBuffer.template store<T*>(this->map, this->ringBuffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART)); }
 
          protected:
         /**

@@ -110,6 +110,8 @@ namespace Finn {
 
     template<typename T>
     class SyncDeviceInputBuffer;
+    template<typename T>
+    class AsyncDeviceInputBuffer;
 
     template<typename T>
     class DeviceInputBuffer : public DeviceBuffer<T> {
@@ -125,6 +127,8 @@ namespace Finn {
         bool store(InputIt first, InputIt last) {
             // TODO(linusjun): benchmark and possibly replace iterator interface with span
             if (auto ptr = dynamic_cast<SyncDeviceInputBuffer<T>*>(this)) {
+                return ptr->template storeImpl<InputIt>(first, last);
+            } else if (auto ptr = dynamic_cast<AsyncDeviceInputBuffer<T>*>(this)) {
                 return ptr->template storeImpl<InputIt>(first, last);
             } else {
                 return false;

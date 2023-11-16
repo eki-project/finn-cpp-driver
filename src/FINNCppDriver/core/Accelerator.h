@@ -43,7 +43,7 @@ namespace Finn {
          *
          * @param deviceDefinitions Vector of @ref DeviceWrapper
          */
-        explicit Accelerator(const std::vector<DeviceWrapper>& deviceDefinitions, unsigned int hostBufferSize);
+        explicit Accelerator(const std::vector<DeviceWrapper>& deviceDefinitions, bool synchronousInference, unsigned int hostBufferSize);
         Accelerator(Accelerator&&) = default;
         Accelerator(const Accelerator&) = delete;
         Accelerator& operator=(Accelerator&&) = default;

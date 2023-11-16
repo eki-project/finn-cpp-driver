@@ -13,6 +13,7 @@
 #include <FINNCppDriver/utils/Logger.h>
 #include <benchmark/benchmark.h>
 
+#include <FINNCppDriver/core/DeviceBuffer/AsyncDeviceBuffers.hpp>
 #include <FINNCppDriver/core/DeviceBuffer/SyncDeviceBuffers.hpp>
 #include <FINNCppDriver/utils/FinnDatatypes.hpp>
 #include <chrono>

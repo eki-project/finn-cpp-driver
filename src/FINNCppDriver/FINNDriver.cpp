@@ -87,7 +87,7 @@ void logDeviceInformation(logger_type& logger, xrt::device& device, const std::s
  * @param hostBufferSize
  * @return Finn::Driver
  */
-Finn::Driver createDriverFromConfig(const std::filesystem::path& configFilePath, unsigned int hostBufferSize) { return {configFilePath, hostBufferSize}; }
+Finn::Driver createDriverFromConfig(const std::filesystem::path& configFilePath, unsigned int hostBufferSize, bool synchronousMode) { return {configFilePath, hostBufferSize, synchronousMode}; }
 
 /**
  * @brief Run test inferences. The data used is generated randomly. Useful for testing functionality
@@ -211,14 +211,11 @@ int main(int argc, char* argv[]) {
         if (!(varMap.count("input") > 0)) {
             FinnUtils::logAndError<std::invalid_argument>("No input file specified for file execution mode!");
         }
-        auto driver = createDriverFromConfig(configFilePath, varMap["buffersize"].as<unsigned int>());
+        auto driver = createDriverFromConfig(configFilePath, varMap["buffersize"].as<unsigned int>(), false);
         runWithInputFile(driver, logger);
     } else if (varMap["mode"].as<std::string>() == "test") {
-        auto driver = createDriverFromConfig(configFilePath, varMap["buffersize"].as<unsigned int>());
+        auto driver = createDriverFromConfig(configFilePath, varMap["buffersize"].as<unsigned int>(), true);
         runFiletest(driver, logger);
-    } else if (varMap["mode"].as<std::string>() == "integrationtest") {
-        auto driver = createDriverFromConfig(configFilePath, varMap["buffersize"].as<unsigned int>());
-        runIntegrationTest(driver, logger);
     } else {
         FinnUtils::logAndError<std::invalid_argument>("Unknown driver mode: " + varMap["mode"].as<std::string>());
     }

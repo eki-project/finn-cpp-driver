@@ -75,7 +75,7 @@ namespace Finn {
 
 
          public:
-        explicit DeviceHandler(const DeviceWrapper& devWrap, unsigned int hostBufferSize = 100);
+        explicit DeviceHandler(const DeviceWrapper& devWrap, bool synchronousInference, unsigned int hostBufferSize = 100);
         /**
          * @brief Default move constructor
          *
@@ -187,6 +187,34 @@ namespace Finn {
          */
         bool containsBuffer(const std::string& kernelBufferName, IO ioMode);
 
+        //* SAFE + REFERENCE
+        bool store(const Finn::vector<uint8_t>& data, const std::string& inputBufferKernelName);
+
+        //* SAFE + ITERATOR
+        template<typename IteratorType>
+        bool store(IteratorType first, IteratorType last, const std::string& inputBufferKernelName) {
+            if (!inputBufferMap.contains(inputBufferKernelName)) {
+                FinnUtils::logAndError<std::runtime_error>("Tried accessing kernel/buffer with name " + inputBufferKernelName + " but this kernel / buffer does not exist!");
+            }
+            return inputBufferMap.at(inputBufferKernelName)->store(first, last);
+        }
+
+        /**
+         * @brief Get an input buffer from this device based on its name
+         *
+         * @param name
+         * @return std::shared_ptr<DeviceInputBuffer<uint8_t>>&
+         */
+        std::shared_ptr<DeviceInputBuffer<uint8_t>>& getInputBuffer(const std::string& name);
+
+        /**
+         * @brief Get the Output Buffer from this device by its name
+         *
+         * @param name
+         * @return std::shared_ptr<DeviceOutputBuffer<uint8_t>>&
+         */
+        std::shared_ptr<DeviceOutputBuffer<uint8_t>>& getOutputBuffer(const std::string& name);
+
 
          protected:
         /**
@@ -207,7 +235,7 @@ namespace Finn {
          * @param devWrap
          * @param hostBufferSize How many multiples of one sample should be store-able in the buffer
          */
-        void initializeBufferObjects(const DeviceWrapper& devWrap, unsigned int hostBufferSize);
+        void initializeBufferObjects(const DeviceWrapper& devWrap, unsigned int hostBufferSize, bool synchronousInference);
 
          private:
         /**
@@ -216,19 +244,6 @@ namespace Finn {
          * @return std::string
          */
         static std::string loggerPrefix();
-
-         public:
-        //* SAFE + REFERENCE
-        bool store(const Finn::vector<uint8_t>& data, const std::string& inputBufferKernelName);
-
-        //* SAFE + ITERATOR
-        template<typename IteratorType>
-        bool store(IteratorType first, IteratorType last, const std::string& inputBufferKernelName) {
-            if (!inputBufferMap.contains(inputBufferKernelName)) {
-                FinnUtils::logAndError<std::runtime_error>("Tried accessing kernel/buffer with name " + inputBufferKernelName + " but this kernel / buffer does not exist!");
-            }
-            return inputBufferMap.at(inputBufferKernelName)->store(first, last);
-        }
 
         //* UNSAFE + REFERENCE
         bool storeUnchecked(const Finn::vector<uint8_t>& data, const std::string& inputBufferKernelName);
@@ -240,21 +255,6 @@ namespace Finn {
             return inputBufferMap.at(inputBufferKernelName)->store(first, last);
         }
 
-        /**
-         * @brief Get an input buffer from this device based on its name
-         *
-         * @param name
-         * @return std::shared_ptr<DeviceInputBuffer<uint8_t>>&
-         */
-        std::shared_ptr<DeviceInputBuffer<uint8_t>>& getInputBuffer(const std::string& name);
-
-        /**
-         * @brief Get the Output Buffer from this device by its name
-         *
-         * @param name
-         * @return std::shared_ptr<DeviceOutputBuffer<uint8_t>>&
-         */
-        std::shared_ptr<DeviceOutputBuffer<uint8_t>>& getOutputBuffer(const std::string& name);
 
 #ifndef NDEBUG
         /**

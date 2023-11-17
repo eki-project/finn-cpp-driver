@@ -149,6 +149,7 @@ namespace Finn {
         template<typename IteratorType>
         bool store(IteratorType first, IteratorType last) {
             const std::size_t datasize = std::abs(std::distance(first, last));
+            FINN_LOG(Logger::getLogger(), loglevel::info) << "Store of size: " << datasize << " into ringbuffer";
             if (datasize % elementsPerPart != 0) {
                 FinnUtils::logAndError<std::runtime_error>("It is not possible to store data that is not a multiple of a part! Datasize: " + std::to_string(datasize) + ", Elements per Part: " + std::to_string(elementsPerPart) + "\n");
             }
@@ -169,6 +170,7 @@ namespace Finn {
                 // the waiting thread only to block again
                 lk.unlock();
                 cv.notify_one();
+                FINN_LOG(Logger::getLogger(), loglevel::info) << "Store completed successfully";
                 return true;
 
             } else {

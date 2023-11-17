@@ -23,6 +23,7 @@
 #include <boost/log/keywords/file_name.hpp>               // for file_name
 #include <boost/log/keywords/format.hpp>                  // for format, key...
 #include <boost/log/keywords/rotation_size.hpp>           // for rotation_size
+#include <boost/log/keywords/severity.hpp>                // for keywords
 #include <boost/log/keywords/time_based_rotation.hpp>     // for time_based_...
 #include <boost/log/sinks/sync_frontend.hpp>              // for synchronous...
 #include <boost/log/sinks/text_file_backend.hpp>          // for rotation_at...
@@ -36,8 +37,7 @@
 #include <boost/smart_ptr/make_shared_object.hpp>         // for make_shared
 #include <boost/smart_ptr/shared_ptr.hpp>                 // for shared_ptr
 #include <boost/thread/exceptions.hpp>                    // for thread_inte...
-#include <fstream>                                        // for streamsize
-#include <iostream>                                       // for clog
+#include <iostream>                                       // for streamsize
 
 using backend_type = bl::sinks::text_file_backend;
 using sink_type = bl::sinks::synchronous_sink<backend_type>;

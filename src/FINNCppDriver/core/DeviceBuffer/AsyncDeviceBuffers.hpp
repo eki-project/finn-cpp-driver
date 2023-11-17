@@ -78,6 +78,7 @@ namespace Finn {
                 if (!this->loadMap(stoken)) {  // blocks
                     break;
                 }
+                FINN_LOG(this->logger, loglevel::info) << "Data loaded into memmap and starting inference";
                 this->sync();
                 this->execute();
             }
@@ -154,6 +155,7 @@ namespace Finn {
                     FINN_LOG(this->logger, loglevel::error) << "A problem has occured during the read process of the FPGA output.";
                     continue;
                 }
+                FINN_LOG(this->logger, loglevel::info) << "Inference complete getting data into the output ring buffer";
                 this->sync();
                 saveMap();
                 if (this->ringBuffer.full()) {  // TODO(linusjun): Allow registering of callback for this event?

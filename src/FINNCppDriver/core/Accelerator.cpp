@@ -12,16 +12,16 @@
 
 #include "Accelerator.h"
 
-#include <algorithm>  // for transform
-#include <cstddef>    // for size_t
-#include <functional>
-#include <iterator>  // for back_insert_iterator, back_inserter
-#include <memory>    // for allocator_traits<>::value_type
+#include <FINNCppDriver/core/DeviceHandler.h>  // for DeviceHandler, Uncheck...
+#include <FINNCppDriver/utils/FinnUtils.h>     // for logAndError, unreachable
+#include <FINNCppDriver/utils/Logger.h>        // for operator<<, DevNull
 
-#include "../utils/ConfigurationStructs.h"
-#include "../utils/FinnUtils.h"
-#include "DeviceHandler.h"
-#include "ert.h"
+#include <algorithm>  // for count_if, find_if, tra...
+#include <cstddef>    // for size_t
+#include <iterator>   // for back_insert_iterator
+#include <stdexcept>  // for runtime_error
+
+#include "ert.h"  // for ert_cmd_state
 
 namespace Finn {
     Accelerator::Accelerator(const std::vector<DeviceWrapper>& deviceDefinitions, bool synchronousInference, unsigned int hostBufferSize) {

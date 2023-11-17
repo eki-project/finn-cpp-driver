@@ -13,14 +13,18 @@
 #ifndef ACCELERATOR_H
 #define ACCELERATOR_H
 
-#include <FINNCppDriver/core/DeviceHandler.h>  // for BufferDescriptor, DeviceHandler
+#include <FINNCppDriver/core/DeviceHandler.h>  // for DeviceHandler, Uncheck...
+#include <FINNCppDriver/utils/Types.h>         // for vector, SIZE_SPECIFIER
 
-#include <cinttypes>   // for uint8_t
-#include <filesystem>  // for path
-#include <string>      // for string
-#include <vector>      // for vector
+#include <cinttypes>  // for uint8_t
+#include <cstddef>    // for size_t
+#include <string>     // for string
+#include <vector>     // for vector, vector<>::iter...
 
-#include "ert.h"
+#include "ert.h"  // for ert_cmd_state
+namespace Finn {
+    struct DeviceWrapper;
+}
 
 
 namespace Finn {
@@ -148,9 +152,9 @@ namespace Finn {
          * @param ss
          * @param deviceIndex
          * @param bufferName
-         * @return size_t
+         * @return std::size_t
          */
-        size_t size(SIZE_SPECIFIER ss, unsigned int deviceIndex, const std::string& bufferName);
+        std::size_t size(SIZE_SPECIFIER ss, unsigned int deviceIndex, const std::string& bufferName);
     };
 
 

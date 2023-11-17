@@ -251,7 +251,7 @@ namespace Finn {
         Finn::vector<V> inferSynchronous(IteratorType first, IteratorType last, uint inputDeviceIndex, const std::string& inputBufferKernelName, uint outputDeviceIndex, const std::string& outputBufferKernelName, uint batchSize,
                                          bool forceArchival) {
             auto packed = Finn::pack<F>(first, last);
-            auto result = inferRaw(packed.begin(), packed.end(), inputDeviceIndex, inputBufferKernelName, outputDeviceIndex, outputBufferKernelName, batchSize, forceArchival);
+            auto result = infer(packed.begin(), packed.end(), inputDeviceIndex, inputBufferKernelName, outputDeviceIndex, outputBufferKernelName, batchSize, forceArchival);
             return unpack<S, V>(result);
         }
 
@@ -287,8 +287,8 @@ namespace Finn {
          * @return Finn::vector<uint8_t>
          */
         template<typename IteratorType>
-        [[nodiscard]] Finn::vector<uint8_t> inferRaw(IteratorType first, IteratorType last, uint inputDeviceIndex, const std::string& inputBufferKernelName, uint outputDeviceIndex, const std::string& outputBufferKernelName, uint batchSize,
-                                                     bool forceArchival) {
+        [[nodiscard]] Finn::vector<uint8_t> infer(IteratorType first, IteratorType last, uint inputDeviceIndex, const std::string& inputBufferKernelName, uint outputDeviceIndex, const std::string& outputBufferKernelName, uint batchSize,
+                                                  bool forceArchival) {
             FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "Starting inference (raw data)";
             auto storeFunc = accelerator.storeFactory(inputDeviceIndex, inputBufferKernelName);
 
@@ -299,33 +299,36 @@ namespace Finn {
             }
 
             bool stored = storeFunc(first, last);
-            bool ran = accelerator.run(inputDeviceIndex, inputBufferKernelName);
+
+            for (std::size_t i = 0; i < batchSize; ++i) {
+                bool ran = accelerator.run(inputDeviceIndex, inputBufferKernelName);
 
 #ifdef UNITTEST
-            Finn::vector<uint8_t> data(first, last);
-            FINN_LOG(logger, loglevel::info) << "Readback from device buffer confirming data was written to board successfully: " << isSyncedDataEquivalent(inputDeviceIndex, inputBufferKernelName, data);
+                Finn::vector<uint8_t> data(first, last);
+                FINN_LOG(logger, loglevel::info) << "Readback from device buffer confirming data was written to board successfully: " << isSyncedDataEquivalent(inputDeviceIndex, inputBufferKernelName, data);
 #endif
 
-            if (stored && ran) {
-                FINN_LOG_DEBUG(logger, loglevel::info) << "Reading out buffers";
-                ert_cmd_state resultState = accelerator.read(outputDeviceIndex, outputBufferKernelName, 1 /*Maybe this can be used to put more than one batch element on the FPGA, ignored for now.*/);
+                if (stored && ran) {
+                    FINN_LOG_DEBUG(logger, loglevel::info) << "Reading out buffers";
+                    ert_cmd_state resultState = accelerator.read(outputDeviceIndex, outputBufferKernelName, 1 /*Maybe this can be used to put more than one batch element on the FPGA, ignored for now.*/);
 
-                // If the kernel run is completed (success or by timeout (more reads than were in the pipeline)), return the data
-                if (resultState == ERT_CMD_STATE_COMPLETED || resultState == ERT_CMD_STATE_TIMEOUT || resultState == ERT_CMD_STATE_NEW) {
-                    return accelerator.retrieveResults(outputDeviceIndex, outputBufferKernelName, forceArchival);
+                    // If the kernel run is completed (success or by timeout (more reads than were in the pipeline)), return the data
+                    if (resultState != ERT_CMD_STATE_COMPLETED && resultState != ERT_CMD_STATE_TIMEOUT && resultState != ERT_CMD_STATE_NEW) {
+                        FinnUtils::logAndError<std::runtime_error>("Unspecifiable error during inference (ert_cmd_state is " + std::to_string(resultState) + ")!");
+                        return {};
+                    }
                 } else {
-                    FinnUtils::logAndError<std::runtime_error>("Unspecifiable error during inference (ert_cmd_state is " + std::to_string(resultState) + ")!");
+                    FinnUtils::logAndError<std::runtime_error>("Data either couldnt be stored or there was no data to execute!");
                     return {};
                 }
-            } else {
-                FinnUtils::logAndError<std::runtime_error>("Data either couldnt be stored or there was no data to execute!");
-                return {};
             }
+
+            return accelerator.retrieveResults(outputDeviceIndex, outputBufferKernelName, forceArchival);
         }
 
         /**
          *
-         * @brief Do an inference with the given data. This assumes already flattened data in uint8_t's. Specify inputs and outputs.
+         * @brief Do inference with the given data. This assumes already flattened data in uint8_t's. Specify inputs and outputs.
          *
          * @param data
          * @param inputDeviceIndex
@@ -336,63 +339,8 @@ namespace Finn {
          * @param forceArchival If true, the data gets written to LTS either way, ensuring that there is data to be read!
          * @return Finn::vector<uint8_t>
          */
-        [[nodiscard]] Finn::vector<uint8_t> inferRaw(const Finn::vector<uint8_t>& data, uint inputDeviceIndex, const std::string& inputBufferKernelName, uint outputDeviceIndex, const std::string& outputBufferKernelName, uint batchSize,
-                                                     bool forceArchival) {
-            return inferRaw(data.begin(), data.end(), inputDeviceIndex, inputBufferKernelName, outputDeviceIndex, outputBufferKernelName, batchSize, forceArchival);
-        }
-
-        /**
-         * @brief Do an inference with the given data. This assumes already flattened data in uint8_t's. Specify inputs and outputs.
-         *
-         * @tparam IteratorType
-         * @param first
-         * @param last
-         * @param inputDeviceIndex
-         * @param inputBufferKernelName
-         * @param outputDeviceIndex
-         * @param outputBufferKernelName
-         * @param batchSize
-         * @param forceArchival
-         * @return Finn::vector<uint8_t>
-         */
-        template<typename IteratorType>
-        [[nodiscard]] Finn::vector<uint8_t> infer(IteratorType first, IteratorType last, uint inputDeviceIndex, const std::string& inputBufferKernelName, uint outputDeviceIndex, const std::string& outputBufferKernelName, uint batchSize,
+        [[nodiscard]] Finn::vector<uint8_t> infer(const Finn::vector<uint8_t>& data, uint inputDeviceIndex, const std::string& inputBufferKernelName, uint outputDeviceIndex, const std::string& outputBufferKernelName, uint batchSize,
                                                   bool forceArchival) {
-            FINN_LOG_DEBUG(logger, loglevel::info) << "Starting inference";
-            bool stored = accelerator.store(first, last, inputDeviceIndex, inputBufferKernelName);
-            FINN_LOG_DEBUG(logger, loglevel::info) << "Running kernels";
-            bool ran = accelerator.run(inputDeviceIndex, inputBufferKernelName);
-            if (stored && ran) {
-                FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "Reading out buffers";
-                ert_cmd_state resultState = accelerator.read(outputDeviceIndex, outputBufferKernelName, 1);
-
-                // If the kernel run is completed (success or by timeout (more reads than were in the pipeline)), return the data
-                if (resultState == ERT_CMD_STATE_COMPLETED || resultState == ERT_CMD_STATE_TIMEOUT || resultState == ERT_CMD_STATE_NEW) {
-                    return accelerator.retrieveResults(outputDeviceIndex, outputBufferKernelName, forceArchival);
-                } else {
-                    FinnUtils::logAndError<std::runtime_error>("Unspecifiable error during inference (ert_cmd_state is " + std::to_string(resultState) + ")!");
-                    return {};
-                }
-            } else {
-                FinnUtils::logAndError<std::runtime_error>("Data either couldnt be stored or there was no data to execute!");
-                return {};
-            }
-        }
-
-        /**
-         * @brief Do an inference with the given data. This assumes already flattened data in uint8_t's. Specify inputs and outputs.
-         *
-         * @param data
-         * @param inputDeviceIndex
-         * @param inputBufferKernelName
-         * @param outputDeviceIndex
-         * @param outputBufferKernelName
-         * @param batchSize
-         * @param forceArchival
-         * @return std::vector<std::vector<uint8_t>>
-         */
-        [[nodiscard]] std::vector<std::vector<uint8_t>> infer(const std::vector<uint8_t>& data, uint inputDeviceIndex, const std::string& inputBufferKernelName, uint outputDeviceIndex, const std::string& outputBufferKernelName,
-                                                              uint batchSize, bool forceArchival) {
             return infer(data.begin(), data.end(), inputDeviceIndex, inputBufferKernelName, outputDeviceIndex, outputBufferKernelName, batchSize, forceArchival);
         }
 

@@ -47,13 +47,13 @@ class TestDriver : public Finn::Driver {
     TestDriver(const Finn::Config& pConfig, unsigned int hostBufferSize) : Finn::Driver(pConfig, hostBufferSize, true) {}
     Finn::vector<uint8_t> inferR(const Finn::vector<uint8_t>& data, unsigned int inputDeviceIndex, const std::string& inputBufferKernelName, unsigned int outputDeviceIndex, const std::string& outputBufferKernelName, unsigned int samples,
                                  bool forceArchival) {
-        return inferRaw(data, inputDeviceIndex, inputBufferKernelName, outputDeviceIndex, outputBufferKernelName, samples, forceArchival);
+        return infer(data, inputDeviceIndex, inputBufferKernelName, outputDeviceIndex, outputBufferKernelName, samples, forceArchival);
     }
 
     template<typename IterType>
     Finn::vector<uint8_t> inferR(IterType first, IterType last, unsigned int inputDeviceIndex, const std::string& inputBufferKernelName, unsigned int outputDeviceIndex, const std::string& outputBufferKernelName, unsigned int samples,
                                  bool forceArchival) {
-        return inferRaw(first, last, inputDeviceIndex, inputBufferKernelName, outputDeviceIndex, outputBufferKernelName, samples, forceArchival);
+        return infer(first, last, inputDeviceIndex, inputBufferKernelName, outputDeviceIndex, outputBufferKernelName, samples, forceArchival);
     }
 };
 

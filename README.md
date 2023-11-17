@@ -2,6 +2,7 @@
 
 [![C++ Standard](https://img.shields.io/badge/C++_Standard-C%2B%2B20-blue.svg?style=flat&logo=c%2B%2B)](https://isocpp.org/)
 [![GitHub license](https://img.shields.io/badge/license-MIT-blueviolet.svg)](LICENSE)
+[![GitHub Releases](https://img.shields.io/github/v/release/eki-project/finn-cpp-driver.svg)](https://github.com/eki-project/finn-cpp-driver/releases)
 
 ## Getting Started
 

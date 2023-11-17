@@ -45,7 +45,7 @@ TEST(SyncInference, syncBatchInferenceTest) {
     Finn::Config conf = Finn::createConfigFromPath(exampleNetworkConfig);
     std::size_t batchLength = 10;
 
-    auto driver = Finn::Driver(conf, static_cast<uint>(batchLength), 0, conf.deviceWrappers[0].idmas[0]->kernelName, 0, conf.deviceWrappers[0].odmas[0]->kernelName, 1, true, true);
+    auto driver = Finn::Driver(conf, static_cast<uint>(batchLength), 0, conf.deviceWrappers[0].idmas[0]->kernelName, 0, conf.deviceWrappers[0].odmas[0]->kernelName, static_cast<uint>(batchLength), true, true);
 
     Finn::vector<int8_t> data(driver.size(SIZE_SPECIFIER::ELEMENTS_PER_PART, 0, conf.deviceWrappers[0].idmas[0]->kernelName) * batchLength, 1);
 

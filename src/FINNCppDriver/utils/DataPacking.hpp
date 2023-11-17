@@ -10,8 +10,8 @@
  *
  */
 
-#ifndef DATAPACKING_HPP
-#define DATAPACKING_HPP
+#ifndef DATAPACKING
+#define DATAPACKING
 
 #include <FINNCppDriver/utils/CustomDynamicBitset.h>
 #include <FINNCppDriver/utils/FinnUtils.h>
@@ -190,14 +190,6 @@ namespace Finn {
                 }
             }
             constexpr T mask = createMask<T>(U().bitwidth());
-            std::cout << "Bits: " << U().bitwidth() << std::endl;
-            std::cout << "Mask: " << (int) mask << std::endl;
-            std::cout << "Distance: " << std::distance(first, last) << std::endl;
-            std::cout << "Input: ";
-            for (auto it = first; it != last; ++it) {
-                std::cout << (int) *it << ",";
-            }
-            std::cout << std::endl;
             std::transform(first, last, first, [](const T& val) { return val & mask; });  // Cut away all bits larger than U().bitwidth()
             if constexpr (invertBytes) {
                 Finn::vector<UnpackingAutoRetType::UnsignedRetType<U>> ret(first, last);
@@ -436,7 +428,11 @@ namespace Finn {
         using FixedPointType = typename std::conditional<neededBytes == 1, int8_t, TwoBytesOrLonger>::type;
         using RetType = typename std::conditional<U().isFixedPoint(), FixedPointType, T>::type;
 
-        if (inp.size() * 8 % U().bitwidth() != 0 || inp.empty()) {
+        if (inp.empty()) {
+            FinnUtils::logAndError<std::runtime_error>("Input to unpacking operation is empty! Abord.");
+        }
+
+        if (inp.size() * 8 % U().bitwidth() != 0) {
             FinnUtils::logAndError<std::runtime_error>("Amount of input elements is not a multiple of output elements");
         }
 
@@ -503,4 +499,4 @@ namespace Finn {
 
 }  // namespace Finn
 
-#endif  // DATAPACKING_HPP
+#endif  // DATAPACKING

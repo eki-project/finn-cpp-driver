@@ -200,7 +200,7 @@ namespace Finn {
          * @return false
          */
         template<typename IteratorType>
-        bool read(IteratorType outputIt) {
+        bool read(IteratorType outputIt, std::stop_token stoken = {}) {
             if constexpr (multiThreaded) {
                 // lock buffer
                 std::unique_lock lk(readWriteMutex);
@@ -208,7 +208,12 @@ namespace Finn {
                 if (buffer.size() < elementsPerPart) {
                     // Not enough data so block
                     // go to sleep and wait until enough data available
-                    cv.wait(lk, [this] { return buffer.size() >= elementsPerPart; });
+                    using namespace std::literals::chrono_literals;
+                    while (!cv.wait_for(lk, 2000ms, [this] { return buffer.size() >= elementsPerPart; })) {
+                        if (stoken.stop_requested()) {
+                            return false;
+                        }
+                    }
                 }
 
                 // read data

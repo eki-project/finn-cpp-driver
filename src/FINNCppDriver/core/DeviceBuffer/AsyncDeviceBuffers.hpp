@@ -26,7 +26,7 @@ namespace Finn {
     namespace detail {
         template<typename T>
         class AsyncBufferWrapper {
-        protected:
+             protected:
             RingBuffer<T, true> ringBuffer;
 
             AsyncBufferWrapper(unsigned int ringBufferSizeFactor, std::size_t elementsPerPart) : ringBuffer(RingBuffer<T, true>(ringBufferSizeFactor, elementsPerPart)) {
@@ -42,7 +42,7 @@ namespace Finn {
             AsyncBufferWrapper& operator=(AsyncBufferWrapper&& buf) = delete;
             AsyncBufferWrapper& operator=(const AsyncBufferWrapper& buf) = delete;
 #ifdef UNITTEST
-        public:
+             public:
             RingBuffer<T, true>& testGetRingBuffer() { return this->ringBuffer; }
 #endif
         };
@@ -50,7 +50,7 @@ namespace Finn {
 
     template<typename T>
     class AsyncDeviceInputBuffer : public DeviceInputBuffer<T>, public detail::AsyncBufferWrapper<T> {
-    private:
+         private:
         friend class DeviceInputBuffer<T>;
         std::jthread workerThread;
 
@@ -75,23 +75,25 @@ namespace Finn {
          */
         void runInternal(std::stop_token stoken) {
             while (!stoken.stop_requested()) {
-                this->loadMap();  // blocks
+                if (!this->loadMap()) {  // blocks
+                    break;
+                }
                 this->sync();
                 this->execute();
             }
+            FINN_LOG(this->logger, loglevel::info) << "Asynchronous Input buffer runner terminated";
         }
 
-    public:
+         public:
         AsyncDeviceInputBuffer(const std::string& pName, xrt::device& device, xrt::kernel& pAssociatedKernel, const shapePacked_t& pShapePacked, unsigned int ringBufferSizeFactor)
             : DeviceInputBuffer<T>(pName, device, pAssociatedKernel, pShapePacked),
-            detail::AsyncBufferWrapper<T>(ringBufferSizeFactor, FinnUtils::shapeToElements(pShapePacked)),
-            workerThread(std::jthread(std::bind_front(&AsyncDeviceInputBuffer::runInternal, this))) {
-        };
+              detail::AsyncBufferWrapper<T>(ringBufferSizeFactor, FinnUtils::shapeToElements(pShapePacked)),
+              workerThread(std::jthread(std::bind_front(&AsyncDeviceInputBuffer::runInternal, this))){};
 
         AsyncDeviceInputBuffer(AsyncDeviceInputBuffer&& buf) noexcept = default;
         AsyncDeviceInputBuffer(const AsyncDeviceInputBuffer& buf) noexcept = delete;
         ~AsyncDeviceInputBuffer() override {
-            FINN_LOG(this->logger, loglevel::info) << "Destruction Asynchronous input buffer";
+            FINN_LOG(this->logger, loglevel::info) << "Destructing Asynchronous input buffer";
             workerThread.request_stop();  // Joining will be handled automatically by destruction
         };
         AsyncDeviceInputBuffer& operator=(AsyncDeviceInputBuffer&& buf) = delete;
@@ -105,7 +107,7 @@ namespace Finn {
          */
         size_t size(SIZE_SPECIFIER ss) override { return this->ringBuffer.size(ss); }
 
-    protected:
+         protected:
         /**
          * @brief Start a run on the associated kernel and wait for it's result.
          * @attention This method is blocking
@@ -140,11 +142,14 @@ namespace Finn {
         std::mutex ltsMutex;
         std::jthread workerThread;
 
-    private:
+         private:
         void readInternal(std::stop_token stoken) {
             FINN_LOG_DEBUG(this->logger, loglevel::info) << this->loggerPrefix() << "Starting to read from the device";
             while (!stoken.stop_requested()) {
                 auto outExecuteResult = execute();
+                if (outExecuteResult == ERT_CMD_STATE_TIMEOUT) {
+                    continue;
+                }
                 if (outExecuteResult == ERT_CMD_STATE_ERROR || outExecuteResult == ERT_CMD_STATE_ABORT) {
                     FINN_LOG(this->logger, loglevel::error) << "A problem has occured during the read process of the FPGA output.";
                     continue;
@@ -157,11 +162,11 @@ namespace Finn {
             }
         }
 
-    public:
+         public:
         AsyncDeviceOutputBuffer(const std::string& pName, xrt::device& device, xrt::kernel& pAssociatedKernel, const shapePacked_t& pShapePacked, unsigned int ringBufferSizeFactor)
             : DeviceOutputBuffer<T>(pName, device, pAssociatedKernel, pShapePacked),
-            detail::AsyncBufferWrapper<T>(ringBufferSizeFactor, FinnUtils::shapeToElements(pShapePacked)),
-            workerThread(std::jthread(std::bind_front(&AsyncDeviceOutputBuffer::readInternal, this))) {};
+              detail::AsyncBufferWrapper<T>(ringBufferSizeFactor, FinnUtils::shapeToElements(pShapePacked)),
+              workerThread(std::jthread(std::bind_front(&AsyncDeviceOutputBuffer::readInternal, this))){};
 
         AsyncDeviceOutputBuffer(AsyncDeviceOutputBuffer&& buf) noexcept = default;
         AsyncDeviceOutputBuffer(const AsyncDeviceOutputBuffer& buf) noexcept = delete;
@@ -213,7 +218,7 @@ namespace Finn {
          */
         void allocateLongTermStorage([[maybe_unused]] unsigned int expectedEntries) override { this->longTermStorage.reserve(expectedEntries * this->ringBuffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART)); }
 
-    protected:
+         protected:
         /**
          * @brief Store the contents of the memory map into the ring buffer.
          *
@@ -230,7 +235,7 @@ namespace Finn {
          */
         ert_cmd_state execute() override {
             auto run = this->associatedKernel(this->internalBo, 1);
-            run.wait();
+            run.wait(2000);
             return run.state();
         }
 
@@ -238,9 +243,7 @@ namespace Finn {
          * @brief Clear the archive of all it's entries
          *
          */
-        void clearArchive() override {
-            this->longTermStorage.clear();
-        }
+        void clearArchive() override { this->longTermStorage.clear(); }
 
         /**
          * @brief Not supported by AsyncOutputBuffer

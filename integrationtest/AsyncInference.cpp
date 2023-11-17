@@ -29,7 +29,7 @@ TEST(SyncInference, syncInferenceTest) {
     std::string exampleNetworkConfig = "config.json";
     Finn::Config conf = Finn::createConfigFromPath(exampleNetworkConfig);
 
-    auto driver = Finn::Driver(conf, 10, 0, conf.deviceWrappers[0].idmas[0]->kernelName, 0, conf.deviceWrappers[0].odmas[0]->kernelName, 1, true, true);
+    auto driver = Finn::Driver(conf, 10, 0, conf.deviceWrappers[0].idmas[0]->kernelName, 0, conf.deviceWrappers[0].odmas[0]->kernelName, 1, true, false);
 
     Finn::vector<int8_t> data(driver.size(SIZE_SPECIFIER::ELEMENTS_PER_PART, 0, conf.deviceWrappers[0].idmas[0]->kernelName), 1);
 
@@ -37,12 +37,17 @@ TEST(SyncInference, syncInferenceTest) {
 
     // Run inference
     driver.input(data.begin(), data.end());
-    std::this_thread::sleep_for(500ms);
+    std::this_thread::sleep_for(2000ms);
     auto results = driver.getResults();
+    FINN_LOG(Logger::getLogger(), loglevel::info) << "Got results back from FPGA";
+    std::cout << join(results, ",") << "\n";
 
     Finn::vector<uint16_t> expectedResults = {254, 510, 253, 509, 252};
 
+    driver.~BaseDriver();
+
     EXPECT_EQ(results, expectedResults);
+
 }
 
 int main(int argc, char** argv) {

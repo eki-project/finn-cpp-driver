@@ -169,6 +169,7 @@ namespace Finn {
         if (forceArchival) {
             outputBufferMap.at(outputBufferKernelName)->archiveValidBufferParts();
         }
+        FINN_LOG(Logger::getLogger(), loglevel::info) << "ACHIEVED ALL DATA";
         return outputBufferMap.at(outputBufferKernelName)->retrieveArchive();
     }
 

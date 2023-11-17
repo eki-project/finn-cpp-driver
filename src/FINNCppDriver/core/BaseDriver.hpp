@@ -116,6 +116,10 @@ namespace Finn {
         BaseDriver& operator=(const BaseDriver&) = delete;
         virtual ~BaseDriver() = default;
 
+        void stop(){
+            accelerator.stopInference();
+        }
+
         /**
          * @brief Set the Default Input Device Index
          *
@@ -243,6 +247,7 @@ namespace Finn {
         Finn::vector<V> getResults() {
             // TODO(linusjun): maybe this method should block until data is available?
             auto result = accelerator.retrieveResults(defaultOutputDeviceIndex, defaultOutputKernelName, forceAchieval);
+            FINN_LOG(this->logger, loglevel::info) << "RETRIEVED RESULTS";
             return unpack<S, V>(result);
         }
 

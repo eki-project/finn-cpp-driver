@@ -1,12 +1,9 @@
 find_program(IWYU_FOUND "include-what-you-use")
 if(NOT IWYU_FOUND)
     message(WARNING "include-what-you-use requested, but not found!")
+else()
+set(IWYU include-what-you-use)
+list(APPEND IWYU -Xiwyu;any;-Xiwyu;iwyu;-Xiwyu;args;)
+set(CMAKE_CXX_INCLUDE_WHAT_YOU_USE ${IWYU})
+message(STATUS "Include-what-you-use command: ${CMAKE_CXX_INCLUDE_WHAT_YOU_USE}")
 endif()
-
-# set(CMAKE_CXX_INCLUDE_WHAT_YOU_USE
-#   include-what-you-use
-#   -Xiwyu
-#   --mapping_file=${PROJECT_SOURCE_DIR}/iwyu.imp
-# )
-
-set(CMAKE_CXX_INCLUDE_WHAT_YOU_USE ${INCLUDE_WHAT_YOU_USE})

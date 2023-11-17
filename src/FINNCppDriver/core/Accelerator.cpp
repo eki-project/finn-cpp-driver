@@ -30,9 +30,6 @@ namespace Finn {
 
     std::string Accelerator::loggerPrefix() { return "[Accelerator] "; }
 
-    void Accelerator::stopInference(){
-        devices.clear();
-    }
 
     /****** GETTER / SETTER ******/
     DeviceHandler& Accelerator::getDeviceHandler(unsigned int deviceIndex) {

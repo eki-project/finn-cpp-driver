@@ -37,17 +37,12 @@ TEST(SyncInference, syncInferenceTest) {
 
     // Run inference
     driver.input(data.begin(), data.end());
-    std::this_thread::sleep_for(2000ms);
+    std::this_thread::sleep_for(200ms);
     auto results = driver.getResults();
-    FINN_LOG(Logger::getLogger(), loglevel::info) << "Got results back from FPGA";
-    std::cout << join(results, ",") << "\n";
 
     Finn::vector<uint16_t> expectedResults = {254, 510, 253, 509, 252};
 
-    driver.~BaseDriver();
-
     EXPECT_EQ(results, expectedResults);
-
 }
 
 int main(int argc, char** argv) {

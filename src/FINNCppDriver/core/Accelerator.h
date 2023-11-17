@@ -36,7 +36,7 @@ namespace Finn {
          */
         std::vector<DeviceHandler> devices;
 
-                /**
+        /**
          * @brief A small prefix to determine where the log write came from
          *
          * @return std::string
@@ -57,7 +57,6 @@ namespace Finn {
         Accelerator& operator=(const Accelerator&) = delete;
         ~Accelerator() = default;
 
-        void stopInference();
 
         /**
          * @brief Return a beginning iterator to the internal device vector (contains DeviceHandler)

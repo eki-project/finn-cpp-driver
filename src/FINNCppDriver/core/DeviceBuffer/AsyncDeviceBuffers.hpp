@@ -75,7 +75,7 @@ namespace Finn {
          */
         void runInternal(std::stop_token stoken) {
             while (!stoken.stop_requested()) {
-                if (!this->loadMap()) {  // blocks
+                if (!this->loadMap(stoken)) {  // blocks
                     break;
                 }
                 this->sync();
@@ -126,7 +126,7 @@ namespace Finn {
          * @return true
          * @return false
          */
-        bool loadMap() { return this->ringBuffer.read(this->map); }
+        bool loadMap(std::stop_token stoken) { return this->ringBuffer.read(this->map, stoken); }
 
         /**
          * @brief Not supported for AsyncInputBuffer
@@ -192,11 +192,10 @@ namespace Finn {
          *
          */
         void archiveValidBufferParts() override {
-            FINN_LOG(this->logger, loglevel::info) << this->loggerPrefix() << "Archiving data from ring buffer to long term storage";
+            FINN_LOG_DEBUG(this->logger, loglevel::info) << this->loggerPrefix() << "Archiving data from ring buffer to long term storage";
             std::lock_guard guard(ltsMutex);
             this->longTermStorage.reserve(this->longTermStorage.size() + this->ringBuffer.size());
             this->ringBuffer.readAllValidParts(std::back_inserter(this->longTermStorage));
-            FINN_LOG(this->logger, loglevel::info) << this->loggerPrefix() << "Archived all data to LTS";
         }
 
         /**
@@ -223,10 +222,7 @@ namespace Finn {
          * @brief Store the contents of the memory map into the ring buffer.
          *
          */
-        void saveMap() override {
-            this->ringBuffer.template store<T*>(this->map, this->ringBuffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
-            FINN_LOG(this->logger, loglevel::info) << this->loggerPrefix() << "Saved data from memmap to ringbuffer.";
-        }
+        void saveMap() override { this->ringBuffer.template store<T*>(this->map, this->ringBuffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART)); }
 
         /**
          * @brief Execute the kernel and await it's return.

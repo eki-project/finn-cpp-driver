@@ -61,7 +61,7 @@ TEST(AsyncInference, asyncBatchInferenceTest) {
 
     // Run inference
     driver.input(data.begin(), data.end());
-    std::this_thread::sleep_for(2000ms);
+    std::this_thread::sleep_for(3000ms);
     auto results = driver.getResults();
 
     Finn::vector<uint16_t> expectedResults;

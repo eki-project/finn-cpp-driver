@@ -70,7 +70,19 @@ TEST(AsyncInference, asyncBatchInferenceTest) {
         expectedResults.insert(expectedResults.end(), {254, 510, 253, 509, 252});
     }
 
+    EXPECT_EQ(results.size(), expectedResults.size());
+
     EXPECT_EQ(results, expectedResults);
+
+    for (auto&& elem : results) {
+        std::cout << elem << ",";
+    }
+    std::cout << "\n";
+
+    for (auto&& elem : expectedResults) {
+        std::cout << elem << ",";
+    }
+    std::cout << "\n";
 }
 
 int main(int argc, char** argv) {

@@ -176,6 +176,7 @@ namespace Finn {
                 return true;
 
             } else {
+                FINN_LOG(Logger::getLogger(), loglevel::info) << "THIS SHOULD NOT BE CALLED!\n";
                 if (datasize > freeSpaceNotLocked()) {
                     // Data could not be stored
                     return false;

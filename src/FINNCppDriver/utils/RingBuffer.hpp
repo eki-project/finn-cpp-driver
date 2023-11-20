@@ -158,6 +158,7 @@ namespace Finn {
             }
             if constexpr (multiThreaded) {
                 // lock buffer
+                FINN_LOG(Logger::getLogger(), loglevel::info) << "PRELOCK\n";
                 std::unique_lock lk(readWriteMutex);
                 FINN_LOG(Logger::getLogger(), loglevel::info) << "Free Space available: " << freeSpaceNotLocked() << "\n";
                 if (datasize > freeSpaceNotLocked()) {

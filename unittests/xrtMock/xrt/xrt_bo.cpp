@@ -3,8 +3,12 @@
 #include "../xrt.h"
 #include "xrt_device.h"
 
-void xrt::bo::sync(XCL_SYNC_MODES syncMode) {
+void xrt::bo::sync(xclBOSyncDirection syncMode) {
     // FINN_LOG(logger, loglevel::debug) << "(xrtMock) xrt::bo object synced!\n";
+}
+
+void sync(xclBOSyncDirection dir, size_t sz, size_t offset){
+    
 }
 
 /**

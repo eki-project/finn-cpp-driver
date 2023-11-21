@@ -55,7 +55,7 @@ namespace Finn {
 
         std::size_t freeSpaceNotLocked() const { return buffer.capacity() - buffer.size(); }
 
-         public:
+    public:
         /**
          * @brief Construct a new Ring Buffer object. It's size in terms of values of
          * type T is given by pElementsPerPart * pParts. By default all parts are
@@ -64,7 +64,7 @@ namespace Finn {
          * @param pParts
          * @param pElementsPerPart
          */
-        RingBuffer(const size_t pParts, const size_t pElementsPerPart) : buffer(pElementsPerPart * pParts), elementsPerPart(pElementsPerPart) {
+        RingBuffer(const size_t pParts, const size_t pElementsPerPart) : buffer(pElementsPerPart* pParts), elementsPerPart(pElementsPerPart) {
             auto logger = Logger::getLogger();
             FINN_LOG(logger, loglevel::info) << "Ringbuffer initialised with " << pElementsPerPart << " Elements per Part and " << pParts << " Parts.\n";
             if (pElementsPerPart * pParts == 0) {
@@ -83,7 +83,8 @@ namespace Finn {
             if constexpr (multiThreaded) {
                 std::lock_guard guard(readWriteMutex);
                 return buffer.empty();
-            } else {
+            }
+            else {
                 return buffer.empty();
             }
         }
@@ -91,7 +92,8 @@ namespace Finn {
             if constexpr (multiThreaded) {
                 std::lock_guard guard(readWriteMutex);
                 return buffer.full();
-            } else {
+            }
+            else {
                 return buffer.full();
             }
         }
@@ -99,7 +101,8 @@ namespace Finn {
             if constexpr (multiThreaded) {
                 std::lock_guard guard(readWriteMutex);
                 return buffer.capacity() - buffer.size();
-            } else {
+            }
+            else {
                 return buffer.capacity() - buffer.size();
             }
         }
@@ -114,13 +117,17 @@ namespace Finn {
         size_t size(SIZE_SPECIFIER ss) const {
             if (ss == SIZE_SPECIFIER::ELEMENTS) {
                 return buffer.capacity();
-            } else if (ss == SIZE_SPECIFIER::BYTES) {
+            }
+            else if (ss == SIZE_SPECIFIER::BYTES) {
                 return buffer.capacity() * sizeof(T);
-            } else if (ss == SIZE_SPECIFIER::PARTS) {
+            }
+            else if (ss == SIZE_SPECIFIER::PARTS) {
                 return buffer.capacity() / elementsPerPart;
-            } else if (ss == SIZE_SPECIFIER::ELEMENTS_PER_PART) {
+            }
+            else if (ss == SIZE_SPECIFIER::ELEMENTS_PER_PART) {
                 return elementsPerPart;
-            } else {
+            }
+            else {
                 FinnUtils::logAndError<std::runtime_error>("Unknown size specifier!");
                 return 0;
             }
@@ -130,7 +137,8 @@ namespace Finn {
             if constexpr (multiThreaded) {
                 std::lock_guard guard(readWriteMutex);
                 return buffer.size() / elementsPerPart;
-            } else {
+            }
+            else {
                 return buffer.size() / elementsPerPart;
             }
         }
@@ -149,7 +157,6 @@ namespace Finn {
         template<typename IteratorType>
         bool store(IteratorType first, IteratorType last) {
             const std::size_t datasize = std::abs(std::distance(first, last));
-            FINN_LOG(Logger::getLogger(), loglevel::info) << "Store of size: " << datasize << " into ringbuffer";
             if (datasize % elementsPerPart != 0) {
                 FinnUtils::logAndError<std::runtime_error>("It is not possible to store data that is not a multiple of a part! Datasize: " + std::to_string(datasize) + ", Elements per Part: " + std::to_string(elementsPerPart) + "\n");
             }
@@ -158,9 +165,7 @@ namespace Finn {
             }
             if constexpr (multiThreaded) {
                 // lock buffer
-                FINN_LOG(Logger::getLogger(), loglevel::info) << "PRELOCK\n";
                 std::unique_lock lk(readWriteMutex);
-                FINN_LOG(Logger::getLogger(), loglevel::info) << "Free Space available: " << freeSpaceNotLocked() << "\n";
                 if (datasize > freeSpaceNotLocked()) {
                     // go to sleep and wait until enough space available
                     cv.wait(lk, [&datasize, this] { return datasize <= freeSpaceNotLocked(); });
@@ -172,11 +177,10 @@ namespace Finn {
                 // the waiting thread only to block again
                 lk.unlock();
                 cv.notify_one();
-                FINN_LOG(Logger::getLogger(), loglevel::info) << "Store completed successfully";
                 return true;
 
-            } else {
-                FINN_LOG(Logger::getLogger(), loglevel::info) << "THIS SHOULD NOT BE CALLED!\n";
+            }
+            else {
                 if (datasize > freeSpaceNotLocked()) {
                     // Data could not be stored
                     return false;
@@ -232,7 +236,8 @@ namespace Finn {
                 cv.notify_one();
                 return true;
 
-            } else {
+            }
+            else {
                 if (buffer.size() < elementsPerPart) {
                     // Not enough data so fail
                     return false;
@@ -270,7 +275,8 @@ namespace Finn {
                 lk.unlock();
                 cv.notify_one();
                 return true;
-            } else {
+            }
+            else {
                 if (buffer.empty()) {
                     return false;
                 }
@@ -301,7 +307,8 @@ namespace Finn {
 
                 if (index == -1) {
                     std::copy(buffer.begin(), buffer.end(), outputIt);
-                } else {
+                }
+                else {
                     std::copy(buffer.begin() + elementsPerPart * index, buffer.begin() + elementsPerPart * (index + 1), outputIt);
                 }
 
@@ -311,14 +318,16 @@ namespace Finn {
                 lk.unlock();
                 cv.notify_one();
                 return true;
-            } else {
+            }
+            else {
                 if (buffer.empty()) {
                     return false;
                 }
 
                 if (index == -1) {
                     std::copy(buffer.begin(), buffer.end(), outputIt);
-                } else {
+                }
+                else {
                     std::copy(buffer.begin() + elementsPerPart * index, buffer.begin() + elementsPerPart * (index + 1), outputIt);
                     std::cout << std::distance(buffer.begin() + elementsPerPart * index, buffer.begin() + elementsPerPart * (index + 1)) << "\n";
                 }

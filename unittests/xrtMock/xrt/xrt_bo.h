@@ -8,7 +8,7 @@
 
 namespace xrt {
     class bo {
-         private:
+    private:
         xrt::device device;
         size_t byteSize;
         unsigned int group;
@@ -17,12 +17,13 @@ namespace xrt {
 
         logger_type& logger;
 
-         public:
+    public:
         bo(xrt::device pDevice, size_t pBytesize, unsigned int pGroup) : device(pDevice), byteSize(pBytesize), group(pGroup), logger(Logger::getLogger()) { FINN_LOG(logger, loglevel::debug) << "(xrtMock) xrt::bo object created!\n"; }
 
         bo(bo&& other) noexcept : device(std::move(other.device)), byteSize(other.byteSize), group(other.group), memmap(nullptr), logger(Logger::getLogger()) { std::swap(memmap, other.memmap); }
 
-        void sync(XCL_SYNC_MODES);
+        void sync(xclBOSyncDirection);
+        void sync(xclBOSyncDirection dir, size_t sz, size_t offset);
         ~bo();
 
         /**

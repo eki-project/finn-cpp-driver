@@ -121,7 +121,7 @@ namespace Finn {
         }
 
         /**
-         * @brief Load data from the ring buffer into the memory map of the device.
+         * @brief  Load data from the ring buffer into the memory map of the device.
          * @attention Invalidates the data that was moved to map
          *
          * @return true

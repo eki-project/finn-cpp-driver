@@ -81,7 +81,7 @@ static void BM_StoreSVRP(benchmark::State& state) {
     for (auto _ : state) {
         for (unsigned int i = 0; i < benchmarkBufferSize; i++) {
             filler.fillRandom(data);
-            (&idb)->store(data.begin(), data.end());
+            (&idb)->store(data);
         }
     }
 }
@@ -113,7 +113,7 @@ static void BM_StoreSVIP(benchmark::State& state) {
     data.resize(idb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
     for (auto _ : state) {
         for (unsigned int i = 0; i < benchmarkBufferSize; i++) {
-            idb.store(data.begin(), data.end());
+            idb.store(data);
         }
     }
 }

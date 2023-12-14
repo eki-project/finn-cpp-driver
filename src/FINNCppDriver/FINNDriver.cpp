@@ -10,17 +10,22 @@
  *
  */
 
-#include <chrono>
-#include <functional>
+#include <cstdint>     // for uint8_t
+#include <filesystem>  // for path, exists
+#include <iosfwd>      // for streamsize
+#include <memory>      // for allocator_trai...
+#include <stdexcept>   // for invalid_argument
 #include <string>
-#include <thread>
+#include <vector>  // for vector
 
 // Helper
+#include <FINNCppDriver/core/DeviceHandler.h>          // for DeviceHandler
+#include <FINNCppDriver/utils/ConfigurationStructs.h>  // for Config
+#include <FINNCppDriver/utils/FinnUtils.h>             // for logAndError
 #include <FINNCppDriver/utils/Logger.h>
+#include <FINNCppDriver/utils/Types.h>  // for SIZE_SPECI...
 
-#include <FINNCppDriver/core/BaseDriver.hpp>
-#include <FINNCppDriver/core/DeviceBuffer/SyncDeviceBuffers.hpp>
-#include <FINNCppDriver/utils/FinnDatatypes.hpp>
+#include <FINNCppDriver/core/BaseDriver.hpp>  // IWYU pragma: keep
 #include <boost/program_options.hpp>
 
 
@@ -32,13 +37,12 @@
 // NOLINTEND
 
 #ifndef FINN_HEADER_LOCATION
-    #include "config/FinnDriverUsedDatatypes.h"
+    #include <FINNCppDriver/config/FinnDriverUsedDatatypes.h>
 #else
     #include STRNGFY(FINN_HEADER_LOCATION)
 #endif
 
 // XRT
-#include "xrt/xrt_bo.h"
 #include "xrt/xrt_device.h"
 #include "xrt/xrt_kernel.h"
 

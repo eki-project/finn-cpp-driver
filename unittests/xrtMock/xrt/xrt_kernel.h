@@ -1,5 +1,5 @@
-#ifndef XRT_KERNEL_H
-#define XRT_KERNEL_H
+#ifndef XRT_KERNEL
+#define XRT_KERNEL
 
 #include <cstdint>
 #include <memory>
@@ -17,8 +17,8 @@ namespace xrt {
          public:
         run() = default;
         void start();
-        void wait();
-        void wait(unsigned int);
+        ert_cmd_state wait();
+        ert_cmd_state wait(unsigned int);
         ert_cmd_state state();
     };
 
@@ -137,4 +137,4 @@ namespace xrt {
 
 }  // namespace xrt
 
-#endif
+#endif  // XRT_KERNEL

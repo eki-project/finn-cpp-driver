@@ -16,12 +16,13 @@
 // NOLINTNEXTLINE
 #define BOOST_LOG_DYN_LINK 1
 
-#include <boost/log/detail/config.hpp>                // for log
-#include <boost/log/sources/severity_feature.hpp>     // for BOOST_LOG_SEV
-#include <boost/log/sources/severity_logger.hpp>      // for severity_logger
-#include <boost/log/trivial.hpp>                      // for severity_level
-#include <boost/smart_ptr/intrusive_ptr.hpp>          // for intrusive_ptr
-#include <boost/smart_ptr/intrusive_ref_counter.hpp>  // for intrusive_ptr_a...
+// IWYU pragma: no_include <FINNCppDriver/utils/Logger.h>
+#include <boost/log/detail/config.hpp>                // IWYU pragma: keep
+#include <boost/log/sources/severity_feature.hpp>     // IWYU pragma: keep
+#include <boost/log/sources/severity_logger.hpp>      // IWYU pragma: keep
+#include <boost/log/trivial.hpp>                      // IWYU pragma: keep
+#include <boost/smart_ptr/intrusive_ptr.hpp>          // IWYU pragma: keep
+#include <boost/smart_ptr/intrusive_ref_counter.hpp>  // IWYU pragma: keep
 #include <string>                                     // for allocator, string
 
 namespace bl = finnBoost::log;

@@ -149,7 +149,6 @@ namespace Finn {
         template<typename IteratorType>
         bool store(IteratorType first, IteratorType last) {
             const std::size_t datasize = std::abs(std::distance(first, last));
-            FINN_LOG(Logger::getLogger(), loglevel::info) << "Store of size: " << datasize << " into ringbuffer";
             if (datasize % elementsPerPart != 0) {
                 FinnUtils::logAndError<std::runtime_error>("It is not possible to store data that is not a multiple of a part! Datasize: " + std::to_string(datasize) + ", Elements per Part: " + std::to_string(elementsPerPart) + "\n");
             }
@@ -158,9 +157,7 @@ namespace Finn {
             }
             if constexpr (multiThreaded) {
                 // lock buffer
-                FINN_LOG(Logger::getLogger(), loglevel::info) << "PRELOCK\n";
                 std::unique_lock lk(readWriteMutex);
-                FINN_LOG(Logger::getLogger(), loglevel::info) << "Free Space available: " << freeSpaceNotLocked() << "\n";
                 if (datasize > freeSpaceNotLocked()) {
                     // go to sleep and wait until enough space available
                     cv.wait(lk, [&datasize, this] { return datasize <= freeSpaceNotLocked(); });
@@ -172,11 +169,9 @@ namespace Finn {
                 // the waiting thread only to block again
                 lk.unlock();
                 cv.notify_one();
-                FINN_LOG(Logger::getLogger(), loglevel::info) << "Store completed successfully";
                 return true;
 
             } else {
-                FINN_LOG(Logger::getLogger(), loglevel::info) << "THIS SHOULD NOT BE CALLED!\n";
                 if (datasize > freeSpaceNotLocked()) {
                     // Data could not be stored
                     return false;

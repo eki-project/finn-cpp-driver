@@ -102,7 +102,7 @@ namespace Finn {
          */
         bool store(std::span<const T> data) override { return this->ringBuffer.store(data.begin(), data.end()); }
 
-    protected:
+         protected:
         /**
          * @brief Start a run on the associated kernel and wait for it's result.
          * @attention This method is blocking
@@ -231,12 +231,16 @@ namespace Finn {
          */
         ert_cmd_state execute() override {
             auto run = this->associatedKernel(this->internalBo, 1);
+<<<<<<< HEAD
             <<<<<< < HEAD
 
                 return run.wait(125);
             ====== =
                 return run.wait(500);
             >>>>>> > d66408bc51495352989135b8f5c540281f97f118
+=======
+            return run.wait(500);
+>>>>>>> d66408bc51495352989135b8f5c540281f97f118
         }
 
         /**

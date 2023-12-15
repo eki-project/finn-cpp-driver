@@ -78,7 +78,7 @@ namespace Finn {
     private:
         friend class DeviceInputBuffer<T>;
 
-    public:
+         public:
         /**
          * @brief Return the size of the buffer as specified by the argument. Bytes returns all bytes the buffer takes up, elements returns the number of T-values, numbers the number of F-values.
          *

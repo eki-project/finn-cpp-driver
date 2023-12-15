@@ -179,8 +179,7 @@ namespace Finn {
                 cv.notify_one();
                 return true;
 
-            }
-            else {
+            } else {
                 if (datasize > freeSpaceNotLocked()) {
                     // Data could not be stored
                     return false;

@@ -78,22 +78,6 @@ namespace Finn {
     private:
         friend class DeviceInputBuffer<T>;
 
-        /**
-         * @brief Store the given data in the ring buffer
-         * @attention This function is NOT THREAD SAFE!
-         *
-         * @tparam InputIt The type of the iterator
-         * @param first
-         * @param last
-         * @return true
-         * @return false
-         */
-        template<typename InputIt>
-        bool storeImpl(InputIt first, InputIt last) {
-            static_assert(std::is_same<typename std::iterator_traits<InputIt>::value_type, T>::value);
-            return this->ringBuffer.store(first, last);
-        }
-
     public:
         /**
          * @brief Return the size of the buffer as specified by the argument. Bytes returns all bytes the buffer takes up, elements returns the number of T-values, numbers the number of F-values.
@@ -102,6 +86,15 @@ namespace Finn {
          * @return size_t
          */
         size_t size(SIZE_SPECIFIER ss) override { return this->ringBuffer.size(ss); }
+
+        /**
+         * @brief Store the given data in the ring buffer
+         *
+         * @param span
+         * @return true
+         * @return false
+         */
+        bool store(std::span<const T> data) override { return this->ringBuffer.store(data.begin(), data.end()); }
 
         /**
          * @brief Execute the first valid data that is found in the buffer. Returns false if no valid data was found
@@ -128,8 +121,7 @@ namespace Finn {
          */
         ert_cmd_state execute() override {
             auto runCall = this->associatedKernel(this->internalBo, 1);
-            runCall.wait();
-            return runCall.state();
+            return runCall.wait();
         }
     };
 
@@ -242,8 +234,7 @@ namespace Finn {
          */
         ert_cmd_state execute() override {
             auto run = this->associatedKernel(this->internalBo, 1);
-            run.wait(this->msExecuteTimeout);
-            return run.state();
+            return run.wait(this->msExecuteTimeout);
         }
 
         /**

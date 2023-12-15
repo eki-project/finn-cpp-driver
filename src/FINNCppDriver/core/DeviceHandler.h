@@ -13,28 +13,28 @@
 #ifndef DEVICEHANDLER_H
 #define DEVICEHANDLER_H
 
-#include <FINNCppDriver/utils/ConfigurationStructs.h>  // for DeviceWrapper, DeviceHandler
-#include <FINNCppDriver/utils/Logger.h>                // for logging
-#include <FINNCppDriver/utils/Types.h>                 // for shape_t
-#include <xrt/xrt_uuid.h>                              // for uuid
+#include <FINNCppDriver/utils/FinnUtils.h>  // for logAndError
+#include <FINNCppDriver/utils/Types.h>      // for shape_t
 
-#include <FINNCppDriver/core/DeviceBuffer/AsyncDeviceBuffers.hpp>
-#include <FINNCppDriver/core/DeviceBuffer/SyncDeviceBuffers.hpp>
+#include <FINNCppDriver/core/DeviceBuffer/DeviceBuffer.hpp>
 #include <cstddef>        // for size_t
 #include <cstdint>        // for uint8_t
-#include <filesystem>     // for path
 #include <iterator>       // for iterator_traits
+#include <memory>         // for shared_ptr
+#include <span>           // for span
+#include <stdexcept>      // for runtime_error
 #include <string>         // for string
 #include <type_traits>    // for is_same
 #include <unordered_map>  // for unordered_map
-#include <utility>        // for shared_ptr
 #include <vector>         // for vector
 
 #include "ert.h"
 #include "xrt/xrt_device.h"  // for device
+#include "xrt/xrt_uuid.h"    // for uuid
 
 namespace Finn {
     class UncheckedStore;
+    struct DeviceWrapper;
     /**
      * @brief Object of DeviceHandler is responsible to handle a programming of a Device and communication to it
      *
@@ -187,9 +187,6 @@ namespace Finn {
          */
         bool containsBuffer(const std::string& kernelBufferName, IO ioMode);
 
-        //* SAFE + REFERENCE
-        bool store(const Finn::vector<uint8_t>& data, const std::string& inputBufferKernelName);
-
         //* SAFE + ITERATOR
         template<typename IteratorType>
         bool store(IteratorType first, IteratorType last, const std::string& inputBufferKernelName) {
@@ -245,14 +242,20 @@ namespace Finn {
          */
         static std::string loggerPrefix();
 
-        //* UNSAFE + REFERENCE
-        bool storeUnchecked(const Finn::vector<uint8_t>& data, const std::string& inputBufferKernelName);
-
-        //* UNSAFE + ITERATOR
+        /**
+         * @brief Store the provided data into the DeviceBuffer
+         *
+         * @tparam IteratorType
+         * @param first
+         * @param last
+         * @param inputBufferKernelName Name of the kernel to be used when transfering data to FPGA
+         * @return true
+         * @return false
+         */
         template<typename IteratorType>
         bool storeUnchecked(IteratorType first, IteratorType last, const std::string& inputBufferKernelName) {
             static_assert(std::is_same<typename std::iterator_traits<IteratorType>::value_type, uint8_t>::value);
-            return inputBufferMap.at(inputBufferKernelName)->store(first, last);
+            return inputBufferMap.at(inputBufferKernelName)->store(std::span<const uint8_t>(first, last));
         }
 
 
@@ -282,7 +285,7 @@ namespace Finn {
          */
         UncheckedStore(DeviceHandler& pDev, const std::string& pInputBufferName) : dev(pDev), inputBufferName(pInputBufferName) {}
 
-        bool operator()(const Finn::vector<uint8_t>& data) { return dev.storeUnchecked(data, inputBufferName); }
+        bool operator()(const Finn::vector<uint8_t>& data) { return dev.storeUnchecked(data.begin(), data.end(), inputBufferName); }
 
         template<typename IteratorType>
         bool operator()(IteratorType first, IteratorType last) {

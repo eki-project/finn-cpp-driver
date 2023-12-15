@@ -24,7 +24,7 @@
 #include "ert.h"  // for ert_cmd_state
 namespace Finn {
     struct DeviceWrapper;
-}
+}  // namespace Finn
 
 
 namespace Finn {
@@ -102,18 +102,6 @@ namespace Finn {
          * @return UncheckedStore
          */
         UncheckedStore storeFactory(unsigned int deviceIndex, const std::string& inputBufferKernelName);
-
-
-        /**
-         * @brief Store data in the device handler with the given deviceIndex, and in the buffer with the given inputBufferKernelName.
-         *
-         * @param data
-         * @param deviceIndex If such a deviceIndex does not exist, use the first (0) device handler. If it doesnt exist, crash.
-         * @param inputBufferKernelName
-         * @return true The write was successfull
-         * @return false The buffer is full and data needs to be run first
-         */
-        bool store(const Finn::vector<uint8_t>& data, unsigned int deviceIndex, const std::string& inputBufferKernelName);
 
         /**
          * @brief Run the given buffer. Returns false if no valid data was found to execute on.

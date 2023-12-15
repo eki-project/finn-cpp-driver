@@ -55,21 +55,6 @@ namespace Finn {
         std::jthread workerThread;
 
         /**
-         * @brief Store the given data in the ring buffer
-         *
-         * @tparam InputIt The type of the iterator
-         * @param first
-         * @param last
-         * @return true
-         * @return false
-         */
-        template<typename InputIt>
-        bool storeImpl(InputIt first, InputIt last) {
-            static_assert(std::is_same<typename std::iterator_traits<InputIt>::value_type, T>::value);
-            return this->ringBuffer.store(first, last);
-        }
-
-        /**
          * @brief Internal run method used by the runner thread
          *
          */
@@ -79,9 +64,8 @@ namespace Finn {
                 if (!this->loadMap(stoken)) {  // blocks
                     break;
                 }
-                this->sync(elementCount);
-                auto retCode = this->execute();
-                std::cout << "Input ret Code:" << retCode << "\n";
+                this->sync();
+                this->execute();
             }
             FINN_LOG(this->logger, loglevel::info) << "Asynchronous Input buffer runner terminated";
         }
@@ -108,6 +92,15 @@ namespace Finn {
          * @return size_t
          */
         size_t size(SIZE_SPECIFIER ss) override { return this->ringBuffer.size(ss); }
+
+        /**
+         * @brief Store the given data in the ring buffer
+         *
+         * @param span
+         * @return true
+         * @return false
+         */
+        bool store(std::span<const T> data) override { return this->ringBuffer.store(data.begin(), data.end()); }
 
     protected:
         /**
@@ -198,7 +191,6 @@ namespace Finn {
          *
          */
         void archiveValidBufferParts() override {
-            FINN_LOG_DEBUG(this->logger, loglevel::info) << this->loggerPrefix() << "Archiving data from ring buffer to long term storage";
             std::lock_guard guard(ltsMutex);
             this->longTermStorage.reserve(this->longTermStorage.size() + this->ringBuffer.size());
             this->ringBuffer.readAllValidParts(std::back_inserter(this->longTermStorage));
@@ -239,8 +231,12 @@ namespace Finn {
          */
         ert_cmd_state execute() override {
             auto run = this->associatedKernel(this->internalBo, 1);
+            <<<<<< < HEAD
 
-            return run.wait(125);
+                return run.wait(125);
+            ====== =
+                return run.wait(500);
+            >>>>>> > d66408bc51495352989135b8f5c540281f97f118
         }
 
         /**

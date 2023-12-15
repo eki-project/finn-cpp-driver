@@ -1,0 +1,12 @@
+[
+{ include: ["@<boost/log/.*>", "private", "<FINNCppDriver/utils/Logger.h>", "public"] },
+{ include: [ "<boost/log/core/record.hpp>", "private", "<boost/log/trivial.hpp>", "private" ] },
+{ include: [ "<boost/log/sources/record_ostream.hpp>", "private", "<boost/log/trivial.hpp>", "private" ] },
+{ include: [ "<boost/log/sinks/basic_sink_frontend.hpp>", "private", "<boost/log/trivial.hpp>", "private" ]},
+{ include: [ "<boost/preprocessor/seq/limits/enum_256.hpp>", "private", "<boost/log/trivial.hpp>", "private" ]},
+{ include: [ "<boost/preprocessor/seq/limits/size_256.hpp>", "private", "<boost/log/trivial.hpp>", "private" ]},
+{ include: ["@<boost/program_options/.*>", "private", "<boost/program_options.hpp>", "public"]},
+{ include: [ "<boost/lexical_cast/bad_lexical_cast.hpp>", "private", "<boost/program_options.hpp>", "public" ]},
+{ include: [ "<boost/type_index/type_index_facade.hpp>", "private", "<boost/program_options.hpp>", "public" ]},
+{ include: [ "<experimental/xrt_xclbin.h>", "private", "\"xrt/xrt_kernel.h\"", "public" ]},
+]

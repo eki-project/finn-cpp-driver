@@ -12,18 +12,28 @@
 
 #include <FINNCppDriver/core/DeviceHandler.h>
 #include <FINNCppDriver/utils/ConfigurationStructs.h>
-#include <FINNCppDriver/utils/Logger.h>  // for operator<<, FINN_LOG, FINN_DEBUG_LOG
-#include <FINNCppDriver/utils/Types.h>   // for shape_t
-#include <xrt/xrt_device.h>              // for device
-#include <xrt/xrt_kernel.h>              // for kernel
+#include <FINNCppDriver/utils/Logger.h>
+#include <FINNCppDriver/utils/Types.h>
 
-#include <boost/cstdint.hpp>  // for uint8_t
+#include <FINNCppDriver/core/DeviceBuffer/AsyncDeviceBuffers.hpp>
+#include <FINNCppDriver/core/DeviceBuffer/DeviceBuffer.hpp>
+#include <FINNCppDriver/core/DeviceBuffer/SyncDeviceBuffers.hpp>
+#include <boost/cstdint.hpp>
 #include <cerrno>
 #include <chrono>
+#include <filesystem>  // for path
 #include <iosfwd>
 #include <memory>
+#include <numeric>
 #include <stdexcept>
 #include <system_error>
+#include <utility>  // for move
+#include <vector>
+
+#include "ert.h"
+#include "xrt/xrt_device.h"
+#include "xrt/xrt_kernel.h"
+#include "xrt/xrt_uuid.h"  // for uuid
 
 
 namespace fs = std::filesystem;
@@ -133,19 +143,6 @@ namespace Finn {
     [[maybe_unused]] std::shared_ptr<DeviceInputBuffer<uint8_t>>& DeviceHandler::getInputBuffer(const std::string& name) { return inputBufferMap.at(name); }
 
     [[maybe_unused]] std::shared_ptr<DeviceOutputBuffer<uint8_t>>& DeviceHandler::getOutputBuffer(const std::string& name) { return outputBufferMap.at(name); }
-
-    /****** USER METHODS ******/
-    bool DeviceHandler::store(const Finn::vector<uint8_t>& data, const std::string& inputBufferKernelName) {
-        if (!inputBufferMap.contains(inputBufferKernelName)) {
-            auto newlineFold = [](std::string a, const auto& b) { return std::move(a) + '\n' + std::move(b.first); };
-            std::string existingNames = "Existing buffer names:";
-            std::accumulate(inputBufferMap.begin(), inputBufferMap.end(), existingNames, newlineFold);
-            FinnUtils::logAndError<std::runtime_error>("[store] Tried accessing kernel/buffer with name " + inputBufferKernelName + " but this kernel / buffer does not exist! " + existingNames);
-        }
-        return inputBufferMap.at(inputBufferKernelName)->store(data);
-    }
-
-    bool DeviceHandler::storeUnchecked(const Finn::vector<uint8_t>& data, const std::string& inputBufferKernelName) { return inputBufferMap.at(inputBufferKernelName)->store(data); }
 
     [[maybe_unused]] unsigned int DeviceHandler::getDeviceIndex() const { return xrtDeviceIndex; }
 

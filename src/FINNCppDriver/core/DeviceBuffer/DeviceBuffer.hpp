@@ -18,6 +18,7 @@
 
 #include <FINNCppDriver/utils/RingBuffer.hpp>
 #include <boost/type_index.hpp>
+#include <span>
 
 #include "xrt.h"
 #include "xrt/xrt_bo.h"
@@ -123,20 +124,6 @@ namespace Finn {
 
         virtual bool run() = 0;
 
-        template<typename InputIt>
-        bool store(InputIt first, InputIt last) {
-            // TODO(linusjun): benchmark and possibly replace iterator interface with span
-            if (auto ptr = dynamic_cast<SyncDeviceInputBuffer<T>*>(this)) {
-                return ptr->template storeImpl<InputIt>(first, last);
-            }
-            else if (auto ptr = dynamic_cast<AsyncDeviceInputBuffer<T>*>(this)) {
-                return ptr->template storeImpl<InputIt>(first, last);
-            }
-            else {
-                return false;
-            }
-        }
-
         /**
          * @brief Store the given vector of data in the ring buffer
          * @attention This function is NOT THREAD SAFE!
@@ -145,7 +132,7 @@ namespace Finn {
          * @return true
          * @return false
          */
-        bool store(const Finn::vector<T>& data) { return store(data.begin(), data.end()); }
+        virtual bool store(std::span<const T> data) = 0;
 
     protected:
         /**

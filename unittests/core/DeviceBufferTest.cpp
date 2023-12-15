@@ -56,16 +56,12 @@ class DBTest : public ::testing::Test {
      * @param ref Whether to use references (true) or iterators (false)
      * @param isInput If true use the input buffer, else the output buffer
      */
-    void fillCompletely(bool ref) {
+    void fillCompletely() {
         for (size_t i = 0; i < buffer.size(SIZE_SPECIFIER::PARTS); i++) {
             filler.fillRandom(data.begin(), data.end());
             storedDatas.push_back(data);
 
-            if (ref) {
-                EXPECT_TRUE(buffer.store(data));
-            } else {
-                EXPECT_TRUE(buffer.store(data.begin(), data.end()));
-            }
+            EXPECT_TRUE(buffer.store(data));
         }
     }
 
@@ -91,13 +87,8 @@ TEST_F(DBTest, DBStoreLoadMapTest) {
     auto initialMapData = buffer.testGetMap();
     //* Test if data is correctly put into the memory buffer
 
-    // Iterator
-    fillCompletely(false);
-    readAndCompare();
-    clearStoredDatas();
-
-    // Reference
-    fillCompletely(true);
+    // Span
+    fillCompletely();
     readAndCompare();
     clearStoredDatas();
 }

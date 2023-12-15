@@ -13,9 +13,9 @@ namespace xrt {
 
     void run::start() {}
 
-    void run::wait() {}
+    ert_cmd_state run::wait() { return ERT_CMD_STATE_COMPLETED; }
 
-    void run::wait(unsigned int ms) {}
+    ert_cmd_state run::wait(unsigned int ms) { return ERT_CMD_STATE_COMPLETED; }
 
     ert_cmd_state run::state() { return ERT_CMD_STATE_COMPLETED; }
 

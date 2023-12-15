@@ -11,6 +11,7 @@
  */
 
 #include <FINNCppDriver/core/DeviceHandler.h>
+#include <FINNCppDriver/utils/ConfigurationStructs.h>
 
 #include <algorithm>
 #include <filesystem>

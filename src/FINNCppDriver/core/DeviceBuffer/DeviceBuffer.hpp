@@ -51,10 +51,12 @@ namespace Finn {
             : name(pName),
             shapePacked(pShapePacked),
             mapSize(FinnUtils::getActualBufferSize(FinnUtils::shapeToElements(pShapePacked))),
-            internalBo(xrt::bo(device, mapSize * sizeof(T), 0)),
+            internalBo(xrt::bo(device, mapSize * sizeof(T), pAssociatedKernel.group_id(0))),
             associatedKernel(pAssociatedKernel),
             map(internalBo.template map<T*>()),
             logger(Logger::getLogger()) {
+            FINN_LOG(logger, loglevel::info) << "[DeviceBuffer] "
+                << "New Device Buffer of size " << mapSize * sizeof(T) << "bytes with group id " << pAssociatedKernel.group_id(0) << "\n";
             FINN_LOG(logger, loglevel::info) << "[DeviceBuffer] "
                 << "Initializing DeviceBuffer " << name << " (SHAPE PACKED: " << FinnUtils::shapeToString(pShapePacked) << " inputs of the given shape, MAP SIZE: " << mapSize << ")\n";
             for (std::size_t i = 0; i < mapSize; ++i) {
@@ -139,7 +141,7 @@ namespace Finn {
          * @brief Sync data from the map to the device.
          *
          */
-        void sync(std::size_t bytes) override { this->internalBo.sync(XCL_BO_SYNC_BO_TO_DEVICE); }
+        void sync(std::size_t bytes) override { this->internalBo.sync(XCL_BO_SYNC_BO_TO_DEVICE, bytes, 0); }
 
     private:
         template<typename InputIt>
@@ -188,7 +190,7 @@ namespace Finn {
          *
          * @return * void
          */
-        void sync(std::size_t bytes) override { this->internalBo.sync(XCL_BO_SYNC_BO_FROM_DEVICE); }
+        void sync(std::size_t bytes) override { this->internalBo.sync(XCL_BO_SYNC_BO_FROM_DEVICE, bytes, 0); }
 
 #ifdef UNITTEST
     public:

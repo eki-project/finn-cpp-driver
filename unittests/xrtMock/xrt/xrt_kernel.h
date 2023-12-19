@@ -111,7 +111,7 @@ namespace xrt {
          * The function throws if the group id is ambigious.
          */
 
-        // int group_id(int argno) const;
+        int group_id(int argno) const;
 
         // uint32_t read_register(uint32_t offset) const;
 

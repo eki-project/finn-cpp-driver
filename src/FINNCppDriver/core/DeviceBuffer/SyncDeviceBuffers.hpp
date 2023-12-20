@@ -1,9 +1,9 @@
 /**
  * @file SyncDeviceBuffers.hpp
- * @author Bjarne Wintermann (bjarne.wintermann@uni-paderborn.de) and others
+ * @author Bjarne Wintermann (bjarne.wintermann@uni-paderborn.de), Linus Jungemann (linus.jungemann@uni-paderborn.de) and others
  * @brief Implements synchronous FPGA interfaces to transfer data to and from the FPGA.
- * @version 0.1
- * @date 2023-11-10
+ * @version 2.0
+ * @date 2023-12-20
  *
  * @copyright Copyright (c) 2023
  * @license All rights reserved. This program and the accompanying materials are made available under the terms of the MIT license.
@@ -23,7 +23,7 @@ namespace Finn {
     namespace detail {
         template<typename T>
         class SyncBufferWrapper {
-        protected:
+             protected:
             RingBuffer<T, false> ringBuffer;
 
             SyncBufferWrapper(unsigned int ringBufferSizeFactor, std::size_t elementsPerPart) : ringBuffer(RingBuffer<T, false>(ringBufferSizeFactor, elementsPerPart)) {
@@ -39,7 +39,7 @@ namespace Finn {
             SyncBufferWrapper& operator=(SyncBufferWrapper&& buf) = delete;
             SyncBufferWrapper& operator=(const SyncBufferWrapper& buf) = delete;
 #ifdef UNITTEST
-        public:
+             public:
             RingBuffer<T, false>& testGetRingBuffer() { return this->ringBuffer; }
 #endif
         };
@@ -47,11 +47,11 @@ namespace Finn {
 
     template<typename T>
     class SyncDeviceInputBuffer : public DeviceInputBuffer<T>, public detail::SyncBufferWrapper<T> {
-    public:
+         public:
         SyncDeviceInputBuffer(const std::string& pName, xrt::device& device, xrt::kernel& pAssociatedKernel, const shapePacked_t& pShapePacked, unsigned int ringBufferSizeFactor)
             : DeviceInputBuffer<T>(pName, device, pAssociatedKernel, pShapePacked), detail::SyncBufferWrapper<T>(ringBufferSizeFactor, FinnUtils::shapeToElements(pShapePacked)) {
             FINN_LOG(this->logger, loglevel::info) << "[SyncDeviceInputBuffer] "
-                << "Initializing DeviceBuffer " << this->name << " (SHAPE PACKED: " << FinnUtils::shapeToString(pShapePacked) << " inputs of the given shape, MAP SIZE: " << this->mapSize << ")\n";
+                                                   << "Initializing DeviceBuffer " << this->name << " (SHAPE PACKED: " << FinnUtils::shapeToString(pShapePacked) << " inputs of the given shape, MAP SIZE: " << this->mapSize << ")\n";
         };
         SyncDeviceInputBuffer(SyncDeviceInputBuffer&& buf) noexcept = default;
         SyncDeviceInputBuffer(const SyncDeviceInputBuffer& buf) noexcept = delete;
@@ -60,9 +60,9 @@ namespace Finn {
         SyncDeviceInputBuffer& operator=(const SyncDeviceInputBuffer& buf) = delete;
 
 #ifdef UNITTEST
-    public:
+         public:
 #else
-    protected:
+         protected:
 #endif
 
         /**
@@ -75,7 +75,7 @@ namespace Finn {
          */
         bool loadMap() { return this->ringBuffer.read(this->map); }
 
-    private:
+         private:
         friend class DeviceInputBuffer<T>;
 
          public:
@@ -113,7 +113,7 @@ namespace Finn {
             return true;
         }
 
-    protected:
+         protected:
         /**
          * @brief Start a run on the associated kernel and wait for it's result.
          * @attention This method is blocking
@@ -127,9 +127,9 @@ namespace Finn {
 
     template<typename T>
     class SyncDeviceOutputBuffer : public DeviceOutputBuffer<T>, public detail::SyncBufferWrapper<T> {
-    public:
+         public:
         SyncDeviceOutputBuffer(const std::string& pName, xrt::device& device, xrt::kernel& pAssociatedKernel, const shapePacked_t& pShapePacked, unsigned int ringBufferSizeFactor)
-            : DeviceOutputBuffer<T>(pName, device, pAssociatedKernel, pShapePacked), detail::SyncBufferWrapper<T>(ringBufferSizeFactor, FinnUtils::shapeToElements(pShapePacked)) {};
+            : DeviceOutputBuffer<T>(pName, device, pAssociatedKernel, pShapePacked), detail::SyncBufferWrapper<T>(ringBufferSizeFactor, FinnUtils::shapeToElements(pShapePacked)){};
 
         SyncDeviceOutputBuffer(SyncDeviceOutputBuffer&& buf) noexcept = default;
         SyncDeviceOutputBuffer(const SyncDeviceOutputBuffer& buf) noexcept = delete;
@@ -215,9 +215,9 @@ namespace Finn {
         void allocateLongTermStorage(unsigned int expectedEntries) override { this->longTermStorage.reserve(expectedEntries * this->ringBuffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART)); }
 
 #ifdef UNITTEST
-    public:
+         public:
 #else
-    protected:
+         protected:
 #endif
 
         /**
@@ -226,7 +226,7 @@ namespace Finn {
          */
         void saveMap() override { this->ringBuffer.template store<T*>(this->map, this->ringBuffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART)); }
 
-    protected:
+         protected:
         /**
          * @brief Execute the kernel and await it's return.
          * @attention This function is blocking.

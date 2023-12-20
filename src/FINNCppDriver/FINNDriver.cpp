@@ -83,11 +83,15 @@ void logDeviceInformation(logger_type& logger, xrt::device& device, const std::s
 /**
  * @brief A simple helper function to create a Finn Driver from a given config file.
  *
+ * @tparam SynchronousInference true=Sync Mode; false=Async Mode
  * @param configFilePath
  * @param hostBufferSize
  * @return Finn::Driver
  */
-Finn::Driver createDriverFromConfig(const std::filesystem::path& configFilePath, unsigned int hostBufferSize, bool synchronousMode) { return {configFilePath, hostBufferSize, synchronousMode}; }
+template<bool SynchronousInference>
+Finn::Driver<SynchronousInference> createDriverFromConfig(const std::filesystem::path& configFilePath, unsigned int hostBufferSize) {
+    return {configFilePath, hostBufferSize};
+}
 
 /**
  * @brief Run test inferences. The data used is generated randomly. Useful for testing functionality
@@ -96,7 +100,7 @@ Finn::Driver createDriverFromConfig(const std::filesystem::path& configFilePath,
  * @param baseDriver
  * @param logger
  */
-void runFiletest(Finn::Driver& baseDriver, logger_type& logger) {
+void runFiletest(Finn::Driver<false>& baseDriver, logger_type& logger) {
     // TODO(bwintermann): Remove after debugging
     FINN_LOG(logger, loglevel::info) << finnMainLogPrefix() << "Device Information: ";
     logDeviceInformation(logger, baseDriver.getDeviceHandler(0).getDevice(), baseDriver.getConfig().deviceWrappers[0].xclbin);
@@ -121,48 +125,12 @@ void runFiletest(Finn::Driver& baseDriver, logger_type& logger) {
 }
 
 /**
- * @brief Run a test inference and save input and output data in a file which can be checked for results
- *
- * @param baseDriver
- * @param logger
- */
-void runIntegrationTest(Finn::Driver& baseDriver, logger_type& logger) {
-    std::fstream resultfile("integration_test_outputs.txt", std::fstream::out);
-
-    FINN_LOG(logger, loglevel::info) << finnMainLogPrefix() << "Device Information: ";
-    logDeviceInformation(logger, baseDriver.getDeviceHandler(0).getDevice(), baseDriver.getConfig().deviceWrappers[0].xclbin);
-
-    // Create vector for inputting data
-    auto filler = FinnUtils::BufferFiller(0, 127);
-    std::vector<uint8_t> data;
-    data.resize(baseDriver.size(SIZE_SPECIFIER::ELEMENTS_PER_PART, 0, "StreamingDataflowPartition_0:{idma0}"));
-
-    // Do a test run with random data and raw inference (no packing no folding)
-    filler.fillRandom(data);
-    // auto results = baseDriver.infer(data, 0, "StreamingDataflowPartition_0:{idma0}", 0, "StreamingDataflowPartition_2:{odma0}", 1, true);
-
-    // // Write data to result file. One line per data, ending with an empty space and a newline
-    // // TODO(bwintermann): Check if "uniq" registers the newline too
-    // // TODO(bwintermann): Introduce checks for everything
-    // for (auto val : data) {
-    //     resultfile << val << " ";
-    // }
-    // resultfile << "\n";
-
-    // for (auto val : results[0]) {
-    //     resultfile << val << " ";
-    // }
-    // resultfile << "\n";
-    // resultfile.close();
-}
-
-/**
  * @brief Run inference on an input file with folding and packing beforehand and unfolding and unpacking afterwards
  *
  * @param baseDriver
  * @param logger
  */
-void runWithInputFile(Finn::Driver& baseDriver, logger_type& logger) {
+void runWithInputFile(Finn::Driver<false>& baseDriver, logger_type& logger) {
     FINN_LOG(logger, loglevel::info) << finnMainLogPrefix() << "Running driver on input files";
     // TODO(bwintermann): Finish this method
 
@@ -211,10 +179,10 @@ int main(int argc, char* argv[]) {
         if (!(varMap.count("input") > 0)) {
             FinnUtils::logAndError<std::invalid_argument>("No input file specified for file execution mode!");
         }
-        auto driver = createDriverFromConfig(configFilePath, varMap["buffersize"].as<unsigned int>(), false);
+        auto driver = createDriverFromConfig<false>(configFilePath, varMap["buffersize"].as<unsigned int>());
         runWithInputFile(driver, logger);
     } else if (varMap["mode"].as<std::string>() == "test") {
-        auto driver = createDriverFromConfig(configFilePath, varMap["buffersize"].as<unsigned int>(), true);
+        auto driver = createDriverFromConfig<false>(configFilePath, varMap["buffersize"].as<unsigned int>());
         runFiletest(driver, logger);
     } else {
         FinnUtils::logAndError<std::invalid_argument>("Unknown driver mode: " + varMap["mode"].as<std::string>());

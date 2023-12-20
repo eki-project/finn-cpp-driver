@@ -42,9 +42,9 @@ class BaseDriverTest : public ::testing::Test {
     void TearDown() override { std::filesystem::remove(fn); }
 };
 
-class TestDriver : public Finn::Driver {
+class TestDriver : public Finn::Driver<true> {
      public:
-    TestDriver(const Finn::Config& pConfig, unsigned int hostBufferSize) : Finn::Driver(pConfig, hostBufferSize, true) {}
+    TestDriver(const Finn::Config& pConfig, unsigned int hostBufferSize) : Finn::Driver<true>(pConfig, hostBufferSize) {}
     Finn::vector<uint8_t> inferR(const Finn::vector<uint8_t>& data, unsigned int inputDeviceIndex, const std::string& inputBufferKernelName, unsigned int outputDeviceIndex, const std::string& outputBufferKernelName, unsigned int samples,
                                  bool forceArchival) {
         return infer(data, inputDeviceIndex, inputBufferKernelName, outputDeviceIndex, outputBufferKernelName, samples, forceArchival);
@@ -87,7 +87,7 @@ TEST_F(BaseDriverTest, BasicBaseDriverTest) {
 }
 
 TEST_F(BaseDriverTest, syncInferenceTest) {
-    auto driver = Finn::Driver(unittestConfig, hostBufferSize, 0, inputDmaName, 0, outputDmaName, 1, true, true);
+    auto driver = Finn::Driver<true>(unittestConfig, hostBufferSize, 0, inputDmaName, 0, outputDmaName, 1, true);
 
     // The input has to be 4 times longer than the expected size of the FPGA, because uint8->int2 packing reduces size by factor 4
     Finn::vector<uint8_t> data(driver.size(SIZE_SPECIFIER::ELEMENTS_PER_PART, 0, inputDmaName) * 4, 1);

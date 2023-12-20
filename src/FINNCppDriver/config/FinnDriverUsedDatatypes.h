@@ -6,5 +6,6 @@ using InputFinnType = Finn::DatatypeInt<2>;
 using OutputFinnType = Finn::DatatypeBinary;
 
 namespace Finn {
-    using Driver = Finn::BaseDriver<InputFinnType, OutputFinnType>;
+    template<bool SynchronousInference>
+    using Driver = Finn::BaseDriver<SynchronousInference, InputFinnType, OutputFinnType>;
 }  // namespace Finn

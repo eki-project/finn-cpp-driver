@@ -35,11 +35,12 @@ namespace Finn {
     /**
      * @brief A class to represent a basic FINN-Driver
      *
+     * @tparam bool SynchronousInference mode switch
      * @tparam F The FINN input datatype
      * @tparam S The FINN output datatype
      * @tparam T The C-datatype used to pass data to the FPGA
      */
-    template<typename F, typename S, typename T = uint8_t>
+    template<bool SynchronousInference, typename F, typename S, typename T = uint8_t>
     class BaseDriver {
          private:
         Accelerator accelerator;
@@ -67,15 +68,14 @@ namespace Finn {
          * @param configPath
          * @param hostBufferSize
          */
-        BaseDriver(const std::filesystem::path& configPath, uint hostBufferSize, bool synchronousInference) : configuration(createConfigFromPath(configPath)), logger(Logger::getLogger()) {
-            accelerator = Accelerator(configuration.deviceWrappers, synchronousInference, hostBufferSize);
+        BaseDriver(const std::filesystem::path& configPath, uint hostBufferSize) : configuration(createConfigFromPath(configPath)), logger(Logger::getLogger()) {
+            accelerator = Accelerator(configuration.deviceWrappers, SynchronousInference, hostBufferSize);
 #ifdef UNITTEST
             logDriver();
 #endif
         };
 
-        BaseDriver(const std::filesystem::path& configPath, uint hostBufferSize, uint inputDeviceIndex, const std::string& inputKernelName, uint outputDeviceIndex, const std::string& outputKernelName, uint batchSize, bool pForceAchieval,
-                   bool synchronousInference)
+        BaseDriver(const std::filesystem::path& configPath, uint hostBufferSize, uint inputDeviceIndex, const std::string& inputKernelName, uint outputDeviceIndex, const std::string& outputKernelName, uint batchSize, bool pForceAchieval)
             : configuration(createConfigFromPath(configPath)),
               logger(Logger::getLogger()),
               defaultInputDeviceIndex(inputDeviceIndex),
@@ -84,7 +84,7 @@ namespace Finn {
               defaultOutputKernelName(outputKernelName),
               batchElements(batchSize),
               forceAchieval(pForceAchieval) {
-            accelerator = Accelerator(configuration.deviceWrappers, synchronousInference, hostBufferSize);
+            accelerator = Accelerator(configuration.deviceWrappers, SynchronousInference, hostBufferSize);
         }
 
         /**
@@ -92,12 +92,9 @@ namespace Finn {
          *
          * @param pConfig
          */
-        BaseDriver(const Config& pConfig, uint hostBufferSize, bool synchronousInference) : configuration(pConfig), logger(Logger::getLogger()) {
-            accelerator = Accelerator(configuration.deviceWrappers, synchronousInference, hostBufferSize);
-        }
+        BaseDriver(const Config& pConfig, uint hostBufferSize) : configuration(pConfig), logger(Logger::getLogger()) { accelerator = Accelerator(configuration.deviceWrappers, SynchronousInference, hostBufferSize); }
 
-        BaseDriver(const Config& pConfig, uint hostBufferSize, uint inputDeviceIndex, const std::string& inputKernelName, uint outputDeviceIndex, const std::string& outputKernelName, uint batchSize, bool pForceAchieval,
-                   bool synchronousInference)
+        BaseDriver(const Config& pConfig, uint hostBufferSize, uint inputDeviceIndex, const std::string& inputKernelName, uint outputDeviceIndex, const std::string& outputKernelName, uint batchSize, bool pForceAchieval)
             : configuration(pConfig),
               logger(Logger::getLogger()),
               defaultInputDeviceIndex(inputDeviceIndex),
@@ -106,7 +103,7 @@ namespace Finn {
               defaultOutputKernelName(outputKernelName),
               batchElements(batchSize),
               forceAchieval(pForceAchieval) {
-            accelerator = Accelerator(configuration.deviceWrappers, synchronousInference, hostBufferSize);
+            accelerator = Accelerator(configuration.deviceWrappers, SynchronousInference, hostBufferSize);
         }
 
 
@@ -203,7 +200,7 @@ namespace Finn {
          * @param inputBufferKernelName Identifier of the input kernel
          * @param batchSize Batch size contained in the input
          */
-        template<typename IteratorType>
+        template<typename IteratorType, typename = std::enable_if<!SynchronousInference>>
         void input(IteratorType first, IteratorType last, uint inputDeviceIndex, const std::string& inputBufferKernelName, uint batchSize) {
             FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "Store data for asynchronous inference.";
             auto packed = Finn::pack<F>(first, last);
@@ -218,7 +215,7 @@ namespace Finn {
             storeFunc(packed.begin(), packed.end());
         }
 
-        template<typename IteratorType>
+        template<typename IteratorType, typename = std::enable_if<!SynchronousInference>>
         void input(IteratorType first, IteratorType last) {
             input(first, last, defaultInputDeviceIndex, defaultInputKernelName, batchElements);
         }
@@ -232,14 +229,14 @@ namespace Finn {
          * @param forceAchival Should data be explicitly polled?
          * @return Finn::vector<V>
          */
-        template<typename V = Finn::UnpackingAutoRetType::AutoRetType<S>>
+        template<typename V = Finn::UnpackingAutoRetType::AutoRetType<S>, typename = std::enable_if<!SynchronousInference>>
         Finn::vector<V> getResults(uint outputDeviceIndex, const std::string& outputBufferKernelName, bool forceArchival) {
             // TODO(linusjun): maybe this method should block until data is available?
             auto result = accelerator.retrieveResults(outputDeviceIndex, outputBufferKernelName, forceArchival);
             return unpack<S, V>(result);
         }
 
-        template<typename V = Finn::UnpackingAutoRetType::AutoRetType<S>>
+        template<typename V = Finn::UnpackingAutoRetType::AutoRetType<S>, typename = std::enable_if<!SynchronousInference>>
         Finn::vector<V> getResults() {
             // TODO(linusjun): maybe this method should block until data is available?
             auto result = accelerator.retrieveResults(defaultOutputDeviceIndex, defaultOutputKernelName, forceAchieval);
@@ -247,7 +244,7 @@ namespace Finn {
         }
 
 
-        template<typename IteratorType, typename V = Finn::UnpackingAutoRetType::AutoRetType<S>>
+        template<typename IteratorType, typename V = Finn::UnpackingAutoRetType::AutoRetType<S>, typename = std::enable_if<SynchronousInference>>
         Finn::vector<V> inferSynchronous(IteratorType first, IteratorType last, uint inputDeviceIndex, const std::string& inputBufferKernelName, uint outputDeviceIndex, const std::string& outputBufferKernelName, uint batchSize,
                                          bool forceArchival) {
             auto packed = Finn::pack<F>(first, last);
@@ -255,17 +252,17 @@ namespace Finn {
             return unpack<S, V>(result);
         }
 
-        template<typename IteratorType, typename V = Finn::UnpackingAutoRetType::AutoRetType<S>>
+        template<typename IteratorType, typename V = Finn::UnpackingAutoRetType::AutoRetType<S>, typename = std::enable_if<SynchronousInference>>
         Finn::vector<V> inferSynchronous(IteratorType first, IteratorType last) {
             return inferSynchronous(first, last, defaultInputDeviceIndex, defaultInputKernelName, defaultOutputDeviceIndex, defaultOutputKernelName, batchElements, forceAchieval);
         }
 
-        template<typename U, typename V = Finn::UnpackingAutoRetType::AutoRetType<S>>
+        template<typename U, typename V = Finn::UnpackingAutoRetType::AutoRetType<S>, typename = std::enable_if<SynchronousInference>>
         Finn::vector<V> inferSynchronous(const Finn::vector<U>& data, uint inputDeviceIndex, const std::string& inputBufferKernelName, uint outputDeviceIndex, const std::string& outputBufferKernelName, uint batchSize, bool forceArchival) {
             return inferSynchronous(data.begin(), data.end(), inputDeviceIndex, inputBufferKernelName, outputDeviceIndex, outputBufferKernelName, batchSize, forceArchival);
         }
 
-        template<typename U, typename V = Finn::UnpackingAutoRetType::AutoRetType<S>>
+        template<typename U, typename V = Finn::UnpackingAutoRetType::AutoRetType<S>, typename = std::enable_if<SynchronousInference>>
         Finn::vector<V> inferSynchronous(const Finn::vector<U>& data) {
             return inferSynchronous(data, defaultInputDeviceIndex, defaultInputKernelName, defaultOutputDeviceIndex, defaultOutputKernelName, batchElements, forceAchieval);
         }

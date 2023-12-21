@@ -19,9 +19,7 @@ namespace xrt {
 
     ert_cmd_state run::state() { return ERT_CMD_STATE_COMPLETED; }
 
-    int kernel::group_id(int argno) const {
-        return 0;
-    }
+    int kernel::group_id(int argno) const { return 0; }
 
 
     std::string kernel::get_name() const { return "testkernel"; }

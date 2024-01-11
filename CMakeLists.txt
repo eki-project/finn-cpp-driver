@@ -110,11 +110,17 @@ message(STATUS "${Boost_LIBRARIES}")
 #mdspan
 include_directories(SYSTEM external/mdspan/include)
 
-#Magic Enums
-include_directories(SYSTEM external/magic_enum/include)
+#xsimd
+add_subdirectory(external/xsimd)
+include_directories(SYSTEM external/xsimd/include)
 
-#NumCpp
-include_directories(SYSTEM external/NumCpp/include)
+#xtl
+add_subdirectory(external/xtl)
+include_directories(SYSTEM external/xtl/include)
+
+#xtensor
+add_subdirectory(external/xtensor)
+include_directories(SYSTEM external/xtensor/include)
 
 #Nlohmann json
 

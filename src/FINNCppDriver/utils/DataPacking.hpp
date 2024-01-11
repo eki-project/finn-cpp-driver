@@ -299,7 +299,8 @@ namespace Finn {
          */
         template<IsDatatype U, typename IteratorType>
         Finn::vector<uint8_t> packImpl(IteratorType first, IteratorType last) {
-            if constexpr (U().bitwidth() == 8) {            // FINN Datatype is a byte long
+            constexpr size_t bitw = U().bitwidth();
+            if constexpr (bitw == 8) {                      // FINN Datatype is a byte long
                 return Finn::vector<uint8_t>(first, last);  // It fits exactly in a byte, so casting should be fine
             } else {
                 // TODO(linusjun): For full bytes this is maybe overkill. So change it?
@@ -327,7 +328,9 @@ namespace Finn {
             []<bool flag = false>() { static_assert(flag, "Big-endian architectures are currently not supported!"); }
             ();
         } else if constexpr (std::endian::native == std::endian::little) {
-            if constexpr (U().isFixedPoint()) {  // Datatype is Fixed Point Number
+            constexpr bool isFix = U().isFixedPoint();
+            constexpr bool isInt = U().isInteger();
+            if constexpr (isFix) {  // Datatype is Fixed Point Number
                 constexpr std::size_t bytes = static_cast<std::size_t>(FinnUtils::ceil(static_cast<double>(U().bitwidth()) / 8.0));
                 if constexpr (std::is_floating_point_v<T>) {  // floating point T have no shift operation, so replace with multiplication
                     std::transform(first, last, first, [](const T& val) { return val * (1 << U().fracBits()); });
@@ -342,7 +345,7 @@ namespace Finn {
 
                 Finn::vector<OneByteOrLonger> vec(first, last);
                 return detail::packImpl<DatatypeInt<U().bitwidth()>>(vec.begin(), vec.end());
-            } else if constexpr (std::is_floating_point_v<T> && U().isInteger()) {  // Datatype is integer number stored in floating point inputs
+            } else if constexpr (std::is_floating_point_v<T> && isInt) {  // Datatype is integer number stored in floating point inputs
                 // Use smallest possible datatype for storing data
                 if constexpr (sizeof(T) >= 4 || sizeof(T) <= 8) {
                     using VecType = typename std::conditional<sizeof(T) == 4, uint32_t, uint64_t>::type;
@@ -369,8 +372,8 @@ namespace Finn {
                     []<bool flag = false>() { static_assert(flag, "Weird floating point data length. Not supported!"); }
                     ();
                 }
-            } else if constexpr (!U().isInteger() && std::is_integral_v<T>) {  // Datatype is float stored in ints
-                Finn::vector<float> vec(first, last);                          // This cast is necessary to make sure, that data is in a 32-bit floating point format before the bitcast.
+            } else if constexpr (!isInt && std::is_integral_v<T>) {  // Datatype is float stored in ints
+                Finn::vector<float> vec(first, last);                // This cast is necessary to make sure, that data is in a 32-bit floating point format before the bitcast.
                 Finn::vector<uint32_t> input;
                 input.resize(static_cast<std::size_t>(std::distance(first, last)));
                 std::transform(vec.begin(), vec.end(), input.begin(), [](const float& val) { return std::bit_cast<uint32_t>(val); });  // This conversion can overflow, but thats the user responsibility
@@ -436,18 +439,21 @@ namespace Finn {
             FinnUtils::logAndError<std::runtime_error>("Amount of input elements is not a multiple of output elements");
         }
 
-        if constexpr (U().bitwidth() / 8.0 == neededBytes) {  // complete Bytes
+        constexpr size_t bitw = U().bitwidth();
+        constexpr bool isSigned = U().sign();
+        if constexpr (bitw / 8.0 == neededBytes) {  // complete Bytes
             Finn::vector<RetType> ret(inp.size() / neededBytes, 0);
             for (std::size_t i = 0; i < ret.size(); ++i) {
                 const std::size_t offset = i * neededBytes;
-                if constexpr (U().sign()) {  // TODO(linusjun): Test if this needs to be optimized or put into a seperate loop to allow vectorization.
+                if constexpr (isSigned) {  // TODO(linusjun): Test if this needs to be optimized or put into a seperate loop to allow vectorization.
                     if ((-128 & inp[offset + neededBytes - 1]) != 0) {
                         ret[i] = -1;
                     }
                 }
                 std::memcpy(&ret.data()[i], &inp.data()[offset], neededBytes);
             }
-            if constexpr (U().isFixedPoint()) {
+            constexpr bool isFixed = U().isFixedPoint();
+            if constexpr (isFixed) {
                 Finn::vector<float> fixedRet(ret.size());
                 std::transform(ret.begin(), ret.end(), fixedRet.begin(), [](const RetType& val) { return static_cast<float>(val) / (1 << U().fracBits()); });
                 return fixedRet;
@@ -479,7 +485,8 @@ namespace Finn {
                 buffer = static_cast<BufferType>(buffer >> shiftOffset);       // remove remaining bits from previous element
                 buffer &= mask;                                                // remove bits from next element
 
-                if constexpr (U().sign()) {  // TODO(linusjun): Test if this needs to be optimized or put into a seperate loop to allow vectorization.
+                constexpr bool isSigned = U().sign();
+                if constexpr (isSigned) {  // TODO(linusjun): Test if this needs to be optimized or put into a seperate loop to allow vectorization.
                     if (((BufferType(1U) << (bitwidth - 1)) & buffer) != 0) {
                         buffer |= ~mask;
                     }
@@ -487,7 +494,8 @@ namespace Finn {
                 ret[index] = static_cast<RetType>(buffer);
             }
 
-            if constexpr (U().isFixedPoint()) {
+            constexpr bool isFixed = U().isFixedPoint();
+            if constexpr (isFixed) {
                 Finn::vector<float> fixedRet(ret.size());
                 std::transform(ret.begin(), ret.end(), fixedRet.begin(), [](const RetType& val) { return static_cast<float>(static_cast<FixedPointType>(val)) / (1 << U().fracBits()); });
                 return fixedRet;

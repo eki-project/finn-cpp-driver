@@ -10,23 +10,29 @@
  *
  */
 
-#include <cstdint>     // for uint8_t
+#include <sys/types.h>  // for uint
+
+#include <algorithm>
+#include <exception>   // for exception
 #include <filesystem>  // for path, exists
-#include <iosfwd>      // for streamsize
+#include <iostream>    // for streamsize
 #include <memory>      // for allocator_trai...
-#include <stdexcept>   // for invalid_argument
-#include <string>
+#include <random>
+#include <stdexcept>  // for invalid_argument
+#include <string>     // for string
+#include <tuple>
 #include <vector>  // for vector
 
 // Helper
 #include <FINNCppDriver/core/DeviceHandler.h>          // for DeviceHandler
 #include <FINNCppDriver/utils/ConfigurationStructs.h>  // for Config
 #include <FINNCppDriver/utils/FinnUtils.h>             // for logAndError
-#include <FINNCppDriver/utils/Logger.h>
-#include <FINNCppDriver/utils/Types.h>  // for SIZE_SPECI...
+#include <FINNCppDriver/utils/Logger.h>                // for FINN_LOG, ...
 
-#include <FINNCppDriver/core/BaseDriver.hpp>  // IWYU pragma: keep
+#include <FINNCppDriver/core/BaseDriver.hpp>    // IWYU pragma: keep
+#include <FINNCppDriver/utils/DataPacking.hpp>  // for AutoReturnType
 #include <boost/program_options.hpp>
+#include <xtensor/xnpy.hpp>
 
 
 // Created by FINN during compilation
@@ -37,16 +43,24 @@
 // NOLINTEND
 
 #ifndef FINN_HEADER_LOCATION
-    #include <FINNCppDriver/config/FinnDriverUsedDatatypes.h>
+    #include <FINNCppDriver/config/FinnDriverUsedDatatypes.h>  // IWYU pragma: keep
 #else
-    #include STRNGFY(FINN_HEADER_LOCATION)
+    #include STRNGFY(FINN_HEADER_LOCATION)  // IWYU pragma: keep
 #endif
 
 // XRT
 #include "xrt/xrt_device.h"
 #include "xrt/xrt_kernel.h"
 
-using std::string;
+/**
+ * @brief Configure ASanitizer to circumvent some buggy behavior with std::to_string
+ *
+ * @return const char*
+ */
+// NOLINTBEGIN
+//  cppcheck-suppress unusedFunction
+extern "C" const char* __asan_default_options() { return "detect_odr_violation=1"; }
+// NOLINTEND
 
 /**
  * @brief A short prefix usable with the logger to determine the source of the log write
@@ -94,47 +108,142 @@ Finn::Driver<SynchronousInference> createDriverFromConfig(const std::filesystem:
 }
 
 /**
- * @brief Run test inferences. The data used is generated randomly. Useful for testing functionality
- * @attention This does NOT FOLD or PACK. As such it does NOT count towards performance measuring
+ * @brief Run a throughput test to test the performance of the driver
  *
  * @param baseDriver
  * @param logger
  */
-void runFiletest(Finn::Driver<false>& baseDriver, logger_type& logger) {
-    // TODO(bwintermann): Remove after debugging
+void runThroughputTest(Finn::Driver<true>& baseDriver, logger_type& logger) {
     FINN_LOG(logger, loglevel::info) << finnMainLogPrefix() << "Device Information: ";
     logDeviceInformation(logger, baseDriver.getDeviceHandler(0).getDevice(), baseDriver.getConfig().deviceWrappers[0].xclbin);
 
-    // Create vector for inputting data
-    auto filler = FinnUtils::BufferFiller(0, 127);
-    std::vector<uint8_t> data;
-    data.resize(baseDriver.size(SIZE_SPECIFIER::ELEMENTS_PER_PART, 0, "StreamingDataflowPartition_0:{idma0}"));
+    size_t elementcount = FinnUtils::shapeToElements((std::static_pointer_cast<Finn::ExtendedBufferDescriptor>(baseDriver.getConfig().deviceWrappers[0].idmas[0]))->normalShape);
 
-    // Do a test run with random data and raw inference (no packing no folding)
-    filler.fillRandom(data);
-    FinnUtils::logResults<uint8_t>(logger, data, 5000, "INPUT DATA: ");
+    constexpr bool isInteger = InputFinnType().isInteger();
+    if constexpr (isInteger) {
+        using dtype = Finn::UnpackingAutoRetType::IntegralType<InputFinnType>;
 
-    // auto results = baseDriver.infer(data, 0, "StreamingDataflowPartition_0:{idma0}", 0, "StreamingDataflowPartition_2:{odma0}", 9, true);
-    // FINN_LOG(logger, loglevel::info) << finnMainLogPrefix() << "Received " << results.size() << " results!";
+        std::vector<dtype> testInputs(elementcount);
 
-    // // Print Results
-    // int counter = 0;
-    // for (auto& resultVector : results) {
-    //     FinnUtils::logResults<uint8_t>(logger, resultVector, 8, finnMainLogPrefix() + "Vec " + std::to_string(counter++));
-    // }
+        std::random_device rndDevice;
+        std::mt19937 mersenneEngine{rndDevice()};  // Generates random integers
+        std::uniform_int_distribution<dtype> dist{static_cast<dtype>(InputFinnType().min()), static_cast<dtype>(InputFinnType().max())};
+
+        auto gen = [&dist, &mersenneEngine]() { return dist(mersenneEngine); };
+
+        std::generate(testInputs.begin(), testInputs.end(), gen);
+
+        // benchmark each step in call chain for int
+    } else {
+        std::vector<float> testInputs(elementcount);
+        std::random_device rndDevice;
+        std::mt19937 mersenneEngine{rndDevice()};  // Generates random integers
+        std::uniform_real_distribution<float> dist{static_cast<float>(InputFinnType().min()), static_cast<float>(InputFinnType().max())};
+
+        auto gen = [&dist, &mersenneEngine]() { return dist(mersenneEngine); };
+
+        std::generate(testInputs.begin(), testInputs.end(), gen);
+
+        // benchmark each step in call chain for float
+    }
 }
 
 /**
- * @brief Run inference on an input file with folding and packing beforehand and unfolding and unpacking afterwards
+ * @brief Run inference on an input file
  *
  * @param baseDriver
  * @param logger
  */
-void runWithInputFile(Finn::Driver<false>& baseDriver, logger_type& logger) {
+void runWithInputFile(Finn::Driver<true>& baseDriver, logger_type& logger, const std::vector<std::string>& inputFiles, const std::vector<std::string>& outputFiles) {
     FINN_LOG(logger, loglevel::info) << finnMainLogPrefix() << "Running driver on input files";
-    // TODO(bwintermann): Finish this method
+    logDeviceInformation(logger, baseDriver.getDeviceHandler(0).getDevice(), baseDriver.getConfig().deviceWrappers[0].xclbin);
 
-    // baseDriver.infer();
+    for (auto [inp, out] = std::tuple{inputFiles.begin(), outputFiles.begin()}; inp != inputFiles.end(); ++inp, ++out) {
+        // load npy file and process it
+        // using normal xnpy::load_npy will not work because it requires a destination type
+        // instead use xnpy::detail::load_npy_file und then concert by hand based on m_typestring of xnpy::detail::npy_file
+        std::ifstream stream(*inp, std::ifstream::binary);
+        if (!stream) {
+            FinnUtils::logAndError<std::runtime_error>("io error: failed to open a file.");
+        }
+
+        auto loadedFile = xt::detail::load_npy_file(stream);
+
+        if (loadedFile.m_typestring[0] == '<') {
+            // little endian
+            size_t sizePos = 2;
+            switch (loadedFile.m_typestring[1]) {
+                case 'f': {
+                    int size = std::stoi(loadedFile.m_typestring, &sizePos);
+                    if (size == 4) {
+                        // float
+                        auto xtensorArray = std::move(loadedFile).cast<float, xt::layout_type::dynamic>();
+                        Finn::vector<float> vec(xtensorArray.begin(), xtensorArray.end());
+                        baseDriver.inferSynchronous(vec.begin(), vec.end());
+                    } else if (size == 8) {
+                        // double
+                        auto xtensorArray = std::move(loadedFile).cast<double, xt::layout_type::dynamic>();
+                    } else {
+                        FinnUtils::logAndError<std::runtime_error>("Unsupported floating point type detected when loading input npy file!");
+                    }
+                    break;
+                }
+                case 'i': {
+                    int size = std::stoi(loadedFile.m_typestring, &sizePos);
+                    break;
+                }
+                case 'b': {
+                    break;
+                }
+                case 'u': {
+                    int size = std::stoi(loadedFile.m_typestring, &sizePos);
+                    break;
+                }
+                default:
+                    std::string errorString = "Loading a numpy array with type identifier string ";
+                    errorString += loadedFile.m_typestring[1];
+                    errorString += " is currently not supported.";
+                    FinnUtils::logAndError<std::runtime_error>(errorString);
+            }
+        } else {
+            // all other endians
+            FinnUtils::logAndError<std::runtime_error>("At the moment only files created on little endian systems are supported!\n");
+        }
+    }
+}
+
+
+void validateDriverMode(const std::string& mode) {
+    if (mode != "execute" && mode != "throughput") {
+        throw finnBoost::program_options::error_with_option_name("'" + mode + "' is not a valid driver mode!", "exec_mode");
+    }
+
+    FINN_LOG(Logger::getLogger(), loglevel::info) << finnMainLogPrefix() << "Driver Mode: " << mode;
+}
+
+void validateBatchSize(int batch) {
+    if (batch <= 0) {
+        throw finnBoost::program_options::error_with_option_name("Batch size must be positive, but is '" + std::to_string(batch) + "'", "batchsize");
+    }
+}
+
+void validateConfigPath(const std::string& path) {
+    auto configFilePath = std::filesystem::path(path);
+    if (!std::filesystem::exists(configFilePath)) {
+        throw finnBoost::program_options::error_with_option_name("Cannot find config file at " + configFilePath.string(), "configpath");
+    }
+
+    FINN_LOG(Logger::getLogger(), loglevel::info) << finnMainLogPrefix() << "Config file found at " + configFilePath.string();
+}
+
+void validateInputPath(const std::vector<std::string>& path) {
+    for (auto&& elem : path) {
+        auto inputFilePath = std::filesystem::path(elem);
+        if (!std::filesystem::exists(inputFilePath)) {
+            throw finnBoost::program_options::error_with_option_name("Cannot find input file at " + inputFilePath.string());
+        }
+        FINN_LOG(Logger::getLogger(), loglevel::info) << finnMainLogPrefix() << "Input file found at " + inputFilePath.string();
+    }
 }
 
 
@@ -144,47 +253,59 @@ int main(int argc, char* argv[]) {
     auto logger = Logger::getLogger();
     FINN_LOG(logger, loglevel::info) << "C++ Driver started";
 
-    // Helper lambas for debug output
-    auto logMode = [&logger](const std::string& m) { FINN_LOG(logger, loglevel::info) << finnMainLogPrefix() << "Driver Mode: " << m; };
-    auto logConfig = [&logger](const std::string& m) { FINN_LOG(logger, loglevel::info) << finnMainLogPrefix() << "Configuration file: " << m; };
-    auto logInputFile = [&logger](const std::string& m) { FINN_LOG(logger, loglevel::info) << finnMainLogPrefix() << "Input file: " << m; };
-    auto logHBufferSize = [&logger](const unsigned int m) { FINN_LOG(logger, loglevel::info) << finnMainLogPrefix() << "Host Buffer Size: " << m; };
+    try {
+        // Command Line Argument Parser
+        po::options_description desc{"Options"};
+        //clang-format off
+        desc.add_options()("help,h", "Display help")("exec_mode,e", po::value<std::string>()->default_value("throughput")->notifier(&validateDriverMode),
+                                                     R"(Please select functional verification ("execute") or throughput test ("throughput")")("configpath,c", po::value<std::string>()->required()->notifier(&validateConfigPath),
+                                                                                                                                              "Required: Path to the config.json file emitted by the FINN compiler")(
+            "input,i", po::value<std::vector<std::string>>()->multitoken()->composing()->notifier(&validateInputPath), "Path to one or more input files (npy format). Only required if mode is set to \"file\"")(
+            "output,o", po::value<std::vector<std::string>>()->multitoken()->composing(), "Path to one or more output files (npy format). Only required if mode is set to \"file\"")(
+            "batchsize,b", po::value<int>()->default_value(1)->notifier(&validateBatchSize), "Number of samples for inference");
+        //clang-format on
+        po::variables_map varMap;
+        po::store(po::parse_command_line(argc, argv, desc), varMap);
 
-    // Command Line Argument Parser
-    po::options_description desc{"Options"};
-    desc.add_options()("help,h", "Display help")("mode,m", po::value<std::string>()->default_value("test")->notifier(logMode), "Mode of execution (file or test)")("configpath,c", po::value<std::string>()->notifier(logConfig),
-                                                                                                                                                                   "Path to the config.json file emitted by the FINN compiler")(
-        "input,i", po::value<std::string>()->notifier(logInputFile), "Path to the input file. Only required if mode is set to \"file\"")("buffersize,b", po::value<unsigned int>()->notifier(logHBufferSize)->default_value(100),
-                                                                                                                                         "How large (in samples) the host buffer is supposed to be");
-    po::variables_map varMap;
-    po::store(po::parse_command_line(argc, argv, desc), varMap);
-    po::notify(varMap);
-    FINN_LOG(logger, loglevel::info) << finnMainLogPrefix() << "Parsed command line params";
-
-    // Display help screen
-    if (varMap.count("help") > 0) {
-        FINN_LOG(logger, loglevel::info) << desc;
-        return 1;
-    }
-
-    // Checking for the existance of the config file
-    auto configFilePath = std::filesystem::path(varMap["configpath"].as<std::string>());
-    if (!std::filesystem::exists(configFilePath)) {
-        FinnUtils::logAndError<std::runtime_error>("Cannot find config file at " + configFilePath.string());
-    }
-
-
-    // Switch on modes
-    if (varMap["mode"].as<std::string>() == "file") {
-        if (!(varMap.count("input") > 0)) {
-            FinnUtils::logAndError<std::invalid_argument>("No input file specified for file execution mode!");
+        // Display help screen
+        // Help option has to be processed before po::notify call to not enforce required options in combination with help
+        if (varMap.count("help") != 0) {
+            FINN_LOG(logger, loglevel::info) << desc;
+            return 1;
         }
-        auto driver = createDriverFromConfig<false>(configFilePath, varMap["buffersize"].as<unsigned int>());
-        runWithInputFile(driver, logger);
-    } else if (varMap["mode"].as<std::string>() == "test") {
-        auto driver = createDriverFromConfig<false>(configFilePath, varMap["buffersize"].as<unsigned int>());
-        runFiletest(driver, logger);
-    } else {
-        FinnUtils::logAndError<std::invalid_argument>("Unknown driver mode: " + varMap["mode"].as<std::string>());
+
+        po::notify(varMap);
+
+        FINN_LOG(logger, loglevel::info) << finnMainLogPrefix() << "Parsed command line params";
+
+        // Switch on modes
+        if (varMap["exec_mode"].as<std::string>() == "execute") {
+            if (varMap.count("input") == 0) {
+                FinnUtils::logAndError<std::invalid_argument>("No input file(s) specified for file execution mode!");
+            }
+            if (varMap.count("output") == 0) {
+                FinnUtils::logAndError<std::invalid_argument>("No output file(s) specified for file execution mode!");
+            }
+            if (varMap.count("input") != varMap.count("output")) {
+                FinnUtils::logAndError<std::invalid_argument>("Same amount of input and output files required!");
+            }
+            auto driver = createDriverFromConfig<true>(varMap["configpath"].as<std::string>(), static_cast<uint>(varMap["batchsize"].as<int>()));
+            runWithInputFile(driver, logger, varMap["input"].as<std::vector<std::string>>(), varMap["output"].as<std::vector<std::string>>());
+        } else if (varMap["exec_mode"].as<std::string>() == "throughput") {
+            auto driver = createDriverFromConfig<true>(varMap["configpath"].as<std::string>(), static_cast<uint>(varMap["batchsize"].as<int>()));
+            runThroughputTest(driver, logger);
+        } else {
+            FinnUtils::logAndError<std::invalid_argument>("Unknown driver mode: " + varMap["exec_mode"].as<std::string>());
+        }
+
+        return 1;
+    } catch (std::exception& e) {
+        std::cerr << "Error: " << e.what() << "\n";
+        return 0;
+    } catch (...)  // Catch everything that is not an exception class
+    {
+        std::cerr << "Unknown error!"
+                  << "\n";
+        return 0;
     }
 }

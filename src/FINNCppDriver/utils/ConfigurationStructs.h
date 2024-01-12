@@ -10,8 +10,8 @@
  *
  */
 
-#ifndef CONFIGURATION_STRUCTS_H
-#define CONFIGURATION_STRUCTS_H
+#ifndef CONFIGURATIONSTRUCTS
+#define CONFIGURATIONSTRUCTS
 
 #include <FINNCppDriver/utils/Types.h>
 
@@ -176,4 +176,4 @@ namespace Finn {
 
 }  // namespace Finn
 
-#endif  // CONFIGURATION_STRUCTS_H
+#endif  // CONFIGURATIONSTRUCTS

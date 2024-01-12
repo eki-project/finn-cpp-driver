@@ -12,27 +12,36 @@
 
 #include <sys/types.h>  // for uint
 
-#include <algorithm>
-#include <exception>   // for exception
-#include <filesystem>  // for path, exists
-#include <iostream>    // for streamsize
-#include <memory>      // for allocator_trai...
-#include <random>
-#include <stdexcept>  // for invalid_argument
-#include <string>     // for string
-#include <tuple>
-#include <vector>  // for vector
+#include <algorithm>    // for generate
+#include <cstdint>      // for uint64_t, uint8_t, ...
+#include <exception>    // for exception
+#include <filesystem>   // for path, exists
+#include <iostream>     // for streamsize
+#include <memory>       // for allocator_trai...
+#include <random>       // for random_device, ...
+#include <stdexcept>    // for invalid_argument
+#include <string>       // for string
+#include <tuple>        // for tuple
+#include <type_traits>  // for remove_ref...
+#include <utility>      // for move
+#include <vector>       // for vector
 
 // Helper
 #include <FINNCppDriver/core/DeviceHandler.h>          // for DeviceHandler
 #include <FINNCppDriver/utils/ConfigurationStructs.h>  // for Config
 #include <FINNCppDriver/utils/FinnUtils.h>             // for logAndError
 #include <FINNCppDriver/utils/Logger.h>                // for FINN_LOG, ...
+#include <FINNCppDriver/utils/Types.h>                 // for shape_t
 
 #include <FINNCppDriver/core/BaseDriver.hpp>    // IWYU pragma: keep
 #include <FINNCppDriver/utils/DataPacking.hpp>  // for AutoReturnType
-#include <boost/program_options.hpp>
-#include <xtensor/xnpy.hpp>
+#include <boost/program_options.hpp>            // for variables_map
+#include <xtensor/xadapt.hpp>                   // for adapt
+#include <xtensor/xarray.hpp>                   // for xarray_ada...
+#include <xtensor/xiterator.hpp>                // for operator==
+#include <xtensor/xlayout.hpp>                  // for layout_type
+#include <xtensor/xnpy.hpp>                     // for dump_npy, ...
+#include <xtl/xiterator_base.hpp>               // for operator!=
 
 
 // Created by FINN during compilation
@@ -148,6 +157,123 @@ void runThroughputTest(Finn::Driver<true>& baseDriver, logger_type& logger) {
     }
 }
 
+constexpr size_t typeStringByteSizePos = 2;
+/**
+ * @brief Executes inference on the input file if input type is a floating point type
+ * @attention This function does no checking of the datatype contained in the loadedNpyFile! Passing a npy file containing a non floating point type is UB.
+ *
+ * @param loadedNpyFile
+ */
+void inferFloatingPoint(Finn::Driver<true>& baseDriver, xt::detail::npy_file& loadedNpyFile, const std::string& outputFile) {
+    size_t sizePos = typeStringByteSizePos;
+    int size = std::stoi(loadedNpyFile.m_typestring, &sizePos);
+    if (size == 4) {
+        // float
+        auto xtensorArray = std::move(loadedNpyFile).cast<float, xt::layout_type::dynamic>();
+        Finn::vector<float> vec(xtensorArray.begin(), xtensorArray.end());
+        auto ret = baseDriver.inferSynchronous(vec.begin(), vec.end());
+        auto xarr = xt::adapt(ret, (std::static_pointer_cast<Finn::ExtendedBufferDescriptor>(baseDriver.getConfig().deviceWrappers[0].odmas[0]))->normalShape);
+        xt::dump_npy(outputFile, xarr);
+    } else if (size == 8) {
+        // double
+        auto xtensorArray = std::move(loadedNpyFile).cast<double, xt::layout_type::dynamic>();
+        Finn::vector<double> vec(xtensorArray.begin(), xtensorArray.end());
+        auto ret = baseDriver.inferSynchronous(vec.begin(), vec.end());
+        auto xarr = xt::adapt(ret, (std::static_pointer_cast<Finn::ExtendedBufferDescriptor>(baseDriver.getConfig().deviceWrappers[0].odmas[0]))->normalShape);
+        xt::dump_npy(outputFile, xarr);
+    } else {
+        FinnUtils::logAndError<std::runtime_error>("Unsupported floating point type detected when loading input npy file!");
+    }
+}
+
+/**
+ * @brief Executes inference on the input file if input type is a signed integer type
+ * @attention This function does no checking of the datatype contained in the loadedNpyFile! Passing a npy file containing a non signed integer type is UB.
+ *
+ * @param baseDriver
+ * @param loadedNpyFile
+ * @param outputFile
+ */
+void inferSignedInteger(Finn::Driver<true>& baseDriver, xt::detail::npy_file& loadedNpyFile, const std::string& outputFile) {
+    size_t sizePos = typeStringByteSizePos;
+    int size = std::stoi(loadedNpyFile.m_typestring, &sizePos);
+    if (size == 1) {
+        // int8_t
+        auto xtensorArray = std::move(loadedNpyFile).cast<int8_t, xt::layout_type::dynamic>();
+        Finn::vector<int8_t> vec(xtensorArray.begin(), xtensorArray.end());
+        auto ret = baseDriver.inferSynchronous(vec.begin(), vec.end());
+        auto xarr = xt::adapt(ret, (std::static_pointer_cast<Finn::ExtendedBufferDescriptor>(baseDriver.getConfig().deviceWrappers[0].odmas[0]))->normalShape);
+        xt::dump_npy(outputFile, xarr);
+    } else if (size == 2) {
+        // int16_t
+        auto xtensorArray = std::move(loadedNpyFile).cast<int16_t, xt::layout_type::dynamic>();
+        Finn::vector<int16_t> vec(xtensorArray.begin(), xtensorArray.end());
+        auto ret = baseDriver.inferSynchronous(vec.begin(), vec.end());
+        auto xarr = xt::adapt(ret, (std::static_pointer_cast<Finn::ExtendedBufferDescriptor>(baseDriver.getConfig().deviceWrappers[0].odmas[0]))->normalShape);
+        xt::dump_npy(outputFile, xarr);
+    } else if (size == 4) {
+        // int32_t
+        auto xtensorArray = std::move(loadedNpyFile).cast<int32_t, xt::layout_type::dynamic>();
+        Finn::vector<int32_t> vec(xtensorArray.begin(), xtensorArray.end());
+        auto ret = baseDriver.inferSynchronous(vec.begin(), vec.end());
+        auto xarr = xt::adapt(ret, (std::static_pointer_cast<Finn::ExtendedBufferDescriptor>(baseDriver.getConfig().deviceWrappers[0].odmas[0]))->normalShape);
+        xt::dump_npy(outputFile, xarr);
+    } else if (size == 8) {
+        // int64_t
+        auto xtensorArray = std::move(loadedNpyFile).cast<int64_t, xt::layout_type::dynamic>();
+        Finn::vector<int64_t> vec(xtensorArray.begin(), xtensorArray.end());
+        auto ret = baseDriver.inferSynchronous(vec.begin(), vec.end());
+        auto xarr = xt::adapt(ret, (std::static_pointer_cast<Finn::ExtendedBufferDescriptor>(baseDriver.getConfig().deviceWrappers[0].odmas[0]))->normalShape);
+        xt::dump_npy(outputFile, xarr);
+    } else {
+        FinnUtils::logAndError<std::runtime_error>("Unsupported signed integer type detected when loading input npy file!");
+    }
+}
+
+/**
+ * @brief Executes inference on the input file if input type is a unsigned integer type
+ * @attention This function does no checking of the datatype contained in the loadedNpyFile! Passing a npy file containing a non unsigned integer type is UB.
+ *
+ * @param baseDriver
+ * @param loadedNpyFile
+ * @param outputFile
+ */
+void inferUnsignedInteger(Finn::Driver<true>& baseDriver, xt::detail::npy_file& loadedNpyFile, const std::string& outputFile) {
+    size_t sizePos = typeStringByteSizePos;
+    int size = std::stoi(loadedNpyFile.m_typestring, &sizePos);
+    if (size == 1) {
+        // uint8_t
+        auto xtensorArray = std::move(loadedNpyFile).cast<uint8_t, xt::layout_type::dynamic>();
+        Finn::vector<uint8_t> vec(xtensorArray.begin(), xtensorArray.end());
+        auto ret = baseDriver.inferSynchronous(vec.begin(), vec.end());
+        auto xarr = xt::adapt(ret, (std::static_pointer_cast<Finn::ExtendedBufferDescriptor>(baseDriver.getConfig().deviceWrappers[0].odmas[0]))->normalShape);
+        xt::dump_npy(outputFile, xarr);
+    } else if (size == 2) {
+        // uint16_t
+        auto xtensorArray = std::move(loadedNpyFile).cast<uint16_t, xt::layout_type::dynamic>();
+        Finn::vector<uint16_t> vec(xtensorArray.begin(), xtensorArray.end());
+        auto ret = baseDriver.inferSynchronous(vec.begin(), vec.end());
+        auto xarr = xt::adapt(ret, (std::static_pointer_cast<Finn::ExtendedBufferDescriptor>(baseDriver.getConfig().deviceWrappers[0].odmas[0]))->normalShape);
+        xt::dump_npy(outputFile, xarr);
+    } else if (size == 4) {
+        // uint32_t
+        auto xtensorArray = std::move(loadedNpyFile).cast<uint32_t, xt::layout_type::dynamic>();
+        Finn::vector<uint32_t> vec(xtensorArray.begin(), xtensorArray.end());
+        auto ret = baseDriver.inferSynchronous(vec.begin(), vec.end());
+        auto xarr = xt::adapt(ret, (std::static_pointer_cast<Finn::ExtendedBufferDescriptor>(baseDriver.getConfig().deviceWrappers[0].odmas[0]))->normalShape);
+        xt::dump_npy(outputFile, xarr);
+    } else if (size == 8) {
+        // uint64_t
+        auto xtensorArray = std::move(loadedNpyFile).cast<uint64_t, xt::layout_type::dynamic>();
+        Finn::vector<uint64_t> vec(xtensorArray.begin(), xtensorArray.end());
+        auto ret = baseDriver.inferSynchronous(vec.begin(), vec.end());
+        auto xarr = xt::adapt(ret, (std::static_pointer_cast<Finn::ExtendedBufferDescriptor>(baseDriver.getConfig().deviceWrappers[0].odmas[0]))->normalShape);
+        xt::dump_npy(outputFile, xarr);
+    } else {
+        FinnUtils::logAndError<std::runtime_error>("Unsupported floating point type detected when loading input npy file!");
+    }
+}
+
 /**
  * @brief Run inference on an input file
  *
@@ -158,7 +284,7 @@ void runWithInputFile(Finn::Driver<true>& baseDriver, logger_type& logger, const
     FINN_LOG(logger, loglevel::info) << finnMainLogPrefix() << "Running driver on input files";
     logDeviceInformation(logger, baseDriver.getDeviceHandler(0).getDevice(), baseDriver.getConfig().deviceWrappers[0].xclbin);
 
-    for (auto [inp, out] = std::tuple{inputFiles.begin(), outputFiles.begin()}; inp != inputFiles.end(); ++inp, ++out) {
+    for (auto&& [inp, out] = std::tuple{inputFiles.begin(), outputFiles.begin()}; inp != inputFiles.end(); ++inp, ++out) {
         // load npy file and process it
         // using normal xnpy::load_npy will not work because it requires a destination type
         // instead use xnpy::detail::load_npy_file und then concert by hand based on m_typestring of xnpy::detail::npy_file
@@ -171,32 +297,25 @@ void runWithInputFile(Finn::Driver<true>& baseDriver, logger_type& logger, const
 
         if (loadedFile.m_typestring[0] == '<') {
             // little endian
-            size_t sizePos = 2;
             switch (loadedFile.m_typestring[1]) {
                 case 'f': {
-                    int size = std::stoi(loadedFile.m_typestring, &sizePos);
-                    if (size == 4) {
-                        // float
-                        auto xtensorArray = std::move(loadedFile).cast<float, xt::layout_type::dynamic>();
-                        Finn::vector<float> vec(xtensorArray.begin(), xtensorArray.end());
-                        baseDriver.inferSynchronous(vec.begin(), vec.end());
-                    } else if (size == 8) {
-                        // double
-                        auto xtensorArray = std::move(loadedFile).cast<double, xt::layout_type::dynamic>();
-                    } else {
-                        FinnUtils::logAndError<std::runtime_error>("Unsupported floating point type detected when loading input npy file!");
-                    }
+                    inferFloatingPoint(baseDriver, loadedFile, *out);
                     break;
                 }
                 case 'i': {
-                    int size = std::stoi(loadedFile.m_typestring, &sizePos);
+                    inferSignedInteger(baseDriver, loadedFile, *out);
                     break;
                 }
                 case 'b': {
+                    auto xtensorArray = std::move(loadedFile).cast<bool, xt::layout_type::dynamic>();
+                    Finn::vector<uint8_t> vec(xtensorArray.begin(), xtensorArray.end());
+                    auto ret = baseDriver.inferSynchronous(vec.begin(), vec.end());
+                    auto xarr = xt::adapt(ret, (std::static_pointer_cast<Finn::ExtendedBufferDescriptor>(baseDriver.getConfig().deviceWrappers[0].odmas[0]))->normalShape);
+                    xt::dump_npy(*out, xarr);
                     break;
                 }
                 case 'u': {
-                    int size = std::stoi(loadedFile.m_typestring, &sizePos);
+                    inferUnsignedInteger(baseDriver, loadedFile, *out);
                     break;
                 }
                 default:

@@ -23,7 +23,7 @@
 #include <boost/log/trivial.hpp>                      // IWYU pragma: keep
 #include <boost/smart_ptr/intrusive_ptr.hpp>          // IWYU pragma: keep
 #include <boost/smart_ptr/intrusive_ref_counter.hpp>  // IWYU pragma: keep
-// #include <string>                                     // for allocator, string
+#include <string>                                     // for allocator, string
 
 namespace bl = finnBoost::log;
 namespace loglevel = bl::trivial;

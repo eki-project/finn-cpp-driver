@@ -13,6 +13,7 @@
 #include <sys/types.h>  // for uint
 
 #include <algorithm>    // for generate
+#include <chrono>       // for nanoseconds, ...
 #include <cstdint>      // for uint64_t, uint8_t, ...
 #include <exception>    // for exception
 #include <filesystem>   // for path, exists
@@ -140,7 +141,35 @@ void runThroughputTest(Finn::Driver<true>& baseDriver, logger_type& logger) {
 
         auto gen = [&dist, &mersenneEngine]() { return dist(mersenneEngine); };
 
-        std::generate(testInputs.begin(), testInputs.end(), gen);
+        constexpr size_t nTestruns = 1000;
+        std::chrono::nanoseconds sumRuntimeEnd2End;
+
+        for (size_t i = 0; i < nTestruns; ++i) {
+            std::generate(testInputs.begin(), testInputs.end(), gen);
+            const auto start = std::chrono::high_resolution_clock::now();
+            // volatile should stop the compiler from optimizing this code away
+            volatile auto ret = baseDriver.inferSynchronous(testInputs.begin(), testInputs.end());
+            const auto end = std::chrono::high_resolution_clock::now();
+
+            sumRuntimeEnd2End += end - start;
+        }
+
+        std::chrono::nanoseconds sumRuntimePacking;
+
+        for (size_t i = 0; i < nTestruns; ++i) {
+            std::generate(testInputs.begin(), testInputs.end(), gen);
+            const auto start = std::chrono::high_resolution_clock::now();
+            // volatile should stop the compiler from optimizing this code away
+            volatile auto packed = Finn::pack<InputFinnType>(testInputs.begin(), testInputs.end());
+            const auto end = std::chrono::high_resolution_clock::now();
+
+            sumRuntimePacking += end - start;
+        }
+
+        std::cout << "Avg. end2end latency: " << (static_cast<unsigned long>(sumRuntimeEnd2End.count()) / nTestruns) << "ns\n";
+        std::cout << "Avg. end2end throughput: " << 1 / (static_cast<unsigned long>(std::chrono::duration_cast<std::chrono::seconds>(sumRuntimeEnd2End).count()) / nTestruns) << " inferences/s\n";
+        std::cout << "Avg. packing latency: " << (static_cast<unsigned long>(sumRuntimePacking.count()) / nTestruns) << "ns\n";
+
 
         // benchmark each step in call chain for int
     } else {
@@ -152,6 +181,23 @@ void runThroughputTest(Finn::Driver<true>& baseDriver, logger_type& logger) {
         auto gen = [&dist, &mersenneEngine]() { return dist(mersenneEngine); };
 
         std::generate(testInputs.begin(), testInputs.end(), gen);
+
+        constexpr size_t nTestruns = 1000;
+        std::chrono::nanoseconds sumRuntimeEnd2End;
+
+        for (size_t i = 0; i < nTestruns; ++i) {
+            std::generate(testInputs.begin(), testInputs.end(), gen);
+            const auto start = std::chrono::high_resolution_clock::now();
+            // volatile should stop the compiler from optimizing this code away
+            volatile auto ret = baseDriver.inferSynchronous(testInputs.begin(), testInputs.end());
+            const auto end = std::chrono::high_resolution_clock::now();
+
+            sumRuntimeEnd2End += end - start;
+        }
+
+        std::cout << "Avg. end2end latency: " << (static_cast<unsigned long>(sumRuntimeEnd2End.count()) / nTestruns) << "ns\n";
+        std::cout << "Avg. end2end throughput: " << 1 / (static_cast<unsigned long>(std::chrono::duration_cast<std::chrono::seconds>(sumRuntimeEnd2End).count()) / nTestruns) << " inferences/s\n";
+
 
         // benchmark each step in call chain for float
     }

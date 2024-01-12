@@ -4,6 +4,8 @@ if(NOT CPP_CHECK_FOUND)
 endif()
 
 set(CMAKE_CXX_CPPCHECK cppcheck
+--suppress=unmatchedSuppression;
+  --suppress=unmatchedSuppression:{};
   --suppress=missingInclude;
   --enable=all;
   --inline-suppr;

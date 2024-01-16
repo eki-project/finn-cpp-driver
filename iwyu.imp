@@ -9,4 +9,5 @@
 { include: [ "<boost/lexical_cast/bad_lexical_cast.hpp>", "private", "<boost/program_options.hpp>", "public" ]},
 { include: [ "<boost/type_index/type_index_facade.hpp>", "private", "<boost/program_options.hpp>", "public" ]},
 { include: [ "<experimental/xrt_xclbin.h>", "private", "\"xrt/xrt_kernel.h\"", "public" ]},
+{ include: [ "<bits/chrono.h>", "private", "<chrono>", "public" ]},
 ]

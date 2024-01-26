@@ -124,7 +124,28 @@ Use ```xbutil``` to get information about the cards and configure them manually 
 
 ### External Use
 
-The Finn C++ Driver can be used as a submodule in your own projects. To get started please first go to your folder where the finn-cpp-driver should be located and add the submodule using `git submodule add HTTPS_OR_SSH_LINK_TO_THIS_REPO`. Next it is important that you choose the correct branch. Most of the time you want to use the main branch, but if you want to a specific branch, go to the finn-cpp-driver submodule folder and check out the correct branch. After that init the submodule using `git submodule update --init --recursive`. Next you will need to build the dependencies used by the Finn C++ Driver. Go to the finn-cpp-driver folder and execute `./buildDependencies.sh`. This will take a while. After the dependencies finished building, it is possible to use the FINN C++ Driver as a CMake submodule:
+**TLDR:**
+```bash
+git submodule add https://github.com/eki-project/finn-cpp-driver.git
+git submodule update --init --recursive
+cd finn-cpp-driver
+./buildDependencies.sh
+cd ..
+```
+
+The Finn C++ Driver can be used as a submodule in your own projects. To get started please first go to your folder where the finn-cpp-driver should be located and add the submodule using `git submodule add https://github.com/eki-project/finn-cpp-driver.git`. Next it is important that you choose the correct branch. Most of the time you want to use the main branch, but if you want to a specific branch, go to the finn-cpp-driver submodule folder and check out the correct branch. After that init the submodule using `git submodule update --init --recursive`. Next you will need to build the dependencies used by the Finn C++ Driver. Go to the finn-cpp-driver folder and execute `./buildDependencies.sh`. This will take a while. After the dependencies finished building, it is possible to use the FINN C++ Driver as a CMake submodule:
+
+```CMake
+#Add the C++ driver as a submodule
+add_subdirectory(external/finn-cpp-driver)
+
+#Link an example application against the finn driver
+#TODO: Maybe rework this so this is nicer with an exported targets?
+add_executable(main main.cpp)
+target_include_directories(main SYSTEM PRIVATE ${XRT_INCLUDE_DIRS} ${FINNC_SRC_DIR})
+target_link_directories(main PRIVATE ${XRT_LIB_CORE_LOCATION} ${XRT_LIB_OCL_LOCATION} ${BOOST_LIBRARYDIR})
+target_link_libraries(main PRIVATE finnc_core OpenCL xrt_coreutil uuid finnc_utils ${Boost_LIBRARIES})
+```
 
 ## TODO
 

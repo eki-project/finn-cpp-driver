@@ -1,7 +1,9 @@
 cmake_minimum_required(VERSION 3.16)
 
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake")
-SET(FINNC_SRC_DIR "${CMAKE_SOURCE_DIR}/src")
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+message(STATUS "${CMAKE_MODULE_PATH}")
+SET(FINNC_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
+SET(FINNC_BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 SET(CMAKE_COLOR_MAKEFILE ON)
 
 
@@ -88,6 +90,7 @@ find_package(Threads REQUIRED)
 
 #XRT
 find_package(OpenCL REQUIRED)
+set(XRT_DIR "${CMAKE_SOURCE_DIR}/cmake")
 find_package(XRT REQUIRED)
 
 #OpenMP
@@ -96,9 +99,9 @@ find_package(OpenMP)
 #Boost
 set(Boost_DEBUG OFF)
 set(Boost_NO_SYSTEM_PATHS ON)
-set(BOOST_ROOT "${CMAKE_SOURCE_DIR}/deps/finn_boost")
-set(BOOST_INCLUDEDIR "${CMAKE_SOURCE_DIR}/deps/finn_boost")
-set(BOOST_LIBRARYDIR "${CMAKE_SOURCE_DIR}/deps/finn_boost/stage/lib/boost")
+set(BOOST_ROOT "${FINNC_BASE_DIR}/deps/finn_boost")
+set(BOOST_INCLUDEDIR "${FINNC_BASE_DIR}/deps/finn_boost")
+set(BOOST_LIBRARYDIR "${FINNC_BASE_DIR}/deps/finn_boost/stage/lib/boost")
 set(Boost_NAMESPACE "finnBoost")
 set(FINNC_SAVE_BOOST_ROOT $ENV{BOOST_ROOT})
 set(ENV{BOOST_ROOT} "")

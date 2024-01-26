@@ -127,6 +127,7 @@ Use ```xbutil``` to get information about the cards and configure them manually 
 **TLDR:**
 ```bash
 git submodule add https://github.com/eki-project/finn-cpp-driver.git
+cd finn-cpp-driver && git checkout dev && cd ..
 git submodule update --init --recursive
 cd finn-cpp-driver
 ./buildDependencies.sh

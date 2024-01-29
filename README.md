@@ -70,10 +70,19 @@ make -j $(nprocs)
 
 **Using the FINN pipeline:**
 
-The FINN pipeline will take over most of the tasks shown above.
+The FINN pipeline will do most of the tasks shown above for you.
 To use the FINN C++ driver with the FINN compiler specify `step_make_cpp_drive` as a build step and `build_cfg.DataflowOutputType.CPP_DRIVER` as an output.
 
-The FINN pipeline will compile the FINN driver for you. (You can of course recompile the FINN C++ driver manually afterwards using the emitted source files.) If you do not want to use the C++ driver frontend, but use it as a library in your own project, please have a look at the section [external use](#external-use).
+By default, the FINN pipeline will not compile the FINN driver for you. After a successful run of the FINN pipeline navigate to the finn-cpp-driver output folder and execute the following commands to build the C++ driver:
+
+```bash
+./buildDependencies.sh
+mkdir build && cd build
+cmake -DCMAKE_BUILD_TYPE=Release -DFINNC_ENABLE_SANITIZERS=Off ..
+make -j $(nprocs)
+```
+
+If you do not want to use the C++ driver frontend, but use it as a library in your own project, please have a look at the section [external use](#external-use).
 
 **Unittests:**
 
@@ -134,6 +143,8 @@ cd finn-cpp-driver
 cd ..
 ```
 
+**Long version:**
+
 The Finn C++ Driver can be used as a submodule in your own projects. To get started please first go to your folder where the finn-cpp-driver should be located and add the submodule using `git submodule add https://github.com/eki-project/finn-cpp-driver.git`. Next it is important that you choose the correct branch. Most of the time you want to use the main branch, but if you want to a specific branch, go to the finn-cpp-driver submodule folder and check out the correct branch. After that init the submodule using `git submodule update --init --recursive`. Next you will need to build the dependencies used by the Finn C++ Driver. Go to the finn-cpp-driver folder and execute `./buildDependencies.sh`. This will take a while. After the dependencies finished building, it is possible to use the FINN C++ Driver as a CMake submodule:
 
 ```CMake
@@ -148,86 +159,9 @@ target_link_directories(main PRIVATE ${XRT_LIB_CORE_LOCATION} ${XRT_LIB_OCL_LOCA
 target_link_libraries(main PRIVATE finnc_core OpenCL xrt_coreutil uuid finnc_utils ${Boost_LIBRARIES})
 ```
 
-## TODO
+### Known Issues
 
-* Check if XRT frees the memory map itself
+* Building against Boost results in undefined references:
+  * This issue is caused by namespaces leaking from inside XRT. The C++ has its own renamed (partial) boost version called finnBoost that can be used as a replacement.
 
-## Structure
-
-```none
-Driver (bjarne)
-    Accelerator (linus)
-        DeviceHandler<uint8>[] OR DeviceHandler<InputType, OutputType>[] (linus)
-            XCLBIN-File
-            Name
-            DeviceIndex
-            xrt::kernel[]
-            DeviceBuffer[]<Type> (bjarne)
-                xrt::bo[]
-                bo-map*
-                sizes
-                Boost CircularBuffer
-                Boost CircularBuffer Methoden
-```
-
-### Driver
-
-```cpp
-entrypoint?()
-```
-
-### DeviceHandler
-
-```cpp
-DeviceHandler()
-initializeDevice()
-initializerDeviceBuffers()
-getDeviceBuffer()
-(getDeviceBufferInputOutputPair())
-syncBuffers() (vlt. mehrere)
-```
-
-### DeviceBuffer
-
-(only ever write from ringBuffer, never manually!)
-
-```cpp
-Flag: IS_INPUT_OR_OUTPUT
-(Iterator für BOMap)
-fillBOMapRandom()
-sync()
-loadFromRingBuffer() (operator overloading?)
-loadToRingBuffer() (operator overloading?)
-[all RingBuffer convenience functions]
-getSizes()
-isEmpty()
-isFull()
-clear()
-```
-
-## Filetree
-
-* Filenames after class names, with UpperCamelCase
-* .h no template, .hpp templated
-* Split every non-template files into header and cpp file
-* utils.hpp only contains items that usable everywhere
-
-* utils: Utility functions and objects
-* utils - types.h: Enums and usings
-
-```none
-src
-    FinnDriverUsercode.cpp
-    config
-        Config.h
-        protobuf_generated_code...
-    core
-        DeviceHandler.hpp
-        DeviceBuffer.hpp
-        Accelerator.hpp
-        Driver.hpp
-    utils
-        FinnDatatypes.hpp
-        Types.h
-        Mdspan.h
-```
+Please refer to the git issues for currently known issues and possible ways to mitigate them.

@@ -1,10 +1,6 @@
 add_subdirectory(utils)
 add_subdirectory(core)
 
-add_executable(main main.cpp)
-target_link_libraries(main PRIVATE finnc_options)
-target_include_directories(main PRIVATE ${FINNC_SRC_DIR})
-
 add_executable(finn FINNDriver.cpp)
 target_include_directories(finn SYSTEM PRIVATE ${XRT_INCLUDE_DIRS} ${FINNC_SRC_DIR})
 target_link_directories(finn PRIVATE ${XRT_LIB_CORE_LOCATION} ${XRT_LIB_OCL_LOCATION} ${BOOST_LIBRARYDIR})

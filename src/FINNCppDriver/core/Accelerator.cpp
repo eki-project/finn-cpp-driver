@@ -12,7 +12,7 @@
 
 #include "Accelerator.h"
 
-#include <FINNCppDriver/core/DeviceHandler.h>          // for DeviceHandler, Uncheck...
+#include <FINNCppDriver/core/DeviceHandler.h>          // for DeviceHandler, UncheckedStore, ...
 #include <FINNCppDriver/utils/ConfigurationStructs.h>  // IWYU pragma: keep
 #include <FINNCppDriver/utils/FinnUtils.h>             // for logAndError, unreachable
 #include <FINNCppDriver/utils/Logger.h>                // for operator<<, DevNull
@@ -64,23 +64,21 @@ namespace Finn {
         if (containsDevice(deviceIndex)) {
             DeviceHandler& devHand = getDeviceHandler(deviceIndex);
             if (devHand.containsBuffer(inputBufferKernelName, IO::INPUT)) {
-                return { devHand, inputBufferKernelName };
+                return {devHand, inputBufferKernelName};
             }
         }
         FinnUtils::logAndError<std::runtime_error>("Tried creating a store-closure on a deviceIndex or kernelBufferName which don't exist! Queried index: " + std::to_string(deviceIndex) + ", KernelBufferName: " + inputBufferKernelName);
         FinnUtils::unreachable();
-        return { devices[0], "" };
+        return {devices[0], ""};
     }
 
     bool Accelerator::run(const unsigned int deviceIndex, const std::string& inputBufferKernelName) {
         if (containsDevice(deviceIndex)) {
             return getDeviceHandler(deviceIndex).run(inputBufferKernelName);
-        }
-        else {
+        } else {
             if (containsDevice(0)) {
                 return getDeviceHandler(0).run(inputBufferKernelName);
-            }
-            else {
+            } else {
                 // cppcheck-suppress missingReturn
                 FinnUtils::logAndError<std::runtime_error>("Tried running data in a devicehandler with an invalid deviceIndex!");
             }
@@ -91,13 +89,11 @@ namespace Finn {
         if (containsDevice(deviceIndex)) {
             FINN_LOG_DEBUG(Logger::getLogger(), loglevel::info) << loggerPrefix() << "Retrieving results from the specified device index! [accelerator.retrueveResults()]";
             return getDeviceHandler(deviceIndex).retrieveResults(outputBufferKernelName, forceArchival);
-        }
-        else {
+        } else {
             if (containsDevice(0)) {
                 FINN_LOG_DEBUG(Logger::getLogger(), loglevel::info) << loggerPrefix() << "Retrieving results from 0  device index! [accelerator.retrueveResults()]";
                 return getDeviceHandler(0).retrieveResults(outputBufferKernelName, forceArchival);
-            }
-            else {
+            } else {
                 // cppcheck-suppress missingReturn
                 FinnUtils::logAndError<std::runtime_error>("Tried receiving data in a devicehandler with an invalid deviceIndex!");
             }
@@ -109,13 +105,11 @@ namespace Finn {
         if (containsDevice(deviceIndex)) {
             FINN_LOG_DEBUG(Logger::getLogger(), loglevel::info) << loggerPrefix() << "Reading from the specified device index! [accelerator.read()]";
             return getDeviceHandler(deviceIndex).read(outputBufferKernelName, samples);
-        }
-        else {
+        } else {
             if (containsDevice(0)) {
                 FINN_LOG_DEBUG(Logger::getLogger(), loglevel::info) << loggerPrefix() << "Reading from 0 device index! [accelerator.read()]";
                 return getDeviceHandler(0).read(outputBufferKernelName, samples);
-            }
-            else {
+            } else {
                 FinnUtils::logAndError<std::runtime_error>("Tried reading data in a devicehandler with an invalid deviceIndex!");
             }
         }

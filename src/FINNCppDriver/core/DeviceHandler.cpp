@@ -13,12 +13,12 @@
 #include <FINNCppDriver/core/DeviceHandler.h>
 #include <FINNCppDriver/utils/ConfigurationStructs.h>
 #include <FINNCppDriver/utils/Logger.h>
-#include <FINNCppDriver/utils/join.hpp>
 #include <FINNCppDriver/utils/Types.h>
 
 #include <FINNCppDriver/core/DeviceBuffer/AsyncDeviceBuffers.hpp>
 #include <FINNCppDriver/core/DeviceBuffer/DeviceBuffer.hpp>
 #include <FINNCppDriver/core/DeviceBuffer/SyncDeviceBuffers.hpp>
+#include <FINNCppDriver/utils/join.hpp>
 #include <boost/cstdint.hpp>
 #include <cerrno>
 #include <chrono>
@@ -29,7 +29,7 @@
 #include <stdexcept>
 #include <system_error>
 #include <utility>  // for move
-#include <vector>
+#include <vector>   // for vector
 
 #include "ert.h"
 #include "xrt/xrt_device.h"
@@ -85,25 +85,24 @@ namespace Finn {
 
     void DeviceHandler::initializeDevice() {
         FINN_LOG(Logger::getLogger(), loglevel::info) << loggerPrefix() << "(" << xrtDeviceIndex << ") "
-            << "Initializing xrt::device, loading xclbin and assigning IP\n";
+                                                      << "Initializing xrt::device, loading xclbin and assigning IP\n";
         device = xrt::device(xrtDeviceIndex);
     }
 
     void DeviceHandler::loadXclbinSetUUID() {
         FINN_LOG(Logger::getLogger(), loglevel::info) << loggerPrefix() << "(" << xrtDeviceIndex << ") "
-            << "Loading XCLBIN and setting uuid\n";
+                                                      << "Loading XCLBIN and setting uuid\n";
         uuid = device.load_xclbin(xclbinPath);
     }
 
     void DeviceHandler::initializeBufferObjects(const DeviceWrapper& devWrap, unsigned int hostBufferSize, bool synchronousInference) {
         FINN_LOG(Logger::getLogger(), loglevel::info) << loggerPrefix() << "(" << xrtDeviceIndex << ") "
-            << "Initializing buffer objects\n";
+                                                      << "Initializing buffer objects\n";
         for (auto&& ebdptr : devWrap.idmas) {
             auto tmpKern = xrt::kernel(device, uuid, ebdptr->kernelName, xrt::kernel::cu_access_mode::shared);
             if (synchronousInference) {
                 inputBufferMap.emplace(std::make_pair(ebdptr->kernelName, std::make_shared<Finn::SyncDeviceInputBuffer<uint8_t>>(ebdptr->kernelName, device, tmpKern, ebdptr->packedShape, hostBufferSize)));
-            }
-            else {
+            } else {
                 inputBufferMap.emplace(std::make_pair(ebdptr->kernelName, std::make_shared<Finn::AsyncDeviceInputBuffer<uint8_t>>(ebdptr->kernelName, device, tmpKern, ebdptr->packedShape, hostBufferSize)));
             }
         }
@@ -113,8 +112,7 @@ namespace Finn {
                 auto ptr = std::make_shared<Finn::SyncDeviceOutputBuffer<uint8_t>>(ebdptr->kernelName, device, tmpKern, ebdptr->packedShape, hostBufferSize);
                 ptr->allocateLongTermStorage(hostBufferSize * 5);
                 outputBufferMap.emplace(std::make_pair(ebdptr->kernelName, ptr));
-            }
-            else {
+            } else {
                 auto ptr = std::make_shared<Finn::AsyncDeviceOutputBuffer<uint8_t>>(ebdptr->kernelName, device, tmpKern, ebdptr->packedShape, hostBufferSize);
                 ptr->allocateLongTermStorage(hostBufferSize * 5);
                 outputBufferMap.emplace(std::make_pair(ebdptr->kernelName, ptr));
@@ -133,8 +131,7 @@ namespace Finn {
     [[maybe_unused]] bool DeviceHandler::containsBuffer(const std::string& kernelBufferName, IO ioMode) {
         if (ioMode == IO::INPUT) {
             return inputBufferMap.contains(kernelBufferName);
-        }
-        else if (ioMode == IO::OUTPUT) {
+        } else if (ioMode == IO::OUTPUT) {
             return outputBufferMap.contains(kernelBufferName);
         }
         return false;
@@ -186,8 +183,7 @@ namespace Finn {
     size_t DeviceHandler::size(SIZE_SPECIFIER ss, const std::string& bufferName) {
         if (inputBufferMap.contains(bufferName)) {
             return inputBufferMap.at(bufferName)->size(ss);
-        }
-        else if (outputBufferMap.contains(bufferName)) {
+        } else if (outputBufferMap.contains(bufferName)) {
             return outputBufferMap.at(bufferName)->size(ss);
         }
         return 0;
@@ -200,14 +196,14 @@ namespace Finn {
         for (size_t index = 0; index < inputBufferMap.bucket_count(); ++index) {
             if (inputBufferMap.bucket_size(index) > 1) {
                 FINN_LOG_DEBUG(Logger::getLogger(), loglevel::error) << loggerPrefix() << "(" << xrtDeviceIndex << ") "
-                    << "Hash collision in inputBufferMap. This access to the inputBufferMap is no longer constant time!";
+                                                                     << "Hash collision in inputBufferMap. This access to the inputBufferMap is no longer constant time!";
                 collisionFound = true;
             }
         }
         for (size_t index = 0; index < outputBufferMap.bucket_count(); ++index) {
             if (outputBufferMap.bucket_size(index) > 1) {
                 FINN_LOG_DEBUG(Logger::getLogger(), loglevel::error) << loggerPrefix() << "(" << xrtDeviceIndex << ") "
-                    << "Hash collision in outputBufferMap. This access to the outputBufferMap is no longer constant time!";
+                                                                     << "Hash collision in outputBufferMap. This access to the outputBufferMap is no longer constant time!";
                 collisionFound = true;
             }
         }

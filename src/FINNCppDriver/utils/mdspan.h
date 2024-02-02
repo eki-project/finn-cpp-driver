@@ -16,14 +16,13 @@
 #include <span>
 
 #ifdef __cpp_lib_mdspan
-using stdex::mdspan = std::mdspan;
+    #warning("Warning: Both std and stdex mdspan are enabled. stdex should be disabled as it is deprecated! ")
+#endif
 
-#else
 
-    #include <mdspan/mdspan.hpp>
+#include <mdspan/mdspan.hpp>
 namespace stdex = Kokkos;
 
-#endif
 
 /**
  * @brief Implementation of makeMDSpan

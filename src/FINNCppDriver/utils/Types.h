@@ -10,8 +10,8 @@
  *
  */
 
-#ifndef TYPES_H
-#define TYPES_H
+#ifndef TYPES
+#define TYPES
 
 #include <FINNCppDriver/utils/AlignedAllocator.hpp>
 #include <vector>
@@ -44,4 +44,4 @@ using shape_t = std::vector<unsigned int>;
 
 using size_bytes_t = std::size_t;
 using index_t = long unsigned int;
-#endif  // TYPES_H
+#endif  // TYPES

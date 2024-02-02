@@ -11,20 +11,10 @@ include(cmake/PreventInSourceBuilds.cmake)
 
 project(FinnCPPDriver)
 
-# Custom paths for the unittest configuration and the header for in-use compilation
-if(DEFINED FINN_CUSTOM_UNITTEST_CONFIG)
-    message(STATUS "Added custom unittest config path (${FINN_CUSTOM_UNITTEST_CONFIG})!")
-    add_definitions(-DFINN_CUSTOM_UNITTEST_CONFIG=${FINN_CUSTOM_UNITTEST_CONFIG})
-endif()
-
-if(DEFINED FINN_HEADER_LOCATION)
-    message(STATUS "Added custom FINN-compiled header path (${FINN_HEADER_LOCATION})!")
-    add_definitions(-DFINN_HEADER_LOCATION=${FINN_HEADER_LOCATION})
-endif()
-
 # specify the C++ standard
 set(CMAKE_CXX_EXTENSIONS ON)
 set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 message(STATUS "Using C++ Standard ${CMAKE_CXX_STANDARD}")
 
 include(cmake/StandardProjectSettings.cmake)
@@ -81,6 +71,17 @@ if(FINNC_BUILD_DOC)
 endif()
 
 #INCLUDES
+
+# Custom paths for the unittest configuration and the header for in-use compilation
+if(DEFINED FINN_CUSTOM_UNITTEST_CONFIG)
+    message(STATUS "Added custom unittest config path (${FINN_CUSTOM_UNITTEST_CONFIG})!")
+    add_definitions(-DFINN_CUSTOM_UNITTEST_CONFIG=${FINN_CUSTOM_UNITTEST_CONFIG})
+endif()
+
+if(DEFINED FINN_HEADER_LOCATION)
+    message(STATUS "Added custom FINN-compiled header path (${FINN_HEADER_LOCATION})!")
+    add_definitions(-DFINN_HEADER_LOCATION=${FINN_HEADER_LOCATION})
+endif()
 
 #set(Boost_USE_STATIC_LIBS   ON)
 

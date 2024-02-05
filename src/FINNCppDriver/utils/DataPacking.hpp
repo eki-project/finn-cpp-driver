@@ -18,6 +18,7 @@
 #include <FINNCppDriver/utils/Types.h>
 
 #include <FINNCppDriver/utils/AlignedAllocator.hpp>
+#include <FINNCppDriver/utils/DynamicMdSpan.hpp>
 #include <FINNCppDriver/utils/FinnDatatypes.hpp>
 #include <algorithm>
 #include <concepts>
@@ -408,6 +409,40 @@ namespace Finn {
     consteval bool IsCorrectFinnType() {
         return std::is_floating_point_v<T> == !U().isInteger() && std::is_signed_v<T> == U().sign() && U().bitwidth() <= sizeof(T) * 8 && (U().isInteger() || std::is_same<float, T>::value) &&
                (std::is_floating_point_v<T> || std::is_integral_v<T>);
+    }
+
+    /**
+     * @brief Function to pack multi dimensional input arrays
+     *
+     * @tparam U Finn Datatype of input data
+     * @tparam IteratorType
+     * @param first Iterator to first element of input
+     * @param last  Iterator to last element of input
+     * @param dynamicSpan DynamicMdSpan object that describes the folded structure of the input
+     * @param elementsInnerMostDim number of elements in the inner most dimension
+     * @return Finn::vector<uint8_t> Vector of packed bytes
+     */
+    template<IsDatatype U, typename IteratorType>
+    Finn::vector<uint8_t> packMultiDimensionalInputs(IteratorType first, IteratorType last, const Finn::DynamicMdSpan<IteratorType>& dynamicSpan, const std::size_t elementsInnerMostDim) {
+        auto innerVecs = dynamicSpan.getMostInnerDims();
+
+        // preallocate memory to make copy more efficient
+        const std::size_t totalElemsPerInnerDim = elementsInnerMostDim * U().bitwidth();
+        constexpr std::size_t byte = 8;
+        const std::size_t retSizePerElem = (totalElemsPerInnerDim % byte) ? totalElemsPerInnerDim / byte + 1 : totalElemsPerInnerDim / byte;  // ceil(totalElemsPerInnerDim/8)
+        const std::size_t retSizeTotal = retSizePerElem * innerVecs.size();
+
+        Finn::vector<uint8_t> packedMerged(retSizeTotal);
+
+        // for each most inner dimension
+#pragma omp parallel for if (innerVecs.size() > 100)
+        for (std::size_t i = 0; i < innerVecs.size(); ++i) {
+            auto packed = Finn::pack<U>(innerVecs[i].begin(), innerVecs[i].end());
+            // combine packing results
+            std::copy(packed.begin(), packed.end(), packedMerged.begin() + i * retSizePerElem);
+        }
+
+        return packedMerged;
     }
 
 

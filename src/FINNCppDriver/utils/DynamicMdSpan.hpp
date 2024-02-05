@@ -22,7 +22,7 @@ namespace Finn {
         const IteratorType end;
 
          public:
-        void setShape(const std::vector<std::size_t>& shape) {
+        void setShape(const std::vector<uint>& shape) {
             if (shape.empty()) {
                 throw std::runtime_error("Can not create dynamic mdspan for empty Shape.");
             }
@@ -49,7 +49,7 @@ namespace Finn {
             }
         }
 
-        DynamicMdSpan(const IteratorType begin, const IteratorType end, const std::vector<std::size_t>& shape) : count(std::distance(begin, end)), begin(begin), end(end) {
+        DynamicMdSpan(const IteratorType begin, const IteratorType end, const std::vector<uint>& shape) : count(std::distance(begin, end)), begin(begin), end(end) {
             if (count == 0) {
                 throw std::runtime_error("Can not create dynamic mdspan for empty container.");
             }
@@ -59,7 +59,7 @@ namespace Finn {
 
         std::vector<std::size_t> getStrides() { return strides; }
 
-        std::vector<std::span<T>> getMostInnerDims() { return mostInnerDims; }
+        std::vector<std::span<T>> getMostInnerDims() const { return mostInnerDims; }
     };
 
 }  // namespace Finn

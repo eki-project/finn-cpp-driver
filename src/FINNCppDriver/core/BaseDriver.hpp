@@ -19,6 +19,7 @@
 #include <FINNCppDriver/utils/Types.h>
 
 #include <FINNCppDriver/utils/DataPacking.hpp>
+#include <FINNCppDriver/utils/DynamicMdSpan.hpp>
 #include <FINNCppDriver/utils/FinnDatatypes.hpp>
 #include <cinttypes>  // for uint8_t
 #include <filesystem>
@@ -29,6 +30,7 @@
 
 #include "Accelerator.h"
 #include "ert.h"
+#include "omp.h"
 
 
 namespace Finn {
@@ -40,7 +42,7 @@ namespace Finn {
      * @tparam S The FINN output datatype
      * @tparam T The C-datatype used to pass data to the FPGA
      */
-    template<bool SynchronousInference, typename F, typename S, typename T = uint8_t>
+    template<bool SynchronousInference, IsDatatype F, IsDatatype S, typename T = uint8_t>
     class BaseDriver {
          private:
         Accelerator accelerator;
@@ -260,13 +262,18 @@ namespace Finn {
         template<typename IteratorType, typename V = Finn::UnpackingAutoRetType::AutoRetType<S>, typename = std::enable_if<SynchronousInference>>
         [[nodiscard]] Finn::vector<V> inferSynchronous(IteratorType first, IteratorType last, uint inputDeviceIndex, const std::string& inputBufferKernelName, uint outputDeviceIndex, const std::string& outputBufferKernelName,
                                                        uint batchSize, bool forceArchival) {
-            // fold
-            // for each most inner dimension
-            auto packed = Finn::pack<F>(first, last);
-            // combine packing results
+            using IterValueType = typename std::iterator_traits<IteratorType>::value_type;
+            // auto foldedShape = static_cast<Finn::ExtendedBufferDescriptor*>(configuration.deviceWrappers[inputDeviceIndex].idmas[0])->foldedShape;
+            auto packedShape = configuration.deviceWrappers[inputDeviceIndex].idmas[0]->packedShape;
+            Finn::DynamicMdSpan reshapedInput(first, last, packedShape);
+
+            auto packed = Finn::packMultiDimensionalInputs<F, IteratorType>(first, last, reshapedInput, packedShape.back());
+
             auto result = infer(packed.begin(), packed.end(), inputDeviceIndex, inputBufferKernelName, outputDeviceIndex, outputBufferKernelName, batchSize, forceArchival);
-            // unpack. for each inner dimension?
-            // unfold
+
+            // TODO(linusjun): Fix this!
+            //  unpack. for each inner dimension?
+            //  unfold
             return unpack<S, V>(result);
         }
 

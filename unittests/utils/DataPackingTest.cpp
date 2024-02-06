@@ -13,6 +13,7 @@
 #include <FINNCppDriver/utils/Types.h>
 
 #include <FINNCppDriver/utils/DataPacking.hpp>
+#include <FINNCppDriver/utils/DynamicMdSpan.hpp>
 #include <FINNCppDriver/utils/join.hpp>
 #include <algorithm>
 #include <array>
@@ -612,6 +613,16 @@ TEST(DataPacking, UnpackingFloatTypes) {
     auto retFloat = Finn::unpack<Finn::DatatypeFloat>(inp);
     Finn::vector<float> base(inputMat7.begin(), inputMat7.end());
     EXPECT_EQ(retFloat, base);
+}
+
+TEST(DataPacking, PackingMultiDimensionalInputs) {
+    Finn::vector<int> inp{
+        -9, -3, 2, 8, -5, -4, 4, -5, 5, -12,
+    };
+    Finn::DynamicMdSpan shape(inp.begin(), inp.end(), {1, 5, 2});
+    auto packed = Finn::packMultiDimensionalInputs<Finn::DatatypeInt<5>>(inp.begin(), inp.end(), shape, 2);
+    Finn::vector<uint8_t> expectedResult{183, 3, 2, 1, 155, 3, 100, 3, 133, 2};
+    EXPECT_EQ(packed, expectedResult);
 }
 
 int main(int argc, char** argv) {

@@ -623,6 +623,31 @@ TEST(DataPacking, PackingMultiDimensionalInputs) {
     auto packed = Finn::packMultiDimensionalInputs<Finn::DatatypeInt<5>>(inp.begin(), inp.end(), shape, 2);
     Finn::vector<uint8_t> expectedResult{183, 3, 2, 1, 155, 3, 100, 3, 133, 2};
     EXPECT_EQ(packed, expectedResult);
+
+    Finn::vector<int> inp1{1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
+    Finn::DynamicMdSpan shape1(inp1.begin(), inp1.end(), {1, 5, 2});
+    auto packed1 = Finn::packMultiDimensionalInputs<Finn::DatatypeInt<5>>(inp1.begin(), inp1.end(), shape1, 2);
+    Finn::vector<uint8_t> expectedResult1{
+        33, 0, 33, 0, 33, 0, 33, 0, 33, 0,
+    };
+    EXPECT_EQ(packed1, expectedResult1);
+}
+
+TEST(DataPacking, UnpackingMultiDimensionalInputs) {
+    Finn::vector<uint8_t> inp1{6, 6, 6, 6, 6, 6, 6, 6, 6, 0};
+    Finn::DynamicMdSpan shape(inp1.begin(), inp1.end(), {1, 10, 1});
+
+    Finn::vector<uint8_t> inp2{
+        33, 0, 33, 0, 33, 0, 33, 0, 33, 0,
+    };
+    for (auto&& elem : inp2) {
+        std::cout << std::bitset<8>(elem) << " ";
+    }
+    std::cout << "\n";
+
+    auto unpacked2 = Finn::unpack<Finn::DatatypeInt<5>>(inp2);
+    Finn::vector<int8_t> expectedResult2{1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
+    EXPECT_EQ(unpacked2, expectedResult2);
 }
 
 int main(int argc, char** argv) {

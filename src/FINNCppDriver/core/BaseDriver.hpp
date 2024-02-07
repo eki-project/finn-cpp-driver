@@ -21,6 +21,7 @@
 #include <FINNCppDriver/utils/DataPacking.hpp>
 #include <FINNCppDriver/utils/DynamicMdSpan.hpp>
 #include <FINNCppDriver/utils/FinnDatatypes.hpp>
+#include <bitset>
 #include <cinttypes>  // for uint8_t
 #include <filesystem>
 #include <fstream>
@@ -270,6 +271,12 @@ namespace Finn {
             auto packed = Finn::packMultiDimensionalInputs<F, IteratorType>(first, last, reshapedInput, packedShape.back());
 
             auto result = infer(packed.begin(), packed.end(), inputDeviceIndex, inputBufferKernelName, outputDeviceIndex, outputBufferKernelName, batchSize, forceArchival);
+
+            for (auto&& elem : result) {
+                std::cout << std::bitset<8>(elem) << " ";
+            }
+            std::cout << "\n";
+            return {};
 
             // TODO(linusjun): Fix this!
             //  unpack. for each inner dimension?

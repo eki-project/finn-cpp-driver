@@ -145,11 +145,13 @@ void runThroughputTest(Finn::Driver<true>& baseDriver, logger_type& logger) {
 
         auto gen = [&dist, &mersenneEngine]() { return dist(mersenneEngine); };
 
-        constexpr size_t nTestruns = 1000;
+        constexpr size_t nTestruns = 1;
         std::chrono::nanoseconds sumRuntimeEnd2End;
 
         for (size_t i = 0; i < nTestruns; ++i) {
-            std::generate(testInputs.begin(), testInputs.end(), gen);
+            // TODO(linusjun): Revert debug stuff
+            // std::generate(testInputs.begin(), testInputs.end(), gen);
+            std::fill(testInputs.begin(), testInputs.end(), 1);
             const auto start = std::chrono::high_resolution_clock::now();
             // volatile should stop the compiler from optimizing this code away
             volatile auto ret = baseDriver.inferSynchronous(testInputs.begin(), testInputs.end());

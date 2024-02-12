@@ -506,8 +506,8 @@ TEST(DataPacking, DynamicBitsetParallel) {
 
 TEST(DataPacking, UnpackingWrongSize) {
     Finn::vector<uint8_t> inp(20, 0);
-    EXPECT_THROW((Finn::unpack<Finn::DatatypeUInt<7>, uint64_t>(inp)), std::runtime_error);
-    EXPECT_NO_THROW((Finn::unpack<Finn::DatatypeUInt<1>, uint32_t>(inp)));
+    EXPECT_THROW((Finn::unpack<Finn::DatatypeUInt<7>, false, uint64_t>(inp)), std::runtime_error);
+    EXPECT_NO_THROW((Finn::unpack<Finn::DatatypeUInt<1>, false, uint32_t>(inp)));
 }
 
 TEST(DataPacking, UnpackingUnsignedTypes) {
@@ -517,17 +517,17 @@ TEST(DataPacking, UnpackingUnsignedTypes) {
     EXPECT_EQ(inp, ret);
 
     Finn::vector<uint16_t> inp2(inp.begin(), inp.end());
-    auto ret2 = Finn::unpack<Finn::DatatypeUInt<8>, uint16_t>(inp);
+    auto ret2 = Finn::unpack<Finn::DatatypeUInt<8>, false, uint16_t>(inp);
     EXPECT_EQ(inp2, ret2);
 
     Finn::vector<uint32_t> inp3(inp.begin(), inp.end());
-    auto ret3 = Finn::unpack<Finn::DatatypeUInt<8>, uint32_t>(inp);
+    auto ret3 = Finn::unpack<Finn::DatatypeUInt<8>, false, uint32_t>(inp);
     EXPECT_EQ(inp3, ret3);
 
     Finn::vector<uint8_t> inp64(24, 0);
     std::iota(inp64.begin(), inp64.end(), 0);
     Finn::vector<uint64_t> inp4(inp64.begin(), inp64.end());
-    auto ret4 = Finn::unpack<Finn::DatatypeUInt<8>, uint64_t>(inp64);
+    auto ret4 = Finn::unpack<Finn::DatatypeUInt<8>, false, uint64_t>(inp64);
     EXPECT_EQ(inp4, ret4);
 
     Finn::vector<uint8_t> inp16 = {0, 0, 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 1, 0};
@@ -592,7 +592,7 @@ TEST(DataPacking, UnpackingFixedPointTypes) {
     std::vector<bool> ans;
     std::transform(retFloat.begin(), retFloat.end(), base1610.begin(), std::back_inserter(ans), approxEqual<float>);
     EXPECT_TRUE(std::all_of(ans.begin(), ans.end(), [](const auto& elem) { return elem; }));
-    retFloat = Finn::unpack<Finn::DatatypeFixed<16, 12>, float>(inp);
+    retFloat = Finn::unpack<Finn::DatatypeFixed<16, 12>, false, float>(inp);
     Finn::vector<float> base1612 = {1089.3125, -2032.0625, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
     ans.clear();
     EXPECT_TRUE(retFloat.size() == base1612.size());
@@ -601,7 +601,7 @@ TEST(DataPacking, UnpackingFixedPointTypes) {
     Finn::vector<uint8_t> inp10(20, 0);
     std::iota(inp10.begin(), inp10.end(), 0);
     Finn::vector<float> base10 = {8.0, 4.0, 1.5, 0.5, -15.84375, 14.03125, 4.0, 1.125, -7.6875, -7.9375, 6.5, 1.75, 0.46875, 2.125, 9.03125, 2.375};
-    auto ret10 = Finn::unpack<Finn::DatatypeFixed<10, 5>, float>(inp10);
+    auto ret10 = Finn::unpack<Finn::DatatypeFixed<10, 5>, false, float>(inp10);
     ans.clear();
     EXPECT_TRUE(ret10.size() == base10.size());
     std::transform(ret10.begin(), ret10.end(), base10.begin(), std::back_inserter(ans), approxEqual<float>);
@@ -634,20 +634,23 @@ TEST(DataPacking, PackingMultiDimensionalInputs) {
 }
 
 TEST(DataPacking, UnpackingMultiDimensionalInputs) {
-    Finn::vector<uint8_t> inp1{6, 6, 6, 6, 6, 6, 6, 6, 6, 0};
+    Finn::vector<uint8_t> inp1{12, 12, 12, 12, 12, 12, 12, 12, 12, 0};
     Finn::DynamicMdSpan shape(inp1.begin(), inp1.end(), {1, 10, 1});
+
+    auto unpacked = Finn::unpackMultiDimensionalOutputs<Finn::DatatypeInt<5>>(inp1.begin(), inp1.end(), shape, {1, 10, 1});
+
+    Finn::vector<int8_t> expectedResult{12, 12, 12, 12, 12, 12, 12, 12, 12, 0};
+    EXPECT_EQ(unpacked, expectedResult);
 
     Finn::vector<uint8_t> inp2{
         33, 0, 33, 0, 33, 0, 33, 0, 33, 0,
     };
-    for (auto&& elem : inp2) {
-        std::cout << std::bitset<8>(elem) << " ";
-    }
-    std::cout << "\n";
 
-    auto unpacked2 = Finn::unpack<Finn::DatatypeInt<5>>(inp2);
+    auto spa = Finn::DynamicMdSpan(inp2.begin(), inp2.end(), {1, 5, 2});
+    auto unpackedMerged = Finn::unpackMultiDimensionalOutputs<Finn::DatatypeInt<5>>(inp2.begin(), inp2.end(), spa, {1, 5, 2});
+
     Finn::vector<int8_t> expectedResult2{1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
-    EXPECT_EQ(unpacked2, expectedResult2);
+    EXPECT_EQ(unpackedMerged, expectedResult2);
 }
 
 int main(int argc, char** argv) {

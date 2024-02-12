@@ -21,6 +21,7 @@
 #include <FINNCppDriver/utils/DynamicMdSpan.hpp>
 #include <FINNCppDriver/utils/FinnDatatypes.hpp>
 #include <algorithm>
+#include <bitset>
 #include <concepts>
 #include <cstdint>
 #include <iterator>
@@ -455,8 +456,8 @@ namespace Finn {
      * @param inp Byte vector
      * @return Finn::vector<T> Vector of T containing U
      */
-    template<IsDatatype U, typename T = UnpackingAutoRetType::AutoRetType<U>, typename = std::enable_if_t<IsCorrectFinnType<U, T>()>>
-    Finn::vector<T> unpack(const Finn::vector<uint8_t>& inp) {
+    template<IsDatatype U, bool reverseByte = false, typename T = UnpackingAutoRetType::AutoRetType<U>, typename = std::enable_if_t<IsCorrectFinnType<U, T>()>>
+    Finn::vector<T> unpack(std::span<uint8_t>& inp, std::size_t padding = 0) {
         static_assert(U().bitwidth() <= 64, "Finn Datatypes with more than 64 bit are not supported!");
 
         constexpr std::size_t neededBytes = FinnUtils::ceil(U().bitwidth() / 8.0);
@@ -470,13 +471,17 @@ namespace Finn {
             FinnUtils::logAndError<std::runtime_error>("Input to unpacking operation is empty! Abord.");
         }
 
-        if (inp.size() * 8 % U().bitwidth() != 0) {
+        if constexpr (reverseByte) {
+            std::reverse(inp.begin(), inp.end());
+        }
+
+        if ((inp.size() * 8 - padding) % U().bitwidth() != 0) {
             FinnUtils::logAndError<std::runtime_error>("Amount of input elements is not a multiple of output elements");
         }
 
         constexpr size_t bitw = U().bitwidth();
         constexpr bool isSigned = U().sign();
-        if constexpr (bitw / 8.0 == neededBytes) {  // complete Bytes
+        if constexpr (bitw / 8.0 == neededBytes) {  // complete Bytes, therefore no padding after here
             Finn::vector<RetType> ret(inp.size() / neededBytes, 0);
             for (std::size_t i = 0; i < ret.size(); ++i) {
                 const std::size_t offset = i * neededBytes;
@@ -505,7 +510,7 @@ namespace Finn {
             using BufferType = typename std::conditional<bitwidth <= 8, uint16_t, TwoBytesOrLongerUnsigned>::type;
 
             constexpr BufferType mask = createMask<BufferType>(bitwidth);
-            const std::size_t elementsInInput = inp.size() * 8 / U().bitwidth();
+            const std::size_t elementsInInput = ((inp.size() * 8) - padding) / U().bitwidth();
             Finn::vector<RetType> ret(elementsInInput, 0);
 
             for (std::size_t index = 0; index < elementsInInput; ++index) {
@@ -538,6 +543,55 @@ namespace Finn {
                 return ret;
             }
         }
+    }
+
+    /**
+     * @brief Unpacks a byte vector into a vector of T containing U.
+     *
+     * @tparam U FinnDatatype that is contained in byte array
+     * @tparam T Type of return vector. Is usually autodeduced, but it is also supported to use larger types for outputs: ex.: uint16_t instead of uint8_t is valid.
+     * @tparam typename Unnamed template param is used to enable the function only for supported types
+     * @param inp Byte vector
+     * @return Finn::vector<T> Vector of T containing U
+     */
+    template<IsDatatype U, bool reverseByte = false, typename T = UnpackingAutoRetType::AutoRetType<U>, typename = std::enable_if_t<IsCorrectFinnType<U, T>()>>
+    Finn::vector<T> unpack(Finn::vector<uint8_t>& inp, std::size_t padding = 0) {
+        std::span<uint8_t> spa{inp.begin(), inp.end()};
+        return unpack<U, reverseByte, T>(spa, padding);
+    }
+
+    /**
+     * @brief Unpacks multi-dimensional output vectors
+     *
+     * @tparam U FinnDatatype that is contained in byte array
+     * @tparam IteratorType Iterator of container containing uint8_t
+     * @tparam reverseByte Switch to reverse input vectors
+     * @tparam T Type of return vector. Usually autodeduced.
+     * @param begin Iterator to first element of linearized byte array
+     * @param end Iterator to the end of linearized byte array
+     * @param dynSpan DynamicMdSpan describing the structure of the byte array
+     * @param foldedShape Shape of the target vector
+     * @return Finn::vector<T> Vector of T containing U
+     */
+    template<IsDatatype U, std::input_iterator IteratorType, bool reverseByte = false, typename T = UnpackingAutoRetType::AutoRetType<U>, typename = std::enable_if_t<IsCorrectFinnType<U, T>()>>
+    Finn::vector<T> unpackMultiDimensionalOutputs(IteratorType begin, IteratorType end, const Finn::DynamicMdSpan<IteratorType>& dynSpan, const shapeFolded_t& foldedShape)
+        requires(std::is_same_v<uint8_t, typename std::iterator_traits<IteratorType>::value_type>)
+    {
+        constexpr std::size_t bytes = 8;
+        auto innerDimVecs = dynSpan.getMostInnerDims();
+        const std::size_t padding = innerDimVecs[0].size() * bytes - foldedShape.back() * U().bitwidth();
+
+        // preallocate memory to make copy more efficient
+        const std::size_t retSizeTotal = FinnUtils::shapeToElements(foldedShape);
+        Finn::vector<T> unpackedMerged(retSizeTotal);
+
+#pragma omp parallel for if (innerDimVecs.size() > 100)
+        for (std::size_t i = 0; i < innerDimVecs.size(); ++i) {
+            auto unpacked = Finn::unpack<U>(innerDimVecs[i], padding);
+            std::copy(unpacked.begin(), unpacked.end(), unpackedMerged.begin() + i * foldedShape.back());
+        }
+
+        return unpackedMerged;
     }
 
 }  // namespace Finn

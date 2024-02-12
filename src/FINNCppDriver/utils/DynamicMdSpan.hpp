@@ -3,13 +3,14 @@
 
 #include <algorithm>
 #include <iostream>
+#include <iterator>
 #include <numeric>
 #include <span>
 #include <vector>
 
 namespace Finn {
 
-    template<typename IteratorType>
+    template<std::input_iterator IteratorType>
     class DynamicMdSpan {
          public:
         using T = typename std::iterator_traits<IteratorType>::value_type;

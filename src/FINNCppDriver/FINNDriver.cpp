@@ -42,6 +42,7 @@
 #include <xtensor/xiterator.hpp>                // for operator==
 #include <xtensor/xlayout.hpp>                  // for layout_type
 #include <xtensor/xnpy.hpp>                     // for dump_npy, ...
+#include <xtl/xclosure.hpp>                     // for closure_ty
 #include <xtl/xiterator_base.hpp>               // for operator!=
 
 

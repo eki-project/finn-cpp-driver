@@ -265,23 +265,22 @@ namespace Finn {
                                                        uint batchSize, bool forceArchival) {
             using IterValueType = typename std::iterator_traits<IteratorType>::value_type;
             // auto foldedShape = static_cast<Finn::ExtendedBufferDescriptor*>(configuration.deviceWrappers[inputDeviceIndex].idmas[0])->foldedShape;
-            auto packedShape = configuration.deviceWrappers[inputDeviceIndex].idmas[0]->packedShape;
-            Finn::DynamicMdSpan reshapedInput(first, last, packedShape);
+            const auto packedShape = configuration.deviceWrappers[inputDeviceIndex].idmas[0]->packedShape;
+            const Finn::DynamicMdSpan reshapedInput(first, last, packedShape);
 
             auto packed = Finn::packMultiDimensionalInputs<F, IteratorType>(first, last, reshapedInput, packedShape.back());
 
             auto result = infer(packed.begin(), packed.end(), inputDeviceIndex, inputBufferKernelName, outputDeviceIndex, outputBufferKernelName, batchSize, forceArchival);
 
-            for (auto&& elem : result) {
-                std::cout << std::bitset<8>(elem) << " ";
-            }
-            std::cout << "\n";
-            return {};
+            const auto packedOutput = configuration.deviceWrappers[inputDeviceIndex].odmas[0]->packedShape;
+            const auto foldedOutput = static_cast<Finn::ExtendedBufferDescriptor*>(configuration.deviceWrappers[inputDeviceIndex].odmas[0].get())->foldedShape;
+            const Finn::DynamicMdSpan reshapedOutput(result.begin(), result.end(), packedOutput);
+            auto unpacked = Finn::unpackMultiDimensionalOutputs<S, Finn::vector<uint8_t>::iterator, false, V>(result.begin(), result.end(), reshapedOutput, foldedOutput);
 
             // TODO(linusjun): Fix this!
             //  unpack. for each inner dimension?
             //  unfold
-            return unpack<S, V>(result);
+            return unpacked;
         }
 
         template<typename IteratorType, typename V = Finn::UnpackingAutoRetType::AutoRetType<S>, typename = std::enable_if<SynchronousInference>>

@@ -179,6 +179,18 @@ void runThroughputTest(Finn::Driver<true>& baseDriver, logger_type& logger) {
             sumRuntimePacking += end - reshape;
         }
 
+        const auto packedOutput = baseDriver.getConfig().deviceWrappers[0].odmas[0]->packedShape;
+        std::vector<uint8_t> unpackingInputs(FinnUtils::shapeToElements(packedOutput));
+        for (size_t i = 0; i < nTestruns; ++i) {
+            const auto start = std::chrono::high_resolution_clock::now();
+            const auto foldedOutput = static_cast<Finn::ExtendedBufferDescriptor*>(baseDriver.getConfig().deviceWrappers[0].odmas[0].get())->foldedShape;
+            const Finn::DynamicMdSpan reshapedOutput(unpackingInputs.begin(), unpackingInputs.end(), packedOutput);
+            auto unpacked = Finn::unpackMultiDimensionalOutputs<OutputFinnType>(unpackingInputs.begin(), unpackingInputs.end(), reshapedOutput, foldedOutput);
+            Finn::DoNotOptimize(unpacked);
+            const auto end = std::chrono::high_resolution_clock::now();
+            sumRuntimeUnpacking += end - start;
+        }
+
         std::cout << "Avg. end2end latency: " << (static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(sumRuntimeEnd2End).count()) / nTestruns / 1000) << "us\n";
         std::cout << "Avg. end2end throughput: " << 1 / (static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(sumRuntimeEnd2End).count()) / nTestruns / 1000 / 1000 / 1000) << " inferences/s\n";
         std::cout << "Avg. packing latency: " << (static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(sumRuntimePacking).count()) / nTestruns) << "ns\n";

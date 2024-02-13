@@ -222,10 +222,41 @@ void runThroughputTest(Finn::Driver<true>& baseDriver, logger_type& logger) {
             sumRuntimeEnd2End += end - start;
         }
 
+        std::chrono::duration<double> sumRuntimePacking{};
+        std::chrono::duration<double> sumRuntimeUnpacking{};
+        std::chrono::duration<double> sumRuntimeReshaping{};
+
+        for (size_t i = 0; i < nTestruns; ++i) {
+            std::generate(testInputs.begin(), testInputs.end(), gen);
+            const auto start = std::chrono::high_resolution_clock::now();
+            const auto packedShape = baseDriver.getConfig().deviceWrappers[0].idmas[0]->packedShape;
+            const Finn::DynamicMdSpan reshapedInput(testInputs.begin(), testInputs.end(), packedShape);
+            const auto reshape = std::chrono::high_resolution_clock::now();
+            auto packed = Finn::packMultiDimensionalInputs<InputFinnType>(testInputs.begin(), testInputs.end(), reshapedInput, packedShape.back());
+            Finn::DoNotOptimize(packed);
+            const auto end = std::chrono::high_resolution_clock::now();
+
+            sumRuntimeReshaping += reshape - start;
+            sumRuntimePacking += end - reshape;
+        }
+
+        const auto packedOutput = baseDriver.getConfig().deviceWrappers[0].odmas[0]->packedShape;
+        std::vector<uint8_t> unpackingInputs(FinnUtils::shapeToElements(packedOutput));
+        for (size_t i = 0; i < nTestruns; ++i) {
+            const auto start = std::chrono::high_resolution_clock::now();
+            const auto foldedOutput = static_cast<Finn::ExtendedBufferDescriptor*>(baseDriver.getConfig().deviceWrappers[0].odmas[0].get())->foldedShape;
+            const Finn::DynamicMdSpan reshapedOutput(unpackingInputs.begin(), unpackingInputs.end(), packedOutput);
+            auto unpacked = Finn::unpackMultiDimensionalOutputs<OutputFinnType>(unpackingInputs.begin(), unpackingInputs.end(), reshapedOutput, foldedOutput);
+            Finn::DoNotOptimize(unpacked);
+            const auto end = std::chrono::high_resolution_clock::now();
+            sumRuntimeUnpacking += end - start;
+        }
+
         std::cout << "Avg. end2end latency: " << (static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(sumRuntimeEnd2End).count()) / nTestruns / 1000) << "us\n";
         std::cout << "Avg. end2end throughput: " << 1 / (static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(sumRuntimeEnd2End).count()) / nTestruns / 1000 / 1000 / 1000) << " inferences/s\n";
-
-
+        std::cout << "Avg. packing latency: " << (static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(sumRuntimePacking).count()) / nTestruns) << "ns\n";
+        std::cout << "Avg. folding latency: " << (static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(sumRuntimeReshaping).count()) / nTestruns) << "ns\n";
+        std::cout << "Avg. unpacking latency: " << (static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(sumRuntimeUnpacking).count()) / nTestruns) << "ns\n";
         // benchmark each step in call chain for float
     }
 }

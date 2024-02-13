@@ -65,7 +65,7 @@ namespace Finn {
             static_assert(std::has_unique_object_representations_v<T>, "T may not have padding bits");
             T result = 0;
             for (int i = 0; i < sizeof(T); ++i) {
-                T const mask = T{ 0xFF } << (i * 8);
+                T const mask = T{0xFF} << (i * 8);
                 T const tmp = FUNCTOR{}(static_cast<uint8_t>((x & mask) >> (i * 8)));
                 result = (result << 8) | tmp;
             }
@@ -183,12 +183,10 @@ namespace Finn {
                 std::transform(first, last, first, wrap);
                 if constexpr (std::is_same_v<U, DatatypeBipolar>) {
                     std::transform(first, last, first, [](const T& val) { return (val + 1) >> (shift - 1); });  // This converts bipolar to binary
-                }
-                else {
+                } else {
                     std::transform(first, last, first, [](const T& val) { return val >> shift; });
                 }
-            }
-            else {
+            } else {
                 if constexpr (std::is_same_v<U, DatatypeBipolar>) {
                     std::transform(first, last, first, [](const T& val) { return (val + 1) >> 1; });  // This converts bipolar to binary
                 }
@@ -198,8 +196,7 @@ namespace Finn {
             if constexpr (invertBytes) {
                 Finn::vector<UnpackingAutoRetType::UnsignedRetType<U>> ret(first, last);
                 return ret;
-            }
-            else {
+            } else {
                 Finn::vector<UnpackingAutoRetType::UnsignedRetType<U>> ret(std::make_reverse_iterator(last), std::make_reverse_iterator(first));
                 return ret;
             }
@@ -230,8 +227,7 @@ namespace Finn {
             Finn::vector<OneByteOrLonger> vec(first, last);
             return detail::toBitsetImpl<U, invertBytes, reverseBits>(vec.begin(), vec.end());
 
-        }
-        else {
+        } else {
             return detail::toBitsetImpl<U, invertBytes, reverseBits>(first, last);
         }
     }
@@ -308,8 +304,7 @@ namespace Finn {
             constexpr size_t bitw = U().bitwidth();
             if constexpr (bitw == 8) {                      // FINN Datatype is a byte long
                 return Finn::vector<uint8_t>(first, last);  // It fits exactly in a byte, so casting should be fine
-            }
-            else {
+            } else {
                 // TODO(linusjun): For full bytes this is maybe overkill. So change it?
                 auto bitsetvector = toBitset<U, true, false>(first, last);
                 auto mergedBitset = mergeBitsets<U>(bitsetvector);
@@ -332,18 +327,16 @@ namespace Finn {
     Finn::vector<uint8_t> pack(IteratorType first, IteratorType last) {
         using T = typename std::iterator_traits<IteratorType>::value_type;
         if constexpr (std::endian::native == std::endian::big) {
-            [] <bool flag = false>() { static_assert(flag, "Big-endian architectures are currently not supported!"); }
+            []<bool flag = false>() { static_assert(flag, "Big-endian architectures are currently not supported!"); }
             ();
-        }
-        else if constexpr (std::endian::native == std::endian::little) {
+        } else if constexpr (std::endian::native == std::endian::little) {
             constexpr bool isFix = U().isFixedPoint();
             constexpr bool isInt = U().isInteger();
             if constexpr (isFix) {  // Datatype is Fixed Point Number
                 constexpr std::size_t bytes = static_cast<std::size_t>(FinnUtils::ceil(static_cast<double>(U().bitwidth()) / 8.0));
                 if constexpr (std::is_floating_point_v<T>) {  // floating point T have no shift operation, so replace with multiplication
                     std::transform(first, last, first, [](const T& val) { return val * (1 << U().fracBits()); });
-                }
-                else {
+                } else {
                     std::transform(first, last, first, [](const T& val) { return val << U().fracBits(); });
                 }
 
@@ -354,20 +347,17 @@ namespace Finn {
 
                 Finn::vector<OneByteOrLonger> vec(first, last);
                 return detail::packImpl<DatatypeInt<U().bitwidth()>>(vec.begin(), vec.end());
-            }
-            else if constexpr (std::is_floating_point_v<T> && isInt) {  // Datatype is integer number stored in floating point inputs
+            } else if constexpr (std::is_floating_point_v<T> && isInt) {  // Datatype is integer number stored in floating point inputs
                 // Use smallest possible datatype for storing data
                 if constexpr (sizeof(T) >= 4 || sizeof(T) <= 8) {
                     using VecType = typename std::conditional<sizeof(T) == 4, uint32_t, uint64_t>::type;
                     Finn::vector<VecType> input(first, last);
                     return detail::packImpl<U>(input.begin(), input.end());
-                }
-                else {
-                    [] <bool flag = false>() { static_assert(flag, "Weird floating point data length. Not supported!"); }
+                } else {
+                    []<bool flag = false>() { static_assert(flag, "Weird floating point data length. Not supported!"); }
                     ();
                 }
-            }
-            else if constexpr (std::is_floating_point_v<T>) {  // Datatype is floating point number
+            } else if constexpr (std::is_floating_point_v<T>) {  // Datatype is floating point number
                 static_assert(sizeof(float) == 4 && sizeof(double) == 8 && std::numeric_limits<T>::is_iec559, "Floating point format is not iee754 or unexpected type width!");
                 if constexpr (sizeof(T) == 8) {            // FINN only supports 32 bit floating point numbers
                     Finn::vector<float> vec(first, last);  // This cast is necessary to make sure, that data is in a 32-bit floating point format before the bitcast.
@@ -375,32 +365,27 @@ namespace Finn {
                     input.resize(static_cast<std::size_t>(std::distance(first, last)));
                     std::transform(vec.begin(), vec.end(), input.begin(), [](const float& val) { return std::bit_cast<uint32_t>(val); });
                     return detail::packImpl<U>(input.begin(), input.end());
-                }
-                else if constexpr (sizeof(T) == 4) {
+                } else if constexpr (sizeof(T) == 4) {
                     Finn::vector<uint32_t> input;
                     input.resize(static_cast<std::size_t>(std::distance(first, last)));
                     std::transform(first, last, input.begin(), [](const T& val) { return std::bit_cast<uint32_t>(val); });
                     return detail::packImpl<U>(input.begin(), input.end());
-                }
-                else {
-                    [] <bool flag = false>() { static_assert(flag, "Weird floating point data length. Not supported!"); }
+                } else {
+                    []<bool flag = false>() { static_assert(flag, "Weird floating point data length. Not supported!"); }
                     ();
                 }
-            }
-            else if constexpr (!isInt && std::is_integral_v<T>) {  // Datatype is float stored in ints
+            } else if constexpr (!isInt && std::is_integral_v<T>) {  // Datatype is float stored in ints
                 Finn::vector<float> vec(first, last);                // This cast is necessary to make sure, that data is in a 32-bit floating point format before the bitcast.
                 Finn::vector<uint32_t> input;
                 input.resize(static_cast<std::size_t>(std::distance(first, last)));
                 std::transform(vec.begin(), vec.end(), input.begin(), [](const float& val) { return std::bit_cast<uint32_t>(val); });  // This conversion can overflow, but thats the user responsibility
                 return detail::packImpl<U>(input.begin(), input.end());
 
-            }
-            else {  // Everything else
+            } else {  // Everything else
                 return detail::packImpl<U>(first, last);
             }
-        }
-        else {
-            [] <bool flag = false>() { static_assert(flag, "Mixed-endian architectures are currently not supported!"); }
+        } else {
+            []<bool flag = false>() { static_assert(flag, "Mixed-endian architectures are currently not supported!"); }
             ();
         }
     }
@@ -424,7 +409,7 @@ namespace Finn {
     template<IsDatatype U, typename T>
     consteval bool IsCorrectFinnType() {
         return std::is_floating_point_v<T> == !U().isInteger() && std::is_signed_v<T> == U().sign() && U().bitwidth() <= sizeof(T) * 8 && (U().isInteger() || std::is_same<float, T>::value) &&
-            (std::is_floating_point_v<T> || std::is_integral_v<T>);
+               (std::is_floating_point_v<T> || std::is_integral_v<T>);
     }
 
     /**
@@ -443,19 +428,19 @@ namespace Finn {
         auto innerVecs = dynamicSpan.getMostInnerDims();
 
         // preallocate memory to make copy more efficient
-        const std::size_t totalElemsPerInnerDim = elementsInnerMostDim * U().bitwidth();
+        const std::size_t payloadBitsPerInnerDim = elementsInnerMostDim * U().bitwidth();
         constexpr std::size_t byte = 8;
-        const std::size_t retSizePerElem = (totalElemsPerInnerDim % byte) ? totalElemsPerInnerDim / byte + 1 : totalElemsPerInnerDim / byte;  // ceil(totalElemsPerInnerDim/8)
-        const std::size_t retSizeTotal = retSizePerElem * innerVecs.size();
+        const std::size_t neededBytesPerInnerDim = (payloadBitsPerInnerDim % byte) ? payloadBitsPerInnerDim / byte + 1 : payloadBitsPerInnerDim / byte;  // ceil(payloadBitsPerInnerDim/8)
+        const std::size_t neededBytesTotal = neededBytesPerInnerDim * innerVecs.size();
 
-        Finn::vector<uint8_t> packedMerged(retSizeTotal);
+        Finn::vector<uint8_t> packedMerged(neededBytesTotal);
 
         // for each most inner dimension
 #pragma omp parallel for if (innerVecs.size() > 100)
         for (std::size_t i = 0; i < innerVecs.size(); ++i) {
             auto packed = Finn::pack<U>(innerVecs[i].begin(), innerVecs[i].end());
             // combine packing results
-            std::copy(packed.begin(), packed.end(), packedMerged.begin() + i * retSizePerElem);
+            std::copy(packed.begin(), packed.end(), packedMerged.begin() + i * neededBytesPerInnerDim);
         }
 
         return packedMerged;
@@ -512,14 +497,12 @@ namespace Finn {
                 Finn::vector<float> fixedRet(ret.size());
                 std::transform(ret.begin(), ret.end(), fixedRet.begin(), [](const RetType& val) { return static_cast<float>(val) / (1 << U().fracBits()); });
                 return fixedRet;
-            }
-            else {
+            } else {
                 return ret;
             }
 
 
-        }
-        else {
+        } else {
             constexpr std::size_t bitwidth = U().bitwidth();
 
             using FourBytesOrLongerUnsigned = typename std::conditional<bitwidth <= 32, uint64_t, __uint128_t>::type;
@@ -556,8 +539,7 @@ namespace Finn {
                 Finn::vector<float> fixedRet(ret.size());
                 std::transform(ret.begin(), ret.end(), fixedRet.begin(), [](const RetType& val) { return static_cast<float>(static_cast<FixedPointType>(val)) / (1 << U().fracBits()); });
                 return fixedRet;
-            }
-            else {
+            } else {
                 return ret;
             }
         }
@@ -574,7 +556,7 @@ namespace Finn {
      */
     template<IsDatatype U, bool reverseByte = false, typename T = UnpackingAutoRetType::AutoRetType<U>, typename = std::enable_if_t<IsCorrectFinnType<U, T>()>>
     Finn::vector<T> unpack(Finn::vector<uint8_t>& inp, std::size_t padding = 0) {
-        std::span<uint8_t> spa{ inp.begin(), inp.end() };
+        std::span<uint8_t> spa{inp.begin(), inp.end()};
         return unpack<U, reverseByte, T>(spa, padding);
     }
 

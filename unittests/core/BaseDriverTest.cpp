@@ -91,7 +91,7 @@ TEST_F(BaseDriverTest, syncInferenceTest) {
 
     // The input has to be 4 times longer than the expected size of the FPGA, because uint8->int2 packing reduces size by factor 4
     std::cout << driver.size(SIZE_SPECIFIER::ELEMENTS_PER_PART, 0, inputDmaName) << "\n";
-    Finn::vector<uint8_t> data(300, 1);
+    Finn::vector<int8_t> data(300, 1);
     Finn::vector<uint8_t> outdata(driver.size(SIZE_SPECIFIER::ELEMENTS_PER_PART, 0, outputDmaName), 1);
 
     // Setup fake output data
@@ -100,13 +100,7 @@ TEST_F(BaseDriverTest, syncInferenceTest) {
     // Run inference
     auto results = driver.inferSynchronous(data.begin(), data.end());
 
-    Finn::vector<uint8_t> expected(driver.size(SIZE_SPECIFIER::ELEMENTS_PER_PART, 0, outputDmaName) * 8, 0);
-
-    for (std::size_t i = 0; i < expected.size(); ++i) {
-        if (i % 8 == 0) {
-            expected[i] = 1;
-        }
-    }
+    Finn::vector<uint8_t> expected(driver.size(SIZE_SPECIFIER::ELEMENTS_PER_PART, 0, outputDmaName), 1);
 
     EXPECT_EQ(results, expected);
 }

@@ -266,7 +266,7 @@ namespace Finn {
                                                        uint batchSize, bool forceArchival) {
             using IterValueType = typename std::iterator_traits<IteratorType>::value_type;
             const auto foldedShape = static_cast<Finn::ExtendedBufferDescriptor*>(configuration.deviceWrappers[inputDeviceIndex].idmas[0].get())->foldedShape;
-            const Finn::DynamicMdSpan reshapedInput(first, last, foldedShape);
+            const Finn::DynamicMdSpan reshapedInput(first, last, foldedShape, batchSize);
 
             auto packed = Finn::packMultiDimensionalInputs<F, IteratorType>(first, last, reshapedInput, foldedShape.back());
 
@@ -275,7 +275,7 @@ namespace Finn {
 
             const auto packedOutput = configuration.deviceWrappers[inputDeviceIndex].odmas[0]->packedShape;
             const auto foldedOutput = static_cast<Finn::ExtendedBufferDescriptor*>(configuration.deviceWrappers[inputDeviceIndex].odmas[0].get())->foldedShape;
-            const Finn::DynamicMdSpan reshapedOutput(result.begin(), result.end(), packedOutput);
+            const Finn::DynamicMdSpan reshapedOutput(result.begin(), result.end(), packedOutput, batchSize);
             auto unpacked = Finn::unpackMultiDimensionalOutputs<S, Finn::vector<uint8_t>::iterator, false, V>(result.begin(), result.end(), reshapedOutput, foldedOutput);
 
             return unpacked;

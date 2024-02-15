@@ -36,6 +36,10 @@ class DynamicBitset {
 
 
      public:
+    /**
+     * @brief Internal storage of bits in bitset
+     *
+     */
     std::vector<uint8_t, AlignedAllocator<uint8_t>> bits;
 
     /**

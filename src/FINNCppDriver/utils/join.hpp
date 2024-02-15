@@ -19,6 +19,13 @@
 #include <string>
 #include <type_traits>
 
+/**
+ * @brief Implements an infix iterator
+ *
+ * @tparam T Datatype of the printed iterable container
+ * @tparam charT Character type used
+ * @tparam traits type traits of the character type
+ */
 template<class T, class charT = char, class traits = std::char_traits<charT>>
 class infix_ostream_iterator : public std::iterator<std::output_iterator_tag, void, void, void, void> {
     std::basic_ostream<charT, traits>* os;
@@ -26,11 +33,40 @@ class infix_ostream_iterator : public std::iterator<std::output_iterator_tag, vo
     bool first_elem;
 
      public:
+    /**
+     * @brief Character type used
+     *
+     */
     typedef charT char_type;
+    /**
+     * @brief Type traits of the character type
+     *
+     */
     typedef traits traits_type;
+    /**
+     * @brief Type of output stream
+     *
+     */
     typedef std::basic_ostream<charT, traits> ostream_type;
+    /**
+     * @brief Construct a new infix ostream iterator object
+     *
+     * @param s
+     */
     explicit infix_ostream_iterator(ostream_type& s) : os(&s), delimiter(0), first_elem(true) {}
+    /**
+     * @brief Construct a new infix ostream iterator object
+     *
+     * @param s
+     * @param d
+     */
     infix_ostream_iterator(ostream_type& s, charT const* d) : os(&s), delimiter(d), first_elem(true) {}
+    /**
+     * @brief Copy assignment operator
+     *
+     * @param item
+     * @return infix_ostream_iterator<T, charT, traits>&
+     */
     infix_ostream_iterator<T, charT, traits>& operator=(T const& item) {
         // Here's the only real change from ostream_iterator:
         // Normally, the '*os << item;' would come before the 'if'.
@@ -40,8 +76,23 @@ class infix_ostream_iterator : public std::iterator<std::output_iterator_tag, vo
         first_elem = false;
         return *this;
     }
+    /**
+     * @brief Return reference to element that is currently pointed to by the iterator
+     *
+     * @return infix_ostream_iterator<T, charT, traits>&
+     */
     infix_ostream_iterator<T, charT, traits>& operator*() { return *this; }
+    /**
+     * @brief Increment operator
+     *
+     * @return infix_ostream_iterator<T, charT, traits>&
+     */
     infix_ostream_iterator<T, charT, traits>& operator++() { return *this; }
+    /**
+     * @brief Increment operator for multiple elements at once
+     *
+     * @return infix_ostream_iterator<T, charT, traits>&
+     */
     infix_ostream_iterator<T, charT, traits>& operator++(int) { return *this; }
 };
 
@@ -50,17 +101,38 @@ namespace detail {
     using std::begin;
     using std::end;
 
+    /**
+     * @brief Internal implementation of is_iterable
+     *
+     * @tparam T
+     * @return decltype(begin(std::declval<T&>()) != end(std::declval<T&>()),    // begin/end and operator !=
+     * ++std::declval<decltype(begin(std::declval<T&>()))&>(),  // operator ++
+     * *begin(std::declval<T&>()),                              // operator*
+     * std::true_type{})
+     */
     template<typename T>
     auto is_iterable_impl(int) -> decltype(begin(std::declval<T&>()) != end(std::declval<T&>()),    // begin/end and operator !=
                                            ++std::declval<decltype(begin(std::declval<T&>()))&>(),  // operator ++
                                            *begin(std::declval<T&>()),                              // operator*
                                            std::true_type{});
 
+    /**
+     * @brief Default case for is_iterable, results in std::false_type
+     *
+     * @tparam T
+     * @param ...
+     * @return std::false_type
+     */
     template<typename T>
     std::false_type is_iterable_impl(...);
 
 }  // namespace detail
 
+/**
+ * @brief Implements type trait to test if type T is iterable
+ *
+ * @tparam T
+ */
 template<typename T>
 using is_iterable = decltype(detail::is_iterable_impl<T>(0));
 

@@ -21,6 +21,11 @@
 namespace Finn {
 
     namespace detail {
+        /**
+         * @brief Wrapper that contains the ringbuffer used by Synchronous Input & Output Buffers
+         *
+         * @tparam T Type of the data stored in the ringbuffer
+         */
         template<typename T>
         class SyncBufferWrapper {
              protected:
@@ -125,6 +130,11 @@ namespace Finn {
         }
     };
 
+    /**
+     * @brief Implements a synchronous device buffer that transfers output data from the fpga to the host system
+     *
+     * @tparam T
+     */
     template<typename T>
     class SyncDeviceOutputBuffer : public DeviceOutputBuffer<T>, public detail::SyncBufferWrapper<T> {
          public:

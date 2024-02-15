@@ -1,3 +1,15 @@
+/**
+ * @file DynamicMdSpan.hpp
+ * @author Linus Jungemann (linus.jungemann@uni-paderborn.de) and others
+ * @brief Implements a multi dimensional span like type with a dynamic number of dimensions
+ * @version 0.1
+ * @date 2023-02-15
+ *
+ * @copyright Copyright (c) 2023
+ * @license All rights reserved. This program and the accompanying materials are made available under the terms of the MIT license.
+ *
+ */
+
 #ifndef DYNAMICMDSPAN
 #define DYNAMICMDSPAN
 
@@ -10,19 +22,24 @@
 
 namespace Finn {
 
+    /**
+     * @brief Implements a multi dimensional span like type with a dynamic number of dimensions
+     *
+     * @tparam IteratorType
+     */
     template<std::input_iterator IteratorType>
     class DynamicMdSpan {
-    public:
+         public:
         using T = typename std::iterator_traits<IteratorType>::value_type;
 
-    private:
+         private:
         const std::size_t count;
         std::vector<std::size_t> strides;
         std::vector<std::span<T>> mostInnerDims;
         const IteratorType begin;
         const IteratorType end;
 
-    public:
+         public:
         void setShape(const std::vector<uint>& shape) {
             if (shape.empty()) {
                 throw std::runtime_error("Can not create dynamic mdspan for empty Shape.");

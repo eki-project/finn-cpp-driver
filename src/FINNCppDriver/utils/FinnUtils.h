@@ -51,6 +51,11 @@ namespace FinnUtils {
     };
 
 
+    /**
+     * @brief Implements FloatingPoint concept
+     *
+     * @tparam T
+     */
     template<typename T>
     concept FloatingPoint = std::is_floating_point_v<T> && (sizeof(T) == 4 || sizeof(T) == 8) &&  // Only 32/64 bit allowed. 80 bit fp not allowed
                             sizeof(float) == 4 && sizeof(double) == 8 &&                          // float must be 32 bit fp while double must be 64 bit fp
@@ -208,6 +213,14 @@ namespace FinnUtils {
      */
     inline size_t shapeToElements(const shape_t& pShape) { return (pShape.empty()) ? 0 : static_cast<size_t>(std::accumulate(pShape.begin(), pShape.end(), 1, std::multiplies<>())); }
 
+    /**
+     * @brief Constexpr version of shapeToElements
+     *
+     * @tparam T
+     * @tparam S
+     * @param pShape
+     * @return constexpr size_t
+     */
     template<typename T, size_t S>
     constexpr size_t shapeToElementsConstexpr(std::array<T, S> pShape) {
         return (S == 0) ? 0 : static_cast<size_t>(std::accumulate(pShape.begin(), pShape.end(), 1, std::multiplies<>()));

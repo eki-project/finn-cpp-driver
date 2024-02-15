@@ -21,10 +21,25 @@
 #include <utility>
 
 namespace Finn {
+    /**
+     * @brief Concept for an integral type
+     *
+     * @tparam T
+     */
     template<class T>
     concept Integral = std::is_integral<T>::value;
+    /**
+     * @brief Concept for an signed integral type
+     *
+     * @tparam T
+     */
     template<class T>
     concept SignedIntegral = Integral<T> && std::is_signed<T>::value;
+    /**
+     * @brief Concept for an unsigned integral type
+     *
+     * @tparam T
+     */
     template<class T>
     concept UnsignedIntegral = Integral<T> && !SignedIntegral<T>;
 
@@ -32,6 +47,12 @@ namespace Finn {
     template<typename T>
     class Datatype;
 
+    /**
+     * @brief Concept to test if type T is subtype of Finn::Datatype
+     *
+     * @tparam T
+     * @tparam D
+     */
     template<typename T, typename D = T>
     concept IsDatatype = std::derived_from<T, Datatype<D>>;
 

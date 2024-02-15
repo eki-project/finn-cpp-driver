@@ -124,31 +124,78 @@ namespace Finn {
      *
      */
     namespace UnpackingAutoRetType {
+        /**
+         * @brief Returns a signed integer type with 4 bytes if input U can be stored in 4 bytes and a 8 byte long type otherwise
+         *
+         * @tparam U
+         */
         template<IsDatatype U>
         using FourBytesOrLongerSigned = typename std::conditional<U().bitwidth() <= 32, int32_t, int64_t>::type;
 
+        /**
+         * @brief Returns a signed integer type with 2 bytes if input U can be stored in 2 bytes and a 4+ byte long type otherwise
+         *
+         * @tparam U
+         */
         template<IsDatatype U>
         using TwoBytesOrLongerSigned = typename std::conditional<U().bitwidth() <= 16, int16_t, FourBytesOrLongerSigned<U>>::type;
 
+        /**
+         * @brief Returns a signed integer type with 1 bytes if input U can be stored in 1 bytes and a 2+ byte long type otherwise
+         *
+         * @tparam U
+         */
         template<IsDatatype U>
         using SignedRetType = typename std::conditional<U().bitwidth() <= 8, int8_t, TwoBytesOrLongerSigned<U>>::type;
 
+        /**
+         * @brief Returns a unsigned integer type with 4 bytes if input U can be stored in 4 bytes and a 8 byte long type otherwise
+         *
+         * @tparam U
+         */
         template<IsDatatype U>
         using FourBytesOrLongerUnsigned = typename std::conditional<U().bitwidth() <= 32, uint32_t, uint64_t>::type;
 
+        /**
+         * @brief Returns a unsigned integer type with 2 bytes if input U can be stored in 2 bytes and a 4 byte long type otherwise
+         *
+         * @tparam U
+         */
         template<IsDatatype U>
         using TwoBytesOrLongerUnsigned = typename std::conditional<U().bitwidth() <= 16, uint16_t, FourBytesOrLongerUnsigned<U>>::type;
 
+        /**
+         * @brief Returns a unsigned integer type with 1 bytes if input U can be stored in 1 bytes and a 2 byte long type otherwise
+         *
+         * @tparam U
+         */
         template<IsDatatype U>
         using UnsignedRetType = typename std::conditional<U().bitwidth() <= 8, uint8_t, TwoBytesOrLongerUnsigned<U>>::type;
 
+        /**
+         * @brief Returns a unsigned integer type if input U unsigned and a signed type otherwise
+         *
+         * @tparam U
+         */
         template<IsDatatype U>
         using IntegralType = typename std::conditional<U().sign(), SignedRetType<U>, UnsignedRetType<U>>::type;
 
+        /**
+         * @brief Returns a integer type if input U integer type and float otherwise
+         *
+         * @tparam U
+         */
         template<IsDatatype U>
         using AutoRetType = typename std::conditional<U().isInteger(), IntegralType<U>, float>::type;
     }  // namespace UnpackingAutoRetType
 
+    /**
+     * @brief Creates a bitmask for the upper bits
+     *
+     * @tparam T Datatype of mask
+     * @param bits Upper bits to be masked
+     * @return consteval Not available at runtime
+     */
     template<typename T>
     consteval T createMask(std::size_t bits) {
         T mask = 0;
@@ -247,6 +294,12 @@ namespace Finn {
         return toBitset<U, invertBytes, reverseBits, typename Finn::vector<V>::iterator>(input.begin(), input.end());
     }
 
+    /**
+     * @brief OpenMp OR reduction for DynamicBitsets
+     *
+     * @param inout Input and output dataset
+     * @param in Input dataset
+     */
     void bitsetOR(DynamicBitset& inout, DynamicBitset& in) { inout |= in; }
 #pragma omp declare reduction(bitsetOR:DynamicBitset : bitsetOR(omp_out, omp_in)) initializer(omp_priv = omp_orig)
 
@@ -406,6 +459,13 @@ namespace Finn {
         return pack<U>(foldedVec.begin(), foldedVec.end());
     }
 
+    /**
+     * @brief Function for template meta code. Tests if a FinnDatatype and C++ are compatible
+     *
+     * @tparam U FinnDatatype
+     * @tparam T C++ Datatype
+     * @return consteval Not available at runtime
+     */
     template<IsDatatype U, typename T>
     consteval bool IsCorrectFinnType() {
         return std::is_floating_point_v<T> == !U().isInteger() && std::is_signed_v<T> == U().sign() && U().bitwidth() <= sizeof(T) * 8 && (U().isInteger() || std::is_same<float, T>::value) &&
@@ -454,6 +514,7 @@ namespace Finn {
      * @tparam T Type of return vector. Is usually autodeduced, but it is also supported to use larger types for outputs: ex.: uint16_t instead of uint8_t is valid.
      * @tparam typename Unnamed template param is used to enable the function only for supported types
      * @param inp Byte vector
+     * @param padding Number of padding bits inserted into last byte of input
      * @return Finn::vector<T> Vector of T containing U
      */
     template<IsDatatype U, bool reverseByte = false, typename T = UnpackingAutoRetType::AutoRetType<U>, typename = std::enable_if_t<IsCorrectFinnType<U, T>()>>
@@ -552,6 +613,7 @@ namespace Finn {
      * @tparam T Type of return vector. Is usually autodeduced, but it is also supported to use larger types for outputs: ex.: uint16_t instead of uint8_t is valid.
      * @tparam typename Unnamed template param is used to enable the function only for supported types
      * @param inp Byte vector
+     * @param padding Number of padding bits inserted into last byte of input
      * @return Finn::vector<T> Vector of T containing U
      */
     template<IsDatatype U, bool reverseByte = false, typename T = UnpackingAutoRetType::AutoRetType<U>, typename = std::enable_if_t<IsCorrectFinnType<U, T>()>>

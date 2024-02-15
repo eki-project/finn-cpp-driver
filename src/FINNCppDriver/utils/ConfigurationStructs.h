@@ -22,9 +22,18 @@
 #include <utility>
 #include <vector>
 
+/**
+ * @brief Abrievation of nlohmann::json
+ *
+ */
 using json = nlohmann::json;
 
 namespace nlohmann {
+    /**
+     * @brief Implements adl lookup for shared pointers
+     *
+     * @tparam T Type of ptr contained in shared ptr
+     */
     template<typename T>
     struct adl_serializer<std::shared_ptr<T>> {
         // NOLINTNEXTLINE
@@ -166,6 +175,14 @@ namespace Finn {
         return config;
     }
 
+    /**
+     * @brief Get the normal, folded and packed shapes for a specific device and dma
+     *
+     * @param conf Config from which the shapes should be read
+     * @param device device index
+     * @param dma dma index
+     * @return std::tuple<shape_t, shape_t, shape_t>
+     */
     inline std::tuple<shape_t, shape_t, shape_t> getConfigShapes(const Config& conf, uint device = 0, uint dma = 0) {
         auto myShapeNormal = (*std::dynamic_pointer_cast<Finn::ExtendedBufferDescriptor>(conf.deviceWrappers.at(device).idmas.at(dma))).normalShape;
         auto myShapeFolded = (*std::dynamic_pointer_cast<Finn::ExtendedBufferDescriptor>(conf.deviceWrappers[device].idmas[dma])).foldedShape;

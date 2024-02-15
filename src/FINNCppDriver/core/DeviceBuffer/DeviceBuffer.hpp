@@ -111,11 +111,26 @@ namespace Finn {
         virtual ert_cmd_state execute() = 0;
     };
 
+    /**
+     * @brief @ref SyncDeviceInputBuffer
+     *
+     * @tparam T
+     */
     template<typename T>
     class SyncDeviceInputBuffer;
+    /**
+     * @brief @ref AsyncDeviceInputBuffer
+     *
+     * @tparam T
+     */
     template<typename T>
     class AsyncDeviceInputBuffer;
 
+    /**
+     * @brief Abstract base class that defines interfaces that need to be fulfilled by the DeviceInputBuffers
+     *
+     * @tparam T
+     */
     template<typename T>
     class DeviceInputBuffer : public DeviceBuffer<T> {
          protected:
@@ -165,6 +180,11 @@ namespace Finn {
     };
 
 
+    /**
+     * @brief Abstract base class that defines interfaces that need to be fulfilled by the DeviceOutputBuffers
+     *
+     * @tparam T
+     */
     template<typename T>
     class DeviceOutputBuffer : public DeviceBuffer<T> {
          protected:

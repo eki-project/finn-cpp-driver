@@ -47,6 +47,7 @@ auto makeMDSpanImpl(T* data, const Array& a, [[maybe_unused]] std::index_sequenc
  * @tparam N Number of dimensions (autodeduced)
  * @tparam Indices Index sequence for dimension array (autodeduced)
  * @param data Pointer to underlying data array
+ * @param list
  * @return auto mdspan
  */
 template<typename T, std::size_t N, typename Indices = std::make_index_sequence<N>>

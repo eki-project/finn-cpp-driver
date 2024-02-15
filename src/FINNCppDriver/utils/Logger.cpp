@@ -37,7 +37,15 @@
 #include <boost/thread/exceptions.hpp>                    // for thread_inte...
 #include <iostream>                                       // for streamsize
 
+/**
+ * @brief Abbrieviation for boost logging type
+ *
+ */
 using backend_type = bl::sinks::text_file_backend;
+/**
+ * @brief Abbrieviation for boost logging type
+ *
+ */
 using sink_type = bl::sinks::synchronous_sink<backend_type>;
 namespace kw = bl::keywords;
 
@@ -48,6 +56,10 @@ DevNull dev_null;
 // NOLINTEND
 
 namespace Details {
+    /**
+     * @brief Global logger object. DO NOT ACCESS DIRECTLY!
+     *
+     */
     // NOLINTNEXTLINE
     logger_type boostLogger;
 }  // namespace Details

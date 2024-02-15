@@ -13,6 +13,10 @@
 #ifndef LOGGING_H
 #define LOGGING_H
 
+/**
+ * @brief Define boost logging to be linked dynamically
+ *
+ */
 // NOLINTNEXTLINE
 #define BOOST_LOG_DYN_LINK 1
 
@@ -28,9 +32,16 @@
 namespace bl = finnBoost::log;
 namespace loglevel = bl::trivial;
 
+/**
+ * @brief Abrieviation of boost logging type
+ *
+ */
 using logger_type = bl::sources::severity_logger<bl::trivial::severity_level>;
 
-// redefine Boost Logger for FINN
+/**
+ * @brief redefine Boost Logger for FINN
+ *
+ */
 // NOLINTBEGIN
 #define FINN_LOG(LOGGER, SEV) BOOST_LOG_SEV(LOGGER, SEV)
 #ifdef NDEBUG
@@ -41,21 +52,59 @@ template<typename T>
 DevNull& operator<<(DevNull& dest, [[maybe_unused]] T) {
     return dest;
 }
+    /**
+     * @brief Defines debug logging macro that is removed when building in Release mode
+     *
+     */
     #define FINN_LOG_DEBUG(LOGGER, SEV) dev_null
 #else
+    /**
+     * @brief Defines debug logging macro that is removed when building in Release mode
+     *
+     */
     #define FINN_LOG_DEBUG(LOGGER, SEV) FINN_LOG(LOGGER, SEV)
 #endif  // NDEBUG
-// NOLINTEND
+        // NOLINTEND
 
+/**
+ * @brief Singleton class that provides logger functionality for the driver. Based on the boost severity logger
+ *
+ */
 class Logger {
      public:
+    /**
+     * @brief Get the Logger object
+     *
+     * @return logger_type&
+     */
     static logger_type& getLogger();
 
+    /**
+     * @brief Construct a new Logger object (Deleted)
+     *
+     */
     Logger(Logger const&) = delete;
+    /**
+     * @brief Deleted copy assignment operator
+     *
+     */
     void operator=(Logger const&) = delete;
+    /**
+     * @brief Deleted move assignment operator
+     *
+     * @return Logger&
+     */
     Logger& operator=(Logger&&) = delete;
 
+    /**
+     * @brief Destroy the Logger object
+     *
+     */
     ~Logger() = default;
+    /**
+     * @brief Move constructor
+     *
+     */
     Logger(Logger&&) = default;
 
      private:

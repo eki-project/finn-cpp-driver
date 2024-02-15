@@ -1,5 +1,5 @@
 /**
- * @file FinnDriver.cpp
+ * @file FINNDriver.cpp
  * @author Linus Jungemann (linus.jungemann@uni-paderborn.de), Bjarne Wintermann (bjarne.wintermann@uni-paderborn.de) and others
  * @brief Main file for the pre packaged C++ FINN driver
  * @version 0.1
@@ -27,7 +27,7 @@
 #include <utility>      // for move
 #include <vector>       // for vector
 
- // Helper
+// Helper
 #include <FINNCppDriver/core/DeviceHandler.h>          // for DeviceHandler
 #include <FINNCppDriver/utils/ConfigurationStructs.h>  // for Config
 #include <FINNCppDriver/utils/DoNotOptimize.h>         // for DoNotOptimize
@@ -49,16 +49,24 @@
 
 
 // Created by FINN during compilation
-// Use the default testing Driver type when none is specified. Normally this is set by the FINN compiler and available together with the xclbin.
+// Use the default testing Driver type when none is specified.
+/**
+ * @brief Converts CMake definition into string
+ *
+ */
 // NOLINTBEGIN
-#define MSTR(x)    #x
+#define MSTR(x) #x
+/**
+ * @brief Converts CMake definition into string
+ *
+ */
 #define STRNGFY(x) MSTR(x)
 // NOLINTEND
 
 #ifndef FINN_HEADER_LOCATION
-#include <FINNCppDriver/config/FinnDriverUsedDatatypes.h>  // IWYU pragma: keep
+    #include <FINNCppDriver/config/FinnDriverUsedDatatypes.h>  // IWYU pragma: keep
 #else
-#include STRNGFY(FINN_HEADER_LOCATION)  // IWYU pragma: keep
+    #include STRNGFY(FINN_HEADER_LOCATION)  // IWYU pragma: keep
 #endif
 
 // XRT
@@ -70,8 +78,8 @@
  *
  * @return const char*
  */
- // NOLINTBEGIN
- //  cppcheck-suppress unusedFunction
+// NOLINTBEGIN
+//  cppcheck-suppress unusedFunction
 extern "C" const char* __asan_default_options() { return "detect_odr_violation=1"; }
 // NOLINTEND
 
@@ -145,8 +153,8 @@ void runThroughputTest(Finn::Driver<true>& baseDriver, logger_type& logger) {
         std::vector<dtype> testInputs(elementcount * batchSize);
 
         std::random_device rndDevice;
-        std::mt19937 mersenneEngine{ rndDevice() };  // Generates random integers
-        std::uniform_int_distribution<dtype> dist{ static_cast<dtype>(InputFinnType().min()), static_cast<dtype>(InputFinnType().max()) };
+        std::mt19937 mersenneEngine{rndDevice()};  // Generates random integers
+        std::uniform_int_distribution<dtype> dist{static_cast<dtype>(InputFinnType().min()), static_cast<dtype>(InputFinnType().max())};
 
         auto gen = [&dist, &mersenneEngine]() { return dist(mersenneEngine); };
 
@@ -204,12 +212,11 @@ void runThroughputTest(Finn::Driver<true>& baseDriver, logger_type& logger) {
 
 
         // benchmark each step in call chain for int
-    }
-    else {
+    } else {
         std::vector<float> testInputs(elementcount * batchSize);
         std::random_device rndDevice;
-        std::mt19937 mersenneEngine{ rndDevice() };  // Generates random integers
-        std::uniform_real_distribution<float> dist{ static_cast<float>(InputFinnType().min()), static_cast<float>(InputFinnType().max()) };
+        std::mt19937 mersenneEngine{rndDevice()};  // Generates random integers
+        std::uniform_real_distribution<float> dist{static_cast<float>(InputFinnType().min()), static_cast<float>(InputFinnType().max())};
 
         auto gen = [&dist, &mersenneEngine]() { return dist(mersenneEngine); };
 
@@ -264,16 +271,21 @@ void runThroughputTest(Finn::Driver<true>& baseDriver, logger_type& logger) {
         std::cout << "Avg. packing latency: " << (static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(sumRuntimePacking).count()) / nTestruns / batchSize) << "ns\n";
         std::cout << "Avg. folding latency: " << (static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(sumRuntimeReshaping).count()) / nTestruns / batchSize) << "ns\n";
         std::cout << "Avg. unpacking latency: " << (static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(sumRuntimeUnpacking).count()) / nTestruns / batchSize) << "ns\n";
-
     }
 }
 
+/**
+ * @brief Index position in string that contains the byte size of the datatype stored in the numpy input file
+ *
+ */
 constexpr size_t typeStringByteSizePos = 2;
 /**
  * @brief Executes inference on the input file if input type is a floating point type
  * @attention This function does no checking of the datatype contained in the loadedNpyFile! Passing a npy file containing a non floating point type is UB.
  *
- * @param loadedNpyFile
+ * @param loadedNpyFile Input file
+ * @param baseDriver Reference to driver used for inference
+ * @param outputFile Name of output file
  */
 void inferFloatingPoint(Finn::Driver<true>& baseDriver, xt::detail::npy_file& loadedNpyFile, const std::string& outputFile) {
     size_t sizePos = typeStringByteSizePos;
@@ -285,16 +297,14 @@ void inferFloatingPoint(Finn::Driver<true>& baseDriver, xt::detail::npy_file& lo
         auto ret = baseDriver.inferSynchronous(vec.begin(), vec.end());
         auto xarr = xt::adapt(ret, (std::static_pointer_cast<Finn::ExtendedBufferDescriptor>(baseDriver.getConfig().deviceWrappers[0].odmas[0]))->normalShape);
         xt::dump_npy(outputFile, xarr);
-    }
-    else if (size == 8) {
+    } else if (size == 8) {
         // double
         auto xtensorArray = std::move(loadedNpyFile).cast<double, xt::layout_type::dynamic>();
         Finn::vector<double> vec(xtensorArray.begin(), xtensorArray.end());
         auto ret = baseDriver.inferSynchronous(vec.begin(), vec.end());
         auto xarr = xt::adapt(ret, (std::static_pointer_cast<Finn::ExtendedBufferDescriptor>(baseDriver.getConfig().deviceWrappers[0].odmas[0]))->normalShape);
         xt::dump_npy(outputFile, xarr);
-    }
-    else {
+    } else {
         FinnUtils::logAndError<std::runtime_error>("Unsupported floating point type detected when loading input npy file!");
     }
 }
@@ -317,32 +327,28 @@ void inferSignedInteger(Finn::Driver<true>& baseDriver, xt::detail::npy_file& lo
         auto ret = baseDriver.inferSynchronous(vec.begin(), vec.end());
         auto xarr = xt::adapt(ret, (std::static_pointer_cast<Finn::ExtendedBufferDescriptor>(baseDriver.getConfig().deviceWrappers[0].odmas[0]))->normalShape);
         xt::dump_npy(outputFile, xarr);
-    }
-    else if (size == 2) {
+    } else if (size == 2) {
         // int16_t
         auto xtensorArray = std::move(loadedNpyFile).cast<int16_t, xt::layout_type::dynamic>();
         Finn::vector<int16_t> vec(xtensorArray.begin(), xtensorArray.end());
         auto ret = baseDriver.inferSynchronous(vec.begin(), vec.end());
         auto xarr = xt::adapt(ret, (std::static_pointer_cast<Finn::ExtendedBufferDescriptor>(baseDriver.getConfig().deviceWrappers[0].odmas[0]))->normalShape);
         xt::dump_npy(outputFile, xarr);
-    }
-    else if (size == 4) {
+    } else if (size == 4) {
         // int32_t
         auto xtensorArray = std::move(loadedNpyFile).cast<int32_t, xt::layout_type::dynamic>();
         Finn::vector<int32_t> vec(xtensorArray.begin(), xtensorArray.end());
         auto ret = baseDriver.inferSynchronous(vec.begin(), vec.end());
         auto xarr = xt::adapt(ret, (std::static_pointer_cast<Finn::ExtendedBufferDescriptor>(baseDriver.getConfig().deviceWrappers[0].odmas[0]))->normalShape);
         xt::dump_npy(outputFile, xarr);
-    }
-    else if (size == 8) {
+    } else if (size == 8) {
         // int64_t
         auto xtensorArray = std::move(loadedNpyFile).cast<int64_t, xt::layout_type::dynamic>();
         Finn::vector<int64_t> vec(xtensorArray.begin(), xtensorArray.end());
         auto ret = baseDriver.inferSynchronous(vec.begin(), vec.end());
         auto xarr = xt::adapt(ret, (std::static_pointer_cast<Finn::ExtendedBufferDescriptor>(baseDriver.getConfig().deviceWrappers[0].odmas[0]))->normalShape);
         xt::dump_npy(outputFile, xarr);
-    }
-    else {
+    } else {
         FinnUtils::logAndError<std::runtime_error>("Unsupported signed integer type detected when loading input npy file!");
     }
 }
@@ -365,32 +371,28 @@ void inferUnsignedInteger(Finn::Driver<true>& baseDriver, xt::detail::npy_file& 
         auto ret = baseDriver.inferSynchronous(vec.begin(), vec.end());
         auto xarr = xt::adapt(ret, (std::static_pointer_cast<Finn::ExtendedBufferDescriptor>(baseDriver.getConfig().deviceWrappers[0].odmas[0]))->normalShape);
         xt::dump_npy(outputFile, xarr);
-    }
-    else if (size == 2) {
+    } else if (size == 2) {
         // uint16_t
         auto xtensorArray = std::move(loadedNpyFile).cast<uint16_t, xt::layout_type::dynamic>();
         Finn::vector<uint16_t> vec(xtensorArray.begin(), xtensorArray.end());
         auto ret = baseDriver.inferSynchronous(vec.begin(), vec.end());
         auto xarr = xt::adapt(ret, (std::static_pointer_cast<Finn::ExtendedBufferDescriptor>(baseDriver.getConfig().deviceWrappers[0].odmas[0]))->normalShape);
         xt::dump_npy(outputFile, xarr);
-    }
-    else if (size == 4) {
+    } else if (size == 4) {
         // uint32_t
         auto xtensorArray = std::move(loadedNpyFile).cast<uint32_t, xt::layout_type::dynamic>();
         Finn::vector<uint32_t> vec(xtensorArray.begin(), xtensorArray.end());
         auto ret = baseDriver.inferSynchronous(vec.begin(), vec.end());
         auto xarr = xt::adapt(ret, (std::static_pointer_cast<Finn::ExtendedBufferDescriptor>(baseDriver.getConfig().deviceWrappers[0].odmas[0]))->normalShape);
         xt::dump_npy(outputFile, xarr);
-    }
-    else if (size == 8) {
+    } else if (size == 8) {
         // uint64_t
         auto xtensorArray = std::move(loadedNpyFile).cast<uint64_t, xt::layout_type::dynamic>();
         Finn::vector<uint64_t> vec(xtensorArray.begin(), xtensorArray.end());
         auto ret = baseDriver.inferSynchronous(vec.begin(), vec.end());
         auto xarr = xt::adapt(ret, (std::static_pointer_cast<Finn::ExtendedBufferDescriptor>(baseDriver.getConfig().deviceWrappers[0].odmas[0]))->normalShape);
         xt::dump_npy(outputFile, xarr);
-    }
-    else {
+    } else {
         FinnUtils::logAndError<std::runtime_error>("Unsupported floating point type detected when loading input npy file!");
     }
 }
@@ -398,14 +400,16 @@ void inferUnsignedInteger(Finn::Driver<true>& baseDriver, xt::detail::npy_file& 
 /**
  * @brief Run inference on an input file
  *
- * @param baseDriver
- * @param logger
+ * @param baseDriver Reference to driver
+ * @param logger Logger to be used
+ * @param inputFiles Files used for inference input
+ * @param outputFiles Filenames used for output files
  */
 void runWithInputFile(Finn::Driver<true>& baseDriver, logger_type& logger, const std::vector<std::string>& inputFiles, const std::vector<std::string>& outputFiles) {
     FINN_LOG(logger, loglevel::info) << finnMainLogPrefix() << "Running driver on input files";
     logDeviceInformation(logger, baseDriver.getDeviceHandler(0).getDevice(), baseDriver.getConfig().deviceWrappers[0].xclbin);
 
-    for (auto&& [inp, out] = std::tuple{ inputFiles.begin(), outputFiles.begin() }; inp != inputFiles.end(); ++inp, ++out) {
+    for (auto&& [inp, out] = std::tuple{inputFiles.begin(), outputFiles.begin()}; inp != inputFiles.end(); ++inp, ++out) {
         // load npy file and process it
         // using normal xnpy::load_npy will not work because it requires a destination type
         // instead use xnpy::detail::load_npy_file und then concert by hand based on m_typestring of xnpy::detail::npy_file
@@ -419,41 +423,44 @@ void runWithInputFile(Finn::Driver<true>& baseDriver, logger_type& logger, const
         if (loadedFile.m_typestring[0] == '<') {
             // little endian
             switch (loadedFile.m_typestring[1]) {
-            case 'f': {
-                inferFloatingPoint(baseDriver, loadedFile, *out);
-                break;
+                case 'f': {
+                    inferFloatingPoint(baseDriver, loadedFile, *out);
+                    break;
+                }
+                case 'i': {
+                    inferSignedInteger(baseDriver, loadedFile, *out);
+                    break;
+                }
+                case 'b': {
+                    auto xtensorArray = std::move(loadedFile).cast<bool, xt::layout_type::dynamic>();
+                    Finn::vector<uint8_t> vec(xtensorArray.begin(), xtensorArray.end());
+                    auto ret = baseDriver.inferSynchronous(vec.begin(), vec.end());
+                    auto xarr = xt::adapt(ret, (std::static_pointer_cast<Finn::ExtendedBufferDescriptor>(baseDriver.getConfig().deviceWrappers[0].odmas[0]))->normalShape);
+                    xt::dump_npy(*out, xarr);
+                    break;
+                }
+                case 'u': {
+                    inferUnsignedInteger(baseDriver, loadedFile, *out);
+                    break;
+                }
+                default:
+                    std::string errorString = "Loading a numpy array with type identifier string ";
+                    errorString += loadedFile.m_typestring[1];
+                    errorString += " is currently not supported.";
+                    FinnUtils::logAndError<std::runtime_error>(errorString);
             }
-            case 'i': {
-                inferSignedInteger(baseDriver, loadedFile, *out);
-                break;
-            }
-            case 'b': {
-                auto xtensorArray = std::move(loadedFile).cast<bool, xt::layout_type::dynamic>();
-                Finn::vector<uint8_t> vec(xtensorArray.begin(), xtensorArray.end());
-                auto ret = baseDriver.inferSynchronous(vec.begin(), vec.end());
-                auto xarr = xt::adapt(ret, (std::static_pointer_cast<Finn::ExtendedBufferDescriptor>(baseDriver.getConfig().deviceWrappers[0].odmas[0]))->normalShape);
-                xt::dump_npy(*out, xarr);
-                break;
-            }
-            case 'u': {
-                inferUnsignedInteger(baseDriver, loadedFile, *out);
-                break;
-            }
-            default:
-                std::string errorString = "Loading a numpy array with type identifier string ";
-                errorString += loadedFile.m_typestring[1];
-                errorString += " is currently not supported.";
-                FinnUtils::logAndError<std::runtime_error>(errorString);
-            }
-        }
-        else {
+        } else {
             // all other endians
             FinnUtils::logAndError<std::runtime_error>("At the moment only files created on little endian systems are supported!\n");
         }
     }
 }
 
-
+/**
+ * @brief Validates the user input for the driver mode switch
+ *
+ * @param mode User input string for selected mode
+ */
 void validateDriverMode(const std::string& mode) {
     if (mode != "execute" && mode != "throughput") {
         throw finnBoost::program_options::error_with_option_name("'" + mode + "' is not a valid driver mode!", "exec_mode");
@@ -462,12 +469,22 @@ void validateDriverMode(const std::string& mode) {
     FINN_LOG(Logger::getLogger(), loglevel::info) << finnMainLogPrefix() << "Driver Mode: " << mode;
 }
 
+/**
+ * @brief Validates the user input for the batch size
+ *
+ * @param batch User input batch size
+ */
 void validateBatchSize(int batch) {
     if (batch <= 0) {
         throw finnBoost::program_options::error_with_option_name("Batch size must be positive, but is '" + std::to_string(batch) + "'", "batchsize");
     }
 }
 
+/**
+ * @brief Validates the user input for the config path. Also checks if file exists
+ *
+ * @param path Path string to be validated
+ */
 void validateConfigPath(const std::string& path) {
     auto configFilePath = std::filesystem::path(path);
     if (!std::filesystem::exists(configFilePath)) {
@@ -477,6 +494,11 @@ void validateConfigPath(const std::string& path) {
     FINN_LOG(Logger::getLogger(), loglevel::info) << finnMainLogPrefix() << "Config file found at " + configFilePath.string();
 }
 
+/**
+ * @brief Validates the user input for the input file path. Also checks if input file exists.
+ *
+ * @param path Path string to be validated
+ */
 void validateInputPath(const std::vector<std::string>& path) {
     for (auto&& elem : path) {
         auto inputFilePath = std::filesystem::path(elem);
@@ -490,20 +512,27 @@ void validateInputPath(const std::vector<std::string>& path) {
 
 namespace po = finnBoost::program_options;
 
+/**
+ * @brief Main entrypoint for the frontend of the C++ Finn driver
+ *
+ * @param argc Number of command line parameters
+ * @param argv Array of command line parameters
+ * @return int Exit status code
+ */
 int main(int argc, char* argv[]) {
     auto logger = Logger::getLogger();
     FINN_LOG(logger, loglevel::info) << "C++ Driver started";
 
     try {
         // Command Line Argument Parser
-        po::options_description desc{ "Options" };
+        po::options_description desc{"Options"};
         //clang-format off
         desc.add_options()("help,h", "Display help")("exec_mode,e", po::value<std::string>()->default_value("throughput")->notifier(&validateDriverMode),
-            R"(Please select functional verification ("execute") or throughput test ("throughput")")("configpath,c", po::value<std::string>()->required()->notifier(&validateConfigPath),
-                "Required: Path to the config.json file emitted by the FINN compiler")(
-                    "input,i", po::value<std::vector<std::string>>()->multitoken()->composing()->notifier(&validateInputPath), "Path to one or more input files (npy format). Only required if mode is set to \"file\"")(
-                        "output,o", po::value<std::vector<std::string>>()->multitoken()->composing(), "Path to one or more output files (npy format). Only required if mode is set to \"file\"")(
-                            "batchsize,b", po::value<int>()->default_value(1)->notifier(&validateBatchSize), "Number of samples for inference");
+                                                     R"(Please select functional verification ("execute") or throughput test ("throughput")")("configpath,c", po::value<std::string>()->required()->notifier(&validateConfigPath),
+                                                                                                                                              "Required: Path to the config.json file emitted by the FINN compiler")(
+            "input,i", po::value<std::vector<std::string>>()->multitoken()->composing()->notifier(&validateInputPath), "Path to one or more input files (npy format). Only required if mode is set to \"file\"")(
+            "output,o", po::value<std::vector<std::string>>()->multitoken()->composing(), "Path to one or more output files (npy format). Only required if mode is set to \"file\"")(
+            "batchsize,b", po::value<int>()->default_value(1)->notifier(&validateBatchSize), "Number of samples for inference");
         //clang-format on
         po::variables_map varMap;
         po::store(po::parse_command_line(argc, argv, desc), varMap);
@@ -532,25 +561,21 @@ int main(int argc, char* argv[]) {
             }
             auto driver = createDriverFromConfig<true>(varMap["configpath"].as<std::string>(), static_cast<uint>(varMap["batchsize"].as<int>()));
             runWithInputFile(driver, logger, varMap["input"].as<std::vector<std::string>>(), varMap["output"].as<std::vector<std::string>>());
-        }
-        else if (varMap["exec_mode"].as<std::string>() == "throughput") {
+        } else if (varMap["exec_mode"].as<std::string>() == "throughput") {
             auto driver = createDriverFromConfig<true>(varMap["configpath"].as<std::string>(), static_cast<uint>(varMap["batchsize"].as<int>()));
             runThroughputTest(driver, logger);
-        }
-        else {
+        } else {
             FinnUtils::logAndError<std::invalid_argument>("Unknown driver mode: " + varMap["exec_mode"].as<std::string>());
         }
 
         return 1;
-    }
-    catch (std::exception& e) {
+    } catch (std::exception& e) {
         std::cerr << "Error: " << e.what() << "\n";
         return 0;
-    }
-    catch (...)  // Catch everything that is not an exception class
+    } catch (...)  // Catch everything that is not an exception class
     {
         std::cerr << "Unknown error!"
-            << "\n";
+                  << "\n";
         return 0;
     }
 }

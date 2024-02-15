@@ -24,6 +24,11 @@
 namespace Finn {
 
     namespace detail {
+        /**
+         * @brief Wrapper that contains the ringbuffer used by Asynchronous Input & Output Buffers
+         *
+         * @tparam T Type of the data stored in the ringbuffer
+         */
         template<typename T>
         class AsyncBufferWrapper {
              protected:
@@ -48,6 +53,11 @@ namespace Finn {
         };
     }  // namespace detail
 
+    /**
+     * @brief Implements the asynchronous input buffer that transfers input to the FPGA device
+     *
+     * @tparam T Datatype of the data transfered. Most likely always uint8_t
+     */
     template<typename T>
     class AsyncDeviceInputBuffer : public DeviceInputBuffer<T>, public detail::AsyncBufferWrapper<T> {
          private:
@@ -134,6 +144,12 @@ namespace Finn {
         bool run() override { FinnUtils::logAndError<std::runtime_error>("Calling run is not supported for Async execution! This is done automatically."); }
     };
 
+
+    /**
+     * @brief Implements the asynchronous output buffer that transfers output from the FPGA device
+     *
+     * @tparam T Datatype of the data transfered. Most likely always uint8_t
+     */
     template<typename T>
     class AsyncDeviceOutputBuffer : public DeviceOutputBuffer<T>, public detail::AsyncBufferWrapper<T> {
         std::mutex ltsMutex;

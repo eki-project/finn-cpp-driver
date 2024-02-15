@@ -53,12 +53,36 @@ namespace Finn {
          * @brief Construct a new Accelerator object using a list of DeviceWrappers
          *
          * @param deviceDefinitions Vector of @ref DeviceWrapper
+         * @param synchronousInference Decides if synchronous or asynchronous inference should be used
+         * @param hostBufferSize Size of ringbuffer to initialize
          */
         explicit Accelerator(const std::vector<DeviceWrapper>& deviceDefinitions, bool synchronousInference, unsigned int hostBufferSize);
+        /**
+         * @brief Construct a new Accelerator object
+         *
+         */
         Accelerator(Accelerator&&) = default;
+        /**
+         * @brief Construct a new Accelerator object (deleted)
+         *
+         */
         Accelerator(const Accelerator&) = delete;
+        /**
+         * @brief Default move assignment operator
+         *
+         * @return Accelerator&
+         */
         Accelerator& operator=(Accelerator&&) = default;
+        /**
+         * @brief Default copy assignment operator
+         *
+         * @return Accelerator&
+         */
         Accelerator& operator=(const Accelerator&) = delete;
+        /**
+         * @brief Destroy the Accelerator object
+         *
+         */
         ~Accelerator() = default;
 
 
@@ -118,8 +142,7 @@ namespace Finn {
          *
          * @param deviceIndex
          * @param outputBufferKernelName
-         * @param samples The number of samples to read
-         * @param forceArchive Whether or not to force a readout into archive. Necessary to get new data. Will be done automatically if a whole multiple of the buffer size is produced
+         * @param forceArchival Whether or not to force a readout into archive. Necessary to get new data. Will be done automatically if a whole multiple of the buffer size is produced
          * @return std::vector<std::vector<uint8_t>>
          */
         Finn::vector<uint8_t> retrieveResults(unsigned int deviceIndex, const std::string& outputBufferKernelName, bool forceArchival);

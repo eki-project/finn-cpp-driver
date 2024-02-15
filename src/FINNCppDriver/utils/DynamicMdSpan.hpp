@@ -12,23 +12,23 @@ namespace Finn {
 
     template<std::input_iterator IteratorType>
     class DynamicMdSpan {
-         public:
+    public:
         using T = typename std::iterator_traits<IteratorType>::value_type;
 
-         private:
+    private:
         const std::size_t count;
         std::vector<std::size_t> strides;
         std::vector<std::span<T>> mostInnerDims;
         const IteratorType begin;
         const IteratorType end;
 
-         public:
-        void setShape(const std::vector<uint>& shape, uint batchSize = 1) {
+    public:
+        void setShape(const std::vector<uint>& shape) {
             if (shape.empty()) {
                 throw std::runtime_error("Can not create dynamic mdspan for empty Shape.");
             }
-            if (count != std::accumulate(std::begin(shape), std::end(shape), 1, std::multiplies<size_t>()) * batchSize) {
-                std::cout << "Distance: " << std::distance(begin, end) << " ; Accumulated Dimensions: " << std::accumulate(std::begin(shape), std::end(shape), 1.0, std::multiplies<double>()) * batchSize << "\n";
+            if (count != std::accumulate(std::begin(shape), std::end(shape), 1, std::multiplies<size_t>())) {
+                std::cout << "Distance: " << std::distance(begin, end) << " ; Accumulated Dimensions: " << std::accumulate(std::begin(shape), std::end(shape), 1.0, std::multiplies<double>()) << "\n";
                 throw std::runtime_error("Elements in input vector does not match elements in dimensions!");
             }
 
@@ -50,12 +50,12 @@ namespace Finn {
             }
         }
 
-        DynamicMdSpan(const IteratorType begin, const IteratorType end, const std::vector<uint>& shape, uint batchSize = 1) : count(std::distance(begin, end)), begin(begin), end(end) {
+        DynamicMdSpan(const IteratorType begin, const IteratorType end, const std::vector<uint>& shape) : count(std::distance(begin, end)), begin(begin), end(end) {
             if (count == 0) {
                 throw std::runtime_error("Can not create dynamic mdspan for empty container.");
             }
 
-            setShape(shape, batchSize);
+            setShape(shape);
         };
 
         std::vector<std::size_t> getStrides() { return strides; }

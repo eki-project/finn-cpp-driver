@@ -155,7 +155,7 @@ namespace Finn {
             auto newlineFold = [](std::string a, const auto& b) { return std::move(a) + '\n' + std::move(b.first); };
             std::string existingNames = "Existing buffer names:";
             std::accumulate(inputBufferMap.begin(), inputBufferMap.end(), existingNames, newlineFold);
-            FinnUtils::logAndError<std::runtime_error>("[run] Tried accessing kernel/buffer with name " + inputBufferKernelName + " but this kernel / buffer does not exist! " + existingNames);
+            FinnUtils::logAndError<std::runtime_error>(loggerPrefix() + " [run] Tried accessing kernel/buffer with name " + inputBufferKernelName + " but this kernel / buffer does not exist! " + existingNames);
         }
         return inputBufferMap.at(inputBufferKernelName)->run();
     }
@@ -165,7 +165,7 @@ namespace Finn {
             auto newlineFold = [](std::string a, const auto& b) { return std::move(a) + '\n' + std::move(b.first); };
             std::string existingNames = "Existing buffer names:";
             std::accumulate(inputBufferMap.begin(), inputBufferMap.end(), existingNames, newlineFold);
-            FinnUtils::logAndError<std::runtime_error>("[retrieve] Tried accessing kernel/buffer with name " + outputBufferKernelName + " but this kernel / buffer does not exist! " + existingNames);
+            FinnUtils::logAndError<std::runtime_error>(loggerPrefix() + " [retrieve] Tried accessing kernel/buffer with name " + outputBufferKernelName + " but this kernel / buffer does not exist! " + existingNames);
         }
         if (forceArchival) {
             outputBufferMap.at(outputBufferKernelName)->archiveValidBufferParts();
@@ -178,7 +178,7 @@ namespace Finn {
             auto newlineFold = [](std::string a, const auto& b) { return std::move(a) + '\n' + std::move(b.first); };
             std::string existingNames = "Existing buffer names:";
             std::accumulate(outputBufferMap.begin(), outputBufferMap.end(), existingNames, newlineFold);
-            FinnUtils::logAndError<std::runtime_error>("[read] Tried accessing kernel/buffer with name " + outputBufferKernelName + " but this kernel / buffer does not exist! \n" + existingNames);
+            FinnUtils::logAndError<std::runtime_error>(loggerPrefix() + " [read] Tried accessing kernel/buffer with name " + outputBufferKernelName + " but this kernel / buffer does not exist! \n" + existingNames);
         }
         return outputBufferMap.at(outputBufferKernelName)->read(samples);
     }

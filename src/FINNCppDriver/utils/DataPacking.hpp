@@ -49,6 +49,12 @@ namespace Finn {
          *
          */
         struct Detail {
+            /**
+             * @brief Functor used for byte reversing
+             *
+             * @param x Input that should be reversed
+             * @return uint8_t Reversed output
+             */
             uint8_t operator()(const uint8_t x) { return table[x]; }
         };
 
@@ -100,20 +106,68 @@ namespace Finn {
          *
          */
         struct Wrapper {
+            /**
+             * @brief Reverses 1 byte long input
+             *
+             * @param x
+             * @return uint8_t
+             */
             uint8_t operator()(const uint8_t x) const { return Detail{}(x); }
 
+            /**
+             * @brief Reverses 2 byte long input
+             *
+             * @param x
+             * @return uint16_t
+             */
             uint16_t operator()(const uint16_t x) const { return bitshuffleMemCopy<Detail, uint16_t>(x); }
 
+            /**
+             * @brief Reverses 4 byte long input
+             *
+             * @param x
+             * @return uint32_t
+             */
             uint32_t operator()(const uint32_t x) const { return bitshuffleMemCopy<Detail, uint32_t>(x); }
 
+            /**
+             * @brief Reverses 8 byte long input
+             *
+             * @param x
+             * @return uint64_t
+             */
             uint64_t operator()(const uint64_t x) const { return bitshuffleMemCopy<Detail, uint64_t>(x); }
 
+            /**
+             * @brief Reverses 1 byte long input
+             *
+             * @param x
+             * @return int8_t
+             */
             int8_t operator()(const int8_t x) const { return static_cast<int8_t>(Detail{}(static_cast<uint8_t>(x))); }
 
+            /**
+             * @brief Reverses 2 byte long input
+             *
+             * @param x
+             * @return int16_t
+             */
             int16_t operator()(const int16_t x) const { return static_cast<int16_t>(bitshuffleMemCopy<Detail, uint16_t>(static_cast<uint16_t>(x))); }
 
+            /**
+             * @brief Reverses 4 byte long input
+             *
+             * @param x
+             * @return int32_t
+             */
             int32_t operator()(const int32_t x) const { return static_cast<int32_t>(bitshuffleMemCopy<Detail, uint32_t>(static_cast<uint32_t>(x))); }
 
+            /**
+             * @brief Reverses 8 byte long input
+             *
+             * @param x
+             * @return int64_t
+             */
             int64_t operator()(const int64_t x) const { return static_cast<int64_t>(bitshuffleMemCopy<Detail, uint64_t>(static_cast<uint64_t>(x))); }
         };
 

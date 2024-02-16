@@ -36,17 +36,52 @@ namespace Finn {
     template<typename T>
     class DeviceBuffer {
          protected:
+        /**
+         * @brief Name of the buufer
+         *
+         */
         std::string name;
-        shapePacked_t shapePacked;  // Packed shape (Type T): (1,2,3)
-        size_t mapSize;             // Numbers of type T: When F has bitwidth 2, and T has bitwidth 8, the folded shape would be (1,2,10) and the packed (1,2,3) and thus 6
+        /**
+         * @brief Packed shape (Type T): (1,2,3)
+         *
+         */
+        shapePacked_t shapePacked;
+        /**
+         * @brief Numbers of type T: When F has bitwidth 2, and T has bitwidth 8, the folded shape would be (1,2,10) and the packed (1,2,3) and thus 6
+         *
+         */
+        size_t mapSize;
+        /**
+         * @brief XRT buffer object; This is used to interact with FPGA memory
+         *
+         */
         xrt::bo internalBo;
+        /**
+         * @brief XRT kernel associated with this Buffer
+         *
+         */
         xrt::kernel associatedKernel;
+        /**
+         * @brief Mapped buffer; Part of the XRT buffer object
+         *
+         */
         T* map;
+        /**
+         * @brief Logger
+         *
+         */
         logger_type& logger;
 
 
          public:
-        //* Normal Constructor
+        /**
+         * @brief Construct a new Device Buffer object
+         *
+         * @param pName Name for indentification
+         * @param device XRT device
+         * @param pAssociatedKernel XRT kernel
+         * @param pShapePacked packed shape of input
+         */
         DeviceBuffer(const std::string& pName, xrt::device& device, xrt::kernel& pAssociatedKernel, const shapePacked_t& pShapePacked)
             : name(pName),
               shapePacked(pShapePacked),
@@ -64,7 +99,11 @@ namespace Finn {
             }
         }
 
-        //* Move Constructor
+        /**
+         * @brief Construct a new Device Buffer object (Move constructor)
+         *
+         * @param buf
+         */
         DeviceBuffer(DeviceBuffer&& buf) noexcept
             : name(std::move(buf.name)),
               shapePacked(std::move(buf.shapePacked)),
@@ -74,16 +113,55 @@ namespace Finn {
               map(std::move(buf.map)),
               logger(Logger::getLogger()) {}
 
+        /**
+         * @brief Construct a new Device Buffer object (Deleted copy constructor)
+         *
+         * @param buf
+         */
         DeviceBuffer(const DeviceBuffer& buf) noexcept = delete;
 
+        /**
+         * @brief Destroy the Device Buffer object
+         *
+         */
         virtual ~DeviceBuffer() { FINN_LOG(logger, loglevel::info) << "[DeviceBuffer] Destructing DeviceBuffer " << name << "\n"; };
 
+        /**
+         * @brief Deleted move assignment operator
+         *
+         * @param buf
+         * @return DeviceBuffer&
+         */
         DeviceBuffer& operator=(DeviceBuffer&& buf) = delete;
+
+        /**
+         * @brief Deleted copy assignment operator
+         *
+         * @param buf
+         * @return DeviceBuffer&
+         */
         DeviceBuffer& operator=(const DeviceBuffer& buf) = delete;
 
+        /**
+         * @brief Returns a specific size parameter of DeviceBuffer. Size parameter selected with @see SIZE_SPECIFIER
+         *
+         * @param ss @see SIZE_SPECIFIER
+         * @return size_t
+         */
         virtual size_t size(SIZE_SPECIFIER ss) = 0;
 
+        /**
+         * @brief Get the name of the device buffer
+         *
+         * @return std::string&
+         */
         virtual std::string& getName() { return name; }
+
+        /**
+         * @brief Get the Packed Shape object
+         *
+         * @return shape_t&
+         */
         virtual shape_t& getPackedShape() { return shapePacked; }
 
          protected:
@@ -107,7 +185,19 @@ namespace Finn {
          * @return std::string
          */
         virtual std::string loggerPrefix() { return "[" + finnBoost::typeindex::type_id<decltype(this)>().pretty_name() + " - " + name + "] "; }
+
+        /**
+         * @brief Synchronizes the Buffer data to the data on the FPGA
+         *
+         * @param bytes
+         */
         virtual void sync(std::size_t bytes) = 0;
+
+        /**
+         * @brief Executes the associated xrt kernel
+         *
+         * @return ert_cmd_state
+         */
         virtual ert_cmd_state execute() = 0;
     };
 
@@ -134,11 +224,29 @@ namespace Finn {
     template<typename T>
     class DeviceInputBuffer : public DeviceBuffer<T> {
          protected:
+        /**
+         * @brief Specifies if DeviceBuffer is input or output buffer
+         *
+         */
         const IO ioMode = IO::INPUT;
 
          public:
+        /**
+         * @brief Construct a new Device Input Buffer object
+         *
+         * @param pName Name for indentification
+         * @param device XRT device
+         * @param pAssociatedKernel XRT kernel
+         * @param pShapePacked packed shape of input
+         */
         DeviceInputBuffer(const std::string& pName, xrt::device& device, xrt::kernel& pAssociatedKernel, const shapePacked_t& pShapePacked) : DeviceBuffer<T>(pName, device, pAssociatedKernel, pShapePacked){};
 
+        /**
+         * @brief Run the kernel to input data from FPGA memory into the accelerator design
+         *
+         * @return true Success
+         * @return false Fail
+         */
         virtual bool run() = 0;
 
         /**
@@ -188,22 +296,81 @@ namespace Finn {
     template<typename T>
     class DeviceOutputBuffer : public DeviceBuffer<T> {
          protected:
+        /**
+         * @brief Specifies IO mode of buffer
+         *
+         */
         const IO ioMode = IO::OUTPUT;
+        /**
+         * @brief Data storage until data is requested by user
+         *
+         */
         Finn::vector<T> longTermStorage;
+        /**
+         * @brief Timeout for kernels
+         *
+         */
         unsigned int msExecuteTimeout = 1000;
 
          public:
+        /**
+         * @brief Construct a new Device Output Buffer object
+         *
+         * @param pName Name for indentification
+         * @param device XRT device
+         * @param pAssociatedKernel XRT kernel
+         * @param pShapePacked packed shape of input
+         */
         DeviceOutputBuffer(const std::string& pName, xrt::device& device, xrt::kernel& pAssociatedKernel, const shapePacked_t& pShapePacked) : DeviceBuffer<T>(pName, device, pAssociatedKernel, pShapePacked){};
 
+        /**
+         * @brief Get timeout
+         *
+         * @return unsigned int
+         */
         virtual unsigned int getMsExecuteTimeout() const = 0;
+        /**
+         * @brief Set timeout
+         *
+         * @param val
+         */
         virtual void setMsExecuteTimeout(unsigned int val) = 0;
+        /**
+         * @brief Transfer output data from ringbuffer to storage until user requests it
+         *
+         */
         virtual void archiveValidBufferParts() = 0;
+        /**
+         * @brief Return stored data from storage
+         *
+         * @return Finn::vector<T>
+         */
         virtual Finn::vector<T> retrieveArchive() = 0;
+        /**
+         * @brief Start XRT kernel to read data from accelerator design into FPGA memory
+         *
+         * @param samples
+         * @return ert_cmd_state
+         */
         virtual ert_cmd_state read(unsigned int samples) = 0;
 
          protected:
+        /**
+         * @brief Delete long term storage contents
+         *
+         */
         virtual void clearArchive() = 0;
+        /**
+         * @brief Make space in long term storage
+         *
+         * @param expectedEntries Number of entries expected to be stored in long term storage
+         */
         virtual void allocateLongTermStorage(unsigned int expectedEntries) = 0;
+
+        /**
+         * @brief Store the contents of the memory map into the ring buffer
+         *
+         */
         virtual void saveMap() = 0;
         /**
          * @brief Sync data from the FPGA into the memory map

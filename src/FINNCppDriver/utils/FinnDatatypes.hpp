@@ -246,15 +246,45 @@ namespace Finn {
      */
     class DatatypeFloat : public Datatype<DatatypeFloat> {
          private:
+        /**
+         * @brief Needed for CRTP
+         *
+         */
         friend class Datatype<DatatypeFloat>;
 
          public:
+        /**
+         * @brief Default constructor
+         *
+         */
         constexpr DatatypeFloat() = default;
+        /**
+         * @brief Destructor
+         *
+         */
         // NOLINTNEXTLINE
         constexpr ~DatatypeFloat() override{};  //{} instead of default because compiler bug
+        /**
+         * @brief Default move constructor
+         *
+         */
         constexpr DatatypeFloat(DatatypeFloat&&) noexcept = default;
+        /**
+         * @brief Default copy constructor
+         *
+         */
         constexpr DatatypeFloat(DatatypeFloat const&) = default;
+        /**
+         * @brief Default move assignment operator
+         *
+         * @return DatatypeFloat&
+         */
         DatatypeFloat& operator=(DatatypeFloat&&) noexcept = default;
+        /**
+         * @brief Default copy assignment operator
+         *
+         * @return DatatypeFloat&
+         */
         DatatypeFloat& operator=(const DatatypeFloat&) = default;
 
         /**
@@ -309,15 +339,45 @@ namespace Finn {
     template<std::size_t B>
     class DatatypeInt : public Datatype<DatatypeInt<B>> {
          private:
+        /**
+         * @brief Needed internally for CRTP
+         *
+         */
         friend class Datatype<DatatypeInt<B>>;
 
          public:
+        /**
+         * @brief Default Constructor
+         *
+         */
         constexpr DatatypeInt() = default;
+        /**
+         * @brief Default destructor
+         *
+         */
         // NOLINTNEXTLINE
         constexpr ~DatatypeInt() override{};  //{} instead of default because compiler bug
+        /**
+         * @brief Default move constructor
+         *
+         */
         constexpr DatatypeInt(DatatypeInt<B>&&) noexcept = default;
+        /**
+         * @brief Default copy constructor
+         *
+         */
         constexpr DatatypeInt(DatatypeInt<B> const&) = default;
+        /**
+         * @brief Default move assignment operator
+         *
+         * @return constexpr DatatypeInt<C>&
+         */
         constexpr DatatypeInt<B>& operator=(DatatypeInt<B>&&) noexcept = default;
+        /**
+         * @brief Default copy assignment operator
+         *
+         * @return constexpr DatatypeInt<C>&
+         */
         constexpr DatatypeInt<B>& operator=(const DatatypeInt<B>&) = default;
 
         /**
@@ -372,15 +432,45 @@ namespace Finn {
     template<std::size_t B, std::size_t I>
     class DatatypeFixed : public Datatype<DatatypeFixed<B, I>> {
          private:
+        /**
+         * @brief Needed internally for CRTP
+         *
+         */
         friend class Datatype<DatatypeFixed<B, I>>;
 
          public:
+        /**
+         * @brief Default Constructor
+         *
+         */
         constexpr DatatypeFixed() = default;
+        /**
+         * @brief Default destructor
+         *
+         */
         // NOLINTNEXTLINE
         constexpr ~DatatypeFixed() override{};  //{} instead of default because compiler bug
+        /**
+         * @brief Default move constructor
+         *
+         */
         constexpr DatatypeFixed(DatatypeFixed<B, I>&&) noexcept = default;
+        /**
+         * @brief Default copy constructor
+         *
+         */
         constexpr DatatypeFixed(DatatypeFixed<B, I> const&) = default;
+        /**
+         * @brief Default move assignment operator
+         *
+         * @return constexpr DatatypeFixed<B, I>&
+         */
         constexpr DatatypeFixed<B, I>& operator=(DatatypeFixed<B, I>&&) noexcept = default;
+        /**
+         * @brief Default copy assignment operator
+         *
+         * @return constexpr DatatypeFixed<B, I>&
+         */
         constexpr DatatypeFixed<B, I>& operator=(const DatatypeFixed<B, I>&) = default;
         /**
          * @brief @see Datatype
@@ -448,15 +538,45 @@ namespace Finn {
     template<std::size_t B>
     class DatatypeUInt : public Datatype<DatatypeUInt<B>> {
          private:
+        /**
+         * @brief Needed internally for CRTP
+         *
+         */
         friend class Datatype<DatatypeUInt<B>>;
 
          public:
+        /**
+         * @brief Default Constructor
+         *
+         */
         constexpr DatatypeUInt() = default;
         // NOLINTNEXTLINE
+        /**
+         * @brief Default destructor
+         *
+         */
         constexpr ~DatatypeUInt() override{};  //{} instead of default because compiler bug
+        /**
+         * @brief Default move constructor
+         *
+         */
         constexpr DatatypeUInt(DatatypeUInt<B>&&) noexcept = default;
+        /**
+         * @brief Default copy constructor
+         *
+         */
         constexpr DatatypeUInt(DatatypeUInt<B> const&) = default;
+        /**
+         * @brief Default move assignment operator
+         *
+         * @return constexpr DatatypeUInt<C>&
+         */
         constexpr DatatypeUInt<B>& operator=(DatatypeUInt<B>&&) noexcept = default;
+        /**
+         * @brief Default copy assignment operator
+         *
+         * @return constexpr DatatypeUInt<C>&
+         */
         constexpr DatatypeUInt<B>& operator=(const DatatypeUInt<B>&) = default;
 
         /**
@@ -515,15 +635,45 @@ namespace Finn {
      */
     class DatatypeBipolar : public Datatype<DatatypeBipolar> {
          private:
+        /**
+         * @brief Needed internally for CRTP
+         *
+         */
         friend class Datatype<DatatypeBipolar>;
 
          public:
+        /**
+         * @brief Default Constructor
+         *
+         */
         constexpr DatatypeBipolar() = default;
+        /**
+         * @brief Default destructor
+         *
+         */
         // NOLINTNEXTLINE
         constexpr ~DatatypeBipolar() override{};  //{} instead of default because compiler bug
+        /**
+         * @brief Default move constructor
+         *
+         */
         constexpr DatatypeBipolar(DatatypeBipolar&&) noexcept = default;
+        /**
+         * @brief Default copy constructor
+         *
+         */
         constexpr DatatypeBipolar(DatatypeBipolar const&) = default;
+        /**
+         * @brief Default move assignment operator
+         *
+         * @return DatatypeBipolar&
+         */
         DatatypeBipolar& operator=(DatatypeBipolar&&) noexcept = default;
+        /**
+         * @brief Default copy assignment operator
+         *
+         * @return DatatypeBipolar&
+         */
         DatatypeBipolar& operator=(const DatatypeBipolar&) = default;
         /**
          * @brief @see Datatype
@@ -579,15 +729,45 @@ namespace Finn {
      */
     class DatatypeTernary : public Datatype<DatatypeTernary> {
          private:
+        /**
+         * @brief Needed internally for CRTP
+         *
+         */
         friend class Datatype<DatatypeTernary>;
 
          public:
+        /**
+         * @brief Default Constructor
+         *
+         */
         constexpr DatatypeTernary() = default;
+        /**
+         * @brief Default destructor
+         *
+         */
         // NOLINTNEXTLINE
         constexpr ~DatatypeTernary() override{};  //{} instead of default because compiler bug
+        /**
+         * @brief Default move constructor
+         *
+         */
         constexpr DatatypeTernary(DatatypeTernary&&) noexcept = default;
+        /**
+         * @brief Default copy constructor
+         *
+         */
         constexpr DatatypeTernary(DatatypeTernary const&) = default;
+        /**
+         * @brief Default move assignment operator
+         *
+         * @return DatatypeTernary&
+         */
         DatatypeTernary& operator=(DatatypeTernary&&) noexcept = default;
+        /**
+         * @brief Defualt copy assignment operator
+         *
+         * @return DatatypeTernary&
+         */
         DatatypeTernary& operator=(const DatatypeTernary&) = default;
         /**
          * @brief @see Datatype

@@ -32,8 +32,18 @@ namespace Finn {
         template<typename T>
         class AsyncBufferWrapper {
              protected:
+            /**
+             * @brief Internal Ringbuffer used by all asynchronous buffers
+             *
+             */
             RingBuffer<T, true> ringBuffer;
 
+            /**
+             * @brief Construct a new Async Buffer Wrapper object
+             *
+             * @param ringBufferSizeFactor Number of batch elements that should be able to be stored
+             * @param elementsPerPart Number of values per batch element
+             */
             AsyncBufferWrapper(unsigned int ringBufferSizeFactor, std::size_t elementsPerPart) : ringBuffer(RingBuffer<T, true>(ringBufferSizeFactor, elementsPerPart)) {
                 if (ringBufferSizeFactor == 0) {
                     FinnUtils::logAndError<std::runtime_error>("DeviceBuffer of size 0 cannot be constructed!");
@@ -41,10 +51,36 @@ namespace Finn {
                 FINN_LOG(Logger::getLogger(), loglevel::info) << "[AsyncDeviceBuffer] Max buffer size:" << ringBufferSizeFactor << "*" << elementsPerPart << "\n";
             }
 
+            /**
+             * @brief Destroy the Async Buffer Wrapper object
+             *
+             */
             ~AsyncBufferWrapper() = default;
+            /**
+             * @brief Construct a new Async Buffer Wrapper object (Move construction)
+             *
+             * @param buf
+             */
             AsyncBufferWrapper(AsyncBufferWrapper&& buf) noexcept : ringBuffer(std::move(buf.ringBuffer)) {}
+            /**
+             * @brief Construct a new Async Buffer Wrapper object (Deleted Copy constructor)
+             *
+             * @param buf
+             */
             AsyncBufferWrapper(const AsyncBufferWrapper& buf) noexcept = delete;
+            /**
+             * @brief Deleted move assignment operator
+             *
+             * @param buf
+             * @return AsyncBufferWrapper&
+             */
             AsyncBufferWrapper& operator=(AsyncBufferWrapper&& buf) = delete;
+            /**
+             * @brief Deleted copy assignment operator
+             *
+             * @param buf
+             * @return AsyncBufferWrapper&
+             */
             AsyncBufferWrapper& operator=(const AsyncBufferWrapper& buf) = delete;
 #ifdef UNITTEST
              public:
@@ -81,18 +117,53 @@ namespace Finn {
         }
 
          public:
+        /**
+         * @brief Construct a new Async Device Input Buffer object
+         *
+         * @param pName Name for indentification
+         * @param device XRT device
+         * @param pAssociatedKernel XRT kernel
+         * @param pShapePacked packed shape of input
+         * @param ringBufferSizeFactor size of ringbuffer in input elements (batch elements)
+         */
         AsyncDeviceInputBuffer(const std::string& pName, xrt::device& device, xrt::kernel& pAssociatedKernel, const shapePacked_t& pShapePacked, unsigned int ringBufferSizeFactor)
             : DeviceInputBuffer<T>(pName, device, pAssociatedKernel, pShapePacked),
               detail::AsyncBufferWrapper<T>(ringBufferSizeFactor, FinnUtils::shapeToElements(pShapePacked)),
               workerThread(std::jthread(std::bind_front(&AsyncDeviceInputBuffer::runInternal, this))){};
 
+        /**
+         * @brief Construct a new Async Device Input Buffer object
+         *
+         * @param buf
+         */
         AsyncDeviceInputBuffer(AsyncDeviceInputBuffer&& buf) noexcept = default;
+        /**
+         * @brief Construct a new Async Device Input Buffer object (Deleted)
+         *
+         * @param buf
+         */
         AsyncDeviceInputBuffer(const AsyncDeviceInputBuffer& buf) noexcept = delete;
+        /**
+         * @brief Destroy the Async Device Input Buffer object
+         *
+         */
         ~AsyncDeviceInputBuffer() override {
             FINN_LOG(this->logger, loglevel::info) << "Destructing Asynchronous input buffer";
             workerThread.request_stop();  // Joining will be handled automatically by destruction
         };
+        /**
+         * @brief Deleted move assignment
+         *
+         * @param buf
+         * @return AsyncDeviceInputBuffer&
+         */
         AsyncDeviceInputBuffer& operator=(AsyncDeviceInputBuffer&& buf) = delete;
+        /**
+         * @brief Deleted copy assignment
+         *
+         * @param buf
+         * @return AsyncDeviceInputBuffer&
+         */
         AsyncDeviceInputBuffer& operator=(const AsyncDeviceInputBuffer& buf) = delete;
 
         /**
@@ -106,7 +177,7 @@ namespace Finn {
         /**
          * @brief Store the given data in the ring buffer
          *
-         * @param span
+         * @param data
          * @return true Store was successful
          * @return false Store failed
          */
@@ -178,18 +249,55 @@ namespace Finn {
         }
 
          public:
+        /**
+         * @brief Construct a new Async Device Output Buffer object
+         *
+         * @param pName Name for indentification
+         * @param device XRT device
+         * @param pAssociatedKernel XRT kernel
+         * @param pShapePacked packed shape of input
+         * @param ringBufferSizeFactor size of ringbuffer in input elements (batch elements)
+         */
         AsyncDeviceOutputBuffer(const std::string& pName, xrt::device& device, xrt::kernel& pAssociatedKernel, const shapePacked_t& pShapePacked, unsigned int ringBufferSizeFactor)
             : DeviceOutputBuffer<T>(pName, device, pAssociatedKernel, pShapePacked),
               detail::AsyncBufferWrapper<T>(ringBufferSizeFactor, FinnUtils::shapeToElements(pShapePacked)),
               workerThread(std::jthread(std::bind_front(&AsyncDeviceOutputBuffer::readInternal, this))){};
 
+        /**
+         * @brief Construct a new Async Device Output Buffer object (Move constructor)
+         *
+         * @param buf
+         */
         AsyncDeviceOutputBuffer(AsyncDeviceOutputBuffer&& buf) noexcept = default;
+        /**
+         * @brief Construct a new Async Device Output Buffer object (Deleted copy constructor)
+         *
+         * @param buf
+         */
         AsyncDeviceOutputBuffer(const AsyncDeviceOutputBuffer& buf) noexcept = delete;
+        /**
+         * @brief Destroy the Async Device Output Buffer object
+         *
+         */
         ~AsyncDeviceOutputBuffer() override {
             FINN_LOG(this->logger, loglevel::info) << "Destruction Asynchronous output buffer";
             workerThread.request_stop();  // Joining will be handled automatically by destruction
         };
+
+        /**
+         * @brief Deleted move assignment operator
+         *
+         * @param buf
+         * @return AsyncDeviceOutputBuffer&
+         */
         AsyncDeviceOutputBuffer& operator=(AsyncDeviceOutputBuffer&& buf) = delete;
+
+        /**
+         * @brief Deleted copy assignment operator
+         *
+         * @param buf
+         * @return AsyncDeviceOutputBuffer&
+         */
         AsyncDeviceOutputBuffer& operator=(const AsyncDeviceOutputBuffer& buf) = delete;
 
         /**

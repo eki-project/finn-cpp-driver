@@ -82,6 +82,11 @@ class AlignedAllocator {
      */
     static inline const T* address(const T& s) { return &s; }
 
+    /**
+     * @brief Returns the maximum size of allocated memory
+     *
+     * @return std::size_t
+     */
     // NOLINTNEXTLINE
     inline std::size_t static max_size() { return std::numeric_limits<size_type>::max() / sizeof(T); }
 
@@ -94,6 +99,10 @@ class AlignedAllocator {
     template<typename U>
     // NOLINTNEXTLINE
     struct rebind {
+        /**
+         * @brief Internal Allocator stuff. Most likely will be replaced in the future.
+         *
+         */
         using other = AlignedAllocator<U, TALIGN>;
     };
 

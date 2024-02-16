@@ -75,6 +75,13 @@ namespace Finn {
 
 
          public:
+        /**
+         * @brief Construct a new Device Handler object
+         *
+         * @param devWrap
+         * @param synchronousInference
+         * @param hostBufferSize
+         */
         explicit DeviceHandler(const DeviceWrapper& devWrap, bool synchronousInference, unsigned int hostBufferSize = 100);
         /**
          * @brief Default move constructor
@@ -153,8 +160,7 @@ namespace Finn {
          * @brief Read from the output buffer on the host. This does NOT execute the output kernel
          *
          * @param outputBufferKernelName
-         * @param forceArchive If true, the data gets copied from the buffer to the long term storage immediately. If false, the newest read data might not actually be returned by this function
-         * @param samples Number of samples to read
+         * @param forceArchival If true, the data gets copied from the buffer to the long term storage immediately. If false, the newest read data might not actually be returned by this function
          * @return Finn::vector<uint8_t>
          */
         Finn::vector<uint8_t> retrieveResults(const std::string& outputBufferKernelName, bool forceArchival);
@@ -187,7 +193,16 @@ namespace Finn {
          */
         bool containsBuffer(const std::string& kernelBufferName, IO ioMode);
 
-        //* SAFE + ITERATOR
+        /**
+         * @brief Stores an input into the Device Buffer
+         *
+         * @tparam IteratorType
+         * @param first Iterator to first element of input
+         * @param last Iterator to end of input
+         * @param inputBufferKernelName identifier of the buffer kernel
+         * @return true success
+         * @return false failure
+         */
         template<typename IteratorType>
         bool store(IteratorType first, IteratorType last, const std::string& inputBufferKernelName) {
             if (!inputBufferMap.contains(inputBufferKernelName)) {
@@ -231,6 +246,7 @@ namespace Finn {
          *
          * @param devWrap
          * @param hostBufferSize How many multiples of one sample should be store-able in the buffer
+         * @param synchronousInference
          */
         void initializeBufferObjects(const DeviceWrapper& devWrap, unsigned int hostBufferSize, bool synchronousInference);
 
@@ -285,8 +301,24 @@ namespace Finn {
          */
         UncheckedStore(DeviceHandler& pDev, const std::string& pInputBufferName) : dev(pDev), inputBufferName(pInputBufferName) {}
 
+        /**
+         * @brief Stores the data vector into a device buffer
+         *
+         * @param data input data
+         * @return true success
+         * @return false failure
+         */
         bool operator()(const Finn::vector<uint8_t>& data) { return dev.storeUnchecked(data.begin(), data.end(), inputBufferName); }
 
+        /**
+         * @brief Stores the data vector into a device buffer
+         *
+         * @tparam IteratorType
+         * @param first Iterator to first element to be stored
+         * @param last Iterator to end of input
+         * @return true success
+         * @return false failure
+         */
         template<typename IteratorType>
         bool operator()(IteratorType first, IteratorType last) {
             return dev.storeUnchecked(first, last, inputBufferName);

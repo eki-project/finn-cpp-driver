@@ -72,6 +72,11 @@ namespace Finn {
             }
         }
 
+        /**
+         * @brief Construct a new Ring Buffer object (Move constructor)
+         *
+         * @param other
+         */
         RingBuffer(RingBuffer&& other) noexcept : buffer(std::move(other.buffer)), elementsPerPart(other.elementsPerPart) {}
 
         RingBuffer(const RingBuffer& other) = delete;
@@ -79,6 +84,12 @@ namespace Finn {
         RingBuffer& operator=(RingBuffer&& other) = delete;
         RingBuffer& operator=(const RingBuffer& other) = delete;
 
+        /**
+         * @brief Tests if ring buffer is empty
+         *
+         * @return true success
+         * @return false failure
+         */
         bool empty() {
             if constexpr (multiThreaded) {
                 std::lock_guard guard(readWriteMutex);
@@ -87,6 +98,13 @@ namespace Finn {
                 return buffer.empty();
             }
         }
+
+        /**
+         * @brief Tests if ring buffer is full
+         *
+         * @return true success
+         * @return false failure
+         */
         bool full() {
             if constexpr (multiThreaded) {
                 std::lock_guard guard(readWriteMutex);
@@ -95,6 +113,12 @@ namespace Finn {
                 return buffer.full();
             }
         }
+
+        /**
+         * @brief Get the availble free space in the driver
+         *
+         * @return std::size_t
+         */
         std::size_t freeSpace() {
             if constexpr (multiThreaded) {
                 std::lock_guard guard(readWriteMutex);
@@ -126,6 +150,11 @@ namespace Finn {
             }
         }
 
+        /**
+         * @brief Get the number of batch elements that can be stored in the buffer
+         *
+         * @return size_t
+         */
         size_t size() {
             if constexpr (multiThreaded) {
                 std::lock_guard guard(readWriteMutex);
@@ -182,11 +211,27 @@ namespace Finn {
             }
         }
 
+        /**
+         * @brief Store input data in the buffer
+         *
+         * @tparam IteratorType
+         * @param data
+         * @param datasize
+         * @return true
+         * @return false
+         */
         template<typename IteratorType>
         bool store(const IteratorType data, size_t datasize) {
             return store(data, data + datasize);
         }
 
+        /**
+         * @brief Store input data in the buffer
+         *
+         * @param vec
+         * @return true
+         * @return false
+         */
         bool store(const std::vector<T> vec) { return store(vec.begin(), vec.end()); }
 
         /**
@@ -196,6 +241,7 @@ namespace Finn {
          *
          * @tparam IteratorType
          * @param outputIt
+         * @param stoken Needed for threaded operation. Do not set by hand!
          * @return true
          * @return false
          */
@@ -283,6 +329,7 @@ namespace Finn {
          *
          * @tparam IteratorType
          * @param outputIt
+         * @param index
          * @return true
          * @return false
          */

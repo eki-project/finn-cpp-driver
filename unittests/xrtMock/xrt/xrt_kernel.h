@@ -14,7 +14,7 @@
 namespace xrt {
 
     class run {
-    public:
+         public:
         run() = default;
         void start();
         ert_cmd_state wait();
@@ -32,12 +32,11 @@ namespace xrt {
      * Most interaction with kernel objects are through \ref xrt::run objects created
      * from the kernel object to represent an execution of the kernel
      */
-     // class kernel_impl;
+    // class kernel_impl;
     class kernel {
-    public:
+         public:
         /**
          * cu_access_mode - compute unit access mode
-         *
          * @var shared
          *  CUs can be shared between processes
          * @var exclusive
@@ -91,25 +90,25 @@ namespace xrt {
          * @return
          *  Run object representing this kernel function invocation
          */
-         //   template<typename ...Args>
-         //   run
-         //   operator() (Args&&... args)
-         //   {
-         //     run r(*this);
-         //     r(std::forward<Args>(args)...);
-         //     return r;
-         //   }
+        //   template<typename ...Args>
+        //   run
+        //   operator() (Args&&... args)
+        //   {
+        //     run r(*this);
+        //     r(std::forward<Args>(args)...);
+        //     return r;
+        //   }
 
-         /**
-          * group_id() - Get the memory bank group id of an kernel argument
-          *
-          * @param argno
-          *  The argument index
-          * @return
-          *  The memory group id to use when allocating buffers (see xrt::bo)
-          *
-          * The function throws if the group id is ambigious.
-          */
+        /**
+         * group_id() - Get the memory bank group id of an kernel argument
+         *
+         * @param argno
+         *  The argument index
+         * @return
+         *  The memory group id to use when allocating buffers (see xrt::bo)
+         *
+         * The function throws if the group id is ambigious.
+         */
 
         int group_id(int argno) const;
 
@@ -126,9 +125,9 @@ namespace xrt {
          * get_xclbin() - Return the xclbin containing the kernel
          */
 
-         // xrt::xclbin get_xclbin() const;
+        // xrt::xclbin get_xclbin() const;
 
-    public:
+         public:
         /// @cond
         // const std::shared_ptr<kernel_impl>& get_handle() const { return handle; }
         /// @endcond

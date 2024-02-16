@@ -29,8 +29,18 @@ namespace Finn {
         template<typename T>
         class SyncBufferWrapper {
              protected:
+            /**
+             * @brief Internal Ringbuffer used by all synchronous buffers
+             *
+             */
             RingBuffer<T, false> ringBuffer;
 
+            /**
+             * @brief Construct a new Sync Buffer Wrapper object
+             *
+             * @param ringBufferSizeFactor Number of batch elements that should be able to be stored
+             * @param elementsPerPart Number of values per batch element
+             */
             SyncBufferWrapper(unsigned int ringBufferSizeFactor, std::size_t elementsPerPart) : ringBuffer(RingBuffer<T, false>(ringBufferSizeFactor, elementsPerPart)) {
                 if (ringBufferSizeFactor == 0) {
                     FinnUtils::logAndError<std::runtime_error>("DeviceBuffer of size 0 cannot be constructed!");
@@ -38,10 +48,40 @@ namespace Finn {
                 FINN_LOG(Logger::getLogger(), loglevel::info) << "[SyncDeviceBuffer] Max buffer size:" << ringBufferSizeFactor << "*" << elementsPerPart << "\n";
             }
 
+            /**
+             * @brief Destroy the Sync Buffer Wrapper object
+             *
+             */
             ~SyncBufferWrapper() = default;
+
+            /**
+             * @brief Construct a new Sync Buffer Wrapper object (Move constructor)
+             *
+             * @param buf
+             */
             SyncBufferWrapper(SyncBufferWrapper&& buf) noexcept : ringBuffer(std::move(buf.ringBuffer)) {}
+
+            /**
+             * @brief Construct a new Sync Buffer Wrapper object (Deleted copy constructor)
+             *
+             * @param buf
+             */
             SyncBufferWrapper(const SyncBufferWrapper& buf) noexcept = delete;
+
+            /**
+             * @brief Deleted move assignment operator
+             *
+             * @param buf
+             * @return SyncBufferWrapper&
+             */
             SyncBufferWrapper& operator=(SyncBufferWrapper&& buf) = delete;
+
+            /**
+             * @brief Deleted copy assignment operator
+             *
+             * @param buf
+             * @return SyncBufferWrapper&
+             */
             SyncBufferWrapper& operator=(const SyncBufferWrapper& buf) = delete;
 #ifdef UNITTEST
              public:
@@ -53,15 +93,55 @@ namespace Finn {
     template<typename T>
     class SyncDeviceInputBuffer : public DeviceInputBuffer<T>, public detail::SyncBufferWrapper<T> {
          public:
+        /**
+         * @brief Construct a new Sync Device Input Buffer object
+         *
+         * @param pName Name for indentification
+         * @param device XRT device
+         * @param pAssociatedKernel XRT kernel
+         * @param pShapePacked packed shape of input
+         * @param ringBufferSizeFactor size of ringbuffer in input elements (batch elements)
+         */
         SyncDeviceInputBuffer(const std::string& pName, xrt::device& device, xrt::kernel& pAssociatedKernel, const shapePacked_t& pShapePacked, unsigned int ringBufferSizeFactor)
             : DeviceInputBuffer<T>(pName, device, pAssociatedKernel, pShapePacked), detail::SyncBufferWrapper<T>(ringBufferSizeFactor, FinnUtils::shapeToElements(pShapePacked)) {
             FINN_LOG(this->logger, loglevel::info) << "[SyncDeviceInputBuffer] "
                                                    << "Initializing DeviceBuffer " << this->name << " (SHAPE PACKED: " << FinnUtils::shapeToString(pShapePacked) << " inputs of the given shape, MAP SIZE: " << this->mapSize << ")\n";
         };
+
+        /**
+         * @brief Construct a new Sync Device Input Buffer object (Move constructor)
+         *
+         * @param buf
+         */
         SyncDeviceInputBuffer(SyncDeviceInputBuffer&& buf) noexcept = default;
+
+        /**
+         * @brief Construct a new Sync Device Input Buffer object (Deleted copy constructor)
+         *
+         * @param buf
+         */
         SyncDeviceInputBuffer(const SyncDeviceInputBuffer& buf) noexcept = delete;
+
+        /**
+         * @brief Destroy the Sync Device Input Buffer object
+         *
+         */
         ~SyncDeviceInputBuffer() override = default;
+
+        /**
+         * @brief Deleted move assignment operator
+         *
+         * @param buf
+         * @return SyncDeviceInputBuffer&
+         */
         SyncDeviceInputBuffer& operator=(SyncDeviceInputBuffer&& buf) = delete;
+
+        /**
+         * @brief Deleted copy assignment operator
+         *
+         * @param buf
+         * @return SyncDeviceInputBuffer&
+         */
         SyncDeviceInputBuffer& operator=(const SyncDeviceInputBuffer& buf) = delete;
 
 #ifdef UNITTEST
@@ -95,7 +175,7 @@ namespace Finn {
         /**
          * @brief Store the given data in the ring buffer
          *
-         * @param span
+         * @param data
          * @return true
          * @return false
          */
@@ -138,13 +218,48 @@ namespace Finn {
     template<typename T>
     class SyncDeviceOutputBuffer : public DeviceOutputBuffer<T>, public detail::SyncBufferWrapper<T> {
          public:
+        /**
+         * @brief Construct a new Synchronous Device Output Buffer object
+         *
+         * @param pName Name for indentification
+         * @param device XRT device
+         * @param pAssociatedKernel XRT kernel
+         * @param pShapePacked packed shape of input
+         * @param ringBufferSizeFactor size of ringbuffer in input elements (batch elements)
+         */
         SyncDeviceOutputBuffer(const std::string& pName, xrt::device& device, xrt::kernel& pAssociatedKernel, const shapePacked_t& pShapePacked, unsigned int ringBufferSizeFactor)
             : DeviceOutputBuffer<T>(pName, device, pAssociatedKernel, pShapePacked), detail::SyncBufferWrapper<T>(ringBufferSizeFactor, FinnUtils::shapeToElements(pShapePacked)){};
 
+        /**
+         * @brief Construct a new Sync Device Output Buffer object (Move constructor)
+         *
+         * @param buf
+         */
         SyncDeviceOutputBuffer(SyncDeviceOutputBuffer&& buf) noexcept = default;
+        /**
+         * @brief Construct a new Sync Device Output Buffer object (Deleted copy constructor)
+         *
+         * @param buf
+         */
         SyncDeviceOutputBuffer(const SyncDeviceOutputBuffer& buf) noexcept = delete;
+        /**
+         * @brief Destroy the Sync Device Output Buffer object
+         *
+         */
         ~SyncDeviceOutputBuffer() override = default;
+        /**
+         * @brief Deleted move assignment operator
+         *
+         * @param buf
+         * @return SyncDeviceOutputBuffer&
+         */
         SyncDeviceOutputBuffer& operator=(SyncDeviceOutputBuffer&& buf) = delete;
+        /**
+         * @brief Deleted copy assignment operator
+         *
+         * @param buf
+         * @return SyncDeviceOutputBuffer&
+         */
         SyncDeviceOutputBuffer& operator=(const SyncDeviceOutputBuffer& buf) = delete;
 
         /**

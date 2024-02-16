@@ -38,15 +38,40 @@ namespace FinnUtils {
         std::uniform_int_distribution<uint8_t> sampler;
 
          public:
+        /**
+         * @brief Construct a new Buffer Filler object
+         *
+         * @param min
+         * @param max
+         */
         BufferFiller(uint8_t min, uint8_t max) : sampler(std::uniform_int_distribution<uint8_t>(min, max)) {}
 
+        /**
+         * @brief
+         *
+         * @param min
+         * @param max
+         * @return BufferFiller
+         */
         static BufferFiller create(uint8_t min, uint8_t max) { return {min, max}; }
 
+        /**
+         * @brief
+         *
+         * @tparam IteratorType
+         * @param first
+         * @param last
+         */
         template<typename IteratorType>
         void fillRandom(IteratorType first, IteratorType last) {
             std::transform(first, last, first, [this]([[maybe_unused]] uint8_t x) { return sampler(engine); });
         }
 
+        /**
+         * @brief
+         *
+         * @param vec
+         */
         void fillRandom(std::vector<uint8_t>& vec) { fillRandom(vec.begin(), vec.end()); }
     };
 

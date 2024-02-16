@@ -100,6 +100,7 @@ namespace Finn {
          * @brief Create a new base driver based on an existing configuration
          *
          * @param pConfig
+         * @param hostBufferSize
          */
         BaseDriver(const Config& pConfig, uint hostBufferSize) : configuration(pConfig), logger(Logger::getLogger()) { initializeBaseDriver(hostBufferSize); }
 
@@ -288,6 +289,14 @@ namespace Finn {
             storeFunc(packed.begin(), packed.end());
         }
 
+        /**
+         * @brief Store input into the driver for asynchronous inference
+         *
+         * @tparam IteratorType
+         * @tparam typename
+         * @param first
+         * @param last
+         */
         template<typename IteratorType, typename = std::enable_if<!SynchronousInference>>
         void input(IteratorType first, IteratorType last) {
             input(first, last, defaultInputDeviceIndex, defaultInputKernelName, batchElements);
@@ -299,7 +308,7 @@ namespace Finn {
          * @tparam V
          * @param outputDeviceIndex FPGA device from which data should be received
          * @param outputBufferKernelName Identifier of the output kernel
-         * @param forceAchival Should data be explicitly polled?
+         * @param forceArchival Should data be explicitly polled?
          * @return Finn::vector<V>
          */
         template<typename V = Finn::UnpackingAutoRetType::AutoRetType<S>, typename = std::enable_if<!SynchronousInference>>
@@ -309,6 +318,13 @@ namespace Finn {
             return unpack<S, V>(result);
         }
 
+        /**
+         * @brief Get the results of a asynchronous inference
+         *
+         * @tparam V
+         * @tparam typename
+         * @return Finn::vector<V>
+         */
         template<typename V = Finn::UnpackingAutoRetType::AutoRetType<S>, typename = std::enable_if<!SynchronousInference>>
         [[nodiscard]] Finn::vector<V> getResults() {
             // TODO(linusjun): maybe this method should block until data is available?
@@ -354,17 +370,51 @@ namespace Finn {
             return unpacked;
         }
 
+        /**
+         * @brief Implements the synchronous inference operation
+         *
+         * @tparam IteratorType
+         * @tparam V
+         * @tparam typename
+         * @param first
+         * @param last
+         * @return Finn::vector<V>
+         */
         template<typename IteratorType, typename V = Finn::UnpackingAutoRetType::AutoRetType<S>, typename = std::enable_if<SynchronousInference>>
         [[nodiscard]] Finn::vector<V> inferSynchronous(IteratorType first, IteratorType last) {
             return inferSynchronous(first, last, defaultInputDeviceIndex, defaultInputKernelName, defaultOutputDeviceIndex, defaultOutputKernelName, batchElements, forceAchieval);
         }
 
+        /**
+         * @brief Implements the synchronous inference operation
+         *
+         * @tparam U
+         * @tparam V
+         * @tparam typename
+         * @param data
+         * @param inputDeviceIndex
+         * @param inputBufferKernelName
+         * @param outputDeviceIndex
+         * @param outputBufferKernelName
+         * @param batchSize
+         * @param forceArchival
+         * @return Finn::vector<V>
+         */
         template<typename U, typename V = Finn::UnpackingAutoRetType::AutoRetType<S>, typename = std::enable_if<SynchronousInference>>
         [[nodiscard]] Finn::vector<V> inferSynchronous(const Finn::vector<U>& data, uint inputDeviceIndex, const std::string& inputBufferKernelName, uint outputDeviceIndex, const std::string& outputBufferKernelName, uint batchSize,
                                                        bool forceArchival) {
             return inferSynchronous(data.begin(), data.end(), inputDeviceIndex, inputBufferKernelName, outputDeviceIndex, outputBufferKernelName, batchSize, forceArchival);
         }
 
+        /**
+         * @brief Implements the synchronous inference operation
+         *
+         * @tparam U
+         * @tparam V
+         * @tparam typename
+         * @param data
+         * @return Finn::vector<V>
+         */
         template<typename U, typename V = Finn::UnpackingAutoRetType::AutoRetType<S>, typename = std::enable_if<SynchronousInference>>
         [[nodiscard]] Finn::vector<V> inferSynchronous(const Finn::vector<U>& data) {
             return inferSynchronous(data, defaultInputDeviceIndex, defaultInputKernelName, defaultOutputDeviceIndex, defaultOutputKernelName, batchElements, forceAchieval);

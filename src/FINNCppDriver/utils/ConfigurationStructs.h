@@ -36,6 +36,12 @@ namespace nlohmann {
      */
     template<typename T>
     struct adl_serializer<std::shared_ptr<T>> {
+        /**
+         * @brief Converts a shared ptr to json
+         *
+         * @param j json output
+         * @param opt pointer input
+         */
         // NOLINTNEXTLINE
         static void to_json(json& j, const std::shared_ptr<T>& opt) {
             if (opt) {
@@ -45,6 +51,12 @@ namespace nlohmann {
             }
         }
 
+        /**
+         * @brief Converts json to a shared ptr
+         *
+         * @param j json input
+         * @param opt shared ptr input
+         */
         // NOLINTNEXTLINE
         static void from_json(const json& j, std::shared_ptr<T>& opt) {
             if (j.is_null()) {
@@ -63,18 +75,63 @@ namespace Finn {
      *
      */
     struct BufferDescriptor : public std::enable_shared_from_this<BufferDescriptor> {
-        std::string kernelName;  // Kernel Name (e.g. vadd:{inst0} / idma0:{inst0})
-        shape_t packedShape;     // This assumes that the values are in uint8_ts (instead of the Finn Datatypes)
+        /**
+         * @brief Kernel Name (e.g. vadd:{inst0} / idma0:{inst0})
+         *
+         */
+        std::string kernelName;
+        /**
+         * @brief This assumes that the values are in uint8_ts (instead of the Finn Datatypes)
+         *
+         */
+        shape_t packedShape;
 
         // TODO(bwintermann): Currently unused, reserved for multi-fpga usage
+        /**
+         * @brief Currently unused, reserved for multi-fpga usage
+         *
+         */
         unsigned int slrIndex = 0;
 
+        /**
+         * @brief Construct a new Buffer Descriptor object
+         *
+         */
         BufferDescriptor() = default;
+        /**
+         * @brief Construct a new Buffer Descriptor object
+         *
+         * @param pKernelName Name of kernel
+         * @param pPackedShape Input shape of kernel
+         */
         BufferDescriptor(const std::string& pKernelName, const shape_t& pPackedShape) : kernelName(pKernelName), packedShape(pPackedShape){};
+        /**
+         * @brief Construct a new Buffer Descriptor object (Move constructor)
+         *
+         */
         BufferDescriptor(BufferDescriptor&&) = default;
+        /**
+         * @brief Construct a new Buffer Descriptor object (Copy constructor)
+         *
+         */
         BufferDescriptor(const BufferDescriptor&) = default;
+        /**
+         * @brief Move assignment operator
+         *
+         * @return BufferDescriptor&
+         */
         BufferDescriptor& operator=(BufferDescriptor&&) = default;
+        /**
+         * @brief Copy assignment operator
+         *
+         * @return BufferDescriptor&
+         */
         BufferDescriptor& operator=(const BufferDescriptor&) = default;
+
+        /**
+         * @brief Destroy the Buffer Descriptor object
+         *
+         */
         virtual ~BufferDescriptor() = default;  // Needed for dynamic cast
     };
 
@@ -83,10 +140,31 @@ namespace Finn {
      *
      */
     struct ExtendedBufferDescriptor : public BufferDescriptor {
+        /**
+         * @brief Construct a new Extended Buffer Descriptor object
+         *
+         */
         ExtendedBufferDescriptor() = default;
+        /**
+         * @brief Construct a new Extended Buffer Descriptor object
+         *
+         * @param pKernelName see @see BufferDescriptor
+         * @param pPackedShape see @see BufferDescriptor
+         * @param pNormalShape Input shape of neural network
+         * @param pFoldedShape Internal reshaped form
+         */
         ExtendedBufferDescriptor(const std::string& pKernelName, const shape_t& pPackedShape, const shape_t& pNormalShape, const shape_t& pFoldedShape)
             : BufferDescriptor(pKernelName, pPackedShape), normalShape(pNormalShape), foldedShape(pFoldedShape){};
+
+        /**
+         * @brief Input shape of neural network
+         *
+         */
         shape_t normalShape;
+        /**
+         * @brief Internal reshaped form
+         *
+         */
         shape_t foldedShape;
     };
 
@@ -95,13 +173,42 @@ namespace Finn {
      *
      */
     struct DeviceWrapper {
+        /**
+         * @brief Path to xclbin
+         *
+         */
         std::filesystem::path xclbin;
+        /**
+         * @brief XRT device index assigned to this device
+         *
+         */
         unsigned int xrtDeviceIndex = 0;
+        /**
+         * @brief List of idma descriptions for this device
+         *
+         */
         std::vector<std::shared_ptr<BufferDescriptor>> idmas;
+        /**
+         * @brief List of odma descriptions for this device
+         *
+         */
         std::vector<std::shared_ptr<BufferDescriptor>> odmas;
 
+        /**
+         * @brief Construct a new Device Wrapper object
+         *
+         * @param pXclbin Path to xclbin
+         * @param pXrtDeviceIndex XRT device index assigned to this device
+         * @param pIdmas List of idma descriptions for this device
+         * @param pOdmas List of odma descriptions for this device
+         */
         DeviceWrapper(const std::filesystem::path& pXclbin, const unsigned int pXrtDeviceIndex, const std::vector<std::shared_ptr<BufferDescriptor>>& pIdmas, const std::vector<std::shared_ptr<BufferDescriptor>>& pOdmas)
             : xclbin(pXclbin), xrtDeviceIndex(pXrtDeviceIndex), idmas(pIdmas), odmas(pOdmas){};
+
+        /**
+         * @brief Construct a new Device Wrapper object
+         *
+         */
         DeviceWrapper() = default;
     };
 
@@ -110,6 +217,10 @@ namespace Finn {
      *
      */
     struct Config {
+        /**
+         * @brief List of device descriptions
+         *
+         */
         std::vector<DeviceWrapper> deviceWrappers;
     };
 

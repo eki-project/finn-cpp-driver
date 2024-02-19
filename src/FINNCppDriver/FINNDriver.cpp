@@ -178,11 +178,11 @@ void runThroughputTest(Finn::Driver<true>& baseDriver, logger_type& logger) {
         for (size_t i = 0; i < nTestruns; ++i) {
             std::generate(testInputs.begin(), testInputs.end(), gen);
             const auto start = std::chrono::high_resolution_clock::now();
-            auto packedShape = baseDriver.getConfig().deviceWrappers[0].idmas[0]->packedShape;
-            packedShape[0] = batchSize;
-            const Finn::DynamicMdSpan reshapedInput(testInputs.begin(), testInputs.end(), packedShape);
+            static auto foldedShape = static_cast<Finn::ExtendedBufferDescriptor*>(baseDriver.getConfig().deviceWrappers[0].idmas[0].get())->foldedShape;
+            foldedShape[0] = batchSize;
+            const Finn::DynamicMdSpan reshapedInput(testInputs.begin(), testInputs.end(), foldedShape);
             const auto reshape = std::chrono::high_resolution_clock::now();
-            auto packed = Finn::packMultiDimensionalInputs<InputFinnType>(testInputs.begin(), testInputs.end(), reshapedInput, packedShape.back());
+            auto packed = Finn::packMultiDimensionalInputs<InputFinnType>(testInputs.begin(), testInputs.end(), reshapedInput, foldedShape.back());
             Finn::DoNotOptimize(packed);
             const auto end = std::chrono::high_resolution_clock::now();
 

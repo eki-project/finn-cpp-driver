@@ -1,0 +1,25 @@
+[
+    {
+        "xrtDeviceIndex": 0,
+        "xclbinPath": "finn-accel.xclbin",
+        "name": "MainDevice",
+        "idmas": [
+            {
+                "kernelName": "StreamingDataflowPartition_0:{idma0}",
+                "normalShape": [1,600],
+                "foldedShape": [1, 75, 8],
+                "packedShape": [1,75,8]
+            }
+        ],
+        "odmas": [
+            {
+                "kernelName": "StreamingDataflowPartition_2:{odma0}",
+                "normalShape": [1,5],
+                "foldedShape": [1,5,1],
+                "packedShape": [1,5,2],
+                "targetFpgaIndex": 1,
+                "targetKernelName": "StreamingDataflowPartition_42:{idma0}"
+            }
+        ]
+    }
+]

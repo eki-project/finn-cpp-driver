@@ -1,0 +1,143 @@
+stages:
+  - build
+  - test
+
+build-dependencies:
+  stage: build
+  variables:
+    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 1:00:00 -N 1 -n 1 --cpus-per-task=128"
+  script:
+    - ml fpga
+    - ml xilinx/xrt/2.14
+    - ml devel/Doxygen/1.9.5-GCCcore-12.2.0
+    - ml compiler/GCC/12.2.0
+    - ml devel/CMake/3.24.3-GCCcore-12.2.0
+    - ./buildDependencies.sh
+  artifacts:
+    paths:
+      - "deps/"
+    expire_in: 1 week
+  only:
+    refs:
+      - main
+      - dev
+
+build-job:
+  stage: build
+  needs:
+    - build-dependencies
+  variables:
+    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 1:00:00 -N 1 -n 1 --cpus-per-task=128"
+  script:
+    - ml vis/Graphviz/2.50.0-GCCcore-11.2.0
+    - ml fpga
+    - ml xilinx/xrt/2.14
+    - ml devel/Doxygen/1.9.5-GCCcore-12.2.0
+    - ml compiler/GCC/12.2.0
+    - ml devel/CMake/3.24.3-GCCcore-12.2.0
+    - mkdir build && cd build
+    - cmake -DCMAKE_BUILD_TYPE=Release ..
+    - make -j $procs
+  artifacts:
+    paths:
+      - "build/"
+    expire_in: 1 week
+  only:
+    refs:
+      - main
+      - dev
+
+build-integrationtests:
+  stage: build
+  needs:
+    - build-dependencies
+  variables:
+    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 1:00:00 -N 1 -n 1 --cpus-per-task=128"
+  script:
+    - ml vis/Graphviz/2.50.0-GCCcore-11.2.0
+    - ml fpga
+    - ml xilinx/xrt/2.14
+    - ml devel/Doxygen/1.9.5-GCCcore-12.2.0
+    - ml compiler/GCC/12.2.0
+    - ml devel/CMake/3.24.3-GCCcore-12.2.0
+    - mkdir build && cd build
+    - cmake -DCMAKE_BUILD_TYPE=Release ..
+    - make Integrationtests -j $procs
+  artifacts:
+    paths:
+      - "build/"
+    expire_in: 1 week
+  only:
+    refs:
+      - main
+      - dev
+
+lint:
+  stage: test
+  variables:
+    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 0:30:00 -N 1 -n 1 --cpus-per-task=2 --mem-per-cpu=2G"
+  script:
+    - ml lang
+    - ml Python/3.10.4-GCCcore-11.3.0
+    - command -v clang-format >/dev/null 2>&1 || pip3 install --user clang-format
+    - find ./src \( -name \*.cpp -o -name \*.h -o -name \*.hpp \) -print0 | xargs -0 -n 1 /pc2/users/e/ekiappci/.local/bin/clang-format -style=file --Werror -n --verbose
+    - find ./unittests \( -name \*.cpp -o -name \*.h -o -name \*.hpp \) -print0 | xargs -0 -n 1 /pc2/users/e/ekiappci/.local/bin/clang-format -style=file --Werror -n --verbose
+    - find ./benchmarks \( -name \*.cpp -o -name \*.h -o -name \*.hpp \) -print0 | xargs -0 -n 1 /pc2/users/e/ekiappci/.local/bin/clang-format -style=file --Werror -n --verbose
+  only:
+    refs:
+      - main
+      - dev
+
+run-unittests:
+  stage: test
+  dependencies:
+    - build-job
+    - build-dependencies
+  variables:
+    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 0:30:00 -N 1 -n 1 --cpus-per-task=2 --mem-per-cpu=2G"
+  script:
+    - ml fpga
+    - ml xilinx/xrt/2.14
+    - ml compiler/GCC/12.2.0
+    - ml devel/CMake/3.24.3-GCCcore-12.2.0
+    - cd build
+    - ctest --output-on-failure --output-junit ctest-results.xml
+  artifacts:
+    paths:
+      - build/ctest-results.xml
+    expire_in: 1 week
+    reports:
+      junit: build/ctest-results.xml
+  only:
+    refs:
+      - main
+      - dev
+
+
+run-integrationtests:
+  stage: test
+  dependencies:
+    - build-integrationtests
+    - build-dependencies
+  variables:
+    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p fpga  -t 0:30:00 --constraint=xilinx_u280_xrt2.14"
+  script:
+    - ml fpga
+    - ml xilinx/xrt/2.14
+    - ml compiler/GCC/12.2.0
+    - ml devel/CMake/3.24.3-GCCcore-12.2.0
+    - cp example_networks/identity_net/* build/integrationtest
+    - cd build/integrationtest
+    - xbutil reset -d 0000:a1:00.1
+    - xbutil reset -d 0000:81:00.1
+    - xbutil reset -d 0000:01:00.1
+    - ./SyncInference
+    # - xbutil reset -d 0000:a1:00.1
+    # - xbutil reset -d 0000:81:00.1
+    # - xbutil reset -d 0000:01:00.1
+    # - ./AsyncInference
+  only:
+    refs:
+      - main
+      - dev
+

@@ -1,6 +1,19 @@
 [submodule "external/mdspan"]
 	path = external/mdspan
 	url = https://github.com/kokkos/mdspan.git
-[submodule "external/magic_enum"]
-	path = external/magic_enum
-	url = https://github.com/Neargye/magic_enum.git
+[submodule "external/boost"]
+	path = external/boost
+	url = https://github.com/boostorg/boost.git
+	ignore = dirty
+[submodule "external/json"]
+	path = external/json
+	url = https://github.com/nlohmann/json.git
+[submodule "external/xtensor"]
+	path = external/xtensor
+	url = https://github.com/xtensor-stack/xtensor.git
+[submodule "external/xtl"]
+	path = external/xtl
+	url = https://github.com/xtensor-stack/xtl.git
+[submodule "external/xsimd"]
+	path = external/xsimd
+	url = https://github.com/xtensor-stack/xsimd.git

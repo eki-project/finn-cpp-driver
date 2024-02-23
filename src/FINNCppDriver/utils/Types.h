@@ -18,6 +18,8 @@
 
 // TODO(linusjun): Clean up this file. Half of these types are no longer used...
 
+using uint = unsigned int;
+
 namespace Finn {
     /**
      * @brief Defines Finn internal vector

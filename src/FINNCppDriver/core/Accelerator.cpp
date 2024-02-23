@@ -72,6 +72,12 @@ namespace Finn {
         return {devices[0], ""};
     }
 
+    void Accelerator::setBatchSize(uint batchsize) {
+        for (auto&& elem : devices) {
+            elem.setBatchSize(batchsize);
+        }
+    }
+
     bool Accelerator::run(const unsigned int deviceIndex, const std::string& inputBufferKernelName) {
         if (containsDevice(deviceIndex)) {
             return getDeviceHandler(deviceIndex).run(inputBufferKernelName);

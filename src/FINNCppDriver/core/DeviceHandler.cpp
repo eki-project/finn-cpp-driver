@@ -11,7 +11,6 @@
  */
 
 #include <FINNCppDriver/core/DeviceHandler.h>
-#include <FINNCppDriver/utils/ConfigurationStructs.h>
 #include <FINNCppDriver/utils/Logger.h>
 #include <FINNCppDriver/utils/Types.h>
 
@@ -39,11 +38,12 @@
 namespace fs = std::filesystem;
 
 namespace Finn {
-    DeviceHandler::DeviceHandler(const DeviceWrapper& devWrap, bool synchronousInference, unsigned int hostBufferSize) : xrtDeviceIndex(devWrap.xrtDeviceIndex), xclbinPath(devWrap.xclbin) {
+    DeviceHandler::DeviceHandler(const DeviceWrapper& devWrap, bool pSynchronousInference, unsigned int hostBufferSize)
+        : synchronousInference(pSynchronousInference), devInformation(devWrap), xrtDeviceIndex(devWrap.xrtDeviceIndex), xclbinPath(devWrap.xclbin) {
         checkDeviceWrapper(devWrap);
         initializeDevice();
         loadXclbinSetUUID();
-        initializeBufferObjects(devWrap, hostBufferSize, synchronousInference);
+        initializeBufferObjects(devWrap, hostBufferSize, pSynchronousInference);
         FINN_LOG(Logger::getLogger(), loglevel::info) << loggerPrefix() << "Finished setting up device " << xrtDeviceIndex;
     }
 
@@ -94,12 +94,12 @@ namespace Finn {
         uuid = device.load_xclbin(xclbinPath);
     }
 
-    void DeviceHandler::initializeBufferObjects(const DeviceWrapper& devWrap, unsigned int hostBufferSize, bool synchronousInference) {
+    void DeviceHandler::initializeBufferObjects(const DeviceWrapper& devWrap, unsigned int hostBufferSize, bool pSynchronousInference) {
         FINN_LOG(Logger::getLogger(), loglevel::info) << loggerPrefix() << "(" << xrtDeviceIndex << ") "
                                                       << "Initializing buffer objects\n";
         for (auto&& ebdptr : devWrap.idmas) {
             auto tmpKern = xrt::kernel(device, uuid, ebdptr->kernelName, xrt::kernel::cu_access_mode::shared);
-            if (synchronousInference) {
+            if (pSynchronousInference) {
                 inputBufferMap.emplace(std::make_pair(ebdptr->kernelName, std::make_shared<Finn::SyncDeviceInputBuffer<uint8_t>>(ebdptr->kernelName, device, tmpKern, ebdptr->packedShape, hostBufferSize)));
             } else {
                 inputBufferMap.emplace(std::make_pair(ebdptr->kernelName, std::make_shared<Finn::AsyncDeviceInputBuffer<uint8_t>>(ebdptr->kernelName, device, tmpKern, ebdptr->packedShape, hostBufferSize)));
@@ -107,7 +107,7 @@ namespace Finn {
         }
         for (auto&& ebdptr : devWrap.odmas) {
             auto tmpKern = xrt::kernel(device, uuid, ebdptr->kernelName, xrt::kernel::cu_access_mode::exclusive);
-            if (synchronousInference) {
+            if (pSynchronousInference) {
                 auto ptr = std::make_shared<Finn::SyncDeviceOutputBuffer<uint8_t>>(ebdptr->kernelName, device, tmpKern, ebdptr->packedShape, hostBufferSize);
                 ptr->allocateLongTermStorage(hostBufferSize * 5);
                 outputBufferMap.emplace(std::make_pair(ebdptr->kernelName, ptr));
@@ -125,6 +125,18 @@ namespace Finn {
     }
 
     /****** GETTER / SETTER ******/
+
+    void DeviceHandler::setBatchSize(uint pBatchsize) {
+        if (this->batchsize == pBatchsize) {
+            return;
+        } else {
+            this->batchsize = pBatchsize;
+            inputBufferMap.clear();
+            outputBufferMap.clear();
+            initializeBufferObjects(this->devInformation, pBatchsize, this->synchronousInference);
+        }
+    }
+
     [[maybe_unused]] xrt::device& DeviceHandler::getDevice() { return device; }
 
     [[maybe_unused]] bool DeviceHandler::containsBuffer(const std::string& kernelBufferName, IO ioMode) {

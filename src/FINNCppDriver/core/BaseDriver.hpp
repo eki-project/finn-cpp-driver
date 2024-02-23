@@ -213,7 +213,10 @@ namespace Finn {
          *
          * @param elements
          */
-        void setBatchSize(uint elements) { batchElements = elements; }
+        void setBatchSize(uint elements) {
+            batchElements = elements;
+            accelerator.setBatchSize(batchElements);
+        }
 
         /**
          * @brief Get the Batch Size
@@ -344,26 +347,25 @@ namespace Finn {
          * @param inputBufferKernelName name of input kernel
          * @param outputDeviceIndex index of output FPGA
          * @param outputBufferKernelName name of output kernel
-         * @param batchSize Number of elements in a batch
          * @param forceArchival
          * @return Finn::vector<V>
          */
         template<typename IteratorType, typename V = Finn::UnpackingAutoRetType::AutoRetType<S>, typename = std::enable_if<SynchronousInference>>
         [[nodiscard]] Finn::vector<V> inferSynchronous(IteratorType first, IteratorType last, uint inputDeviceIndex, const std::string& inputBufferKernelName, uint outputDeviceIndex, const std::string& outputBufferKernelName,
-                                                       uint batchSize, bool forceArchival) {
+                                                       bool forceArchival) {
             using IterValueType = typename std::iterator_traits<IteratorType>::value_type;
             static auto foldedShape = static_cast<Finn::ExtendedBufferDescriptor*>(configuration.deviceWrappers[inputDeviceIndex].idmas[0].get())->foldedShape;
-            foldedShape[0] = batchSize;
+            foldedShape[0] = batchElements;
             const Finn::DynamicMdSpan reshapedInput(first, last, foldedShape);
 
             auto packed = Finn::packMultiDimensionalInputs<F, IteratorType>(first, last, reshapedInput, foldedShape.back());
 
-            auto result = infer(packed.begin(), packed.end(), inputDeviceIndex, inputBufferKernelName, outputDeviceIndex, outputBufferKernelName, batchSize, forceArchival);
+            auto result = infer(packed.begin(), packed.end(), inputDeviceIndex, inputBufferKernelName, outputDeviceIndex, outputBufferKernelName, batchElements, forceArchival);
 
             static auto packedOutput = configuration.deviceWrappers[inputDeviceIndex].odmas[0]->packedShape;
-            packedOutput[0] = batchSize;
+            packedOutput[0] = batchElements;
             static auto foldedOutput = static_cast<Finn::ExtendedBufferDescriptor*>(configuration.deviceWrappers[inputDeviceIndex].odmas[0].get())->foldedShape;
-            foldedOutput[0] = batchSize;
+            foldedOutput[0] = batchElements;
             const Finn::DynamicMdSpan reshapedOutput(result.begin(), result.end(), packedOutput);
             auto unpacked = Finn::unpackMultiDimensionalOutputs<S, Finn::vector<uint8_t>::iterator, false, V>(result.begin(), result.end(), reshapedOutput, foldedOutput);
 
@@ -382,7 +384,7 @@ namespace Finn {
          */
         template<typename IteratorType, typename V = Finn::UnpackingAutoRetType::AutoRetType<S>, typename = std::enable_if<SynchronousInference>>
         [[nodiscard]] Finn::vector<V> inferSynchronous(IteratorType first, IteratorType last) {
-            return inferSynchronous(first, last, defaultInputDeviceIndex, defaultInputKernelName, defaultOutputDeviceIndex, defaultOutputKernelName, batchElements, forceAchieval);
+            return inferSynchronous(first, last, defaultInputDeviceIndex, defaultInputKernelName, defaultOutputDeviceIndex, defaultOutputKernelName, forceAchieval);
         }
 
         /**
@@ -396,14 +398,12 @@ namespace Finn {
          * @param inputBufferKernelName
          * @param outputDeviceIndex
          * @param outputBufferKernelName
-         * @param batchSize
          * @param forceArchival
          * @return Finn::vector<V>
          */
         template<typename U, typename V = Finn::UnpackingAutoRetType::AutoRetType<S>, typename = std::enable_if<SynchronousInference>>
-        [[nodiscard]] Finn::vector<V> inferSynchronous(const Finn::vector<U>& data, uint inputDeviceIndex, const std::string& inputBufferKernelName, uint outputDeviceIndex, const std::string& outputBufferKernelName, uint batchSize,
-                                                       bool forceArchival) {
-            return inferSynchronous(data.begin(), data.end(), inputDeviceIndex, inputBufferKernelName, outputDeviceIndex, outputBufferKernelName, batchSize, forceArchival);
+        [[nodiscard]] Finn::vector<V> inferSynchronous(const Finn::vector<U>& data, uint inputDeviceIndex, const std::string& inputBufferKernelName, uint outputDeviceIndex, const std::string& outputBufferKernelName, bool forceArchival) {
+            return inferSynchronous(data.begin(), data.end(), inputDeviceIndex, inputBufferKernelName, outputDeviceIndex, outputBufferKernelName, batchElements, forceArchival);
         }
 
         /**

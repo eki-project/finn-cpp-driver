@@ -189,8 +189,8 @@ namespace Finn {
          * @attention This method is blocking
          *
          */
-        ert_cmd_state execute() override {
-            auto runCall = this->associatedKernel(this->internalBo, 1);
+        ert_cmd_state execute(uint batchsize = 1) override {
+            auto runCall = this->associatedKernel(this->internalBo, batchsize);
             return runCall.wait();
         }
 
@@ -353,8 +353,8 @@ namespace Finn {
          * @brief Execute the kernel and await it's return.
          * @attention This function is blocking.
          */
-        ert_cmd_state execute() override {
-            auto run = this->associatedKernel(this->internalBo, 1);
+        ert_cmd_state execute(uint batchsize = 1) override {
+            auto run = this->associatedKernel(this->internalBo, batchsize);
             return run.wait(500);
         }
 

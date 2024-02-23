@@ -18,7 +18,6 @@
 #include <FINNCppDriver/core/DeviceBuffer/AsyncDeviceBuffers.hpp>
 #include <FINNCppDriver/core/DeviceBuffer/DeviceBuffer.hpp>
 #include <FINNCppDriver/core/DeviceBuffer/SyncDeviceBuffers.hpp>
-#include <FINNCppDriver/utils/join.hpp>
 #include <boost/cstdint.hpp>
 #include <cerrno>
 #include <chrono>

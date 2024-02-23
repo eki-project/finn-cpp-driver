@@ -198,7 +198,7 @@ namespace Finn {
          *
          * @return ert_cmd_state
          */
-        virtual ert_cmd_state execute() = 0;
+        virtual ert_cmd_state execute(uint batchsize = 1) = 0;
     };
 
     /**

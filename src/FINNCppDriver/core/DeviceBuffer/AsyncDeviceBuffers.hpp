@@ -105,7 +105,7 @@ namespace Finn {
          *
          */
         void runInternal(std::stop_token stoken) {
-            const std::size_t elementCount = this->ringBuffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART);
+            const std::size_t elementCount = this->ringBuffer.size(SIZE_SPECIFIER::FEATUREMAP_SIZE);
             while (!stoken.stop_requested()) {
                 if (!this->loadMap(stoken)) {  // blocks
                     break;
@@ -229,7 +229,7 @@ namespace Finn {
          private:
         void readInternal(std::stop_token stoken) {
             FINN_LOG_DEBUG(this->logger, loglevel::info) << this->loggerPrefix() << "Starting to read from the device";
-            const std::size_t elementCount = this->ringBuffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART);
+            const std::size_t elementCount = this->ringBuffer.size(SIZE_SPECIFIER::FEATUREMAP_SIZE);
             while (!stoken.stop_requested()) {
                 auto outExecuteResult = execute();
                 std::cout << outExecuteResult << "\n";
@@ -314,7 +314,7 @@ namespace Finn {
          * @note This function can be executed manually instead of wait for it to be called by read() when the ring buffer is full.
          *
          */
-        void archiveValidBufferParts() override {
+        void archiveValidBufferParts() {
             std::lock_guard guard(ltsMutex);
             this->longTermStorage.reserve(this->longTermStorage.size() + this->ringBuffer.size());
             this->ringBuffer.readAllValidParts(std::back_inserter(this->longTermStorage));
@@ -325,7 +325,7 @@ namespace Finn {
          *
          * @return Finn::vector<T>
          */
-        Finn::vector<T> retrieveArchive() override {
+        Finn::vector<T> getData() {
             std::lock_guard guard(ltsMutex);
             Finn::vector<T> tmp(this->longTermStorage);
             clearArchive();
@@ -337,16 +337,16 @@ namespace Finn {
          *
          * @param expectedEntries
          */
-        void allocateLongTermStorage([[maybe_unused]] unsigned int expectedEntries) override { this->longTermStorage.reserve(expectedEntries * this->ringBuffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART)); }
+        void allocateLongTermStorage([[maybe_unused]] unsigned int expectedEntries) { this->longTermStorage.reserve(expectedEntries * this->ringBuffer.size(SIZE_SPECIFIER::FEATUREMAP_SIZE)); }
 
          protected:
         /**
          * @brief Store the contents of the memory map into the ring buffer.
          *
          */
-        void saveMap() override {
+        void saveMap() {
             FINN_LOG(this->logger, loglevel::info) << "Data transfer of output from FPGA!\n";
-            this->ringBuffer.template store<T*>(this->map, this->ringBuffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
+            this->ringBuffer.template store<T*>(this->map, this->ringBuffer.size(SIZE_SPECIFIER::FEATUREMAP_SIZE));
         }
 
         /**
@@ -362,7 +362,7 @@ namespace Finn {
          * @brief Clear the archive of all it's entries
          *
          */
-        void clearArchive() override { this->longTermStorage.clear(); }
+        void clearArchive() { this->longTermStorage.clear(); }
 
         /**
          * @brief Not supported by AsyncOutputBuffer

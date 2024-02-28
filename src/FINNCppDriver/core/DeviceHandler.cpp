@@ -109,7 +109,6 @@ namespace Finn {
             auto tmpKern = xrt::kernel(device, uuid, ebdptr->kernelName, xrt::kernel::cu_access_mode::exclusive);
             if (pSynchronousInference) {
                 auto ptr = std::make_shared<Finn::SyncDeviceOutputBuffer<uint8_t>>(ebdptr->kernelName, device, tmpKern, ebdptr->packedShape, hostBufferSize);
-                ptr->allocateLongTermStorage(hostBufferSize * 5);
                 outputBufferMap.emplace(std::make_pair(ebdptr->kernelName, ptr));
             } else {
                 auto ptr = std::make_shared<Finn::AsyncDeviceOutputBuffer<uint8_t>>(ebdptr->kernelName, device, tmpKern, ebdptr->packedShape, hostBufferSize);
@@ -176,9 +175,10 @@ namespace Finn {
             FinnUtils::logAndError<std::runtime_error>(loggerPrefix() + " [retrieve] Tried accessing kernel/buffer with name " + outputBufferKernelName + " but this kernel / buffer does not exist! " + existingNames);
         }
         if (forceArchival) {
-            outputBufferMap.at(outputBufferKernelName)->archiveValidBufferParts();
+            // TODO(linusjun): Fix for asynchronous inference
+            // outputBufferMap.at(outputBufferKernelName)->archiveValidBufferParts();
         }
-        return outputBufferMap.at(outputBufferKernelName)->retrieveArchive();
+        return outputBufferMap.at(outputBufferKernelName)->getData();
     }
 
     ert_cmd_state DeviceHandler::read(const std::string& outputBufferKernelName, unsigned int samples) {

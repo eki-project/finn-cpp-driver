@@ -70,7 +70,7 @@ enum class IO { INPUT = 0, OUTPUT = 1, INOUT = 2, UNSPECIFIED = -1 };
  * @brief Size specifier enum
  *
  */
-enum class SIZE_SPECIFIER { BYTES = 0, ELEMENTS = 1, NUMBERS = 2, SAMPLES = 3, PARTS = 4, ELEMENTS_PER_PART = 5, INVALID = -1 };
+enum class SIZE_SPECIFIER { BYTES = 0, TOTAL_DATA_SIZE = 1, BATCHSIZE = 4, FEATUREMAP_SIZE = 5, INVALID = -1 };
 
 /**
  * @brief Endianness

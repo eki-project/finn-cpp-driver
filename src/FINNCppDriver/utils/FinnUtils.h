@@ -64,7 +64,7 @@ namespace FinnUtils {
          */
         template<typename IteratorType>
         void fillRandom(IteratorType first, IteratorType last) {
-            std::transform(first, last, first, [this]([[maybe_unused]] uint8_t x) { return sampler(engine); });
+            std::generate(first, last, [this, &sampler = sampler, &engine = engine]() { return sampler(engine); });
         }
 
         /**

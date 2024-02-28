@@ -63,7 +63,7 @@ TEST_F(BaseDriverTest, BasicBaseDriverTest) {
 
     Finn::vector<uint8_t> data;
     Finn::vector<uint8_t> backupData;
-    data.resize(driver.size(SIZE_SPECIFIER::ELEMENTS_PER_PART, 0, inputDmaName));
+    data.resize(driver.size(SIZE_SPECIFIER::FEATUREMAP_SIZE, 0, inputDmaName));
 
     filler.fillRandom(data.begin(), data.end());
     backupData = data;
@@ -74,7 +74,7 @@ TEST_F(BaseDriverTest, BasicBaseDriverTest) {
     // Run inference
     auto results = driver.inferR(data.begin(), data.begin() + 80, 0, inputDmaName, 0, outputDmaName, 1, 1);
 
-    Finn::vector<uint8_t> base(data.begin(), data.begin() + static_cast<long int>(driver.size(SIZE_SPECIFIER::ELEMENTS_PER_PART, 0, outputDmaName)));
+    Finn::vector<uint8_t> base(data.begin(), data.begin() + static_cast<long int>(driver.size(SIZE_SPECIFIER::TOTAL_DATA_SIZE, 0, outputDmaName)));
 
 
     // Checks: That input and output data is the same is just for convenience, in application this does not need to be
@@ -90,9 +90,9 @@ TEST_F(BaseDriverTest, syncInferenceTest) {
     auto driver = Finn::Driver<true>(unittestConfig, hostBufferSize, 0, inputDmaName, 0, outputDmaName, 1, true);
 
     // The input has to be 4 times longer than the expected size of the FPGA, because uint8->int2 packing reduces size by factor 4
-    std::cout << driver.size(SIZE_SPECIFIER::ELEMENTS_PER_PART, 0, inputDmaName) << "\n";
+    std::cout << driver.size(SIZE_SPECIFIER::FEATUREMAP_SIZE, 0, inputDmaName) << "\n";
     Finn::vector<int8_t> data(300, 1);
-    Finn::vector<uint8_t> outdata(driver.size(SIZE_SPECIFIER::ELEMENTS_PER_PART, 0, outputDmaName), 1);
+    Finn::vector<uint8_t> outdata(driver.size(SIZE_SPECIFIER::FEATUREMAP_SIZE, 0, outputDmaName), 1);
 
     // Setup fake output data
     driver.getDeviceHandler(0).getOutputBuffer(outputDmaName)->testSetMap(outdata);
@@ -100,7 +100,7 @@ TEST_F(BaseDriverTest, syncInferenceTest) {
     // Run inference
     auto results = driver.inferSynchronous(data.begin(), data.end());
 
-    Finn::vector<uint8_t> expected(driver.size(SIZE_SPECIFIER::ELEMENTS_PER_PART, 0, outputDmaName), 1);
+    Finn::vector<uint8_t> expected(driver.size(SIZE_SPECIFIER::TOTAL_DATA_SIZE, 0, outputDmaName), 1);
 
     EXPECT_EQ(results, expected);
 }

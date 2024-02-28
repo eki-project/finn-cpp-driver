@@ -283,10 +283,10 @@ namespace Finn {
             auto packed = Finn::pack<F>(first, last);
             auto storeFunc = accelerator.storeFactory(inputDeviceIndex, inputBufferKernelName);
 
-            if (std::abs(std::distance(packed.begin(), packed.end())) != size(SIZE_SPECIFIER::ELEMENTS_PER_PART, inputDeviceIndex, inputBufferKernelName) * batchSize) {
+            if (std::abs(std::distance(packed.begin(), packed.end())) != size(SIZE_SPECIFIER::FEATUREMAP_SIZE, inputDeviceIndex, inputBufferKernelName) * batchSize) {
                 FinnUtils::logAndError<std::runtime_error>("Input length (" + std::to_string(std::abs(std::distance(packed.begin(), packed.end()))) + ") does not match up with batches*inputsize_per_batch (" +
-                                                           std::to_string(size(SIZE_SPECIFIER::ELEMENTS_PER_PART, inputDeviceIndex, inputBufferKernelName)) + "*" + std::to_string(batchSize) + "=" +
-                                                           std::to_string(size(SIZE_SPECIFIER::ELEMENTS_PER_PART, inputDeviceIndex, inputBufferKernelName) * batchSize) + ")");
+                                                           std::to_string(size(SIZE_SPECIFIER::FEATUREMAP_SIZE, inputDeviceIndex, inputBufferKernelName)) + "*" + std::to_string(batchSize) + "=" +
+                                                           std::to_string(size(SIZE_SPECIFIER::FEATUREMAP_SIZE, inputDeviceIndex, inputBufferKernelName) * batchSize) + ")");
             }
 
             storeFunc(packed.begin(), packed.end());
@@ -442,35 +442,33 @@ namespace Finn {
             FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "Starting inference (raw data)";
             auto storeFunc = accelerator.storeFactory(inputDeviceIndex, inputBufferKernelName);
 
-            if (std::abs(std::distance(first, last)) != size(SIZE_SPECIFIER::ELEMENTS_PER_PART, inputDeviceIndex, inputBufferKernelName) * batchSize) {
+            if (std::abs(std::distance(first, last)) != size(SIZE_SPECIFIER::TOTAL_DATA_SIZE, inputDeviceIndex, inputBufferKernelName)) {
                 FinnUtils::logAndError<std::runtime_error>(loggerPrefix() + " Input length (" + std::to_string(std::abs(std::distance(first, last))) + ") does not match up with batches*inputsize_per_batch (" +
-                                                           std::to_string(size(SIZE_SPECIFIER::ELEMENTS_PER_PART, inputDeviceIndex, inputBufferKernelName)) + "*" + std::to_string(batchSize) + "=" +
-                                                           std::to_string(size(SIZE_SPECIFIER::ELEMENTS_PER_PART, inputDeviceIndex, inputBufferKernelName) * batchSize) + ")");
+                                                           std::to_string(size(SIZE_SPECIFIER::FEATUREMAP_SIZE, inputDeviceIndex, inputBufferKernelName)) + "*" + std::to_string(batchSize) + "=" +
+                                                           std::to_string(size(SIZE_SPECIFIER::TOTAL_DATA_SIZE, inputDeviceIndex, inputBufferKernelName)) + ")");
             }
 
             bool stored = storeFunc(first, last);
 
-            for (std::size_t i = 0; i < batchSize; ++i) {
-                bool ran = accelerator.run(inputDeviceIndex, inputBufferKernelName);
+            bool ran = accelerator.run(inputDeviceIndex, inputBufferKernelName);
 
 #ifdef UNITTEST
-                Finn::vector<uint8_t> data(first, last);
-                FINN_LOG(logger, loglevel::info) << "Readback from device buffer confirming data was written to board successfully: " << isSyncedDataEquivalent(inputDeviceIndex, inputBufferKernelName, data);
+            Finn::vector<uint8_t> data(first, last);
+            FINN_LOG(logger, loglevel::info) << "Readback from device buffer confirming data was written to board successfully: " << isSyncedDataEquivalent(inputDeviceIndex, inputBufferKernelName, data);
 #endif
 
-                if (stored && ran) {
-                    FINN_LOG_DEBUG(logger, loglevel::info) << "Reading out buffers";
-                    ert_cmd_state resultState = accelerator.read(outputDeviceIndex, outputBufferKernelName, 1 /*Maybe this can be used to put more than one batch element on the FPGA, ignored for now.*/);
+            if (stored && ran) {
+                FINN_LOG_DEBUG(logger, loglevel::info) << "Reading out buffers";
+                ert_cmd_state resultState = accelerator.read(outputDeviceIndex, outputBufferKernelName, batchSize);
 
-                    // If the kernel run is completed (success or by timeout (more reads than were in the pipeline)), return the data
-                    if (resultState != ERT_CMD_STATE_COMPLETED && resultState != ERT_CMD_STATE_TIMEOUT && resultState != ERT_CMD_STATE_NEW) {
-                        FinnUtils::logAndError<std::runtime_error>("Unspecifiable error during inference (ert_cmd_state is " + std::to_string(resultState) + ")!");
-                        return {};
-                    }
-                } else {
-                    FinnUtils::logAndError<std::runtime_error>("Data either couldnt be stored or there was no data to execute!");
+                // If the kernel run is completed (success or by timeout (more reads than were in the pipeline)), return the data
+                if (resultState != ERT_CMD_STATE_COMPLETED && resultState != ERT_CMD_STATE_TIMEOUT && resultState != ERT_CMD_STATE_NEW) {
+                    FinnUtils::logAndError<std::runtime_error>("Unspecifiable error during inference (ert_cmd_state is " + std::to_string(resultState) + ")!");
                     return {};
                 }
+            } else {
+                FinnUtils::logAndError<std::runtime_error>("Data either couldnt be stored or there was no data to execute!");
+                return {};
             }
 
             return accelerator.retrieveResults(outputDeviceIndex, outputBufferKernelName, forceArchival);
@@ -522,15 +520,15 @@ namespace Finn {
                     FINN_LOG(logger, loglevel::info) << "\t\tInput buffers: ";
                     FINN_LOG(logger, loglevel::info) << "\t\t\tName: " << keyValuePair.second->getName() << " (in hashmap as " << keyValuePair.first << ")";
                     FINN_LOG(logger, loglevel::info) << "\t\t\tShape packed: " << FinnUtils::shapeToString(keyValuePair.second->getPackedShape());
-                    FINN_LOG(logger, loglevel::info) << "\t\t\tElements of type T (usually uint8_t) per sample: " << keyValuePair.second->size(SIZE_SPECIFIER::ELEMENTS_PER_PART);
-                    FINN_LOG(logger, loglevel::info) << "\t\t\tElements of type T (usually uint8_t) in buffer overall: " << keyValuePair.second->size(SIZE_SPECIFIER::ELEMENTS);
+                    FINN_LOG(logger, loglevel::info) << "\t\t\tElements of type T (usually uint8_t) per sample: " << keyValuePair.second->size(SIZE_SPECIFIER::FEATUREMAP_SIZE);
+                    FINN_LOG(logger, loglevel::info) << "\t\t\tElements of type T (usually uint8_t) in buffer overall: " << keyValuePair.second->size(SIZE_SPECIFIER::TOTAL_DATA_SIZE);
                 }
                 for (auto& keyValuePair : devHandler.getOutputBufferMap()) {
                     FINN_LOG(logger, loglevel::info) << "\t\tOutput buffers: ";
                     FINN_LOG(logger, loglevel::info) << "\t\t\tName: " << keyValuePair.second->getName() << " (in hashmap as " << keyValuePair.first << ")";
                     FINN_LOG(logger, loglevel::info) << "\t\t\tShape packed: " << FinnUtils::shapeToString(keyValuePair.second->getPackedShape());
-                    FINN_LOG(logger, loglevel::info) << "\t\t\tElements of type T (usually uint8_t) per sample: " << keyValuePair.second->size(SIZE_SPECIFIER::ELEMENTS_PER_PART);
-                    FINN_LOG(logger, loglevel::info) << "\t\t\tElements of type T (usually uint8_t) in buffer overall: " << keyValuePair.second->size(SIZE_SPECIFIER::ELEMENTS);
+                    FINN_LOG(logger, loglevel::info) << "\t\t\tElements of type T (usually uint8_t) per sample: " << keyValuePair.second->size(SIZE_SPECIFIER::FEATUREMAP_SIZE);
+                    FINN_LOG(logger, loglevel::info) << "\t\t\tElements of type T (usually uint8_t) in buffer overall: " << keyValuePair.second->size(SIZE_SPECIFIER::TOTAL_DATA_SIZE);
                 }
             }
         }

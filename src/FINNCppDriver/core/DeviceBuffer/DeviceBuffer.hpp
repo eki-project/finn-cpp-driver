@@ -10,8 +10,8 @@
  *
  */
 
-#ifndef DEVICEBUFFER_H
-#define DEVICEBUFFER_H
+#ifndef DEVICEBUFFER
+#define DEVICEBUFFER
 
 #include <FINNCppDriver/utils/Logger.h>
 #include <FINNCppDriver/utils/Types.h>
@@ -250,7 +250,7 @@ namespace Finn {
         virtual bool run() = 0;
 
         /**
-         * @brief Store the given vector of data in the ring buffer
+         * @brief Store the given vector of data in the FPGA mem map
          * @attention This function is NOT THREAD SAFE!
          *
          * @param data
@@ -336,16 +336,11 @@ namespace Finn {
          */
         virtual void setMsExecuteTimeout(unsigned int val) = 0;
         /**
-         * @brief Transfer output data from ringbuffer to storage until user requests it
-         *
-         */
-        virtual void archiveValidBufferParts() = 0;
-        /**
          * @brief Return stored data from storage
          *
          * @return Finn::vector<T>
          */
-        virtual Finn::vector<T> retrieveArchive() = 0;
+        virtual Finn::vector<T> getData() = 0;
         /**
          * @brief Start XRT kernel to read data from accelerator design into FPGA memory
          *
@@ -355,23 +350,6 @@ namespace Finn {
         virtual ert_cmd_state read(unsigned int samples) = 0;
 
          protected:
-        /**
-         * @brief Delete long term storage contents
-         *
-         */
-        virtual void clearArchive() = 0;
-        /**
-         * @brief Make space in long term storage
-         *
-         * @param expectedEntries Number of entries expected to be stored in long term storage
-         */
-        virtual void allocateLongTermStorage(unsigned int expectedEntries) = 0;
-
-        /**
-         * @brief Store the contents of the memory map into the ring buffer
-         *
-         */
-        virtual void saveMap() = 0;
         /**
          * @brief Sync data from the FPGA into the memory map
          *
@@ -410,4 +388,4 @@ namespace Finn {
     };
 }  // namespace Finn
 
-#endif  // DEVICEBUFFER_H
+#endif  // DEVICEBUFFER

@@ -27,7 +27,7 @@ TEST(SyncInference, syncInferenceTest) {
     std::string exampleNetworkConfig = "config.json";
     Finn::Config conf = Finn::createConfigFromPath(exampleNetworkConfig);
 
-    auto driver = Finn::Driver<true>(conf, 10, 0, conf.deviceWrappers[0].idmas[0]->kernelName, 0, conf.deviceWrappers[0].odmas[0]->kernelName, 1, true);
+    auto driver = Finn::Driver<true>(conf, 0, conf.deviceWrappers[0].idmas[0]->kernelName, 0, conf.deviceWrappers[0].odmas[0]->kernelName, 1, true);
 
     Finn::vector<int8_t> data(driver.size(SIZE_SPECIFIER::FEATUREMAP_SIZE, 0, conf.deviceWrappers[0].idmas[0]->kernelName), 1);
 
@@ -46,7 +46,7 @@ TEST(SyncInference, syncBatchInferenceTest) {
     Finn::Config conf = Finn::createConfigFromPath(exampleNetworkConfig);
     std::size_t batchLength = 10;
 
-    auto driver = Finn::Driver<true>(conf, static_cast<uint>(batchLength), 0, conf.deviceWrappers[0].idmas[0]->kernelName, 0, conf.deviceWrappers[0].odmas[0]->kernelName, static_cast<uint>(batchLength), true);
+    auto driver = Finn::Driver<true>(conf, 0, conf.deviceWrappers[0].idmas[0]->kernelName, 0, conf.deviceWrappers[0].odmas[0]->kernelName, static_cast<uint>(batchLength), true);
 
     Finn::vector<int8_t> data(driver.size(SIZE_SPECIFIER::FEATUREMAP_SIZE, 0, conf.deviceWrappers[0].idmas[0]->kernelName) * batchLength, 1);
 

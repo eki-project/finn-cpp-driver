@@ -437,25 +437,23 @@ namespace Finn {
 
             bool stored = storeFunc(first, last);
 
-            bool ran = accelerator.run(inputDeviceIndex, inputBufferKernelName);
+            std::promise<ert_cmd_state> run_promise;
+            accelerator.run(inputDeviceIndex, inputBufferKernelName, run_promise);
+            std::future<ert_cmd_state> run_future = run_promise.get_future();
 
 #ifdef UNITTEST
             Finn::vector<uint8_t> data(first, last);
             FINN_LOG(logger, loglevel::info) << "Readback from device buffer confirming data was written to board successfully: " << isSyncedDataEquivalent(inputDeviceIndex, inputBufferKernelName, data);
 #endif
 
-            if (stored && ran) {
-                FINN_LOG_DEBUG(logger, loglevel::info) << "Reading out buffers";
-                ert_cmd_state resultState = accelerator.read(outputDeviceIndex, outputBufferKernelName, batchSize);
+            FINN_LOG_DEBUG(logger, loglevel::info) << "Reading out buffers";
+            ert_cmd_state resultState = accelerator.read(outputDeviceIndex, outputBufferKernelName, batchSize);
 
-                // If the kernel run is completed (success or by timeout (more reads than were in the pipeline)), return the data
-                if (resultState != ERT_CMD_STATE_COMPLETED && resultState != ERT_CMD_STATE_TIMEOUT && resultState != ERT_CMD_STATE_NEW) {
-                    FinnUtils::logAndError<std::runtime_error>("Unspecifiable error during inference (ert_cmd_state is " + std::to_string(resultState) + ")!");
-                    return {};
-                }
-            } else {
-                FinnUtils::logAndError<std::runtime_error>("Data either couldnt be stored or there was no data to execute!");
-                return {};
+            ert_cmd_state run_state = run_future.get();  // Future can only be read once! Do not access run_future again!
+            if (!stored || run_state != ert_cmd_state::ERT_CMD_STATE_COMPLETED || resultState != ert_cmd_state::ERT_CMD_STATE_COMPLETED) {
+                std::stringstream errStr;
+                errStr << "Unspecifiable error during inference (store success:" << std::boolalpha << stored << std::noboolalpha << ", Input ert state: " << run_state << ", Output ert state: " << resultState << ")!\n";
+                FinnUtils::logAndError<std::runtime_error>(errStr.str());
             }
 
             return accelerator.retrieveResults(outputDeviceIndex, outputBufferKernelName, forceArchival);

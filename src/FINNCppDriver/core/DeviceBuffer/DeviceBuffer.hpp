@@ -18,7 +18,9 @@
 
 #include <FINNCppDriver/utils/RingBuffer.hpp>
 #include <boost/type_index.hpp>
+#include <future>
 #include <span>
+#include <thread>
 
 #include "xrt.h"
 #include "xrt/xrt_bo.h"
@@ -247,7 +249,7 @@ namespace Finn {
          * @return true Success
          * @return false Fail
          */
-        virtual bool run() = 0;
+        virtual void run(std::promise<ert_cmd_state>& run_promise) = 0;
 
         /**
          * @brief Store the given vector of data in the FPGA mem map

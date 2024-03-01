@@ -212,7 +212,7 @@ namespace Finn {
          * @return true
          * @return false
          */
-        bool run() override { FinnUtils::logAndError<std::runtime_error>("Calling run is not supported for Async execution! This is done automatically."); }
+        void run(std::promise<ert_cmd_state>& run_promise) override { FinnUtils::logAndError<std::runtime_error>("Calling run is not supported for Async execution! This is done automatically."); }
     };
 
 

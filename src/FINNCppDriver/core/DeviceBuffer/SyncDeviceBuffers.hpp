@@ -191,11 +191,12 @@ namespace Finn {
          * @return true
          * @return false
          */
-        bool run() override {
+        void run(std::promise<ert_cmd_state>& run_promise) override {
             FINN_LOG_DEBUG(logger, loglevel::info) << this->loggerPrefix() << "DeviceBuffer (" << this->name << ") executing...";
-            this->sync(FinnUtils::shapeToElements(this->shapePacked));
-            execute(this->shapePacked[0]);
-            return true;
+            std::thread([this, &run_promise] {
+                this->sync(FinnUtils::shapeToElements(this->shapePacked));
+                run_promise.set_value_at_thread_exit(execute(this->shapePacked[0]));
+            }).detach();
         }
 
          protected:
@@ -339,7 +340,7 @@ namespace Finn {
          */
         ert_cmd_state execute(uint batchsize = 1) override {
             auto run = this->associatedKernel(this->internalBo, batchsize);
-            return run.wait(this->msExecuteTimeout);
+            return run.wait();
         }
     };
 }  // namespace Finn

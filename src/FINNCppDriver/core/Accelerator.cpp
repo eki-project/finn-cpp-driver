@@ -78,12 +78,12 @@ namespace Finn {
         }
     }
 
-    bool Accelerator::run(const unsigned int deviceIndex, const std::string& inputBufferKernelName) {
+    void Accelerator::run(const unsigned int deviceIndex, const std::string& inputBufferKernelName, std::promise<ert_cmd_state>& run_promise) {
         if (containsDevice(deviceIndex)) {
-            return getDeviceHandler(deviceIndex).run(inputBufferKernelName);
+            return getDeviceHandler(deviceIndex).run(inputBufferKernelName, run_promise);
         } else {
             if (containsDevice(0)) {
-                return getDeviceHandler(0).run(inputBufferKernelName);
+                return getDeviceHandler(0).run(inputBufferKernelName, run_promise);
             } else {
                 // cppcheck-suppress missingReturn
                 FinnUtils::logAndError<std::runtime_error>("Tried running data in a devicehandler with an invalid deviceIndex!");

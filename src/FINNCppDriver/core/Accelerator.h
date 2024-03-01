@@ -142,7 +142,7 @@ namespace Finn {
          * @return true
          * @return false
          */
-        bool run(unsigned int deviceIndex, const std::string& inputBufferKernelName);
+        void run(unsigned int deviceIndex, const std::string& inputBufferKernelName, std::promise<ert_cmd_state>& run_promise);
 
         /**
          * @brief Return a vector of output samples.

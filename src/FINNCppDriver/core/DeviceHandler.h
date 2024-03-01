@@ -19,12 +19,14 @@
 #include <stddef.h>                         // for size_t
 
 #include <FINNCppDriver/core/DeviceBuffer/DeviceBuffer.hpp>
-#include <cstdint>        // for uint8_t
-#include <iterator>       // for iterator_traits
-#include <memory>         // for shared_ptr
-#include <span>           // for span
-#include <stdexcept>      // for runtime_error
-#include <string>         // for string
+#include <cstdint>  // for uint8_t
+#include <future>
+#include <iterator>   // for iterator_traits
+#include <memory>     // for shared_ptr
+#include <span>       // for span
+#include <stdexcept>  // for runtime_error
+#include <string>     // for string
+#include <thread>
 #include <type_traits>    // for is_same
 #include <unordered_map>  // for unordered_map
 #include <vector>         // for vector
@@ -180,7 +182,7 @@ namespace Finn {
          * @return true
          * @return false
          */
-        bool run(const std::string& inputBufferKernelName);
+        void run(const std::string& inputBufferKernelName, std::promise<ert_cmd_state>& run_promise);
 
         /**
          * @brief Read from the output buffer on the host. This does NOT execute the output kernel

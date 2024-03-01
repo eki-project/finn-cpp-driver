@@ -157,14 +157,14 @@ namespace Finn {
 
     [[maybe_unused]] unsigned int DeviceHandler::getDeviceIndex() const { return xrtDeviceIndex; }
 
-    bool DeviceHandler::run(const std::string& inputBufferKernelName) {
+    void DeviceHandler::run(const std::string& inputBufferKernelName, std::promise<ert_cmd_state>& run_promise) {
         if (!inputBufferMap.contains(inputBufferKernelName)) {
             auto newlineFold = [](std::string a, const auto& b) { return std::move(a) + '\n' + std::move(b.first); };
             std::string existingNames = "Existing buffer names:";
             std::accumulate(inputBufferMap.begin(), inputBufferMap.end(), existingNames, newlineFold);
             FinnUtils::logAndError<std::runtime_error>(loggerPrefix() + " [run] Tried accessing kernel/buffer with name " + inputBufferKernelName + " but this kernel / buffer does not exist! " + existingNames);
         }
-        return inputBufferMap.at(inputBufferKernelName)->run();
+        return inputBufferMap.at(inputBufferKernelName)->run(run_promise);
     }
 
     [[maybe_unused]] Finn::vector<uint8_t> DeviceHandler::retrieveResults(const std::string& outputBufferKernelName, bool forceArchival) {

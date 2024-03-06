@@ -28,7 +28,7 @@ namespace Finn {
          */
         template<typename T>
         class SyncBufferWrapper {
-             protected:
+        protected:
             /**
              * @brief Internal Ringbuffer used by all synchronous buffers
              *
@@ -84,7 +84,7 @@ namespace Finn {
              */
             SyncBufferWrapper& operator=(const SyncBufferWrapper& buf) = delete;
 #ifdef UNITTEST
-             public:
+        public:
             RingBuffer<T, false>& testGetRingBuffer() { return this->ringBuffer; }
 #endif
         };
@@ -92,7 +92,7 @@ namespace Finn {
 
     template<typename T>
     class SyncDeviceInputBuffer : public DeviceInputBuffer<T> {
-         public:
+    public:
         /**
          * @brief Construct a new Sync Device Input Buffer object
          *
@@ -102,9 +102,9 @@ namespace Finn {
          * @param pShapePacked packed shape of input
          * @param batchSize batch size
          */
-        SyncDeviceInputBuffer(const std::string& pName, xrt::device& device, xrt::kernel& pAssociatedKernel, const shapePacked_t& pShapePacked, unsigned int batchSize) : DeviceInputBuffer<T>(pName, device, pAssociatedKernel, pShapePacked) {
+        SyncDeviceInputBuffer(const std::string& pName, xrt::device& device, xrt::kernel& pAssociatedKernel, const shapePacked_t& pShapePacked, unsigned int batchSize) : DeviceInputBuffer<T>(pName, device, pAssociatedKernel, pShapePacked, batchSize) {
             FINN_LOG(this->logger, loglevel::info) << "[SyncDeviceInputBuffer] "
-                                                   << "Initializing DeviceBuffer " << this->name << " (SHAPE PACKED: " << FinnUtils::shapeToString(pShapePacked) << " inputs of the given shape, MAP SIZE: " << this->mapSize << ")\n";
+                << "Initializing DeviceBuffer " << this->name << " (SHAPE PACKED: " << FinnUtils::shapeToString(pShapePacked) << " inputs of the given shape, MAP SIZE: " << this->mapSize << ")\n";
             this->shapePacked[0] = batchSize;
         };
 
@@ -145,31 +145,31 @@ namespace Finn {
         SyncDeviceInputBuffer& operator=(const SyncDeviceInputBuffer& buf) = delete;
 
 #ifdef UNITTEST
-         public:
+    public:
 #else
-         protected:
+    protected:
 #endif
 
-         private:
+    private:
         friend class DeviceInputBuffer<T>;
 
-         public:
+    public:
         size_t size(SIZE_SPECIFIER ss) override {
             switch (ss) {
-                case SIZE_SPECIFIER::BYTES: {
-                    return FinnUtils::shapeToElements(this->shapePacked) * sizeof(T);
-                }
-                case SIZE_SPECIFIER::FEATUREMAP_SIZE: {
-                    return FinnUtils::shapeToElements(this->shapePacked) / this->shapePacked[0];
-                }
-                case SIZE_SPECIFIER::BATCHSIZE: {
-                    return this->shapePacked[0];
-                }
-                case SIZE_SPECIFIER::TOTAL_DATA_SIZE: {
-                    return FinnUtils::shapeToElements(this->shapePacked);
-                }
-                default:
-                    return 0;
+            case SIZE_SPECIFIER::BYTES: {
+                return FinnUtils::shapeToElements(this->shapePacked) * sizeof(T);
+            }
+            case SIZE_SPECIFIER::FEATUREMAP_SIZE: {
+                return FinnUtils::shapeToElements(this->shapePacked) / this->shapePacked[0];
+            }
+            case SIZE_SPECIFIER::BATCHSIZE: {
+                return this->shapePacked[0];
+            }
+            case SIZE_SPECIFIER::TOTAL_DATA_SIZE: {
+                return FinnUtils::shapeToElements(this->shapePacked);
+            }
+            default:
+                return 0;
             }
         }
 
@@ -192,14 +192,14 @@ namespace Finn {
          * @return false
          */
         void run(std::promise<ert_cmd_state>& run_promise) override {
-            FINN_LOG_DEBUG(logger, loglevel::info) << this->loggerPrefix() << "DeviceBuffer (" << this->name << ") executing...";
+            FINN_LOG_DEBUG(this->logger, loglevel::info) << this->loggerPrefix() << "DeviceBuffer (" << this->name << ") executing...";
             std::thread([this, &run_promise] {
                 this->sync(FinnUtils::shapeToElements(this->shapePacked));
                 run_promise.set_value_at_thread_exit(execute(this->shapePacked[0]));
-            }).detach();
+                }).detach();
         }
 
-         protected:
+    protected:
         /**
          * @brief Start a run on the associated kernel and wait for it's result.
          * @attention This method is blocking
@@ -218,7 +218,7 @@ namespace Finn {
      */
     template<typename T>
     class SyncDeviceOutputBuffer : public DeviceOutputBuffer<T> {
-         public:
+    public:
         /**
          * @brief Construct a new Synchronous Device Output Buffer object
          *
@@ -273,20 +273,20 @@ namespace Finn {
          */
         size_t size(SIZE_SPECIFIER ss) override {
             switch (ss) {
-                case SIZE_SPECIFIER::BYTES: {
-                    return FinnUtils::shapeToElements(this->shapePacked) * sizeof(T);
-                }
-                case SIZE_SPECIFIER::FEATUREMAP_SIZE: {
-                    return FinnUtils::shapeToElements(this->shapePacked) / this->shapePacked[0];
-                }
-                case SIZE_SPECIFIER::BATCHSIZE: {
-                    return this->shapePacked[0];
-                }
-                case SIZE_SPECIFIER::TOTAL_DATA_SIZE: {
-                    return FinnUtils::shapeToElements(this->shapePacked);
-                }
-                default:
-                    return 0;
+            case SIZE_SPECIFIER::BYTES: {
+                return FinnUtils::shapeToElements(this->shapePacked) * sizeof(T);
+            }
+            case SIZE_SPECIFIER::FEATUREMAP_SIZE: {
+                return FinnUtils::shapeToElements(this->shapePacked) / this->shapePacked[0];
+            }
+            case SIZE_SPECIFIER::BATCHSIZE: {
+                return this->shapePacked[0];
+            }
+            case SIZE_SPECIFIER::TOTAL_DATA_SIZE: {
+                return FinnUtils::shapeToElements(this->shapePacked);
+            }
+            default:
+                return 0;
             }
         }
 
@@ -323,7 +323,7 @@ namespace Finn {
          * @return ert_cmd_state
          */
         ert_cmd_state read(unsigned int batchSize) override {
-            FINN_LOG_DEBUG(logger, loglevel::info) << this->loggerPrefix() << "Reading " << batchSize << " samples from the device";
+            FINN_LOG_DEBUG(this->logger, loglevel::info) << this->loggerPrefix() << "Reading " << batchSize << " samples from the device";
             ert_cmd_state outExecuteResult = execute(batchSize);  // Return error if batchSize == 0
             if (outExecuteResult == ERT_CMD_STATE_ERROR || outExecuteResult == ERT_CMD_STATE_ABORT) {
                 return outExecuteResult;
@@ -332,7 +332,7 @@ namespace Finn {
             return outExecuteResult;
         }
 
-         protected:
+    protected:
         /**
          * @brief Execute the kernel and await it's return.
          * @attention This function is blocking.

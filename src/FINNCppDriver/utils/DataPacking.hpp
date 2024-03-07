@@ -726,7 +726,7 @@ namespace Finn {
         const std::size_t retSizeTotal = FinnUtils::shapeToElements(foldedShape);
         Finn::vector<T> unpackedMerged(retSizeTotal);
 
-        //#pragma omp parallel for num_threads(std::min({(innerVecSize >> 5), static_cast<std::size_t>(omp_get_num_procs()), FinnUtils::log2_64(innerVecSize)<<1}))
+        #pragma omp parallel for
         for (std::size_t i = 0; i < innerDimVecs.size(); ++i) {
             auto unpacked = Finn::unpack<U>(innerDimVecs[i], padding);
             std::copy(unpacked.begin(), unpacked.end(), unpackedMerged.begin() + i * foldedShape.back());

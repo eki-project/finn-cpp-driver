@@ -218,6 +218,8 @@ namespace Finn {
      */
     template<typename T>
     class SyncDeviceOutputBuffer : public DeviceOutputBuffer<T> {
+        private:
+     std::size_t elementCount;
     public:
         /**
          * @brief Construct a new Synchronous Device Output Buffer object
@@ -231,6 +233,7 @@ namespace Finn {
         SyncDeviceOutputBuffer(const std::string& pName, xrt::device& device, xrt::kernel& pAssociatedKernel, const shapePacked_t& pShapePacked, unsigned int batchSize)
             : DeviceOutputBuffer<T>(pName, device, pAssociatedKernel, pShapePacked) {
             this->shapePacked[0] = batchSize;
+            elementCount = FinnUtils::shapeToElements(this->shapePacked);
         };
 
         /**
@@ -274,16 +277,16 @@ namespace Finn {
         size_t size(SIZE_SPECIFIER ss) override {
             switch (ss) {
             case SIZE_SPECIFIER::BYTES: {
-                return FinnUtils::shapeToElements(this->shapePacked) * sizeof(T);
+                return elementCount * sizeof(T);
             }
             case SIZE_SPECIFIER::FEATUREMAP_SIZE: {
-                return FinnUtils::shapeToElements(this->shapePacked) / this->shapePacked[0];
+                return elementCount / this->shapePacked[0];
             }
             case SIZE_SPECIFIER::BATCHSIZE: {
                 return this->shapePacked[0];
             }
             case SIZE_SPECIFIER::TOTAL_DATA_SIZE: {
-                return FinnUtils::shapeToElements(this->shapePacked);
+                return elementCount;
             }
             default:
                 return 0;
@@ -312,7 +315,7 @@ namespace Finn {
          * @return Finn::vector<T>
          */
         Finn::vector<T> getData() override {
-            Finn::vector<T> tmp(this->map, this->map + FinnUtils::shapeToElements(this->shapePacked));
+            Finn::vector<T> tmp(this->map, this->map + elementCount);
             return tmp;
         }
 
@@ -324,11 +327,8 @@ namespace Finn {
          */
         ert_cmd_state read(unsigned int batchSize) override {
             FINN_LOG_DEBUG(this->logger, loglevel::info) << this->loggerPrefix() << "Reading " << batchSize << " samples from the device";
-            ert_cmd_state outExecuteResult = execute(batchSize);  // Return error if batchSize == 0
-            if (outExecuteResult == ERT_CMD_STATE_ERROR || outExecuteResult == ERT_CMD_STATE_ABORT) {
-                return outExecuteResult;
-            }
-            this->sync(FinnUtils::shapeToElements(this->shapePacked));
+            const ert_cmd_state outExecuteResult = execute(batchSize);  // Return error if batchSize == 0
+            this->sync(elementCount);
             return outExecuteResult;
         }
 

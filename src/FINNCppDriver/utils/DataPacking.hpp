@@ -566,9 +566,9 @@ namespace Finn {
         const std::size_t neededBytesTotal = neededBytesPerInnerDim * innerVecSize;
 
         Finn::vector<uint8_t> packedMerged(neededBytesTotal);
-        std::size_t threadcount = std::min({ (innerVecSize >> 5), static_cast<std::size_t>(omp_get_num_procs()), FinnUtils::log2_64(innerVecSize) << 1 });
+        std::size_t threadcount = std::min({ (innerVecSize >> 5), static_cast<std::size_t>(omp_get_num_procs()), FinnUtils::fastLog2(innerVecSize) << 1 });
         omp_set_num_threads(threadcount);
-        //        std::cout << (std::min({(innerVecSize >> 5), static_cast<std::size_t>(omp_get_num_procs()), FinnUtils::log2_64(innerVecSize2)<<1})) << "\n";
+        //        std::cout << (std::min({(innerVecSize >> 5), static_cast<std::size_t>(omp_get_num_procs()), FinnUtils::fastLog2(innerVecSize2)<<1})) << "\n";
 
                 // for each most inner dimension
 #pragma omp parallel for

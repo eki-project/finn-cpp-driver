@@ -26,6 +26,7 @@
 #include <type_traits>  // for remove_ref...
 #include <utility>      // for move
 #include <vector>       // for vector
+#include <ratio>
 
  // Helper
 #include <FINNCppDriver/core/DeviceHandler.h>          // for DeviceHandler
@@ -173,7 +174,7 @@ void runThroughputTest(Finn::Driver<true>& baseDriver, logger_type& logger) {
             Finn::DoNotOptimize(ret);
             const auto end = std::chrono::high_resolution_clock::now();
 
-            sumRuntimeEnd2End += end - start;
+            sumRuntimeEnd2End += (end - start);
         }
 
         std::chrono::duration<double> sumRuntimePacking{};
@@ -191,8 +192,8 @@ void runThroughputTest(Finn::Driver<true>& baseDriver, logger_type& logger) {
             Finn::DoNotOptimize(packed);
             const auto end = std::chrono::high_resolution_clock::now();
 
-            sumRuntimeReshaping += reshape - start;
-            sumRuntimePacking += end - reshape;
+            sumRuntimeReshaping += (reshape - start);
+            sumRuntimePacking += (end - reshape);
         }
 
         auto packedOutput = baseDriver.getConfig().deviceWrappers[0].odmas[0]->packedShape;
@@ -206,7 +207,7 @@ void runThroughputTest(Finn::Driver<true>& baseDriver, logger_type& logger) {
             auto unpacked = Finn::unpackMultiDimensionalOutputs<OutputFinnType>(unpackingInputs.begin(), unpackingInputs.end(), reshapedOutput, foldedOutput);
             Finn::DoNotOptimize(unpacked);
             const auto end = std::chrono::high_resolution_clock::now();
-            sumRuntimeUnpacking += end - start;
+            sumRuntimeUnpacking += (end - start);
         }
 
         std::cout << "Avg. end2end latency: " << (static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(sumRuntimeEnd2End).count()) / nTestruns / 1000) << "us\n";

@@ -32,12 +32,12 @@ namespace FinnUtils {
      *
      */
     class BufferFiller {
-         private:
+    private:
         std::random_device rd;
-        std::mt19937 engine{rd()};
+        std::mt19937 engine{ rd() };
         std::uniform_int_distribution<uint8_t> sampler;
 
-         public:
+    public:
         /**
          * @brief Construct a new Buffer Filler object
          *
@@ -53,7 +53,7 @@ namespace FinnUtils {
          * @param max
          * @return BufferFiller
          */
-        static BufferFiller create(uint8_t min, uint8_t max) { return {min, max}; }
+        static BufferFiller create(uint8_t min, uint8_t max) { return { min, max }; }
 
         /**
          * @brief
@@ -64,7 +64,7 @@ namespace FinnUtils {
          */
         template<typename IteratorType>
         void fillRandom(IteratorType first, IteratorType last) {
-            std::transform(first, last, first, [this]([[maybe_unused]] uint8_t x) { return sampler(engine); });
+            std::generate(first, last, [this, &sampler = sampler, &engine = engine]() { return sampler(engine); });
         }
 
         /**
@@ -83,9 +83,9 @@ namespace FinnUtils {
      */
     template<typename T>
     concept FloatingPoint = std::is_floating_point_v<T> && (sizeof(T) == 4 || sizeof(T) == 8) &&  // Only 32/64 bit allowed. 80 bit fp not allowed
-                            sizeof(float) == 4 && sizeof(double) == 8 &&                          // float must be 32 bit fp while double must be 64 bit fp
-                            std::numeric_limits<T>::is_iec559 &&                                  // Only IEEE 754  fp allowed
-                            std::endian::native == std::endian::little;
+        sizeof(float) == 4 && sizeof(double) == 8 &&                          // float must be 32 bit fp while double must be 64 bit fp
+        std::numeric_limits<T>::is_iec559 &&                                  // Only IEEE 754  fp allowed
+        std::endian::native == std::endian::little;
 
     /**
      * @brief Helper function for ceil. Checks if param is inf. Based on https://codereview.stackexchange.com/questions/248169/two-constexpr-ceil-functions
@@ -131,8 +131,8 @@ namespace FinnUtils {
         constexpr uintN_t mantissaMask = (~exponentMask) & signRemovalMask;  // the bits of the mantissa are 1's, sign and exponent 0's.
 
         return (((std::bit_cast<uintN_t, T>(inFp) & exponentMask) == exponentMask) &&  // if exponent is all 1's
-                ((std::bit_cast<uintN_t, T>(inFp) & mantissaMask) != 0)                // if mantissa is != 0
-        );
+            ((std::bit_cast<uintN_t, T>(inFp) & mantissaMask) != 0)                // if mantissa is != 0
+            );
     }
 
     /**
@@ -154,10 +154,23 @@ namespace FinnUtils {
         // NOLINTBEGIN
         if (inFp > 0 && inFp != static_cast<intN_t>(inFp)) {  // These lossy conversions are intended for rounding
             return static_cast<intN_t>(inFp + 1);             // These lossy conversions are intended for rounding
-        } else {
+        }
+        else {
             return static_cast<intN_t>(inFp);  // These lossy conversions are intended for rounding
         }
         // NOLINTEND
+    }
+
+    template<typename T>
+    inline constexpr T fastLog2(T value)
+    {
+        return std::bit_width(value) - 1;
+    }
+
+    template<typename T>
+    inline constexpr T fastLog2Ceil(T value)
+    {
+        return fastLog2(value - 1) + 1;
     }
 
     /**
@@ -174,34 +187,7 @@ namespace FinnUtils {
      * @param requiredBytes The number of bytes that are needed. The return value will be greater or equal than this
      * @return unsigned int
      */
-    inline size_t getActualBufferSize(size_t requiredBytes) { return static_cast<size_t>(std::max(4096.0, pow(2, ceil(log2(static_cast<double>(requiredBytes)))))); }
-
-    /**
-     * @brief Get the number of elements required to represent S elements of FINN datatype F in the datatype T.
-     *
-     * @tparam T
-     * @tparam F
-     * @tparam S
-     * @return constexpr size_t
-     */
-    template<typename T = uint8_t, typename F, size_t S>
-    constexpr size_t getPackedElementSize() {
-        return static_cast<size_t>(ceil(S * (F().bitwidth() / (sizeof(T) * 8.0F))));
-    }
-
-    /**
-     * @brief Returns the number of sizeof(T) iterations needed to scan all the data of the F value. This value may differ if sizeof(DT) is much larger than sizeof(F).
-     * For example if the Finn datatype is DatatypeUint<4> but DT is a 256 bit uint, one would only need to scan one 8-bit sector of the 256 bit variable to get the necessary data
-     *
-     * @tparam T
-     * @tparam F
-     * @tparam DT
-     * @return constexpr size_t
-     */
-    template<typename T, typename F, typename DT>
-    constexpr size_t iterationsNeededPerDT() {
-        return std::min(ceil(F().bitwidth() / sizeof(T) * 8.0F), ceil(static_cast<float>(sizeof(DT)) / static_cast<float>(sizeof(T))));  // Can leave out * 8 on both sides of division
-    }
+    inline constexpr size_t getActualBufferSize(size_t requiredBytes) { return std::max(4096, (2 << fastLog2Ceil(requiredBytes)-1)); }
 
     /**
      * @brief Put some newlines into the log script for clearer reading
@@ -209,25 +195,6 @@ namespace FinnUtils {
      * @param logger
      */
     inline void logSpacer(logger_type& logger) { FINN_LOG(logger, loglevel::info) << "\n\n\n\n"; }
-
-    /**
-     * @brief Log out the given number of results in a vector. If entriesToRead is larger than the vector size, the whole vector gets printed
-     *
-     * @param logger
-     * @param results
-     * @param entriesToRead
-     * @param prefix
-     */
-    template<typename T>
-    inline void logResults(logger_type& logger, const std::vector<T>& results, unsigned int entriesToRead, const std::string& prefix = "") {
-        FINN_LOG(logger, loglevel::info) << prefix << "Values: ";
-        std::string str;
-        for (unsigned int i = 0; i < std::min(entriesToRead, static_cast<unsigned int>(results.size())); i++) {
-            str += std::to_string(results[i]) + " ";
-        }
-        FINN_LOG(logger, loglevel::info) << str;
-    }
-
 
     /**
      * @brief Calculates the number of elements in a tensor given its shape.
@@ -282,9 +249,9 @@ namespace FinnUtils {
 #ifdef __GNUC__  // GCC, Clang, ICC
         __builtin_unreachable();
 #else
-    #ifdef _MSC_VER  // MSVC
+#ifdef _MSC_VER  // MSVC
         __assume(false);
-    #endif
+#endif
 #endif
     }
 

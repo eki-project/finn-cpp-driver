@@ -128,6 +128,13 @@ namespace Finn {
         UncheckedStore storeFactory(unsigned int deviceIndex, const std::string& inputBufferKernelName);
 
         /**
+         * @brief Set the Batch Size
+         *
+         * @param batchsize
+         */
+        void setBatchSize(uint batchsize);
+
+        /**
          * @brief Run the given buffer. Returns false if no valid data was found to execute on.
          *
          * @param deviceIndex
@@ -135,7 +142,7 @@ namespace Finn {
          * @return true
          * @return false
          */
-        bool run(unsigned int deviceIndex, const std::string& inputBufferKernelName);
+        void run(unsigned int deviceIndex, const std::string& inputBufferKernelName, std::promise<ert_cmd_state>& run_promise);
 
         /**
          * @brief Return a vector of output samples.

@@ -38,8 +38,8 @@ static void BM_VecCopyBase(benchmark::State& state) {
     auto idb = Finn::SyncDeviceInputBuffer<uint8_t>("Tester", device, kernel, myShapePacked, benchmarkBufferSize);
     auto dat1 = std::vector<uint8_t>();
     auto dat2 = std::vector<uint8_t>();
-    dat1.resize(idb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
-    dat2.resize(idb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
+    dat1.resize(idb.size(SIZE_SPECIFIER::FEATUREMAP_SIZE));
+    dat2.resize(idb.size(SIZE_SPECIFIER::FEATUREMAP_SIZE));
     filler.fillRandom(dat1);
     filler.fillRandom(dat2);
     for (auto _ : state) {
@@ -60,7 +60,7 @@ static void BM_StoreCVRP(benchmark::State& state) {
     auto kernel = xrt::kernel();
     auto idb = Finn::SyncDeviceInputBuffer<uint8_t>("Tester", device, kernel, myShapePacked, benchmarkBufferSize);
     Finn::vector<uint8_t> data;
-    data.resize(idb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
+    data.resize(idb.size(SIZE_SPECIFIER::FEATUREMAP_SIZE));
     for (auto _ : state) {
         for (unsigned int i = 0; i < benchmarkBufferSize; i++) {
             filler.fillRandom(data.begin(), data.end());
@@ -77,7 +77,7 @@ static void BM_StoreSVRP(benchmark::State& state) {
     auto kernel = xrt::kernel();
     auto idb = Finn::SyncDeviceInputBuffer<uint8_t>("Tester", device, kernel, myShapePacked, benchmarkBufferSize);
     std::vector<uint8_t> data;
-    data.resize(idb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
+    data.resize(idb.size(SIZE_SPECIFIER::FEATUREMAP_SIZE));
     for (auto _ : state) {
         for (unsigned int i = 0; i < benchmarkBufferSize; i++) {
             filler.fillRandom(data);
@@ -94,7 +94,7 @@ static void BM_StoreCVIP(benchmark::State& state) {
     auto kernel = xrt::kernel();
     auto idb = Finn::SyncDeviceInputBuffer<uint8_t>("Tester", device, kernel, myShapePacked, benchmarkBufferSize);
     Finn::vector<uint8_t> data;
-    data.resize(idb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
+    data.resize(idb.size(SIZE_SPECIFIER::FEATUREMAP_SIZE));
     for (auto _ : state) {
         for (unsigned int i = 0; i < benchmarkBufferSize; i++) {
             idb.store(data);
@@ -110,7 +110,7 @@ static void BM_StoreSVIP(benchmark::State& state) {
     auto kernel = xrt::kernel();
     auto idb = Finn::SyncDeviceInputBuffer<uint8_t>("Tester", device, kernel, myShapePacked, benchmarkBufferSize);
     Finn::vector<uint8_t> data;
-    data.resize(idb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
+    data.resize(idb.size(SIZE_SPECIFIER::FEATUREMAP_SIZE));
     for (auto _ : state) {
         for (unsigned int i = 0; i < benchmarkBufferSize; i++) {
             idb.store(data);
@@ -125,9 +125,9 @@ static void BM_StoreFCVRP(benchmark::State& state) {
     auto device = xrt::device();
     auto kernel = xrt::kernel();
     auto idb = Finn::DeviceInputBuffer<uint8_t>("Tester", device, kernel, myShapePacked, benchmarkBufferSize);
-    const auto bytesPerSample = idb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART);
+    const auto bytesPerSample = idb.size(SIZE_SPECIFIER::FEATUREMAP_SIZE);
     std::vector<uint8_t> data;
-    data.resize(idb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
+    data.resize(idb.size(SIZE_SPECIFIER::FEATUREMAP_SIZE));
     for (auto _ : state) {
         for (unsigned int i = 0; i < benchmarkBufferSize; i++) {
             idb.storeFast(data);
@@ -142,9 +142,9 @@ static void BM_StoreFCVIP(benchmark::State& state) {
     auto device = xrt::device();
     auto kernel = xrt::kernel();
     auto idb = Finn::DeviceInputBuffer<uint8_t>("Tester", device, kernel, myShapePacked, benchmarkBufferSize);
-    const auto bytesPerSample = idb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART);
+    const auto bytesPerSample = idb.size(SIZE_SPECIFIER::FEATUREMAP_SIZE);
     std::vector<uint8_t> data;
-    data.resize(idb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
+    data.resize(idb.size(SIZE_SPECIFIER::FEATUREMAP_SIZE));
     for (auto _ : state) {
         for (unsigned int i = 0; i < benchmarkBufferSize; i++) {
             idb.storeFast(data.begin(), data.end());
@@ -177,7 +177,7 @@ static void BM_StoreMultithreaded_CVRP(benchmark::State& state) {
         datas[i].resize(countSamplesPerThread);
         for (unsigned int j = 0; j < countSamplesPerThread; j++) {
             datas[i][j] = Sample();
-            datas[i][j].resize(idb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
+            datas[i][j].resize(idb.size(SIZE_SPECIFIER::FEATUREMAP_SIZE));
             filler.fillRandom(datas[i][j].begin(), datas[i][j].end());
         }
     }

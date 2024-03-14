@@ -41,7 +41,7 @@ class DeviceHandlerSetup : public ::testing::Test {
 
 
 TEST_F(DeviceHandlerSetup, InitTest) {
-    auto devicehandler = DeviceHandler(DeviceWrapper("somefile.xclbin", 0U, {std::make_shared<BufferDescriptor>("a", shape_t({1}))}, {std::make_shared<BufferDescriptor>("b", shape_t({1}))}), true);
+    auto devicehandler = DeviceHandler(DeviceWrapper("somefile.xclbin", 0U, {std::make_shared<BufferDescriptor>("a", shape_t({1}))}, {std::make_shared<BufferDescriptor>("b", shape_t({1}))}), true, 100);
     EXPECT_EQ(xrt::device::device_costum_constructor_called, 1);
     EXPECT_EQ(xrt::device::device_param_didx, 0);
 
@@ -57,7 +57,7 @@ TEST_F(DeviceHandlerSetup, InitTest) {
     kernel_devices.clear();
     kernel_uuids.clear();
 
-    auto devicehandler2 = DeviceHandler(DeviceWrapper("somefile.xclbin", 4, {std::make_shared<BufferDescriptor>("inpName", shape_t({4}))}, {std::make_shared<BufferDescriptor>("outName", shape_t({4}))}), true);
+    auto devicehandler2 = DeviceHandler(DeviceWrapper("somefile.xclbin", 4, {std::make_shared<BufferDescriptor>("inpName", shape_t({4}))}, {std::make_shared<BufferDescriptor>("outName", shape_t({4}))}), true, 100);
     EXPECT_EQ(xrt::device::device_costum_constructor_called, 2);
 
     std::vector<std::string> ionames = {"inpName", "outName"};
@@ -75,15 +75,15 @@ TEST_F(DeviceHandlerSetup, InitTest) {
 }
 
 TEST_F(DeviceHandlerSetup, ArgumentTest) {
-    EXPECT_THROW(DeviceHandler(DeviceWrapper("", 0, {std::make_shared<BufferDescriptor>("a", shape_t({1}))}, {std::make_shared<BufferDescriptor>("b", shape_t({1}))}), true), std::filesystem::filesystem_error);
-    EXPECT_THROW(DeviceHandler(DeviceWrapper("somefile.xclbin", 0, {}, {std::make_shared<BufferDescriptor>("b", shape_t({1}))}), true), std::invalid_argument);
-    EXPECT_THROW(DeviceHandler(DeviceWrapper("somefile.xclbin", 0, {std::make_shared<BufferDescriptor>("", shape_t({1}))}, {std::make_shared<BufferDescriptor>("b", shape_t({1}))}), true), std::invalid_argument);
-    EXPECT_THROW(DeviceHandler(DeviceWrapper("somefile.xclbin", 0, {std::make_shared<BufferDescriptor>("a", shape_t({}))}, {std::make_shared<BufferDescriptor>("b", shape_t({1}))}), true), std::invalid_argument);
-    EXPECT_THROW(DeviceHandler(DeviceWrapper("somefile.xclbin", 0, {std::make_shared<BufferDescriptor>("a", shape_t({1}))}, {std::make_shared<BufferDescriptor>("", shape_t({1}))}), true), std::invalid_argument);
-    EXPECT_THROW(DeviceHandler(DeviceWrapper("somefile.xclbin", 0, {std::make_shared<BufferDescriptor>("a", shape_t({1}))}, {std::make_shared<BufferDescriptor>("b", shape_t({}))}), true), std::invalid_argument);
-    EXPECT_THROW(DeviceHandler(DeviceWrapper("somefile.xclbin", 0, {std::make_shared<BufferDescriptor>("a", shape_t({1}))}, {}), true), std::invalid_argument);
-    EXPECT_NO_THROW(
-        DeviceHandler(DeviceWrapper("somefile.xclbin", 0, {std::make_shared<BufferDescriptor>("a", shape_t({1})), std::make_shared<BufferDescriptor>("c", shape_t({1}))}, {std::make_shared<BufferDescriptor>("b", shape_t({1, 2}))}), true));
+    EXPECT_THROW(DeviceHandler(DeviceWrapper("", 0, {std::make_shared<BufferDescriptor>("a", shape_t({1}))}, {std::make_shared<BufferDescriptor>("b", shape_t({1}))}), true, 1), std::filesystem::filesystem_error);
+    EXPECT_THROW(DeviceHandler(DeviceWrapper("somefile.xclbin", 0, {}, {std::make_shared<BufferDescriptor>("b", shape_t({1}))}), true, 1), std::invalid_argument);
+    EXPECT_THROW(DeviceHandler(DeviceWrapper("somefile.xclbin", 0, {std::make_shared<BufferDescriptor>("", shape_t({1}))}, {std::make_shared<BufferDescriptor>("b", shape_t({1}))}), true, 1), std::invalid_argument);
+    EXPECT_THROW(DeviceHandler(DeviceWrapper("somefile.xclbin", 0, {std::make_shared<BufferDescriptor>("a", shape_t({}))}, {std::make_shared<BufferDescriptor>("b", shape_t({1}))}), true, 1), std::invalid_argument);
+    EXPECT_THROW(DeviceHandler(DeviceWrapper("somefile.xclbin", 0, {std::make_shared<BufferDescriptor>("a", shape_t({1}))}, {std::make_shared<BufferDescriptor>("", shape_t({1}))}), true, 1), std::invalid_argument);
+    EXPECT_THROW(DeviceHandler(DeviceWrapper("somefile.xclbin", 0, {std::make_shared<BufferDescriptor>("a", shape_t({1}))}, {std::make_shared<BufferDescriptor>("b", shape_t({}))}), true, 1), std::invalid_argument);
+    EXPECT_THROW(DeviceHandler(DeviceWrapper("somefile.xclbin", 0, {std::make_shared<BufferDescriptor>("a", shape_t({1}))}, {}), true, 1), std::invalid_argument);
+    EXPECT_NO_THROW(DeviceHandler(
+        DeviceWrapper("somefile.xclbin", 0, {std::make_shared<BufferDescriptor>("a", shape_t({1})), std::make_shared<BufferDescriptor>("c", shape_t({1}))}, {std::make_shared<BufferDescriptor>("b", shape_t({1, 2}))}), true, 1));
 }
 
 

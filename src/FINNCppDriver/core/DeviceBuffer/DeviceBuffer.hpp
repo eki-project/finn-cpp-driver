@@ -10,21 +10,23 @@
  *
  */
 
-#ifndef DEVICEBUFFER_H
-#define DEVICEBUFFER_H
+#ifndef DEVICEBUFFER
+#define DEVICEBUFFER
 
 #include <FINNCppDriver/utils/Logger.h>
 #include <FINNCppDriver/utils/Types.h>
 
 #include <FINNCppDriver/utils/RingBuffer.hpp>
 #include <boost/type_index.hpp>
+#include <future>
 #include <span>
+#include <thread>
 
 #include "xrt.h"
 #include "xrt/xrt_bo.h"
 #include "xrt/xrt_kernel.h"
 
-// Forward declares
+ // Forward declares
 enum ert_cmd_state;
 
 namespace Finn {
@@ -35,7 +37,7 @@ namespace Finn {
      */
     template<typename T>
     class DeviceBuffer {
-         protected:
+    protected:
         /**
          * @brief Name of the buufer
          *
@@ -73,7 +75,7 @@ namespace Finn {
         logger_type& logger;
 
 
-         public:
+    public:
         /**
          * @brief Construct a new Device Buffer object
          *
@@ -82,18 +84,19 @@ namespace Finn {
          * @param pAssociatedKernel XRT kernel
          * @param pShapePacked packed shape of input
          */
-        DeviceBuffer(const std::string& pName, xrt::device& device, xrt::kernel& pAssociatedKernel, const shapePacked_t& pShapePacked)
+        DeviceBuffer(const std::string& pName, xrt::device& device, xrt::kernel& pAssociatedKernel, const shapePacked_t& pShapePacked, unsigned int batchSize = 1)
             : name(pName),
-              shapePacked(pShapePacked),
-              mapSize(FinnUtils::getActualBufferSize(FinnUtils::shapeToElements(pShapePacked))),
-              internalBo(xrt::bo(device, mapSize * sizeof(T), pAssociatedKernel.group_id(0))),
-              associatedKernel(pAssociatedKernel),
-              map(internalBo.template map<T*>()),
-              logger(Logger::getLogger()) {
+            shapePacked(pShapePacked),
+            mapSize(FinnUtils::getActualBufferSize(FinnUtils::shapeToElements(pShapePacked)* batchSize)),
+            internalBo(xrt::bo(device, mapSize * sizeof(T), pAssociatedKernel.group_id(0))),
+            associatedKernel(pAssociatedKernel),
+            map(internalBo.template map<T*>()),
+            logger(Logger::getLogger()) {
+            shapePacked[0] = batchSize;
             FINN_LOG(logger, loglevel::info) << "[DeviceBuffer] "
-                                             << "New Device Buffer of size " << mapSize * sizeof(T) << "bytes with group id " << pAssociatedKernel.group_id(0) << "\n";
+                << "New Device Buffer of size " << mapSize * sizeof(T) << "bytes with group id " << pAssociatedKernel.group_id(0) << "\n";
             FINN_LOG(logger, loglevel::info) << "[DeviceBuffer] "
-                                             << "Initializing DeviceBuffer " << name << " (SHAPE PACKED: " << FinnUtils::shapeToString(pShapePacked) << " inputs of the given shape, MAP SIZE: " << mapSize << ")\n";
+                << "Initializing DeviceBuffer " << name << " (SHAPE PACKED: " << FinnUtils::shapeToString(pShapePacked) << " inputs of the given shape, MAP SIZE: " << mapSize << ")\n";
             for (std::size_t i = 0; i < mapSize; ++i) {
                 map[i] = 0;
             }
@@ -106,12 +109,12 @@ namespace Finn {
          */
         DeviceBuffer(DeviceBuffer&& buf) noexcept
             : name(std::move(buf.name)),
-              shapePacked(std::move(buf.shapePacked)),
-              mapSize(buf.mapSize),
-              internalBo(std::move(buf.internalBo)),
-              associatedKernel(std::move(buf.associatedKernel)),
-              map(std::move(buf.map)),
-              logger(Logger::getLogger()) {}
+            shapePacked(std::move(buf.shapePacked)),
+            mapSize(buf.mapSize),
+            internalBo(std::move(buf.internalBo)),
+            associatedKernel(std::move(buf.associatedKernel)),
+            map(std::move(buf.map)),
+            logger(Logger::getLogger()) {}
 
         /**
          * @brief Construct a new Device Buffer object (Deleted copy constructor)
@@ -164,7 +167,7 @@ namespace Finn {
          */
         virtual shape_t& getPackedShape() { return shapePacked; }
 
-         protected:
+    protected:
         /**
          * @brief Internal constructor used by the move constructors of the sub classes !!!NOT THREAD SAFE!!!
          *
@@ -198,7 +201,7 @@ namespace Finn {
          *
          * @return ert_cmd_state
          */
-        virtual ert_cmd_state execute() = 0;
+        virtual ert_cmd_state execute(uint batchsize = 1) = 0;
     };
 
     /**
@@ -223,14 +226,14 @@ namespace Finn {
      */
     template<typename T>
     class DeviceInputBuffer : public DeviceBuffer<T> {
-         protected:
+    protected:
         /**
          * @brief Specifies if DeviceBuffer is input or output buffer
          *
          */
         const IO ioMode = IO::INPUT;
 
-         public:
+    public:
         /**
          * @brief Construct a new Device Input Buffer object
          *
@@ -239,7 +242,7 @@ namespace Finn {
          * @param pAssociatedKernel XRT kernel
          * @param pShapePacked packed shape of input
          */
-        DeviceInputBuffer(const std::string& pName, xrt::device& device, xrt::kernel& pAssociatedKernel, const shapePacked_t& pShapePacked) : DeviceBuffer<T>(pName, device, pAssociatedKernel, pShapePacked){};
+        DeviceInputBuffer(const std::string& pName, xrt::device& device, xrt::kernel& pAssociatedKernel, const shapePacked_t& pShapePacked, unsigned int batchSize = 1) : DeviceBuffer<T>(pName, device, pAssociatedKernel, pShapePacked, batchSize) {};
 
         /**
          * @brief Run the kernel to input data from FPGA memory into the accelerator design
@@ -247,10 +250,10 @@ namespace Finn {
          * @return true Success
          * @return false Fail
          */
-        virtual bool run() = 0;
+        virtual void run(std::promise<ert_cmd_state>& run_promise) = 0;
 
         /**
-         * @brief Store the given vector of data in the ring buffer
+         * @brief Store the given vector of data in the FPGA mem map
          * @attention This function is NOT THREAD SAFE!
          *
          * @param data
@@ -259,14 +262,14 @@ namespace Finn {
          */
         virtual bool store(std::span<const T> data) = 0;
 
-         protected:
+    protected:
         /**
          * @brief Sync data from the map to the device.
          *
          */
         void sync(std::size_t bytes) override { this->internalBo.sync(XCL_BO_SYNC_BO_TO_DEVICE, bytes, 0); }
 
-         private:
+    private:
         template<typename InputIt>
         static bool storeImpl(InputIt first, InputIt last) {
             FinnUtils::logAndError<std::runtime_error>("Base Implementation called! This should not happen.");
@@ -274,7 +277,7 @@ namespace Finn {
         }
 
 #ifdef UNITTEST
-         public:
+    public:
         Finn::vector<T> testGetMap() {
             Finn::vector<T> temp;
             for (size_t i = 0; i < FinnUtils::shapeToElements(this->shapePacked); i++) {
@@ -295,7 +298,7 @@ namespace Finn {
      */
     template<typename T>
     class DeviceOutputBuffer : public DeviceBuffer<T> {
-         protected:
+    protected:
         /**
          * @brief Specifies IO mode of buffer
          *
@@ -312,7 +315,7 @@ namespace Finn {
          */
         unsigned int msExecuteTimeout = 1000;
 
-         public:
+    public:
         /**
          * @brief Construct a new Device Output Buffer object
          *
@@ -321,7 +324,7 @@ namespace Finn {
          * @param pAssociatedKernel XRT kernel
          * @param pShapePacked packed shape of input
          */
-        DeviceOutputBuffer(const std::string& pName, xrt::device& device, xrt::kernel& pAssociatedKernel, const shapePacked_t& pShapePacked) : DeviceBuffer<T>(pName, device, pAssociatedKernel, pShapePacked){};
+        DeviceOutputBuffer(const std::string& pName, xrt::device& device, xrt::kernel& pAssociatedKernel, const shapePacked_t& pShapePacked) : DeviceBuffer<T>(pName, device, pAssociatedKernel, pShapePacked) {};
 
         /**
          * @brief Get timeout
@@ -336,16 +339,11 @@ namespace Finn {
          */
         virtual void setMsExecuteTimeout(unsigned int val) = 0;
         /**
-         * @brief Transfer output data from ringbuffer to storage until user requests it
-         *
-         */
-        virtual void archiveValidBufferParts() = 0;
-        /**
          * @brief Return stored data from storage
          *
          * @return Finn::vector<T>
          */
-        virtual Finn::vector<T> retrieveArchive() = 0;
+        virtual Finn::vector<T> getData() = 0;
         /**
          * @brief Start XRT kernel to read data from accelerator design into FPGA memory
          *
@@ -354,24 +352,7 @@ namespace Finn {
          */
         virtual ert_cmd_state read(unsigned int samples) = 0;
 
-         protected:
-        /**
-         * @brief Delete long term storage contents
-         *
-         */
-        virtual void clearArchive() = 0;
-        /**
-         * @brief Make space in long term storage
-         *
-         * @param expectedEntries Number of entries expected to be stored in long term storage
-         */
-        virtual void allocateLongTermStorage(unsigned int expectedEntries) = 0;
-
-        /**
-         * @brief Store the contents of the memory map into the ring buffer
-         *
-         */
-        virtual void saveMap() = 0;
+    protected:
         /**
          * @brief Sync data from the FPGA into the memory map
          *
@@ -380,7 +361,7 @@ namespace Finn {
         void sync(std::size_t bytes) override { this->internalBo.sync(XCL_BO_SYNC_BO_FROM_DEVICE, bytes, 0); }
 
 #ifdef UNITTEST
-         public:
+    public:
         std::vector<T> testGetMap() {
             std::vector<T> temp;
             for (size_t i = 0; i < FinnUtils::shapeToElements(this->shapePacked); ++i) {
@@ -410,4 +391,4 @@ namespace Finn {
     };
 }  // namespace Finn
 
-#endif  // DEVICEBUFFER_H
+#endif  // DEVICEBUFFER

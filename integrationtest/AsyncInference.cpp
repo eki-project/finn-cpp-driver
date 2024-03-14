@@ -32,7 +32,7 @@ using namespace std::literals::chrono_literals;
 
 //     auto driver = Finn::Driver<false>(conf, 10, 0, conf.deviceWrappers[0].idmas[0]->kernelName, 0, conf.deviceWrappers[0].odmas[0]->kernelName, 1, true);
 
-//     Finn::vector<int8_t> data(driver.size(SIZE_SPECIFIER::ELEMENTS_PER_PART, 0, conf.deviceWrappers[0].idmas[0]->kernelName), 1);
+//     Finn::vector<int8_t> data(driver.size(SIZE_SPECIFIER::FEATUREMAP_SIZE, 0, conf.deviceWrappers[0].idmas[0]->kernelName), 1);
 
 //     std::iota(data.begin(), data.end(), -127);
 
@@ -53,11 +53,11 @@ using namespace std::literals::chrono_literals;
 
 //     auto driver = Finn::Driver<false>(conf, static_cast<uint>(batchLength), 0, conf.deviceWrappers[0].idmas[0]->kernelName, 0, conf.deviceWrappers[0].odmas[0]->kernelName, static_cast<uint>(batchLength), true);
 
-//     Finn::vector<int8_t> data(driver.size(SIZE_SPECIFIER::ELEMENTS_PER_PART, 0, conf.deviceWrappers[0].idmas[0]->kernelName) * batchLength, 1);
+//     Finn::vector<int8_t> data(driver.size(SIZE_SPECIFIER::FEATUREMAP_SIZE, 0, conf.deviceWrappers[0].idmas[0]->kernelName) * batchLength, 1);
 
 //     for (std::size_t i = 0; i < batchLength; ++i) {
-//         std::iota(data.begin() + static_cast<decltype(data)::difference_type>(i * driver.size(SIZE_SPECIFIER::ELEMENTS_PER_PART, 0, conf.deviceWrappers[0].idmas[0]->kernelName)),
-//                   data.begin() + static_cast<decltype(data)::difference_type>((i + 1) * driver.size(SIZE_SPECIFIER::ELEMENTS_PER_PART, 0, conf.deviceWrappers[0].idmas[0]->kernelName)), -127);
+//         std::iota(data.begin() + static_cast<decltype(data)::difference_type>(i * driver.size(SIZE_SPECIFIER::FEATUREMAP_SIZE, 0, conf.deviceWrappers[0].idmas[0]->kernelName)),
+//                   data.begin() + static_cast<decltype(data)::difference_type>((i + 1) * driver.size(SIZE_SPECIFIER::FEATUREMAP_SIZE, 0, conf.deviceWrappers[0].idmas[0]->kernelName)), -127);
 //     }
 
 //     // Run inference

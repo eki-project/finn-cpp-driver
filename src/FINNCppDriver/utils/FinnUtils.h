@@ -32,12 +32,12 @@ namespace FinnUtils {
      *
      */
     class BufferFiller {
-    private:
+         private:
         std::random_device rd;
-        std::mt19937 engine{ rd() };
+        std::mt19937 engine{rd()};
         std::uniform_int_distribution<uint8_t> sampler;
 
-    public:
+         public:
         /**
          * @brief Construct a new Buffer Filler object
          *
@@ -53,7 +53,7 @@ namespace FinnUtils {
          * @param max
          * @return BufferFiller
          */
-        static BufferFiller create(uint8_t min, uint8_t max) { return { min, max }; }
+        static BufferFiller create(uint8_t min, uint8_t max) { return {min, max}; }
 
         /**
          * @brief
@@ -83,9 +83,9 @@ namespace FinnUtils {
      */
     template<typename T>
     concept FloatingPoint = std::is_floating_point_v<T> && (sizeof(T) == 4 || sizeof(T) == 8) &&  // Only 32/64 bit allowed. 80 bit fp not allowed
-        sizeof(float) == 4 && sizeof(double) == 8 &&                          // float must be 32 bit fp while double must be 64 bit fp
-        std::numeric_limits<T>::is_iec559 &&                                  // Only IEEE 754  fp allowed
-        std::endian::native == std::endian::little;
+                            sizeof(float) == 4 && sizeof(double) == 8 &&                          // float must be 32 bit fp while double must be 64 bit fp
+                            std::numeric_limits<T>::is_iec559 &&                                  // Only IEEE 754  fp allowed
+                            std::endian::native == std::endian::little;
 
     /**
      * @brief Helper function for ceil. Checks if param is inf. Based on https://codereview.stackexchange.com/questions/248169/two-constexpr-ceil-functions
@@ -131,8 +131,8 @@ namespace FinnUtils {
         constexpr uintN_t mantissaMask = (~exponentMask) & signRemovalMask;  // the bits of the mantissa are 1's, sign and exponent 0's.
 
         return (((std::bit_cast<uintN_t, T>(inFp) & exponentMask) == exponentMask) &&  // if exponent is all 1's
-            ((std::bit_cast<uintN_t, T>(inFp) & mantissaMask) != 0)                // if mantissa is != 0
-            );
+                ((std::bit_cast<uintN_t, T>(inFp) & mantissaMask) != 0)                // if mantissa is != 0
+        );
     }
 
     /**
@@ -154,23 +154,25 @@ namespace FinnUtils {
         // NOLINTBEGIN
         if (inFp > 0 && inFp != static_cast<intN_t>(inFp)) {  // These lossy conversions are intended for rounding
             return static_cast<intN_t>(inFp + 1);             // These lossy conversions are intended for rounding
-        }
-        else {
+        } else {
             return static_cast<intN_t>(inFp);  // These lossy conversions are intended for rounding
         }
         // NOLINTEND
     }
 
     template<typename T>
-    inline constexpr T fastLog2(T value)
-    {
+    inline constexpr T fastLog2(T value) {
         return std::bit_width(value) - 1;
     }
 
     template<typename T>
-    inline constexpr T fastLog2Ceil(T value)
-    {
+    inline constexpr T fastLog2Ceil(T value) {
         return fastLog2(value - 1) + 1;
+    }
+
+    template<typename T>
+    inline constexpr T fastDivCeil(T value, T value2) {
+        return value == 0 ? 0 : 1 + ((value - 1) / value2);
     }
 
     /**
@@ -187,7 +189,7 @@ namespace FinnUtils {
      * @param requiredBytes The number of bytes that are needed. The return value will be greater or equal than this
      * @return unsigned int
      */
-    inline constexpr size_t getActualBufferSize(size_t requiredBytes) { return std::max(4096, (2 << fastLog2Ceil(requiredBytes)-1)); }
+    inline constexpr size_t getActualBufferSize(size_t requiredBytes) { return std::max(4096, (2 << fastLog2Ceil(requiredBytes) - 1)); }
 
     /**
      * @brief Put some newlines into the log script for clearer reading
@@ -249,9 +251,9 @@ namespace FinnUtils {
 #ifdef __GNUC__  // GCC, Clang, ICC
         __builtin_unreachable();
 #else
-#ifdef _MSC_VER  // MSVC
+    #ifdef _MSC_VER  // MSVC
         __assume(false);
-#endif
+    #endif
 #endif
     }
 

@@ -87,6 +87,12 @@ namespace Finn {
          private:
         unsigned int getGroupId(const xrt::device& device, const xrt::uuid& uuid, const std::string& computeUnit) { return xrt::kernel(device, uuid, computeUnit).group_id(0); }
 
+        /**
+         * @brief Used for deciding if execute needs to write data registers or not
+         *
+         */
+        uint32_t oldRepetitions = 0;
+
          public:
         /**
          * @brief Construct a new Device Buffer object
@@ -194,25 +200,33 @@ namespace Finn {
          */
         virtual void sync(std::size_t bytes) = 0;
 
-        void execute(xrt::ip& ip, const long long adr, const uint32_t repetitions = 1) {
+        void execute(const uint32_t repetitions = 1) {
             // writes the buffer adress
             constexpr uint32_t offset_buf = 0x10;
             constexpr uint32_t offset_rep = 0x1C;
-            ip.write_register(offset_buf, adr);
-            ip.write_register(offset_buf + 4, adr >> 32);
+
+            // If repetition number is the same as for the last call, then nothing has to be written before starting the Kernel
+            if (repetitions == oldRepetitions) {
+                assocIPCore.write_register(CSR_OFFSET, IP_START);
+                return;
+            }
+            oldRepetitions = repetitions;
+
+            assocIPCore.write_register(offset_buf, bufAdr);
+            assocIPCore.write_register(offset_buf + 4, bufAdr >> 32);
 
             // writes the repetitions
-            ip.write_register(offset_rep, repetitions);
+            assocIPCore.write_register(offset_rep, repetitions);
 
             // Start inference
-            ip.write_register(CSR_OFFSET, IP_START);
+            assocIPCore.write_register(CSR_OFFSET, IP_START);
         }
 
-        ert_cmd_state busyWait(xrt::ip& ip) {
+        ert_cmd_state busyWait() {
             // Wait until the IP is DONE
             uint32_t axi_ctrl = 0;
             while ((axi_ctrl & IP_IDLE) != IP_IDLE) {
-                axi_ctrl = ip.read_register(CSR_OFFSET);
+                axi_ctrl = assocIPCore.read_register(CSR_OFFSET);
             }
             return ert_cmd_state::ERT_CMD_STATE_COMPLETED;
         }

@@ -124,8 +124,8 @@ namespace Finn {
             FINN_LOG_DEBUG(this->logger, loglevel::info) << this->loggerPrefix() << "DeviceBuffer (" << this->name << ") executing...";
             std::thread([this, &run_promise] {
                 this->sync(FinnUtils::shapeToElements(this->shapePacked));
-                this->execute(this->assocIPCore, this->bufAdr, this->shapePacked[0]);
-                run_promise.set_value_at_thread_exit(this->busyWait(this->assocIPCore));
+                this->execute(this->shapePacked[0]);
+                run_promise.set_value_at_thread_exit(this->busyWait());
             }).detach();
         }
     };
@@ -230,8 +230,8 @@ namespace Finn {
          */
         ert_cmd_state read(unsigned int batchSize) override {
             FINN_LOG_DEBUG(this->logger, loglevel::info) << this->loggerPrefix() << "Reading " << batchSize << " samples from the device";
-            this->execute(this->assocIPCore, this->bufAdr, batchSize);
-            const ert_cmd_state outExecuteResult = this->busyWait(this->assocIPCore);
+            this->execute(batchSize);
+            const ert_cmd_state outExecuteResult = this->busyWait();
             this->sync(elementCount);
             return outExecuteResult;
         }

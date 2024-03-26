@@ -25,10 +25,6 @@
 #include "xrt/xrt_device.h"
 #include "xrt/xrt_kernel.h"
 
-
-TEST(DummyTest, DT) { EXPECT_TRUE(true); }
-
-
 // Globals
 using RB = Finn::RingBuffer<int, false>;
 const size_t parts = FinnUnittest::parts;

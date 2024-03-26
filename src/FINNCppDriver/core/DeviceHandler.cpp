@@ -17,6 +17,7 @@
 #include <FINNCppDriver/core/DeviceBuffer/AsyncDeviceBuffers.hpp>
 #include <FINNCppDriver/core/DeviceBuffer/DeviceBuffer.hpp>
 #include <FINNCppDriver/core/DeviceBuffer/SyncDeviceBuffers.hpp>
+#include <algorithm>  // for copy
 #include <boost/cstdint.hpp>
 #include <cerrno>
 #include <chrono>
@@ -31,7 +32,6 @@
 
 #include "ert.h"
 #include "xrt/xrt_device.h"
-#include "xrt/xrt_kernel.h"
 #include "xrt/xrt_uuid.h"  // for uuid
 
 
@@ -98,20 +98,18 @@ namespace Finn {
         FINN_LOG(Logger::getLogger(), loglevel::info) << loggerPrefix() << "(" << xrtDeviceIndex << ") "
                                                       << "Initializing buffer objects\n";
         for (auto&& ebdptr : devWrap.idmas) {
-            auto tmpKern = xrt::kernel(device, uuid, ebdptr->kernelName, xrt::kernel::cu_access_mode::shared);
             if (pSynchronousInference) {
-                inputBufferMap.emplace(std::make_pair(ebdptr->kernelName, std::make_shared<Finn::SyncDeviceInputBuffer<uint8_t>>(ebdptr->kernelName, device, tmpKern, ebdptr->packedShape, hostBufferSize)));
+                inputBufferMap.emplace(std::make_pair(ebdptr->kernelName, std::make_shared<Finn::SyncDeviceInputBuffer<uint8_t>>(ebdptr->kernelName, device, uuid, ebdptr->packedShape, hostBufferSize)));
             } else {
-                inputBufferMap.emplace(std::make_pair(ebdptr->kernelName, std::make_shared<Finn::AsyncDeviceInputBuffer<uint8_t>>(ebdptr->kernelName, device, tmpKern, ebdptr->packedShape, hostBufferSize)));
+                inputBufferMap.emplace(std::make_pair(ebdptr->kernelName, std::make_shared<Finn::AsyncDeviceInputBuffer<uint8_t>>(ebdptr->kernelName, device, uuid, ebdptr->packedShape, hostBufferSize)));
             }
         }
         for (auto&& ebdptr : devWrap.odmas) {
-            auto tmpKern = xrt::kernel(device, uuid, ebdptr->kernelName, xrt::kernel::cu_access_mode::exclusive);
             if (pSynchronousInference) {
-                auto ptr = std::make_shared<Finn::SyncDeviceOutputBuffer<uint8_t>>(ebdptr->kernelName, device, tmpKern, ebdptr->packedShape, hostBufferSize);
+                auto ptr = std::make_shared<Finn::SyncDeviceOutputBuffer<uint8_t>>(ebdptr->kernelName, device, uuid, ebdptr->packedShape, hostBufferSize);
                 outputBufferMap.emplace(std::make_pair(ebdptr->kernelName, ptr));
             } else {
-                auto ptr = std::make_shared<Finn::AsyncDeviceOutputBuffer<uint8_t>>(ebdptr->kernelName, device, tmpKern, ebdptr->packedShape, hostBufferSize);
+                auto ptr = std::make_shared<Finn::AsyncDeviceOutputBuffer<uint8_t>>(ebdptr->kernelName, device, uuid, ebdptr->packedShape, hostBufferSize);
                 ptr->allocateLongTermStorage(hostBufferSize * 5);
                 outputBufferMap.emplace(std::make_pair(ebdptr->kernelName, ptr));
             }
@@ -157,14 +155,14 @@ namespace Finn {
 
     [[maybe_unused]] unsigned int DeviceHandler::getDeviceIndex() const { return xrtDeviceIndex; }
 
-    void DeviceHandler::run(const std::string& inputBufferKernelName, std::promise<ert_cmd_state>& run_promise) {
+    void DeviceHandler::run(const std::string& inputBufferKernelName, std::promise<ert_cmd_state>& runPromise) {
         if (!inputBufferMap.contains(inputBufferKernelName)) {
             auto newlineFold = [](std::string a, const auto& b) { return std::move(a) + '\n' + std::move(b.first); };
             std::string existingNames = "Existing buffer names:";
             std::accumulate(inputBufferMap.begin(), inputBufferMap.end(), existingNames, newlineFold);
             FinnUtils::logAndError<std::runtime_error>(loggerPrefix() + " [run] Tried accessing kernel/buffer with name " + inputBufferKernelName + " but this kernel / buffer does not exist! " + existingNames);
         }
-        return inputBufferMap.at(inputBufferKernelName)->run(run_promise);
+        return inputBufferMap.at(inputBufferKernelName)->run(runPromise);
     }
 
     [[maybe_unused]] Finn::vector<uint8_t> DeviceHandler::retrieveResults(const std::string& outputBufferKernelName, bool forceArchival) {

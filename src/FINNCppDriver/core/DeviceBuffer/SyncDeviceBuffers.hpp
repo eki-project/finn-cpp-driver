@@ -19,80 +19,9 @@
 #include "ert.h"
 
 namespace Finn {
-
-    namespace detail {
-        /**
-         * @brief Wrapper that contains the ringbuffer used by Synchronous Input & Output Buffers
-         *
-         * @tparam T Type of the data stored in the ringbuffer
-         */
-        template<typename T>
-        class SyncBufferWrapper {
-        protected:
-            /**
-             * @brief Internal Ringbuffer used by all synchronous buffers
-             *
-             */
-            RingBuffer<T, false> ringBuffer;
-
-            /**
-             * @brief Construct a new Sync Buffer Wrapper object
-             *
-             * @param ringBufferSizeFactor Number of batch elements that should be able to be stored
-             * @param elementsPerPart Number of values per batch element
-             */
-            SyncBufferWrapper(unsigned int ringBufferSizeFactor, std::size_t elementsPerPart) : ringBuffer(RingBuffer<T, false>(ringBufferSizeFactor, elementsPerPart)) {
-                if (ringBufferSizeFactor == 0) {
-                    FinnUtils::logAndError<std::runtime_error>("DeviceBuffer of size 0 cannot be constructed!");
-                }
-                FINN_LOG(Logger::getLogger(), loglevel::info) << "[SyncDeviceBuffer] Max buffer size:" << ringBufferSizeFactor << "*" << elementsPerPart << "\n";
-            }
-
-            /**
-             * @brief Destroy the Sync Buffer Wrapper object
-             *
-             */
-            ~SyncBufferWrapper() = default;
-
-            /**
-             * @brief Construct a new Sync Buffer Wrapper object (Move constructor)
-             *
-             * @param buf
-             */
-            SyncBufferWrapper(SyncBufferWrapper&& buf) noexcept : ringBuffer(std::move(buf.ringBuffer)) {}
-
-            /**
-             * @brief Construct a new Sync Buffer Wrapper object (Deleted copy constructor)
-             *
-             * @param buf
-             */
-            SyncBufferWrapper(const SyncBufferWrapper& buf) noexcept = delete;
-
-            /**
-             * @brief Deleted move assignment operator
-             *
-             * @param buf
-             * @return SyncBufferWrapper&
-             */
-            SyncBufferWrapper& operator=(SyncBufferWrapper&& buf) = delete;
-
-            /**
-             * @brief Deleted copy assignment operator
-             *
-             * @param buf
-             * @return SyncBufferWrapper&
-             */
-            SyncBufferWrapper& operator=(const SyncBufferWrapper& buf) = delete;
-#ifdef UNITTEST
-        public:
-            RingBuffer<T, false>& testGetRingBuffer() { return this->ringBuffer; }
-#endif
-        };
-    }  // namespace detail
-
     template<typename T>
     class SyncDeviceInputBuffer : public DeviceInputBuffer<T> {
-    public:
+         public:
         /**
          * @brief Construct a new Sync Device Input Buffer object
          *
@@ -102,9 +31,9 @@ namespace Finn {
          * @param pShapePacked packed shape of input
          * @param batchSize batch size
          */
-        SyncDeviceInputBuffer(const std::string& pName, xrt::device& device, xrt::kernel& pAssociatedKernel, const shapePacked_t& pShapePacked, unsigned int batchSize) : DeviceInputBuffer<T>(pName, device, pAssociatedKernel, pShapePacked, batchSize) {
+        SyncDeviceInputBuffer(const std::string& pCUName, xrt::device& device, xrt::uuid& pDevUUID, const shapePacked_t& pShapePacked, unsigned int batchSize) : DeviceInputBuffer<T>(pCUName, device, pDevUUID, pShapePacked, batchSize) {
             FINN_LOG(this->logger, loglevel::info) << "[SyncDeviceInputBuffer] "
-                << "Initializing DeviceBuffer " << this->name << " (SHAPE PACKED: " << FinnUtils::shapeToString(pShapePacked) << " inputs of the given shape, MAP SIZE: " << this->mapSize << ")\n";
+                                                   << "Initializing DeviceBuffer " << this->name << " (SHAPE PACKED: " << FinnUtils::shapeToString(pShapePacked) << " inputs of the given shape, MAP SIZE: " << this->mapSize << ")\n";
             this->shapePacked[0] = batchSize;
         };
 
@@ -145,31 +74,31 @@ namespace Finn {
         SyncDeviceInputBuffer& operator=(const SyncDeviceInputBuffer& buf) = delete;
 
 #ifdef UNITTEST
-    public:
+         public:
 #else
-    protected:
+         protected:
 #endif
 
-    private:
+         private:
         friend class DeviceInputBuffer<T>;
 
-    public:
+         public:
         size_t size(SIZE_SPECIFIER ss) override {
             switch (ss) {
-            case SIZE_SPECIFIER::BYTES: {
-                return FinnUtils::shapeToElements(this->shapePacked) * sizeof(T);
-            }
-            case SIZE_SPECIFIER::FEATUREMAP_SIZE: {
-                return FinnUtils::shapeToElements(this->shapePacked) / this->shapePacked[0];
-            }
-            case SIZE_SPECIFIER::BATCHSIZE: {
-                return this->shapePacked[0];
-            }
-            case SIZE_SPECIFIER::TOTAL_DATA_SIZE: {
-                return FinnUtils::shapeToElements(this->shapePacked);
-            }
-            default:
-                return 0;
+                case SIZE_SPECIFIER::BYTES: {
+                    return FinnUtils::shapeToElements(this->shapePacked) * sizeof(T);
+                }
+                case SIZE_SPECIFIER::FEATUREMAP_SIZE: {
+                    return FinnUtils::shapeToElements(this->shapePacked) / this->shapePacked[0];
+                }
+                case SIZE_SPECIFIER::BATCHSIZE: {
+                    return this->shapePacked[0];
+                }
+                case SIZE_SPECIFIER::TOTAL_DATA_SIZE: {
+                    return FinnUtils::shapeToElements(this->shapePacked);
+                }
+                default:
+                    return 0;
             }
         }
 
@@ -195,19 +124,9 @@ namespace Finn {
             FINN_LOG_DEBUG(this->logger, loglevel::info) << this->loggerPrefix() << "DeviceBuffer (" << this->name << ") executing...";
             std::thread([this, &run_promise] {
                 this->sync(FinnUtils::shapeToElements(this->shapePacked));
-                run_promise.set_value_at_thread_exit(execute(this->shapePacked[0]));
-                }).detach();
-        }
-
-    protected:
-        /**
-         * @brief Start a run on the associated kernel and wait for it's result.
-         * @attention This method is blocking
-         *
-         */
-        ert_cmd_state execute(uint batchsize = 1) override {
-            auto runCall = this->associatedKernel(this->internalBo, batchsize);
-            return runCall.wait();
+                this->execute(this->assocIPCore, this->bufAdr, this->shapePacked[0]);
+                run_promise.set_value_at_thread_exit(this->busyWait(this->assocIPCore));
+            }).detach();
         }
     };
 
@@ -218,9 +137,10 @@ namespace Finn {
      */
     template<typename T>
     class SyncDeviceOutputBuffer : public DeviceOutputBuffer<T> {
-        private:
-     std::size_t elementCount;
-    public:
+         private:
+        std::size_t elementCount;
+
+         public:
         /**
          * @brief Construct a new Synchronous Device Output Buffer object
          *
@@ -230,8 +150,7 @@ namespace Finn {
          * @param pShapePacked packed shape of input
          * @param ringBufferSizeFactor size of ringbuffer in input elements (batch elements)
          */
-        SyncDeviceOutputBuffer(const std::string& pName, xrt::device& device, xrt::kernel& pAssociatedKernel, const shapePacked_t& pShapePacked, unsigned int batchSize)
-            : DeviceOutputBuffer<T>(pName, device, pAssociatedKernel, pShapePacked) {
+        SyncDeviceOutputBuffer(const std::string& pCUName, xrt::device& device, xrt::uuid& pDevUUID, const shapePacked_t& pShapePacked, unsigned int batchSize) : DeviceOutputBuffer<T>(pCUName, device, pDevUUID, pShapePacked) {
             this->shapePacked[0] = batchSize;
             elementCount = FinnUtils::shapeToElements(this->shapePacked);
         };
@@ -276,38 +195,22 @@ namespace Finn {
          */
         size_t size(SIZE_SPECIFIER ss) override {
             switch (ss) {
-            case SIZE_SPECIFIER::BYTES: {
-                return elementCount * sizeof(T);
-            }
-            case SIZE_SPECIFIER::FEATUREMAP_SIZE: {
-                return elementCount / this->shapePacked[0];
-            }
-            case SIZE_SPECIFIER::BATCHSIZE: {
-                return this->shapePacked[0];
-            }
-            case SIZE_SPECIFIER::TOTAL_DATA_SIZE: {
-                return elementCount;
-            }
-            default:
-                return 0;
+                case SIZE_SPECIFIER::BYTES: {
+                    return elementCount * sizeof(T);
+                }
+                case SIZE_SPECIFIER::FEATUREMAP_SIZE: {
+                    return elementCount / this->shapePacked[0];
+                }
+                case SIZE_SPECIFIER::BATCHSIZE: {
+                    return this->shapePacked[0];
+                }
+                case SIZE_SPECIFIER::TOTAL_DATA_SIZE: {
+                    return elementCount;
+                }
+                default:
+                    return 0;
             }
         }
-
-
-        /**
-         * @brief Get the the kernel timeout in miliseconds
-         *
-         * @return unsigned int
-         */
-        unsigned int getMsExecuteTimeout() const override { return this->msExecuteTimeout; }
-
-        /**
-         * @brief Set the kernel timeout in miliseconds
-         *
-         * @param val
-         */
-        void setMsExecuteTimeout(unsigned int val) override { this->msExecuteTimeout = val; }
-
 
         /**
          * @brief Return the data contained in the FPGA Buffer map.
@@ -327,20 +230,10 @@ namespace Finn {
          */
         ert_cmd_state read(unsigned int batchSize) override {
             FINN_LOG_DEBUG(this->logger, loglevel::info) << this->loggerPrefix() << "Reading " << batchSize << " samples from the device";
-            const ert_cmd_state outExecuteResult = execute(batchSize);  // Return error if batchSize == 0
+            this->execute(this->assocIPCore, this->bufAdr, batchSize);
+            const ert_cmd_state outExecuteResult = this->busyWait(this->assocIPCore);
             this->sync(elementCount);
             return outExecuteResult;
-        }
-
-    protected:
-        /**
-         * @brief Execute the kernel and await it's return.
-         * @attention This function is blocking.
-         *
-         */
-        ert_cmd_state execute(uint batchsize = 1) override {
-            auto run = this->associatedKernel(this->internalBo, batchsize);
-            return run.wait();
         }
     };
 }  // namespace Finn

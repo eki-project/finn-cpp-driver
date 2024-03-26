@@ -18,6 +18,7 @@
 
 #include <cinttypes>  // for uint8_t
 #include <cstddef>    // for size_t
+#include <future>     // for promise
 #include <string>     // for string
 #include <vector>     // for vector, vector<>::iter...
 
@@ -142,7 +143,7 @@ namespace Finn {
          * @return true
          * @return false
          */
-        void run(unsigned int deviceIndex, const std::string& inputBufferKernelName, std::promise<ert_cmd_state>& run_promise);
+        void run(unsigned int deviceIndex, const std::string& inputBufferKernelName, std::promise<ert_cmd_state>& runPromise);
 
         /**
          * @brief Return a vector of output samples.

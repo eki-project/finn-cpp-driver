@@ -110,6 +110,7 @@ namespace Finn {
                 std::lock_guard guard(readWriteMutex);
                 return buffer.full();
             } else {
+                // std::cout << "" << "\n";
                 return buffer.full();
             }
         }
@@ -362,7 +363,6 @@ namespace Finn {
                     std::copy(buffer.begin(), buffer.end(), outputIt);
                 } else {
                     std::copy(buffer.begin() + elementsPerPart * index, buffer.begin() + elementsPerPart * (index + 1), outputIt);
-                    std::cout << std::distance(buffer.begin() + elementsPerPart * index, buffer.begin() + elementsPerPart * (index + 1)) << "\n";
                 }
 
                 return true;

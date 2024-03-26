@@ -162,12 +162,12 @@ namespace FinnUtils {
 
     template<typename T>
     inline constexpr T fastLog2(T value) {
-        return std::bit_width(value) - 1;
+        return (value == 0) ? 0 : std::bit_width(value) - 1;
     }
 
     template<typename T>
     inline constexpr T fastLog2Ceil(T value) {
-        return fastLog2(value - 1) + 1;
+        return (value == 0) ? 0 : fastLog2(value - 1) + 1;
     }
 
     template<typename T>
@@ -189,7 +189,7 @@ namespace FinnUtils {
      * @param requiredBytes The number of bytes that are needed. The return value will be greater or equal than this
      * @return unsigned int
      */
-    inline constexpr size_t getActualBufferSize(size_t requiredBytes) { return std::max(4096, (2 << fastLog2Ceil(requiredBytes) - 1)); }
+    inline constexpr size_t getActualBufferSize(size_t requiredBytes) { return requiredBytes == 0 ? 4096UL : std::max(4096UL, (2UL << fastLog2Ceil(requiredBytes) - 1)); }
 
     /**
      * @brief Put some newlines into the log script for clearer reading

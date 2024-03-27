@@ -21,6 +21,7 @@
 #include <future>
 #include <span>
 #include <thread>
+#include <chrono>
 
 #include "experimental/xrt_ip.h"
 #include "xrt.h"
@@ -42,7 +43,7 @@ namespace Finn {
      */
     template<typename T>
     class DeviceBuffer {
-         protected:
+    protected:
         /**
          * @brief Name of the buufer
          *
@@ -84,8 +85,11 @@ namespace Finn {
          */
         logger_type& logger;
 
-         private:
-        unsigned int getGroupId(const xrt::device& device, const xrt::uuid& uuid, const std::string& computeUnit) { return xrt::kernel(device, uuid, computeUnit).group_id(0); }
+    private:
+        unsigned int getGroupId(const xrt::device& device, const xrt::uuid& uuid, const std::string& computeUnit) {
+            return xrt::kernel(device, uuid, computeUnit).group_id(0);
+
+        }
 
         /**
          * @brief Used for deciding if execute needs to write data registers or not
@@ -93,7 +97,7 @@ namespace Finn {
          */
         uint32_t oldRepetitions = 0;
 
-         public:
+    public:
         /**
          * @brief Construct a new Device Buffer object
          *
@@ -104,18 +108,18 @@ namespace Finn {
          */
         DeviceBuffer(const std::string& pCUName, xrt::device& device, xrt::uuid& pDevUUID, const shapePacked_t& pShapePacked, unsigned int batchSize = 1)
             : name(pCUName),
-              shapePacked(pShapePacked),
-              mapSize(FinnUtils::getActualBufferSize(FinnUtils::shapeToElements(pShapePacked) * batchSize)),
-              internalBo(xrt::bo(device, mapSize * sizeof(T), getGroupId(device, pDevUUID, pCUName))),
-              assocIPCore(xrt::ip(device, pDevUUID, pCUName)),
-              map(internalBo.template map<T*>()),
-              bufAdr(internalBo.address()),
-              logger(Logger::getLogger()) {
+            shapePacked(pShapePacked),
+            mapSize(FinnUtils::getActualBufferSize(FinnUtils::shapeToElements(pShapePacked)* batchSize)),
+            internalBo(xrt::bo(device, mapSize * sizeof(T), getGroupId(device, pDevUUID, pCUName))),
+            map(internalBo.template map<T*>()),
+            assocIPCore(xrt::ip(device, pDevUUID, pCUName)),//Using xrt::kernel/getGroupId after this point leads to a total bricking of the FPGA card!!
+            bufAdr(internalBo.address()),
+            logger(Logger::getLogger()) {
             shapePacked[0] = batchSize;
             FINN_LOG(logger, loglevel::info) << "[DeviceBuffer] "
-                                             << "New Device Buffer of size " << mapSize * sizeof(T) << "bytes with group id " << getGroupId(device, pDevUUID, pCUName) << "\n";
+                << "New Device Buffer of size " << mapSize * sizeof(T) << "bytes with group id " << 0 << "\n";
             FINN_LOG(logger, loglevel::info) << "[DeviceBuffer] "
-                                             << "Initializing DeviceBuffer " << name << " (SHAPE PACKED: " << FinnUtils::shapeToString(pShapePacked) << " inputs of the given shape, MAP SIZE: " << mapSize << ")\n";
+                << "Initializing DeviceBuffer " << name << " (SHAPE PACKED: " << FinnUtils::shapeToString(pShapePacked) << " inputs of the given shape, MAP SIZE: " << mapSize << ")\n";
             std::fill(map, map + mapSize, 0);
         }
 
@@ -126,13 +130,13 @@ namespace Finn {
          */
         DeviceBuffer(DeviceBuffer&& buf) noexcept
             : name(std::move(buf.name)),
-              shapePacked(std::move(buf.shapePacked)),
-              mapSize(buf.mapSize),
-              internalBo(std::move(buf.internalBo)),
-              assocIPCore(std::move(buf.assocIPCore)),
-              map(std::move(buf.map)),
-              bufAdr(internalBo.address()),
-              logger(Logger::getLogger()) {}
+            shapePacked(std::move(buf.shapePacked)),
+            mapSize(buf.mapSize),
+            internalBo(std::move(buf.internalBo)),
+            assocIPCore(std::move(buf.assocIPCore)),
+            map(std::move(buf.map)),
+            bufAdr(internalBo.address()),
+            logger(Logger::getLogger()) {}
 
         /**
          * @brief Construct a new Device Buffer object (Deleted copy constructor)
@@ -185,7 +189,7 @@ namespace Finn {
          */
         virtual shape_t& getPackedShape() { return shapePacked; }
 
-         protected:
+    protected:
         /**
          * @brief Returns a device prefix for logging
          *
@@ -254,14 +258,14 @@ namespace Finn {
      */
     template<typename T>
     class DeviceInputBuffer : public DeviceBuffer<T> {
-         protected:
+    protected:
         /**
          * @brief Specifies if DeviceBuffer is input or output buffer
          *
          */
         const IO ioMode = IO::INPUT;
 
-         public:
+    public:
         /**
          * @brief Construct a new Device Input Buffer object
          *
@@ -270,7 +274,7 @@ namespace Finn {
          * @param pAssociatedKernel XRT kernel
          * @param pShapePacked packed shape of input
          */
-        DeviceInputBuffer(const std::string& pCUName, xrt::device& device, xrt::uuid& pDevUUID, const shapePacked_t& pShapePacked, unsigned int batchSize = 1) : DeviceBuffer<T>(pCUName, device, pDevUUID, pShapePacked, batchSize){};
+        DeviceInputBuffer(const std::string& pCUName, xrt::device& device, xrt::uuid& pDevUUID, const shapePacked_t& pShapePacked, unsigned int batchSize = 1) : DeviceBuffer<T>(pCUName, device, pDevUUID, pShapePacked, batchSize) {};
 
         /**
          * @brief Run the kernel to input data from FPGA memory into the accelerator design
@@ -290,14 +294,14 @@ namespace Finn {
          */
         virtual bool store(std::span<const T> data) = 0;
 
-         protected:
+    protected:
         /**
          * @brief Sync data from the map to the device.
          *
          */
         void sync(std::size_t bytes) override { this->internalBo.sync(XCL_BO_SYNC_BO_TO_DEVICE, bytes, 0); }
 
-         private:
+    private:
         template<typename InputIt>
         static bool storeImpl(InputIt first, InputIt last) {
             FinnUtils::logAndError<std::runtime_error>("Base Implementation called! This should not happen.");
@@ -305,7 +309,7 @@ namespace Finn {
         }
 
 #ifdef UNITTEST
-         public:
+    public:
         Finn::vector<T> testGetMap() {
             Finn::vector<T> temp;
             for (size_t i = 0; i < FinnUtils::shapeToElements(this->shapePacked); i++) {
@@ -326,7 +330,7 @@ namespace Finn {
      */
     template<typename T>
     class DeviceOutputBuffer : public DeviceBuffer<T> {
-         protected:
+    protected:
         /**
          * @brief Specifies IO mode of buffer
          *
@@ -343,7 +347,7 @@ namespace Finn {
          */
         unsigned int msExecuteTimeout = 1000;
 
-         public:
+    public:
         /**
          * @brief Construct a new Device Output Buffer object
          *
@@ -352,7 +356,7 @@ namespace Finn {
          * @param pAssociatedKernel XRT kernel
          * @param pShapePacked packed shape of input
          */
-        DeviceOutputBuffer(const std::string& pCUName, xrt::device& device, xrt::uuid& pDevUUID, const shapePacked_t& pShapePacked, unsigned int batchSize = 1) : DeviceBuffer<T>(pCUName, device, pDevUUID, pShapePacked, batchSize){};
+        DeviceOutputBuffer(const std::string& pCUName, xrt::device& device, xrt::uuid& pDevUUID, const shapePacked_t& pShapePacked, unsigned int batchSize = 1) : DeviceBuffer<T>(pCUName, device, pDevUUID, pShapePacked, batchSize) {};
 
         /**
          * @brief Return stored data from storage
@@ -368,7 +372,7 @@ namespace Finn {
          */
         virtual ert_cmd_state read(unsigned int samples) = 0;
 
-         protected:
+    protected:
         /**
          * @brief Sync data from the FPGA into the memory map
          *
@@ -377,7 +381,7 @@ namespace Finn {
         void sync(std::size_t bytes) override { this->internalBo.sync(XCL_BO_SYNC_BO_FROM_DEVICE, bytes, 0); }
 
 #ifdef UNITTEST
-         public:
+    public:
         std::vector<T> testGetMap() {
             std::vector<T> temp;
             for (size_t i = 0; i < FinnUtils::shapeToElements(this->shapePacked); ++i) {

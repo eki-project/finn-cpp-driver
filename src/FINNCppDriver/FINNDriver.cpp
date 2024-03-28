@@ -10,10 +10,9 @@
  *
  */
 
-#include <sys/types.h>  // for uint
-
 #include <algorithm>    // for generate
 #include <chrono>       // for nanoseconds, ...
+#include <cstddef>      // for size_t
 #include <cstdint>      // for uint64_t, uint8_t, ...
 #include <exception>    // for exception
 #include <filesystem>   // for path, exists
@@ -131,6 +130,85 @@ Finn::Driver<SynchronousInference> createDriverFromConfig(const std::filesystem:
     return driver;
 }
 
+template<typename O>
+using destribution_t = typename std::conditional_t<std::is_same_v<O, float>, std::uniform_real_distribution<O>, std::uniform_int_distribution<O>>;
+
+template<typename T>
+void runThroughputTestImpl(Finn::Driver<true>& baseDriver, std::size_t elementCount, uint batchSize) {
+    using dtype = T;
+    Finn::vector<dtype> testInputs(elementCount * batchSize);
+
+    std::random_device rndDevice;
+    std::mt19937 mersenneEngine{rndDevice()};  // Generates random integers
+
+    destribution_t<dtype> dist{static_cast<dtype>(InputFinnType().min()), static_cast<dtype>(InputFinnType().max())};
+
+    auto gen = [&dist, &mersenneEngine]() { return dist(mersenneEngine); };
+
+    constexpr size_t nTestruns = 5000;
+    std::chrono::duration<double> sumRuntimeEnd2End{};
+
+    // Warmup
+    std::fill(testInputs.begin(), testInputs.end(), 1);
+    auto warmup = baseDriver.inferSynchronous(testInputs.begin(), testInputs.end());
+    Finn::DoNotOptimize(warmup);
+
+    for (size_t i = 0; i < nTestruns; ++i) {
+        std::generate(testInputs.begin(), testInputs.end(), gen);
+        const auto start = std::chrono::high_resolution_clock::now();
+        auto ret = baseDriver.inferSynchronous(testInputs.begin(), testInputs.end());
+        Finn::DoNotOptimize(ret);
+        const auto end = std::chrono::high_resolution_clock::now();
+
+        sumRuntimeEnd2End += (end - start);
+    }
+
+    std::chrono::duration<double> sumRuntimePacking{};
+    std::chrono::duration<double> sumRuntimeUnpacking{};
+    std::chrono::duration<double> sumRuntimeReshaping{};
+
+    for (size_t i = 0; i < nTestruns; ++i) {
+        std::generate(testInputs.begin(), testInputs.end(), gen);
+        const auto start = std::chrono::high_resolution_clock::now();
+        static auto foldedShape = static_cast<Finn::ExtendedBufferDescriptor*>(baseDriver.getConfig().deviceWrappers[0].idmas[0].get())->foldedShape;
+        foldedShape[0] = batchSize;
+        const Finn::DynamicMdSpan reshapedInput(testInputs.begin(), testInputs.end(), foldedShape);
+        const auto reshape = std::chrono::high_resolution_clock::now();
+        auto packed = Finn::packMultiDimensionalInputs<InputFinnType>(testInputs.begin(), testInputs.end(), reshapedInput, foldedShape.back());
+        Finn::DoNotOptimize(packed);
+        const auto end = std::chrono::high_resolution_clock::now();
+
+        sumRuntimeReshaping += (reshape - start);
+        sumRuntimePacking += (end - reshape);
+    }
+
+    auto packedOutput = baseDriver.getConfig().deviceWrappers[0].odmas[0]->packedShape;
+    packedOutput[0] = batchSize;
+    std::vector<uint8_t> unpackingInputs(FinnUtils::shapeToElements(packedOutput));
+    for (size_t i = 0; i < nTestruns; ++i) {
+        const auto start = std::chrono::high_resolution_clock::now();
+        auto foldedOutput = static_cast<Finn::ExtendedBufferDescriptor*>(baseDriver.getConfig().deviceWrappers[0].odmas[0].get())->foldedShape;
+        foldedOutput[0] = batchSize;
+        const Finn::DynamicMdSpan reshapedOutput(unpackingInputs.begin(), unpackingInputs.end(), packedOutput);
+        auto unpacked = Finn::unpackMultiDimensionalOutputs<OutputFinnType>(unpackingInputs.begin(), unpackingInputs.end(), reshapedOutput, foldedOutput);
+        Finn::DoNotOptimize(unpacked);
+        const auto end = std::chrono::high_resolution_clock::now();
+        sumRuntimeUnpacking += (end - start);
+    }
+
+    std::cout << "Avg. end2end latency: " << (static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(sumRuntimeEnd2End).count()) / nTestruns / 1000) << "us\n";
+    std::cout << "Avg. end2end throughput: " << 1 / (static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(sumRuntimeEnd2End).count()) / nTestruns / batchSize / 1000 / 1000 / 1000) << " inferences/s\n";
+    std::cout << "Avg. packing latency: " << (static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(sumRuntimePacking).count()) / nTestruns) << "ns\n";
+    std::cout << "Avg. folding latency: " << (static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(sumRuntimeReshaping).count()) / nTestruns) << "ns\n";
+    std::cout << "Avg. unpacking latency: " << (static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(sumRuntimeUnpacking).count()) / nTestruns) << "ns\n";
+    std::cout << "Avg. raw inference latency:"
+              << (static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(sumRuntimeEnd2End).count()) / nTestruns) -
+                     (static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(sumRuntimePacking).count()) / nTestruns) -
+                     (static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(sumRuntimeReshaping).count()) / nTestruns) -
+                     (static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(sumRuntimeUnpacking).count()) / nTestruns)
+              << "ns\n";
+}
+
 /**
  * @brief Run a throughput test to test the performance of the driver
  *
@@ -149,139 +227,20 @@ void runThroughputTest(Finn::Driver<true>& baseDriver, logger_type& logger) {
     constexpr bool isInteger = InputFinnType().isInteger();
     if constexpr (isInteger) {
         using dtype = Finn::UnpackingAutoRetType::IntegralType<InputFinnType>;
-
-        Finn::vector<dtype> testInputs(elementcount * batchSize);
-
-        std::random_device rndDevice;
-        std::mt19937 mersenneEngine{rndDevice()};  // Generates random integers
-        std::uniform_int_distribution<dtype> dist{static_cast<dtype>(InputFinnType().min()), static_cast<dtype>(InputFinnType().max())};
-
-        auto gen = [&dist, &mersenneEngine]() { return dist(mersenneEngine); };
-
-        constexpr size_t nTestruns = 5000;
-        std::chrono::duration<double> sumRuntimeEnd2End{};
-
-        // Warmup
-        std::fill(testInputs.begin(), testInputs.end(), 1);
-        auto warmup = baseDriver.inferSynchronous(testInputs.begin(), testInputs.end());
-        Finn::DoNotOptimize(warmup);
-
-        for (size_t i = 0; i < nTestruns; ++i) {
-            std::generate(testInputs.begin(), testInputs.end(), gen);
-            const auto start = std::chrono::high_resolution_clock::now();
-            auto ret = baseDriver.inferSynchronous(testInputs.begin(), testInputs.end());
-            Finn::DoNotOptimize(ret);
-            const auto end = std::chrono::high_resolution_clock::now();
-
-            sumRuntimeEnd2End += (end - start);
-        }
-
-        std::chrono::duration<double> sumRuntimePacking{};
-        std::chrono::duration<double> sumRuntimeUnpacking{};
-        std::chrono::duration<double> sumRuntimeReshaping{};
-
-        for (size_t i = 0; i < nTestruns; ++i) {
-            std::generate(testInputs.begin(), testInputs.end(), gen);
-            const auto start = std::chrono::high_resolution_clock::now();
-            static auto foldedShape = static_cast<Finn::ExtendedBufferDescriptor*>(baseDriver.getConfig().deviceWrappers[0].idmas[0].get())->foldedShape;
-            foldedShape[0] = batchSize;
-            const Finn::DynamicMdSpan reshapedInput(testInputs.begin(), testInputs.end(), foldedShape);
-            const auto reshape = std::chrono::high_resolution_clock::now();
-            auto packed = Finn::packMultiDimensionalInputs<InputFinnType>(testInputs.begin(), testInputs.end(), reshapedInput, foldedShape.back());
-            Finn::DoNotOptimize(packed);
-            const auto end = std::chrono::high_resolution_clock::now();
-
-            sumRuntimeReshaping += (reshape - start);
-            sumRuntimePacking += (end - reshape);
-        }
-
-        auto packedOutput = baseDriver.getConfig().deviceWrappers[0].odmas[0]->packedShape;
-        packedOutput[0] = batchSize;
-        std::vector<uint8_t> unpackingInputs(FinnUtils::shapeToElements(packedOutput));
-        for (size_t i = 0; i < nTestruns; ++i) {
-            const auto start = std::chrono::high_resolution_clock::now();
-            auto foldedOutput = static_cast<Finn::ExtendedBufferDescriptor*>(baseDriver.getConfig().deviceWrappers[0].odmas[0].get())->foldedShape;
-            foldedOutput[0] = batchSize;
-            const Finn::DynamicMdSpan reshapedOutput(unpackingInputs.begin(), unpackingInputs.end(), packedOutput);
-            auto unpacked = Finn::unpackMultiDimensionalOutputs<OutputFinnType>(unpackingInputs.begin(), unpackingInputs.end(), reshapedOutput, foldedOutput);
-            Finn::DoNotOptimize(unpacked);
-            const auto end = std::chrono::high_resolution_clock::now();
-            sumRuntimeUnpacking += (end - start);
-        }
-
-        std::cout << "Avg. end2end latency: " << (static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(sumRuntimeEnd2End).count()) / nTestruns / 1000) << "us\n";
-        std::cout << "Avg. end2end throughput: " << 1 / (static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(sumRuntimeEnd2End).count()) / nTestruns / batchSize / 1000 / 1000 / 1000) << " inferences/s\n";
-        std::cout << "Avg. packing latency: " << (static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(sumRuntimePacking).count()) / nTestruns) << "ns\n";
-        std::cout << "Avg. folding latency: " << (static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(sumRuntimeReshaping).count()) / nTestruns) << "ns\n";
-        std::cout << "Avg. unpacking latency: " << (static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(sumRuntimeUnpacking).count()) / nTestruns) << "ns\n";
-        std::cout << "Avg. raw inference latency:"
-                  << (static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(sumRuntimeEnd2End).count()) / nTestruns) -
-                         (static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(sumRuntimePacking).count()) / nTestruns) -
-                         (static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(sumRuntimeReshaping).count()) / nTestruns) -
-                         (static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(sumRuntimeUnpacking).count()) / nTestruns)
-                  << "ns\n";
-
+        runThroughputTestImpl<dtype>(baseDriver, elementcount, batchSize);
         // benchmark each step in call chain for int
     } else {
-        std::vector<float> testInputs(elementcount * batchSize);
-        std::random_device rndDevice;
-        std::mt19937 mersenneEngine{rndDevice()};  // Generates random integers
-        std::uniform_real_distribution<float> dist{static_cast<float>(InputFinnType().min()), static_cast<float>(InputFinnType().max())};
-
-        auto gen = [&dist, &mersenneEngine]() { return dist(mersenneEngine); };
-
-        constexpr size_t nTestruns = 1000;
-        std::chrono::duration<double> sumRuntimeEnd2End{};
-
-        for (size_t i = 0; i < nTestruns; ++i) {
-            std::generate(testInputs.begin(), testInputs.end(), gen);
-            const auto start = std::chrono::high_resolution_clock::now();
-            auto ret = baseDriver.inferSynchronous(testInputs.begin(), testInputs.end());
-            Finn::DoNotOptimize(ret);
-            const auto end = std::chrono::high_resolution_clock::now();
-
-            sumRuntimeEnd2End += end - start;
-        }
-
-        std::chrono::duration<double> sumRuntimePacking{};
-        std::chrono::duration<double> sumRuntimeUnpacking{};
-        std::chrono::duration<double> sumRuntimeReshaping{};
-
-        for (size_t i = 0; i < nTestruns; ++i) {
-            std::generate(testInputs.begin(), testInputs.end(), gen);
-            const auto start = std::chrono::high_resolution_clock::now();
-            auto packedShape = baseDriver.getConfig().deviceWrappers[0].idmas[0]->packedShape;
-            packedShape[0] = batchSize;
-            const Finn::DynamicMdSpan reshapedInput(testInputs.begin(), testInputs.end(), packedShape);
-            const auto reshape = std::chrono::high_resolution_clock::now();
-            auto packed = Finn::packMultiDimensionalInputs<InputFinnType>(testInputs.begin(), testInputs.end(), reshapedInput, packedShape.back());
-            Finn::DoNotOptimize(packed);
-            const auto end = std::chrono::high_resolution_clock::now();
-
-            sumRuntimeReshaping += reshape - start;
-            sumRuntimePacking += end - reshape;
-        }
-
-        auto packedOutput = baseDriver.getConfig().deviceWrappers[0].odmas[0]->packedShape;
-        packedOutput[0] = batchSize;
-        std::vector<uint8_t> unpackingInputs(FinnUtils::shapeToElements(packedOutput));
-        for (size_t i = 0; i < nTestruns; ++i) {
-            const auto start = std::chrono::high_resolution_clock::now();
-            auto foldedOutput = static_cast<Finn::ExtendedBufferDescriptor*>(baseDriver.getConfig().deviceWrappers[0].odmas[0].get())->foldedShape;
-            foldedOutput[0] = batchSize;
-            const Finn::DynamicMdSpan reshapedOutput(unpackingInputs.begin(), unpackingInputs.end(), packedOutput);
-            auto unpacked = Finn::unpackMultiDimensionalOutputs<OutputFinnType>(unpackingInputs.begin(), unpackingInputs.end(), reshapedOutput, foldedOutput);
-            Finn::DoNotOptimize(unpacked);
-            const auto end = std::chrono::high_resolution_clock::now();
-            sumRuntimeUnpacking += end - start;
-        }
-
-        std::cout << "Avg. end2end latency: " << (static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(sumRuntimeEnd2End).count()) / nTestruns / batchSize / 1000) << "us\n";
-        std::cout << "Avg. end2end throughput: " << 1 / (static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(sumRuntimeEnd2End).count()) / nTestruns / batchSize / 1000 / 1000 / 1000) << " inferences/s\n";
-        std::cout << "Avg. packing latency: " << (static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(sumRuntimePacking).count()) / nTestruns / batchSize) << "ns\n";
-        std::cout << "Avg. folding latency: " << (static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(sumRuntimeReshaping).count()) / nTestruns / batchSize) << "ns\n";
-        std::cout << "Avg. unpacking latency: " << (static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(sumRuntimeUnpacking).count()) / nTestruns / batchSize) << "ns\n";
+        runThroughputTestImpl<float>(baseDriver, elementcount, batchSize);
     }
+}
+
+template<typename T>
+void loadInferDump(Finn::Driver<true>& baseDriver, xt::detail::npy_file& loadedNpyFile, const std::string& outputFile) {
+    auto xtensorArray = std::move(loadedNpyFile).cast<T, xt::layout_type::dynamic>();
+    Finn::vector<T> vec(xtensorArray.begin(), xtensorArray.end());
+    auto ret = baseDriver.inferSynchronous(vec.begin(), vec.end());
+    auto xarr = xt::adapt(ret, (std::static_pointer_cast<Finn::ExtendedBufferDescriptor>(baseDriver.getConfig().deviceWrappers[0].odmas[0]))->normalShape);
+    xt::dump_npy(outputFile, xarr);
 }
 
 /**
@@ -302,18 +261,10 @@ void inferFloatingPoint(Finn::Driver<true>& baseDriver, xt::detail::npy_file& lo
     int size = std::stoi(loadedNpyFile.m_typestring, &sizePos);
     if (size == 4) {
         // float
-        auto xtensorArray = std::move(loadedNpyFile).cast<float, xt::layout_type::dynamic>();
-        Finn::vector<float> vec(xtensorArray.begin(), xtensorArray.end());
-        auto ret = baseDriver.inferSynchronous(vec.begin(), vec.end());
-        auto xarr = xt::adapt(ret, (std::static_pointer_cast<Finn::ExtendedBufferDescriptor>(baseDriver.getConfig().deviceWrappers[0].odmas[0]))->normalShape);
-        xt::dump_npy(outputFile, xarr);
+        loadInferDump<float>(baseDriver, loadedNpyFile, outputFile);
     } else if (size == 8) {
         // double
-        auto xtensorArray = std::move(loadedNpyFile).cast<double, xt::layout_type::dynamic>();
-        Finn::vector<double> vec(xtensorArray.begin(), xtensorArray.end());
-        auto ret = baseDriver.inferSynchronous(vec.begin(), vec.end());
-        auto xarr = xt::adapt(ret, (std::static_pointer_cast<Finn::ExtendedBufferDescriptor>(baseDriver.getConfig().deviceWrappers[0].odmas[0]))->normalShape);
-        xt::dump_npy(outputFile, xarr);
+        loadInferDump<double>(baseDriver, loadedNpyFile, outputFile);
     } else {
         FinnUtils::logAndError<std::runtime_error>("Unsupported floating point type detected when loading input npy file!");
     }
@@ -332,32 +283,16 @@ void inferSignedInteger(Finn::Driver<true>& baseDriver, xt::detail::npy_file& lo
     int size = std::stoi(loadedNpyFile.m_typestring, &sizePos);
     if (size == 1) {
         // int8_t
-        auto xtensorArray = std::move(loadedNpyFile).cast<int8_t, xt::layout_type::dynamic>();
-        Finn::vector<int8_t> vec(xtensorArray.begin(), xtensorArray.end());
-        auto ret = baseDriver.inferSynchronous(vec.begin(), vec.end());
-        auto xarr = xt::adapt(ret, (std::static_pointer_cast<Finn::ExtendedBufferDescriptor>(baseDriver.getConfig().deviceWrappers[0].odmas[0]))->normalShape);
-        xt::dump_npy(outputFile, xarr);
+        loadInferDump<int8_t>(baseDriver, loadedNpyFile, outputFile);
     } else if (size == 2) {
         // int16_t
-        auto xtensorArray = std::move(loadedNpyFile).cast<int16_t, xt::layout_type::dynamic>();
-        Finn::vector<int16_t> vec(xtensorArray.begin(), xtensorArray.end());
-        auto ret = baseDriver.inferSynchronous(vec.begin(), vec.end());
-        auto xarr = xt::adapt(ret, (std::static_pointer_cast<Finn::ExtendedBufferDescriptor>(baseDriver.getConfig().deviceWrappers[0].odmas[0]))->normalShape);
-        xt::dump_npy(outputFile, xarr);
+        loadInferDump<int16_t>(baseDriver, loadedNpyFile, outputFile);
     } else if (size == 4) {
         // int32_t
-        auto xtensorArray = std::move(loadedNpyFile).cast<int32_t, xt::layout_type::dynamic>();
-        Finn::vector<int32_t> vec(xtensorArray.begin(), xtensorArray.end());
-        auto ret = baseDriver.inferSynchronous(vec.begin(), vec.end());
-        auto xarr = xt::adapt(ret, (std::static_pointer_cast<Finn::ExtendedBufferDescriptor>(baseDriver.getConfig().deviceWrappers[0].odmas[0]))->normalShape);
-        xt::dump_npy(outputFile, xarr);
+        loadInferDump<int32_t>(baseDriver, loadedNpyFile, outputFile);
     } else if (size == 8) {
         // int64_t
-        auto xtensorArray = std::move(loadedNpyFile).cast<int64_t, xt::layout_type::dynamic>();
-        Finn::vector<int64_t> vec(xtensorArray.begin(), xtensorArray.end());
-        auto ret = baseDriver.inferSynchronous(vec.begin(), vec.end());
-        auto xarr = xt::adapt(ret, (std::static_pointer_cast<Finn::ExtendedBufferDescriptor>(baseDriver.getConfig().deviceWrappers[0].odmas[0]))->normalShape);
-        xt::dump_npy(outputFile, xarr);
+        loadInferDump<int64_t>(baseDriver, loadedNpyFile, outputFile);
     } else {
         FinnUtils::logAndError<std::runtime_error>("Unsupported signed integer type detected when loading input npy file!");
     }
@@ -376,32 +311,16 @@ void inferUnsignedInteger(Finn::Driver<true>& baseDriver, xt::detail::npy_file& 
     int size = std::stoi(loadedNpyFile.m_typestring, &sizePos);
     if (size == 1) {
         // uint8_t
-        auto xtensorArray = std::move(loadedNpyFile).cast<uint8_t, xt::layout_type::dynamic>();
-        Finn::vector<uint8_t> vec(xtensorArray.begin(), xtensorArray.end());
-        auto ret = baseDriver.inferSynchronous(vec.begin(), vec.end());
-        auto xarr = xt::adapt(ret, (std::static_pointer_cast<Finn::ExtendedBufferDescriptor>(baseDriver.getConfig().deviceWrappers[0].odmas[0]))->normalShape);
-        xt::dump_npy(outputFile, xarr);
+        loadInferDump<uint8_t>(baseDriver, loadedNpyFile, outputFile);
     } else if (size == 2) {
         // uint16_t
-        auto xtensorArray = std::move(loadedNpyFile).cast<uint16_t, xt::layout_type::dynamic>();
-        Finn::vector<uint16_t> vec(xtensorArray.begin(), xtensorArray.end());
-        auto ret = baseDriver.inferSynchronous(vec.begin(), vec.end());
-        auto xarr = xt::adapt(ret, (std::static_pointer_cast<Finn::ExtendedBufferDescriptor>(baseDriver.getConfig().deviceWrappers[0].odmas[0]))->normalShape);
-        xt::dump_npy(outputFile, xarr);
+        loadInferDump<uint16_t>(baseDriver, loadedNpyFile, outputFile);
     } else if (size == 4) {
         // uint32_t
-        auto xtensorArray = std::move(loadedNpyFile).cast<uint32_t, xt::layout_type::dynamic>();
-        Finn::vector<uint32_t> vec(xtensorArray.begin(), xtensorArray.end());
-        auto ret = baseDriver.inferSynchronous(vec.begin(), vec.end());
-        auto xarr = xt::adapt(ret, (std::static_pointer_cast<Finn::ExtendedBufferDescriptor>(baseDriver.getConfig().deviceWrappers[0].odmas[0]))->normalShape);
-        xt::dump_npy(outputFile, xarr);
+        loadInferDump<uint32_t>(baseDriver, loadedNpyFile, outputFile);
     } else if (size == 8) {
         // uint64_t
-        auto xtensorArray = std::move(loadedNpyFile).cast<uint64_t, xt::layout_type::dynamic>();
-        Finn::vector<uint64_t> vec(xtensorArray.begin(), xtensorArray.end());
-        auto ret = baseDriver.inferSynchronous(vec.begin(), vec.end());
-        auto xarr = xt::adapt(ret, (std::static_pointer_cast<Finn::ExtendedBufferDescriptor>(baseDriver.getConfig().deviceWrappers[0].odmas[0]))->normalShape);
-        xt::dump_npy(outputFile, xarr);
+        loadInferDump<uint64_t>(baseDriver, loadedNpyFile, outputFile);
     } else {
         FinnUtils::logAndError<std::runtime_error>("Unsupported floating point type detected when loading input npy file!");
     }

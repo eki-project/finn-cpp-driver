@@ -84,6 +84,14 @@ namespace Finn {
          */
         logger_type& logger;
 
+        void busyWait() {
+            // Wait until the IP is DONE
+            uint32_t axi_ctrl = 0;
+            while ((axi_ctrl & IP_IDLE) != IP_IDLE) {
+                axi_ctrl = assocIPCore.read_register(CSR_OFFSET);
+            }
+        }
+
          private:
         unsigned int getGroupId(const xrt::device& device, const xrt::uuid& uuid, const std::string& computeUnit) { return xrt::kernel(device, uuid, computeUnit).group_id(0); }
 
@@ -185,6 +193,19 @@ namespace Finn {
          */
         virtual shape_t& getPackedShape() { return shapePacked; }
 
+        /**
+         * @brief Run the associated kernel
+         *
+         * @return true Success
+         * @return false Fail
+         */
+        virtual bool run() = 0;
+
+        virtual bool wait() {
+            busyWait();
+            return true;
+        };
+
          protected:
         /**
          * @brief Returns a device prefix for logging
@@ -220,15 +241,6 @@ namespace Finn {
 
             // Start inference
             assocIPCore.write_register(CSR_OFFSET, IP_START);
-        }
-
-        ert_cmd_state busyWait() {
-            // Wait until the IP is DONE
-            uint32_t axi_ctrl = 0;
-            while ((axi_ctrl & IP_IDLE) != IP_IDLE) {
-                axi_ctrl = assocIPCore.read_register(CSR_OFFSET);
-            }
-            return ert_cmd_state::ERT_CMD_STATE_COMPLETED;
         }
     };
 
@@ -271,14 +283,6 @@ namespace Finn {
          * @param pShapePacked packed shape of input
          */
         DeviceInputBuffer(const std::string& pCUName, xrt::device& device, xrt::uuid& pDevUUID, const shapePacked_t& pShapePacked, unsigned int batchSize = 1) : DeviceBuffer<T>(pCUName, device, pDevUUID, pShapePacked, batchSize){};
-
-        /**
-         * @brief Run the kernel to input data from FPGA memory into the accelerator design
-         *
-         * @return true Success
-         * @return false Fail
-         */
-        virtual void run(std::promise<ert_cmd_state>& run_promise) = 0;
 
         /**
          * @brief Store the given vector of data in the FPGA mem map
@@ -361,12 +365,10 @@ namespace Finn {
          */
         virtual Finn::vector<T> getData() = 0;
         /**
-         * @brief Start XRT kernel to read data from accelerator design into FPGA memory
+         * @brief Sync data from the FPGA back to the host
          *
-         * @param samples
-         * @return ert_cmd_state
          */
-        virtual ert_cmd_state read(unsigned int samples) = 0;
+        virtual bool read() = 0;
 
          protected:
         /**

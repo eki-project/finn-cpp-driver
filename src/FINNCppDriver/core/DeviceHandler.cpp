@@ -30,7 +30,6 @@
 #include <utility>  // for move
 #include <vector>   // for vector
 
-#include "ert.h"
 #include "xrt/xrt_device.h"
 #include "xrt/xrt_uuid.h"  // for uuid
 
@@ -155,15 +154,40 @@ namespace Finn {
 
     [[maybe_unused]] unsigned int DeviceHandler::getDeviceIndex() const { return xrtDeviceIndex; }
 
-    void DeviceHandler::run(const std::string& inputBufferKernelName, std::promise<ert_cmd_state>& runPromise) {
-        if (!inputBufferMap.contains(inputBufferKernelName)) {
-            auto newlineFold = [](std::string a, const auto& b) { return std::move(a) + '\n' + std::move(b.first); };
-            std::string existingNames = "Existing buffer names:";
-            std::accumulate(inputBufferMap.begin(), inputBufferMap.end(), existingNames, newlineFold);
-            FinnUtils::logAndError<std::runtime_error>(loggerPrefix() + " [run] Tried accessing kernel/buffer with name " + inputBufferKernelName + " but this kernel / buffer does not exist! " + existingNames);
+    bool DeviceHandler::run() {
+        // Start the output kernels before the input to overlap the execution in a better way
+        bool ret = true;
+        // cppcheck-suppress unusedVariable
+        for (auto&& [key, value] : outputBufferMap) {
+            ret &= value->run();
         }
-        return inputBufferMap.at(inputBufferKernelName)->run(runPromise);
+        // cppcheck-suppress unusedVariable
+        for (auto&& [key, value] : inputBufferMap) {
+            ret &= value->run();
+        }
+        return ret;
     }
+
+    bool DeviceHandler::wait() {
+        // We only need to wait for the outputs, because inputs have to finish before outputs
+        bool ret = true;
+        // cppcheck-suppress unusedVariable
+        for (auto&& [key, value] : outputBufferMap) {
+            ret &= value->wait();
+        }
+        return ret;
+    }
+
+    bool DeviceHandler::read() {
+        // Sync data back from the FPGA
+        bool ret = true;
+        // cppcheck-suppress unusedVariable
+        for (auto&& [key, value] : outputBufferMap) {
+            ret &= value->read();
+        }
+        return ret;
+    }
+
 
     [[maybe_unused]] Finn::vector<uint8_t> DeviceHandler::retrieveResults(const std::string& outputBufferKernelName, bool forceArchival) {
         if (!outputBufferMap.contains(outputBufferKernelName)) {
@@ -177,16 +201,6 @@ namespace Finn {
             // outputBufferMap.at(outputBufferKernelName)->archiveValidBufferParts();
         }
         return outputBufferMap.at(outputBufferKernelName)->getData();
-    }
-
-    ert_cmd_state DeviceHandler::read(const std::string& outputBufferKernelName, unsigned int samples) {
-        if (!outputBufferMap.contains(outputBufferKernelName)) {
-            auto newlineFold = [](std::string a, const auto& b) { return std::move(a) + '\n' + std::move(b.first); };
-            std::string existingNames = "Existing buffer names:";
-            std::accumulate(outputBufferMap.begin(), outputBufferMap.end(), existingNames, newlineFold);
-            FinnUtils::logAndError<std::runtime_error>(loggerPrefix() + " [read] Tried accessing kernel/buffer with name " + outputBufferKernelName + " but this kernel / buffer does not exist! \n" + existingNames);
-        }
-        return outputBufferMap.at(outputBufferKernelName)->read(samples);
     }
 
     size_t DeviceHandler::size(SIZE_SPECIFIER ss, const std::string& bufferName) {

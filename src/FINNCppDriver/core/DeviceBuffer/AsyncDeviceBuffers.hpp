@@ -202,7 +202,7 @@ namespace Finn {
          * @return true
          * @return false
          */
-        void run(std::promise<ert_cmd_state>& run_promise) override { FinnUtils::logAndError<std::runtime_error>("Calling run is not supported for Async execution! This is done automatically."); }
+        bool run() override { return false; }
     };
 
 
@@ -329,6 +329,21 @@ namespace Finn {
          */
         void allocateLongTermStorage([[maybe_unused]] unsigned int expectedEntries) { this->longTermStorage.reserve(expectedEntries * this->ringBuffer.size(SIZE_SPECIFIER::FEATUREMAP_SIZE)); }
 
+        /**
+         * @brief Not supported by the AsyncDeviceOutputBuffer.
+         *
+         * @return false
+         */
+        bool read() override { return false; }
+
+        /**
+         * @brief Not supported for AsyncDeviceOutputBuffer
+         *
+         * @return true
+         * @return false
+         */
+        bool run() override { return false; }
+
          protected:
         /**
          * @brief Store the contents of the memory map into the ring buffer.
@@ -344,14 +359,6 @@ namespace Finn {
          *
          */
         void clearArchive() { this->longTermStorage.clear(); }
-
-        /**
-         * @brief Not supported by the AsyncDeviceOutputBuffer.
-         *
-         * @param samples
-         * @return ert_cmd_state Returns error every time.
-         */
-        ert_cmd_state read(unsigned int samples) override { return ert_cmd_state::ERT_CMD_STATE_ERROR; }
     };
 }  // namespace Finn
 

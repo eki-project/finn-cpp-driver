@@ -120,13 +120,11 @@ namespace Finn {
          * @return true
          * @return false
          */
-        void run(std::promise<ert_cmd_state>& run_promise) override {
+        bool run() override {
             FINN_LOG_DEBUG(this->logger, loglevel::info) << this->loggerPrefix() << "DeviceBuffer (" << this->name << ") executing...";
-            std::thread([this, &run_promise] {
-                this->sync(FinnUtils::shapeToElements(this->shapePacked));
-                this->execute(this->shapePacked[0]);
-                run_promise.set_value_at_thread_exit(this->busyWait());
-            }).detach();
+            this->sync(FinnUtils::shapeToElements(this->shapePacked));
+            this->execute(this->shapePacked[0]);
+            return true;
         }
     };
 
@@ -223,17 +221,26 @@ namespace Finn {
         }
 
         /**
+         * @brief Execute the output kernel.
+         *
+         * @return true
+         * @return false
+         */
+        bool run() override {
+            FINN_LOG_DEBUG(this->logger, loglevel::info) << this->loggerPrefix() << "DeviceBuffer (" << this->name << ") executing...";
+            this->execute(this->shapePacked[0]);
+            return true;
+        }
+
+        /**
          * @brief Read the specified number of batchSize. If a read fails, immediately return. If all are successful, the kernel state of the last run is returned
          *
-         * @param batchSize
-         * @return ert_cmd_state
+         * @return bool
          */
-        ert_cmd_state read(unsigned int batchSize) override {
-            FINN_LOG_DEBUG(this->logger, loglevel::info) << this->loggerPrefix() << "Reading " << batchSize << " samples from the device";
-            this->execute(batchSize);
-            const ert_cmd_state outExecuteResult = this->busyWait();
+        bool read() override {
+            FINN_LOG_DEBUG(this->logger, loglevel::info) << this->loggerPrefix() << "Synching  " << elementCount << " bytes from the device";
             this->sync(elementCount);
-            return outExecuteResult;
+            return true;
         }
     };
 }  // namespace Finn

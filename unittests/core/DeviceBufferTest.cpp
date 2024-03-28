@@ -49,7 +49,7 @@ TEST_F(DBTest, DBOutputTest) {
     Finn::vector<uint8_t> data(buffer.size(SIZE_SPECIFIER::TOTAL_DATA_SIZE));
     FinnUtils::BufferFiller(0, 255).fillRandom(data.begin(), data.end());
     buffer.testSetMap(data);
-    buffer.read(FinnUnittest::parts);
+    buffer.read();
     auto vec = buffer.getData();
     EXPECT_EQ(data, vec);
 }

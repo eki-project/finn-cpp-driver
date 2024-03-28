@@ -22,8 +22,6 @@
 #include <iterator>   // for back_insert_iterator
 #include <stdexcept>  // for runtime_error
 
-#include "ert.h"  // for ert_cmd_state
-
 namespace Finn {
     Accelerator::Accelerator(const std::vector<DeviceWrapper>& deviceDefinitions, bool synchronousInference, unsigned int hostBufferSize) {
         std::transform(deviceDefinitions.begin(), deviceDefinitions.end(), std::back_inserter(devices), [hostBufferSize, synchronousInference](const DeviceWrapper& dew) { return DeviceHandler(dew, synchronousInference, hostBufferSize); });
@@ -78,20 +76,32 @@ namespace Finn {
         }
     }
 
-    void Accelerator::run(const unsigned int deviceIndex, const std::string& inputBufferKernelName, std::promise<ert_cmd_state>& runPromise) {
-        if (containsDevice(deviceIndex)) {
-            return getDeviceHandler(deviceIndex).run(inputBufferKernelName, runPromise);
-        } else {
-            if (containsDevice(0)) {
-                return getDeviceHandler(0).run(inputBufferKernelName, runPromise);
-            } else {
-                // cppcheck-suppress missingReturn
-                FinnUtils::logAndError<std::runtime_error>("Tried running data in a devicehandler with an invalid deviceIndex!");
-            }
+    bool Accelerator::run() {
+        bool ret = true;
+        for (auto&& dev : devices) {
+            ret &= dev.run();
         }
+        return ret;
     }
 
-    Finn::vector<uint8_t> Accelerator::retrieveResults(const unsigned int deviceIndex, const std::string& outputBufferKernelName, bool forceArchival) {
+    bool Accelerator::wait() {
+        bool ret = true;
+        for (auto&& dev : devices) {
+            // Each of these calls can potentielly block
+            ret &= dev.wait();
+        }
+        return ret;
+    }
+
+    bool Accelerator::read() {
+        bool ret = true;
+        for (auto&& dev : devices) {
+            ret &= dev.read();
+        }
+        return ret;
+    }
+
+    Finn::vector<uint8_t> Accelerator::getOutputData(const unsigned int deviceIndex, const std::string& outputBufferKernelName, bool forceArchival) {
         if (containsDevice(deviceIndex)) {
             FINN_LOG_DEBUG(Logger::getLogger(), loglevel::info) << loggerPrefix() << "Retrieving results from the specified device index! [accelerator.retrueveResults()]";
             return getDeviceHandler(deviceIndex).retrieveResults(outputBufferKernelName, forceArchival);
@@ -102,21 +112,6 @@ namespace Finn {
             } else {
                 // cppcheck-suppress missingReturn
                 FinnUtils::logAndError<std::runtime_error>("Tried receiving data in a devicehandler with an invalid deviceIndex!");
-            }
-        }
-    }
-
-
-    ert_cmd_state Accelerator::read(const unsigned int deviceIndex, const std::string& outputBufferKernelName, unsigned int samples) {
-        if (containsDevice(deviceIndex)) {
-            FINN_LOG_DEBUG(Logger::getLogger(), loglevel::info) << loggerPrefix() << "Reading from the specified device index! [accelerator.read()]";
-            return getDeviceHandler(deviceIndex).read(outputBufferKernelName, samples);
-        } else {
-            if (containsDevice(0)) {
-                FINN_LOG_DEBUG(Logger::getLogger(), loglevel::info) << loggerPrefix() << "Reading from 0 device index! [accelerator.read()]";
-                return getDeviceHandler(0).read(outputBufferKernelName, samples);
-            } else {
-                FinnUtils::logAndError<std::runtime_error>("Tried reading data in a devicehandler with an invalid deviceIndex!");
             }
         }
     }

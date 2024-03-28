@@ -18,11 +18,9 @@
 
 #include <cinttypes>  // for uint8_t
 #include <cstddef>    // for size_t
-#include <future>     // for promise
 #include <string>     // for string
 #include <vector>     // for vector, vector<>::iter...
 
-#include "ert.h"  // for ert_cmd_state
 namespace Finn {
     struct DeviceWrapper;
 }  // namespace Finn
@@ -136,14 +134,28 @@ namespace Finn {
         void setBatchSize(uint batchsize);
 
         /**
-         * @brief Run the given buffer. Returns false if no valid data was found to execute on.
+         * @brief Run the accelerator with the stored input
          *
-         * @param deviceIndex
-         * @param inputBufferKernelName
-         * @return true
-         * @return false
+         * @return true success
+         * @return false failure
          */
-        void run(unsigned int deviceIndex, const std::string& inputBufferKernelName, std::promise<ert_cmd_state>& runPromise);
+        bool run();
+
+        /**
+         * @brief Wait for the accelerator run to finish
+         *
+         * @return true success
+         * @return false failure
+         */
+        bool wait();
+
+        /**
+         * @brief Reads the buffers from all fpga devices
+         *
+         * @return true success
+         * @return false failure
+         */
+        bool read();
 
         /**
          * @brief Return a vector of output samples.
@@ -153,17 +165,7 @@ namespace Finn {
          * @param forceArchival Whether or not to force a readout into archive. Necessary to get new data. Will be done automatically if a whole multiple of the buffer size is produced
          * @return std::vector<std::vector<uint8_t>>
          */
-        Finn::vector<uint8_t> retrieveResults(unsigned int deviceIndex, const std::string& outputBufferKernelName, bool forceArchival);
-
-        /**
-         * @brief Execute the output kernel and return it's result. If a run fails, the function returns early, with the corresponding ert_cmd_state.
-         *
-         * @param deviceIndex
-         * @param outputBufferKernelName
-         * @param samples
-         * @return ert_cmd_state
-         */
-        ert_cmd_state read(unsigned int deviceIndex, const std::string& outputBufferKernelName, unsigned int samples);
+        Finn::vector<uint8_t> getOutputData(unsigned int deviceIndex, const std::string& outputBufferKernelName, bool forceArchival);
 
         /**
          * @brief Get the size of the buffer with the specified device index and buffer name

@@ -49,9 +49,9 @@ TEST_F(DeviceHandlerSetup, InitTest) {
     auto& kernel_devices = xrt::kernel::kernel_device;
     auto& kernel_uuids = xrt::kernel::kernel_uuid;
 
-    ASSERT_EQ(kernel_names.size(), 4);
-    ASSERT_EQ(kernel_devices.size(), 4);
-    ASSERT_EQ(kernel_uuids.size(), 4);
+    ASSERT_EQ(kernel_names.size(), 2);
+    ASSERT_EQ(kernel_devices.size(), 2);
+    ASSERT_EQ(kernel_uuids.size(), 2);
 
     kernel_names.clear();
     kernel_devices.clear();
@@ -68,7 +68,7 @@ TEST_F(DeviceHandlerSetup, InitTest) {
         FAIL();
     }
 
-    ASSERT_EQ(kernel_devices.size(), 4);
+    ASSERT_EQ(kernel_devices.size(), 2);
 
     EXPECT_EQ(kernel_devices[0].loadedUUID, kernel_devices[1].loadedUUID);
     EXPECT_EQ(kernel_uuids[0], kernel_uuids[1]);

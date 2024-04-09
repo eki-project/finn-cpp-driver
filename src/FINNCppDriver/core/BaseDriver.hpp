@@ -426,6 +426,7 @@ namespace Finn {
         template<typename IteratorType>
         [[nodiscard]] Finn::vector<uint8_t> infer(IteratorType first, IteratorType last, uint inputDeviceIndex, const std::string& inputBufferKernelName, uint outputDeviceIndex, const std::string& outputBufferKernelName, uint batchSize,
                                                   bool forceArchival) {
+            const auto start = std::chrono::high_resolution_clock::now();
             FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "Starting inference (raw data)";
             auto storeFunc = accelerator.storeFactory(inputDeviceIndex, inputBufferKernelName);
 
@@ -434,6 +435,10 @@ namespace Finn {
                                                            std::to_string(size(SIZE_SPECIFIER::FEATUREMAP_SIZE, inputDeviceIndex, inputBufferKernelName)) + "*" + std::to_string(batchSize) + "=" +
                                                            std::to_string(size(SIZE_SPECIFIER::TOTAL_DATA_SIZE, inputDeviceIndex, inputBufferKernelName)) + ")");
             }
+            const auto end = std::chrono::high_resolution_clock::now();
+
+            auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+            std::cout << "preamble infer took " << ns << " ns\n";
 
             bool stored = storeFunc(first, last);
 

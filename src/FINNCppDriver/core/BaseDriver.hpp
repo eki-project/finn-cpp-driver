@@ -304,7 +304,7 @@ namespace Finn {
         template<typename V = Finn::UnpackingAutoRetType::AutoRetType<S>, typename = std::enable_if<!SynchronousInference>>
         [[nodiscard]] Finn::vector<V> getResults(uint outputDeviceIndex, const std::string& outputBufferKernelName, bool forceArchival) {
             // TODO(linusjun): maybe this method should block until data is available?
-            auto result = accelerator.retrieveResults(outputDeviceIndex, outputBufferKernelName, forceArchival);
+            auto result = accelerator.getOutputData(outputDeviceIndex, outputBufferKernelName, forceArchival);
             return unpack<S, V>(result);
         }
 
@@ -318,7 +318,7 @@ namespace Finn {
         template<typename V = Finn::UnpackingAutoRetType::AutoRetType<S>, typename = std::enable_if<!SynchronousInference>>
         [[nodiscard]] Finn::vector<V> getResults() {
             // TODO(linusjun): maybe this method should block until data is available?
-            auto result = accelerator.retrieveResults(defaultOutputDeviceIndex, defaultOutputKernelName, forceAchieval);
+            auto result = accelerator.getOutputData(defaultOutputDeviceIndex, defaultOutputKernelName, forceAchieval);
             return unpack<S, V>(result);
         }
 
@@ -426,6 +426,7 @@ namespace Finn {
         template<typename IteratorType>
         [[nodiscard]] Finn::vector<uint8_t> infer(IteratorType first, IteratorType last, uint inputDeviceIndex, const std::string& inputBufferKernelName, uint outputDeviceIndex, const std::string& outputBufferKernelName, uint batchSize,
                                                   bool forceArchival) {
+            const auto start = std::chrono::high_resolution_clock::now();
             FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "Starting inference (raw data)";
             auto storeFunc = accelerator.storeFactory(inputDeviceIndex, inputBufferKernelName);
 
@@ -434,29 +435,24 @@ namespace Finn {
                                                            std::to_string(size(SIZE_SPECIFIER::FEATUREMAP_SIZE, inputDeviceIndex, inputBufferKernelName)) + "*" + std::to_string(batchSize) + "=" +
                                                            std::to_string(size(SIZE_SPECIFIER::TOTAL_DATA_SIZE, inputDeviceIndex, inputBufferKernelName)) + ")");
             }
+            const auto end = std::chrono::high_resolution_clock::now();
+
+            auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+            std::cout << "preamble infer took " << ns << " ns\n";
 
             bool stored = storeFunc(first, last);
 
-            std::promise<ert_cmd_state> run_promise;
-            accelerator.run(inputDeviceIndex, inputBufferKernelName, run_promise);
-            std::future<ert_cmd_state> run_future = run_promise.get_future();
+            accelerator.run();
 
 #ifdef UNITTEST
             Finn::vector<uint8_t> data(first, last);
             FINN_LOG(logger, loglevel::info) << "Readback from device buffer confirming data was written to board successfully: " << isSyncedDataEquivalent(inputDeviceIndex, inputBufferKernelName, data);
 #endif
+            accelerator.wait();
 
             FINN_LOG_DEBUG(logger, loglevel::info) << "Reading out buffers";
-            ert_cmd_state resultState = accelerator.read(outputDeviceIndex, outputBufferKernelName, batchSize);
-
-            ert_cmd_state run_state = run_future.get();  // Future can only be read once! Do not access run_future again!
-            if (!stored || run_state != ert_cmd_state::ERT_CMD_STATE_COMPLETED || resultState != ert_cmd_state::ERT_CMD_STATE_COMPLETED) {
-                std::stringstream errStr;
-                errStr << "Unspecifiable error during inference (store success:" << std::boolalpha << stored << std::noboolalpha << ", Input ert state: " << run_state << ", Output ert state: " << resultState << ")!\n";
-                FinnUtils::logAndError<std::runtime_error>(errStr.str());
-            }
-
-            return accelerator.retrieveResults(outputDeviceIndex, outputBufferKernelName, forceArchival);
+            accelerator.read();
+            return accelerator.getOutputData(outputDeviceIndex, outputBufferKernelName, forceArchival);
         }
 
         /**

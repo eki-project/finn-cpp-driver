@@ -21,7 +21,6 @@
 
 #include "gtest/gtest.h"
 #include "xrt/xrt_device.h"
-#include "xrt/xrt_kernel.h"
 
 // Provides config and shapes for testing
 #include "UnittestConfig.h"
@@ -30,7 +29,7 @@ using namespace FinnUnittest;
 class DBTest : public ::testing::Test {
      protected:
     xrt::device device;
-    xrt::kernel kernel;
+    xrt::uuid uuid;
     FinnUtils::BufferFiller filler = FinnUtils::BufferFiller(0, 255);
 
     void SetUp() override {}
@@ -38,7 +37,7 @@ class DBTest : public ::testing::Test {
 };
 
 TEST_F(DBTest, DBStoreTest) {
-    Finn::SyncDeviceInputBuffer<uint8_t> buffer("InputBuffer", device, kernel, FinnUnittest::myShapePacked, FinnUnittest::parts);
+    Finn::SyncDeviceInputBuffer<uint8_t> buffer("InputBuffer", device, uuid, FinnUnittest::myShapePacked, FinnUnittest::parts);
     Finn::vector<uint8_t> data(buffer.size(SIZE_SPECIFIER::FEATUREMAP_SIZE) * buffer.size(SIZE_SPECIFIER::BATCHSIZE));
     FinnUtils::BufferFiller(0, 255).fillRandom(data.begin(), data.end());
     buffer.store({data.begin(), data.end()});
@@ -46,11 +45,11 @@ TEST_F(DBTest, DBStoreTest) {
 }
 
 TEST_F(DBTest, DBOutputTest) {
-    Finn::SyncDeviceOutputBuffer<uint8_t> buffer("OutputBuffer", device, kernel, FinnUnittest::myShapePacked, FinnUnittest::parts);
+    Finn::SyncDeviceOutputBuffer<uint8_t> buffer("OutputBuffer", device, uuid, FinnUnittest::myShapePacked, FinnUnittest::parts);
     Finn::vector<uint8_t> data(buffer.size(SIZE_SPECIFIER::TOTAL_DATA_SIZE));
     FinnUtils::BufferFiller(0, 255).fillRandom(data.begin(), data.end());
     buffer.testSetMap(data);
-    buffer.read(FinnUnittest::parts);
+    buffer.read();
     auto vec = buffer.getData();
     EXPECT_EQ(data, vec);
 }

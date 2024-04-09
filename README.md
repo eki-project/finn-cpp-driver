@@ -64,7 +64,7 @@ git submodule update --init --recursive
 (git checkout <branch>)
 ./buildDependencies.sh
 mkdir build && cd build
-cmake -DCMAKE_BUILD_TYPE=Release -DFINNC_ENABLE_SANITIZERS=Off -DFINN_HEADER_LOCATION=%YOUR_CONFIG_HEADER_LOCATION% ..
+cmake -DCMAKE_BUILD_TYPE=Release -DFINN_ENABLE_SANITIZERS=Off -DFINN_HEADER_LOCATION=%YOUR_CONFIG_HEADER_LOCATION% ..
 make -j $(nprocs)
 ```
 
@@ -78,7 +78,7 @@ By default, the FINN pipeline will not compile the FINN driver for you. After a 
 ```bash
 ./buildDependencies.sh
 mkdir build && cd build
-cmake -DCMAKE_BUILD_TYPE=Release -DFINNC_ENABLE_SANITIZERS=Off ..
+cmake -DCMAKE_BUILD_TYPE=Release -DFINN_ENABLE_SANITIZERS=Off ..
 make -j $(nprocs)
 ```
 
@@ -134,6 +134,7 @@ Use ```xbutil``` to get information about the cards and configure them manually 
 ### External Use
 
 **TLDR:**
+
 ```bash
 git submodule add https://github.com/eki-project/finn-cpp-driver.git
 cd finn-cpp-driver && git checkout dev && cd ..
@@ -154,7 +155,7 @@ add_subdirectory(external/finn-cpp-driver)
 #Link an example application against the finn driver
 #TODO: Maybe rework this so this is nicer with an exported targets?
 add_executable(main main.cpp)
-target_include_directories(main SYSTEM PRIVATE ${XRT_INCLUDE_DIRS} ${FINNC_SRC_DIR})
+target_include_directories(main SYSTEM PRIVATE ${XRT_INCLUDE_DIRS} ${FINN_SRC_DIR})
 target_link_directories(main PRIVATE ${XRT_LIB_CORE_LOCATION} ${XRT_LIB_OCL_LOCATION} ${BOOST_LIBRARYDIR})
 target_link_libraries(main PRIVATE finnc_core OpenCL xrt_coreutil uuid finnc_utils ${Boost_LIBRARIES})
 ```

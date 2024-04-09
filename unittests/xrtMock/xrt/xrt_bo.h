@@ -40,6 +40,8 @@ namespace xrt {
             memmap = createdMap;
             return createdMap;
         }
+
+        uint64_t address() const { return 0; };
     };
 }  // namespace xrt
 

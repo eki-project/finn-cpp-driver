@@ -21,7 +21,6 @@
 #include <thread>
 
 #include "xrt/xrt_device.h"
-#include "xrt/xrt_kernel.h"
 
 // Provides config and shapes for testing
 #include "../unittests/core/UnittestConfig.h"
@@ -32,10 +31,10 @@ const unsigned int benchmarkBufferSize = 10000;
 const unsigned int iterations = 100;
 
 static void BM_VecCopyBase(benchmark::State& state) {
-    auto filler = FinnUtils::BufferFiller(0, 255);
-    auto device = xrt::device();
-    auto kernel = xrt::kernel();
-    auto idb = Finn::SyncDeviceInputBuffer<uint8_t>("Tester", device, kernel, myShapePacked, benchmarkBufferSize);
+    FinnUtils::BufferFiller filler(0, 255);
+    xrt::device device;
+    xrt::uuid uuid;
+    auto idb = Finn::SyncDeviceInputBuffer<uint8_t>("Tester", device, uuid, myShapePacked, benchmarkBufferSize);
     auto dat1 = std::vector<uint8_t>();
     auto dat2 = std::vector<uint8_t>();
     dat1.resize(idb.size(SIZE_SPECIFIER::FEATUREMAP_SIZE));
@@ -55,10 +54,10 @@ BENCHMARK(BM_VecCopyBase)->Iterations(iterations);
 //! Notation: CV = Changing vector, SV = Static vector, RP = Reference passing, IP = Iterator passing
 
 static void BM_StoreCVRP(benchmark::State& state) {
-    auto filler = FinnUtils::BufferFiller(0, 255);
-    auto device = xrt::device();
-    auto kernel = xrt::kernel();
-    auto idb = Finn::SyncDeviceInputBuffer<uint8_t>("Tester", device, kernel, myShapePacked, benchmarkBufferSize);
+    FinnUtils::BufferFiller filler(0, 255);
+    xrt::device device;
+    xrt::uuid uuid;
+    auto idb = Finn::SyncDeviceInputBuffer<uint8_t>("Tester", device, uuid, myShapePacked, benchmarkBufferSize);
     Finn::vector<uint8_t> data;
     data.resize(idb.size(SIZE_SPECIFIER::FEATUREMAP_SIZE));
     for (auto _ : state) {
@@ -72,10 +71,10 @@ BENCHMARK(BM_StoreCVRP)->Iterations(iterations);
 
 
 static void BM_StoreSVRP(benchmark::State& state) {
-    auto filler = FinnUtils::BufferFiller(0, 255);
-    auto device = xrt::device();
-    auto kernel = xrt::kernel();
-    auto idb = Finn::SyncDeviceInputBuffer<uint8_t>("Tester", device, kernel, myShapePacked, benchmarkBufferSize);
+    FinnUtils::BufferFiller filler(0, 255);
+    xrt::device device;
+    xrt::uuid uuid;
+    auto idb = Finn::SyncDeviceInputBuffer<uint8_t>("Tester", device, uuid, myShapePacked, benchmarkBufferSize);
     std::vector<uint8_t> data;
     data.resize(idb.size(SIZE_SPECIFIER::FEATUREMAP_SIZE));
     for (auto _ : state) {
@@ -89,10 +88,10 @@ BENCHMARK(BM_StoreSVRP)->Iterations(iterations);
 
 
 static void BM_StoreCVIP(benchmark::State& state) {
-    auto filler = FinnUtils::BufferFiller(0, 255);
-    auto device = xrt::device();
-    auto kernel = xrt::kernel();
-    auto idb = Finn::SyncDeviceInputBuffer<uint8_t>("Tester", device, kernel, myShapePacked, benchmarkBufferSize);
+    FinnUtils::BufferFiller filler(0, 255);
+    xrt::device device;
+    xrt::uuid uuid;
+    auto idb = Finn::SyncDeviceInputBuffer<uint8_t>("Tester", device, uuid, myShapePacked, benchmarkBufferSize);
     Finn::vector<uint8_t> data;
     data.resize(idb.size(SIZE_SPECIFIER::FEATUREMAP_SIZE));
     for (auto _ : state) {
@@ -105,10 +104,10 @@ BENCHMARK(BM_StoreCVIP)->Iterations(iterations);
 
 
 static void BM_StoreSVIP(benchmark::State& state) {
-    auto filler = FinnUtils::BufferFiller(0, 255);
-    auto device = xrt::device();
-    auto kernel = xrt::kernel();
-    auto idb = Finn::SyncDeviceInputBuffer<uint8_t>("Tester", device, kernel, myShapePacked, benchmarkBufferSize);
+    FinnUtils::BufferFiller filler(0, 255);
+    xrt::device device;
+    xrt::uuid uuid;
+    auto idb = Finn::SyncDeviceInputBuffer<uint8_t>("Tester", device, uuid, myShapePacked, benchmarkBufferSize);
     Finn::vector<uint8_t> data;
     data.resize(idb.size(SIZE_SPECIFIER::FEATUREMAP_SIZE));
     for (auto _ : state) {
@@ -155,10 +154,10 @@ BENCHMARK(BM_StoreFCVIP)->Iterations(iterations);
 */
 
 static void BM_StoreMultithreaded_CVRP(benchmark::State& state) {
-    auto filler = FinnUtils::BufferFiller(0, 255);
-    auto device = xrt::device();
-    auto kernel = xrt::kernel();
-    auto idb = Finn::SyncDeviceInputBuffer<uint8_t>("Tester", device, kernel, myShapePacked, benchmarkBufferSize * 10);
+    FinnUtils::BufferFiller filler(0, 255);
+    xrt::device device;
+    xrt::uuid uuid;
+    auto idb = Finn::SyncDeviceInputBuffer<uint8_t>("Tester", device, uuid, myShapePacked, benchmarkBufferSize * 10);
 
     // Prepare multithreading (allocate beforehand to improve vector performance)
     using Sample = Finn::vector<uint8_t>;

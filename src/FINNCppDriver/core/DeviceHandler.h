@@ -19,19 +19,16 @@
 #include <stddef.h>                         // for size_t
 
 #include <FINNCppDriver/core/DeviceBuffer/DeviceBuffer.hpp>
-#include <cstdint>  // for uint8_t
-#include <future>
-#include <iterator>   // for iterator_traits
-#include <memory>     // for shared_ptr
-#include <span>       // for span
-#include <stdexcept>  // for runtime_error
-#include <string>     // for string
-#include <thread>
+#include <cstdint>        // for uint8_t
+#include <iterator>       // for iterator_traits
+#include <memory>         // for shared_ptr
+#include <span>           // for span
+#include <stdexcept>      // for runtime_error
+#include <string>         // for string
 #include <type_traits>    // for is_same
 #include <unordered_map>  // for unordered_map
 #include <vector>         // for vector
 
-#include "ert.h"
 #include "xrt/xrt_device.h"  // for device
 #include "xrt/xrt_uuid.h"    // for uuid
 
@@ -174,15 +171,29 @@ namespace Finn {
          */
         std::unordered_map<std::string, std::shared_ptr<DeviceOutputBuffer<uint8_t>>>& getOutputBufferMap();
 
+        /**
+         * @brief Run the device with the stored input
+         *
+         * @return true success
+         * @return false failure
+         */
+        bool run();
 
         /**
-         * @brief Run the kernel of the given name. Returns true if successful, returns false if no valid data to write was found
+         * @brief Wait for the device run to finish
          *
-         * @param inputBufferKernelName
-         * @return true
-         * @return false
+         * @return true success
+         * @return false failure
          */
-        void run(const std::string& inputBufferKernelName, std::promise<ert_cmd_state>& run_promise);
+        bool wait();
+
+        /**
+         * @brief Reads the output buffers
+         *
+         * @return true success
+         * @return false failure
+         */
+        bool read();
 
         /**
          * @brief Read from the output buffer on the host. This does NOT execute the output kernel
@@ -192,15 +203,6 @@ namespace Finn {
          * @return Finn::vector<uint8_t>
          */
         Finn::vector<uint8_t> retrieveResults(const std::string& outputBufferKernelName, bool forceArchival);
-
-        /**
-         * @brief Execute the output kernel and return it's result. If a run fails, the function returns early.
-         *
-         * @param outputBufferKernelName
-         * @param samples
-         * @return ert_cmd_state
-         */
-        ert_cmd_state read(const std::string& outputBufferKernelName, unsigned int samples);
 
         /**
          * @brief Return the buffer sizes

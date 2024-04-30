@@ -23,13 +23,13 @@ function(add_unittest test_name)
 
   target_link_directories(${test} PRIVATE ${BOOST_LIBRARYDIR})
 
-  target_include_directories(${test} PRIVATE ${FINNC_SRC_DIR})
+  target_include_directories(${test} PRIVATE ${FINN_SRC_DIR})
 
   target_compile_definitions(${test} PRIVATE UNITTEST=1)
 
   add_test(NAME "${test}"
     COMMAND ${test} ${CATCH_TEST_FILTER}
-    WORKING_DIRECTORY ${FINNC_UNITTEST_DIR}
+    WORKING_DIRECTORY ${FINN_UNITTEST_DIR}
   )
   set_tests_properties("${test}" PROPERTIES LABELS "all")
   set(CTEST_OUTPUT_ON_FAILURE ON)

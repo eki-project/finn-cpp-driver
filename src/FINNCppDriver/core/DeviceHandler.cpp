@@ -11,14 +11,13 @@
  */
 
 #include <FINNCppDriver/core/DeviceHandler.h>
-#include <FINNCppDriver/utils/ConfigurationStructs.h>
 #include <FINNCppDriver/utils/Logger.h>
 #include <FINNCppDriver/utils/Types.h>
 
 #include <FINNCppDriver/core/DeviceBuffer/AsyncDeviceBuffers.hpp>
 #include <FINNCppDriver/core/DeviceBuffer/DeviceBuffer.hpp>
 #include <FINNCppDriver/core/DeviceBuffer/SyncDeviceBuffers.hpp>
-#include <FINNCppDriver/utils/join.hpp>
+#include <algorithm>  // for copy
 #include <boost/cstdint.hpp>
 #include <cerrno>
 #include <chrono>
@@ -31,20 +30,19 @@
 #include <utility>  // for move
 #include <vector>   // for vector
 
-#include "ert.h"
 #include "xrt/xrt_device.h"
-#include "xrt/xrt_kernel.h"
 #include "xrt/xrt_uuid.h"  // for uuid
 
 
 namespace fs = std::filesystem;
 
 namespace Finn {
-    DeviceHandler::DeviceHandler(const DeviceWrapper& devWrap, bool synchronousInference, unsigned int hostBufferSize) : xrtDeviceIndex(devWrap.xrtDeviceIndex), xclbinPath(devWrap.xclbin) {
+    DeviceHandler::DeviceHandler(const DeviceWrapper& devWrap, bool pSynchronousInference, unsigned int hostBufferSize)
+        : synchronousInference(pSynchronousInference), devInformation(devWrap), xrtDeviceIndex(devWrap.xrtDeviceIndex), xclbinPath(devWrap.xclbin) {
         checkDeviceWrapper(devWrap);
         initializeDevice();
         loadXclbinSetUUID();
-        initializeBufferObjects(devWrap, hostBufferSize, synchronousInference);
+        initializeBufferObjects(devWrap, hostBufferSize, pSynchronousInference);
         FINN_LOG(Logger::getLogger(), loglevel::info) << loggerPrefix() << "Finished setting up device " << xrtDeviceIndex;
     }
 
@@ -95,25 +93,22 @@ namespace Finn {
         uuid = device.load_xclbin(xclbinPath);
     }
 
-    void DeviceHandler::initializeBufferObjects(const DeviceWrapper& devWrap, unsigned int hostBufferSize, bool synchronousInference) {
+    void DeviceHandler::initializeBufferObjects(const DeviceWrapper& devWrap, unsigned int hostBufferSize, bool pSynchronousInference) {
         FINN_LOG(Logger::getLogger(), loglevel::info) << loggerPrefix() << "(" << xrtDeviceIndex << ") "
                                                       << "Initializing buffer objects\n";
         for (auto&& ebdptr : devWrap.idmas) {
-            auto tmpKern = xrt::kernel(device, uuid, ebdptr->kernelName, xrt::kernel::cu_access_mode::shared);
-            if (synchronousInference) {
-                inputBufferMap.emplace(std::make_pair(ebdptr->kernelName, std::make_shared<Finn::SyncDeviceInputBuffer<uint8_t>>(ebdptr->kernelName, device, tmpKern, ebdptr->packedShape, hostBufferSize)));
+            if (pSynchronousInference) {
+                inputBufferMap.emplace(std::make_pair(ebdptr->kernelName, std::make_shared<Finn::SyncDeviceInputBuffer<uint8_t>>(ebdptr->kernelName, device, uuid, ebdptr->packedShape, hostBufferSize)));
             } else {
-                inputBufferMap.emplace(std::make_pair(ebdptr->kernelName, std::make_shared<Finn::AsyncDeviceInputBuffer<uint8_t>>(ebdptr->kernelName, device, tmpKern, ebdptr->packedShape, hostBufferSize)));
+                inputBufferMap.emplace(std::make_pair(ebdptr->kernelName, std::make_shared<Finn::AsyncDeviceInputBuffer<uint8_t>>(ebdptr->kernelName, device, uuid, ebdptr->packedShape, hostBufferSize)));
             }
         }
         for (auto&& ebdptr : devWrap.odmas) {
-            auto tmpKern = xrt::kernel(device, uuid, ebdptr->kernelName, xrt::kernel::cu_access_mode::exclusive);
-            if (synchronousInference) {
-                auto ptr = std::make_shared<Finn::SyncDeviceOutputBuffer<uint8_t>>(ebdptr->kernelName, device, tmpKern, ebdptr->packedShape, hostBufferSize);
-                ptr->allocateLongTermStorage(hostBufferSize * 5);
+            if (pSynchronousInference) {
+                auto ptr = std::make_shared<Finn::SyncDeviceOutputBuffer<uint8_t>>(ebdptr->kernelName, device, uuid, ebdptr->packedShape, hostBufferSize);
                 outputBufferMap.emplace(std::make_pair(ebdptr->kernelName, ptr));
             } else {
-                auto ptr = std::make_shared<Finn::AsyncDeviceOutputBuffer<uint8_t>>(ebdptr->kernelName, device, tmpKern, ebdptr->packedShape, hostBufferSize);
+                auto ptr = std::make_shared<Finn::AsyncDeviceOutputBuffer<uint8_t>>(ebdptr->kernelName, device, uuid, ebdptr->packedShape, hostBufferSize);
                 ptr->allocateLongTermStorage(hostBufferSize * 5);
                 outputBufferMap.emplace(std::make_pair(ebdptr->kernelName, ptr));
             }
@@ -126,6 +121,18 @@ namespace Finn {
     }
 
     /****** GETTER / SETTER ******/
+
+    void DeviceHandler::setBatchSize(uint pBatchsize) {
+        if (this->batchsize == pBatchsize) {
+            return;
+        } else {
+            this->batchsize = pBatchsize;
+            inputBufferMap.clear();
+            outputBufferMap.clear();
+            initializeBufferObjects(this->devInformation, pBatchsize, this->synchronousInference);
+        }
+    }
+
     [[maybe_unused]] xrt::device& DeviceHandler::getDevice() { return device; }
 
     [[maybe_unused]] bool DeviceHandler::containsBuffer(const std::string& kernelBufferName, IO ioMode) {
@@ -147,15 +154,40 @@ namespace Finn {
 
     [[maybe_unused]] unsigned int DeviceHandler::getDeviceIndex() const { return xrtDeviceIndex; }
 
-    bool DeviceHandler::run(const std::string& inputBufferKernelName) {
-        if (!inputBufferMap.contains(inputBufferKernelName)) {
-            auto newlineFold = [](std::string a, const auto& b) { return std::move(a) + '\n' + std::move(b.first); };
-            std::string existingNames = "Existing buffer names:";
-            std::accumulate(inputBufferMap.begin(), inputBufferMap.end(), existingNames, newlineFold);
-            FinnUtils::logAndError<std::runtime_error>(loggerPrefix() + " [run] Tried accessing kernel/buffer with name " + inputBufferKernelName + " but this kernel / buffer does not exist! " + existingNames);
+    bool DeviceHandler::run() {
+        // Start the output kernels before the input to overlap the execution in a better way
+        bool ret = true;
+        // cppcheck-suppress unusedVariable
+        for (auto&& [key, value] : outputBufferMap) {
+            ret &= value->run();
         }
-        return inputBufferMap.at(inputBufferKernelName)->run();
+        // cppcheck-suppress unusedVariable
+        for (auto&& [key, value] : inputBufferMap) {
+            ret &= value->run();
+        }
+        return ret;
     }
+
+    bool DeviceHandler::wait() {
+        // We only need to wait for the outputs, because inputs have to finish before outputs
+        bool ret = true;
+        // cppcheck-suppress unusedVariable
+        for (auto&& [key, value] : outputBufferMap) {
+            ret &= value->wait();
+        }
+        return ret;
+    }
+
+    bool DeviceHandler::read() {
+        // Sync data back from the FPGA
+        bool ret = true;
+        // cppcheck-suppress unusedVariable
+        for (auto&& [key, value] : outputBufferMap) {
+            ret &= value->read();
+        }
+        return ret;
+    }
+
 
     [[maybe_unused]] Finn::vector<uint8_t> DeviceHandler::retrieveResults(const std::string& outputBufferKernelName, bool forceArchival) {
         if (!outputBufferMap.contains(outputBufferKernelName)) {
@@ -165,19 +197,10 @@ namespace Finn {
             FinnUtils::logAndError<std::runtime_error>(loggerPrefix() + " [retrieve] Tried accessing kernel/buffer with name " + outputBufferKernelName + " but this kernel / buffer does not exist! " + existingNames);
         }
         if (forceArchival) {
-            outputBufferMap.at(outputBufferKernelName)->archiveValidBufferParts();
+            // TODO(linusjun): Fix for asynchronous inference
+            // outputBufferMap.at(outputBufferKernelName)->archiveValidBufferParts();
         }
-        return outputBufferMap.at(outputBufferKernelName)->retrieveArchive();
-    }
-
-    ert_cmd_state DeviceHandler::read(const std::string& outputBufferKernelName, unsigned int samples) {
-        if (!outputBufferMap.contains(outputBufferKernelName)) {
-            auto newlineFold = [](std::string a, const auto& b) { return std::move(a) + '\n' + std::move(b.first); };
-            std::string existingNames = "Existing buffer names:";
-            std::accumulate(outputBufferMap.begin(), outputBufferMap.end(), existingNames, newlineFold);
-            FinnUtils::logAndError<std::runtime_error>(loggerPrefix() + " [read] Tried accessing kernel/buffer with name " + outputBufferKernelName + " but this kernel / buffer does not exist! \n" + existingNames);
-        }
-        return outputBufferMap.at(outputBufferKernelName)->read(samples);
+        return outputBufferMap.at(outputBufferKernelName)->getData();
     }
 
     size_t DeviceHandler::size(SIZE_SPECIFIER ss, const std::string& bufferName) {

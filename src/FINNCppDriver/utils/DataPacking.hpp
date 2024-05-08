@@ -16,6 +16,7 @@
 #include <FINNCppDriver/utils/CustomDynamicBitset.h>
 #include <FINNCppDriver/utils/FinnUtils.h>
 #include <FINNCppDriver/utils/Types.h>
+#include <omp.h>
 
 #include <FINNCppDriver/utils/AlignedAllocator.hpp>
 #include <FINNCppDriver/utils/DynamicMdSpan.hpp>
@@ -440,7 +441,7 @@ namespace Finn {
             constexpr bool isFix = U().isFixedPoint();
             constexpr bool isInt = U().isInteger();
             if constexpr (isFix) {  // Datatype is Fixed Point Number
-                constexpr std::size_t bytes = static_cast<std::size_t>(FinnUtils::ceil(static_cast<double>(U().bitwidth()) / 8.0));
+                constexpr std::size_t bytes = FinnUtils::fastDivCeil(U().bitwidth(), 8UL);
                 if constexpr (std::is_floating_point_v<T>) {  // floating point T have no shift operation, so replace with multiplication
                     std::transform(first, last, first, [](const T& val) { return val * (1 << U().fracBits()); });
                 } else {
@@ -540,18 +541,22 @@ namespace Finn {
     template<IsDatatype U, typename IteratorType>
     Finn::vector<uint8_t> packMultiDimensionalInputs(IteratorType first, IteratorType last, const Finn::DynamicMdSpan<IteratorType>& dynamicSpan, const std::size_t elementsInnerMostDim) {
         auto innerVecs = dynamicSpan.getMostInnerDims();
+        std::size_t innerVecSize = innerVecs.size();
 
         // preallocate memory to make copy more efficient
         const std::size_t payloadBitsPerInnerDim = elementsInnerMostDim * U().bitwidth();
         constexpr std::size_t byte = 8;
-        const std::size_t neededBytesPerInnerDim = (payloadBitsPerInnerDim % byte) ? payloadBitsPerInnerDim / byte + 1 : payloadBitsPerInnerDim / byte;  // ceil(payloadBitsPerInnerDim/8)
-        const std::size_t neededBytesTotal = neededBytesPerInnerDim * innerVecs.size();
+        const std::size_t neededBytesPerInnerDim = FinnUtils::fastDivCeil(payloadBitsPerInnerDim, byte);
+        const std::size_t neededBytesTotal = neededBytesPerInnerDim * innerVecSize;
 
         Finn::vector<uint8_t> packedMerged(neededBytesTotal);
+        std::size_t threadcount = std::min({(innerVecSize >> 5), static_cast<std::size_t>(omp_get_num_procs()), FinnUtils::fastLog2(innerVecSize) << 1});
+        omp_set_num_threads(threadcount);
+        //        std::cout << (std::min({(innerVecSize >> 5), static_cast<std::size_t>(omp_get_num_procs()), FinnUtils::fastLog2(innerVecSize2)<<1})) << "\n";
 
         // for each most inner dimension
-#pragma omp parallel for if (innerVecs.size() > 100)
-        for (std::size_t i = 0; i < innerVecs.size(); ++i) {
+#pragma omp parallel for
+        for (std::size_t i = 0; i < innerVecSize; ++i) {
             auto packed = Finn::pack<U>(innerVecs[i].begin(), innerVecs[i].end());
             // combine packing results
             std::copy(packed.begin(), packed.end(), packedMerged.begin() + i * neededBytesPerInnerDim);
@@ -575,7 +580,7 @@ namespace Finn {
     Finn::vector<T> unpack(std::span<uint8_t>& inp, std::size_t padding = 0) {
         static_assert(U().bitwidth() <= 64, "Finn Datatypes with more than 64 bit are not supported!");
 
-        constexpr std::size_t neededBytes = FinnUtils::ceil(U().bitwidth() / 8.0);
+        constexpr std::size_t neededBytes = FinnUtils::fastDivCeil(U().bitwidth(), 8UL);
 
         using FourBytesOrLonger = typename std::conditional<neededBytes <= 4, int32_t, int64_t>::type;
         using TwoBytesOrLonger = typename std::conditional<neededBytes == 2, int16_t, FourBytesOrLonger>::type;
@@ -695,13 +700,14 @@ namespace Finn {
     {
         constexpr std::size_t bytes = 8;
         auto innerDimVecs = dynSpan.getMostInnerDims();
+        std::size_t innerVecSize = innerDimVecs.size();
         const std::size_t padding = innerDimVecs[0].size() * bytes - foldedShape.back() * U().bitwidth();
 
         // preallocate memory to make copy more efficient
         const std::size_t retSizeTotal = FinnUtils::shapeToElements(foldedShape);
         Finn::vector<T> unpackedMerged(retSizeTotal);
 
-#pragma omp parallel for if (innerDimVecs.size() > 100)
+#pragma omp parallel for
         for (std::size_t i = 0; i < innerDimVecs.size(); ++i) {
             auto unpacked = Finn::unpack<U>(innerDimVecs[i], padding);
             std::copy(unpacked.begin(), unpacked.end(), unpackedMerged.begin() + i * foldedShape.back());

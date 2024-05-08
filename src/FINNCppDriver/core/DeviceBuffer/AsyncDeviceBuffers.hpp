@@ -105,13 +105,13 @@ namespace Finn {
          *
          */
         void runInternal(std::stop_token stoken) {
-            const std::size_t elementCount = this->ringBuffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART);
+            const std::size_t elementCount = this->ringBuffer.size(SIZE_SPECIFIER::FEATUREMAP_SIZE);
             while (!stoken.stop_requested()) {
                 if (!this->loadMap(stoken)) {  // blocks
                     break;
                 }
                 this->sync(elementCount);
-                this->execute();
+                // this->execute(); TODO(linusjun): Fix all this shit!
             }
             FINN_LOG(this->logger, loglevel::info) << "Asynchronous Input buffer runner terminated";
         }
@@ -126,8 +126,8 @@ namespace Finn {
          * @param pShapePacked packed shape of input
          * @param ringBufferSizeFactor size of ringbuffer in input elements (batch elements)
          */
-        AsyncDeviceInputBuffer(const std::string& pName, xrt::device& device, xrt::kernel& pAssociatedKernel, const shapePacked_t& pShapePacked, unsigned int ringBufferSizeFactor)
-            : DeviceInputBuffer<T>(pName, device, pAssociatedKernel, pShapePacked),
+        AsyncDeviceInputBuffer(const std::string& pCUName, xrt::device& device, xrt::uuid& pDevUUID, const shapePacked_t& pShapePacked, unsigned int ringBufferSizeFactor)
+            : DeviceInputBuffer<T>(pCUName, device, pDevUUID, pShapePacked),
               detail::AsyncBufferWrapper<T>(ringBufferSizeFactor, FinnUtils::shapeToElements(pShapePacked)),
               workerThread(std::jthread(std::bind_front(&AsyncDeviceInputBuffer::runInternal, this))){};
 
@@ -185,16 +185,6 @@ namespace Finn {
 
          protected:
         /**
-         * @brief Start a run on the associated kernel and wait for it's result.
-         * @attention This method is blocking
-         *
-         */
-        ert_cmd_state execute() override {
-            auto runCall = this->associatedKernel(this->internalBo, 1);
-            return runCall.wait();
-        }
-
-        /**
          * @brief  Load data from the ring buffer into the memory map of the device.
          * @attention Invalidates the data that was moved to map
          *
@@ -212,7 +202,7 @@ namespace Finn {
          * @return true
          * @return false
          */
-        bool run() override { FinnUtils::logAndError<std::runtime_error>("Calling run is not supported for Async execution! This is done automatically."); }
+        bool run() override { return false; }
     };
 
 
@@ -229,17 +219,17 @@ namespace Finn {
          private:
         void readInternal(std::stop_token stoken) {
             FINN_LOG_DEBUG(this->logger, loglevel::info) << this->loggerPrefix() << "Starting to read from the device";
-            const std::size_t elementCount = this->ringBuffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART);
+            const std::size_t elementCount = this->ringBuffer.size(SIZE_SPECIFIER::FEATUREMAP_SIZE);
             while (!stoken.stop_requested()) {
-                auto outExecuteResult = execute();
-                std::cout << outExecuteResult << "\n";
-                if (outExecuteResult != ERT_CMD_STATE_COMPLETED && outExecuteResult != ERT_CMD_STATE_ERROR && outExecuteResult != ERT_CMD_STATE_ABORT) {
-                    continue;
-                }
-                if (outExecuteResult == ERT_CMD_STATE_ERROR || outExecuteResult == ERT_CMD_STATE_ABORT) {
-                    FINN_LOG(this->logger, loglevel::error) << "A problem has occured during the read process of the FPGA output.";
-                    continue;
-                }
+                // auto outExecuteResult = execute();
+                // std::cout << outExecuteResult << "\n";
+                // if (outExecuteResult != ERT_CMD_STATE_COMPLETED && outExecuteResult != ERT_CMD_STATE_ERROR && outExecuteResult != ERT_CMD_STATE_ABORT) {
+                //     continue;
+                // }
+                // if (outExecuteResult == ERT_CMD_STATE_ERROR || outExecuteResult == ERT_CMD_STATE_ABORT) {
+                //     FINN_LOG(this->logger, loglevel::error) << "A problem has occured during the read process of the FPGA output.";
+                //     continue;
+                // }
                 this->sync(elementCount);
                 saveMap();
                 if (this->ringBuffer.full()) {  // TODO(linusjun): Allow registering of callback for this event?
@@ -258,8 +248,8 @@ namespace Finn {
          * @param pShapePacked packed shape of input
          * @param ringBufferSizeFactor size of ringbuffer in input elements (batch elements)
          */
-        AsyncDeviceOutputBuffer(const std::string& pName, xrt::device& device, xrt::kernel& pAssociatedKernel, const shapePacked_t& pShapePacked, unsigned int ringBufferSizeFactor)
-            : DeviceOutputBuffer<T>(pName, device, pAssociatedKernel, pShapePacked),
+        AsyncDeviceOutputBuffer(const std::string& pCUName, xrt::device& device, xrt::uuid& pDevUUID, const shapePacked_t& pShapePacked, unsigned int ringBufferSizeFactor)
+            : DeviceOutputBuffer<T>(pCUName, device, pDevUUID, pShapePacked),
               detail::AsyncBufferWrapper<T>(ringBufferSizeFactor, FinnUtils::shapeToElements(pShapePacked)),
               workerThread(std::jthread(std::bind_front(&AsyncDeviceOutputBuffer::readInternal, this))){};
 
@@ -314,7 +304,7 @@ namespace Finn {
          * @note This function can be executed manually instead of wait for it to be called by read() when the ring buffer is full.
          *
          */
-        void archiveValidBufferParts() override {
+        void archiveValidBufferParts() {
             std::lock_guard guard(ltsMutex);
             this->longTermStorage.reserve(this->longTermStorage.size() + this->ringBuffer.size());
             this->ringBuffer.readAllValidParts(std::back_inserter(this->longTermStorage));
@@ -325,7 +315,7 @@ namespace Finn {
          *
          * @return Finn::vector<T>
          */
-        Finn::vector<T> retrieveArchive() override {
+        Finn::vector<T> getData() {
             std::lock_guard guard(ltsMutex);
             Finn::vector<T> tmp(this->longTermStorage);
             clearArchive();
@@ -337,54 +327,38 @@ namespace Finn {
          *
          * @param expectedEntries
          */
-        void allocateLongTermStorage([[maybe_unused]] unsigned int expectedEntries) override { this->longTermStorage.reserve(expectedEntries * this->ringBuffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART)); }
+        void allocateLongTermStorage([[maybe_unused]] unsigned int expectedEntries) { this->longTermStorage.reserve(expectedEntries * this->ringBuffer.size(SIZE_SPECIFIER::FEATUREMAP_SIZE)); }
+
+        /**
+         * @brief Not supported by the AsyncDeviceOutputBuffer.
+         *
+         * @return false
+         */
+        bool read() override { return false; }
+
+        /**
+         * @brief Not supported for AsyncDeviceOutputBuffer
+         *
+         * @return true
+         * @return false
+         */
+        bool run() override { return false; }
 
          protected:
         /**
          * @brief Store the contents of the memory map into the ring buffer.
          *
          */
-        void saveMap() override {
+        void saveMap() {
             FINN_LOG(this->logger, loglevel::info) << "Data transfer of output from FPGA!\n";
-            this->ringBuffer.template store<T*>(this->map, this->ringBuffer.size(SIZE_SPECIFIER::ELEMENTS_PER_PART));
-        }
-
-        /**
-         * @brief Execute the kernel and await it's return.
-         * @attention This function is blocking.
-         */
-        ert_cmd_state execute() override {
-            auto run = this->associatedKernel(this->internalBo, 1);
-            return run.wait(500);
+            this->ringBuffer.template store<T*>(this->map, this->ringBuffer.size(SIZE_SPECIFIER::FEATUREMAP_SIZE));
         }
 
         /**
          * @brief Clear the archive of all it's entries
          *
          */
-        void clearArchive() override { this->longTermStorage.clear(); }
-
-        /**
-         * @brief Not supported by AsyncOutputBuffer
-         *
-         * @return unsigned int
-         */
-        unsigned int getMsExecuteTimeout() const override { return 0; }
-
-        /**
-         * @brief Not supported by AsyncOutputBuffer
-         *
-         * @param val
-         */
-        void setMsExecuteTimeout(unsigned int val) override {}
-
-        /**
-         * @brief Not supported by the AsyncDeviceOutputBuffer.
-         *
-         * @param samples
-         * @return ert_cmd_state Returns error every time.
-         */
-        ert_cmd_state read(unsigned int samples) override { return ert_cmd_state::ERT_CMD_STATE_ERROR; }
+        void clearArchive() { this->longTermStorage.clear(); }
     };
 }  // namespace Finn
 

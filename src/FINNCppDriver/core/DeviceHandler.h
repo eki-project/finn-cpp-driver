@@ -13,11 +13,12 @@
 #ifndef DEVICEHANDLER_H
 #define DEVICEHANDLER_H
 
+#include <FINNCppDriver/utils/ConfigurationStructs.h>
 #include <FINNCppDriver/utils/FinnUtils.h>  // for logAndError
 #include <FINNCppDriver/utils/Types.h>      // for shape_t
+#include <stddef.h>                         // for size_t
 
 #include <FINNCppDriver/core/DeviceBuffer/DeviceBuffer.hpp>
-#include <cstddef>        // for size_t
 #include <cstdint>        // for uint8_t
 #include <iterator>       // for iterator_traits
 #include <memory>         // for shared_ptr
@@ -28,13 +29,11 @@
 #include <unordered_map>  // for unordered_map
 #include <vector>         // for vector
 
-#include "ert.h"
 #include "xrt/xrt_device.h"  // for device
 #include "xrt/xrt_uuid.h"    // for uuid
 
 namespace Finn {
     class UncheckedStore;
-    struct DeviceWrapper;
     /**
      * @brief Object of DeviceHandler is responsible to handle a programming of a Device and communication to it
      *
@@ -42,6 +41,25 @@ namespace Finn {
     class DeviceHandler {
          private:
         friend UncheckedStore;
+
+        /**
+         * @brief Switch to decide if inference happens synchronous or asynchronous
+         *
+         */
+        bool synchronousInference;
+
+        /**
+         * @brief Device information needed to initialize device
+         *
+         */
+        DeviceWrapper devInformation;
+
+        /**
+         * @brief The current batch size
+         *
+         */
+        uint batchsize = 1;
+
         /**
          * @brief The xrt device itself
          *
@@ -82,7 +100,7 @@ namespace Finn {
          * @param synchronousInference
          * @param hostBufferSize
          */
-        explicit DeviceHandler(const DeviceWrapper& devWrap, bool synchronousInference, unsigned int hostBufferSize = 100);
+        explicit DeviceHandler(const DeviceWrapper& devWrap, bool synchronousInference, unsigned int hostBufferSize);
         /**
          * @brief Default move constructor
          *
@@ -110,6 +128,13 @@ namespace Finn {
          *
          */
         ~DeviceHandler() = default;
+
+        /**
+         * @brief Sets the input batch size. Needs to reinitialize all buffers!
+         *
+         * @param batchsize
+         */
+        void setBatchSize(uint batchsize);
 
         /**
          * @brief Check if a correct DeviceWrapper configuration was given
@@ -146,15 +171,29 @@ namespace Finn {
          */
         std::unordered_map<std::string, std::shared_ptr<DeviceOutputBuffer<uint8_t>>>& getOutputBufferMap();
 
+        /**
+         * @brief Run the device with the stored input
+         *
+         * @return true success
+         * @return false failure
+         */
+        bool run();
 
         /**
-         * @brief Run the kernel of the given name. Returns true if successful, returns false if no valid data to write was found
+         * @brief Wait for the device run to finish
          *
-         * @param inputBufferKernelName
-         * @return true
-         * @return false
+         * @return true success
+         * @return false failure
          */
-        bool run(const std::string& inputBufferKernelName);
+        bool wait();
+
+        /**
+         * @brief Reads the output buffers
+         *
+         * @return true success
+         * @return false failure
+         */
+        bool read();
 
         /**
          * @brief Read from the output buffer on the host. This does NOT execute the output kernel
@@ -164,15 +203,6 @@ namespace Finn {
          * @return Finn::vector<uint8_t>
          */
         Finn::vector<uint8_t> retrieveResults(const std::string& outputBufferKernelName, bool forceArchival);
-
-        /**
-         * @brief Execute the output kernel and return it's result. If a run fails, the function returns early.
-         *
-         * @param outputBufferKernelName
-         * @param samples
-         * @return ert_cmd_state
-         */
-        ert_cmd_state read(const std::string& outputBufferKernelName, unsigned int samples);
 
         /**
          * @brief Return the buffer sizes
@@ -248,7 +278,7 @@ namespace Finn {
          * @param hostBufferSize How many multiples of one sample should be store-able in the buffer
          * @param synchronousInference
          */
-        void initializeBufferObjects(const DeviceWrapper& devWrap, unsigned int hostBufferSize, bool synchronousInference);
+        void initializeBufferObjects(const DeviceWrapper& devWrap, unsigned int hostBufferSize, bool pSynchronousInference);
 
          private:
         /**

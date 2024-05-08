@@ -64,7 +64,7 @@ namespace FinnUtils {
          */
         template<typename IteratorType>
         void fillRandom(IteratorType first, IteratorType last) {
-            std::transform(first, last, first, [this]([[maybe_unused]] uint8_t x) { return sampler(engine); });
+            std::generate(first, last, [this, &sampler = sampler, &engine = engine]() { return sampler(engine); });
         }
 
         /**
@@ -160,6 +160,21 @@ namespace FinnUtils {
         // NOLINTEND
     }
 
+    template<typename T>
+    inline constexpr T fastLog2(T value) {
+        return (value == 0) ? 0 : std::bit_width(value) - 1;
+    }
+
+    template<typename T>
+    inline constexpr T fastLog2Ceil(T value) {
+        return (value == 0) ? 0 : fastLog2(value - 1) + 1;
+    }
+
+    template<typename T>
+    inline constexpr T fastDivCeil(T value, T value2) {
+        return value == 0 ? 0 : 1 + ((value - 1) / value2);
+    }
+
     /**
      * @brief Return the innermost dimension of a shape. For example for (1,30,10) this would return 10
      *
@@ -174,34 +189,7 @@ namespace FinnUtils {
      * @param requiredBytes The number of bytes that are needed. The return value will be greater or equal than this
      * @return unsigned int
      */
-    inline size_t getActualBufferSize(size_t requiredBytes) { return static_cast<size_t>(std::max(4096.0, pow(2, ceil(log2(static_cast<double>(requiredBytes)))))); }
-
-    /**
-     * @brief Get the number of elements required to represent S elements of FINN datatype F in the datatype T.
-     *
-     * @tparam T
-     * @tparam F
-     * @tparam S
-     * @return constexpr size_t
-     */
-    template<typename T = uint8_t, typename F, size_t S>
-    constexpr size_t getPackedElementSize() {
-        return static_cast<size_t>(ceil(S * (F().bitwidth() / (sizeof(T) * 8.0F))));
-    }
-
-    /**
-     * @brief Returns the number of sizeof(T) iterations needed to scan all the data of the F value. This value may differ if sizeof(DT) is much larger than sizeof(F).
-     * For example if the Finn datatype is DatatypeUint<4> but DT is a 256 bit uint, one would only need to scan one 8-bit sector of the 256 bit variable to get the necessary data
-     *
-     * @tparam T
-     * @tparam F
-     * @tparam DT
-     * @return constexpr size_t
-     */
-    template<typename T, typename F, typename DT>
-    constexpr size_t iterationsNeededPerDT() {
-        return std::min(ceil(F().bitwidth() / sizeof(T) * 8.0F), ceil(static_cast<float>(sizeof(DT)) / static_cast<float>(sizeof(T))));  // Can leave out * 8 on both sides of division
-    }
+    inline constexpr size_t getActualBufferSize(size_t requiredBytes) { return requiredBytes == 0 ? 4096UL : std::max(4096UL, (2UL << fastLog2Ceil(requiredBytes) - 1)); }
 
     /**
      * @brief Put some newlines into the log script for clearer reading
@@ -209,25 +197,6 @@ namespace FinnUtils {
      * @param logger
      */
     inline void logSpacer(logger_type& logger) { FINN_LOG(logger, loglevel::info) << "\n\n\n\n"; }
-
-    /**
-     * @brief Log out the given number of results in a vector. If entriesToRead is larger than the vector size, the whole vector gets printed
-     *
-     * @param logger
-     * @param results
-     * @param entriesToRead
-     * @param prefix
-     */
-    template<typename T>
-    inline void logResults(logger_type& logger, const std::vector<T>& results, unsigned int entriesToRead, const std::string& prefix = "") {
-        FINN_LOG(logger, loglevel::info) << prefix << "Values: ";
-        std::string str;
-        for (unsigned int i = 0; i < std::min(entriesToRead, static_cast<unsigned int>(results.size())); i++) {
-            str += std::to_string(results[i]) + " ";
-        }
-        FINN_LOG(logger, loglevel::info) << str;
-    }
-
 
     /**
      * @brief Calculates the number of elements in a tensor given its shape.

@@ -110,6 +110,7 @@ namespace Finn {
                 std::lock_guard guard(readWriteMutex);
                 return buffer.full();
             } else {
+                // std::cout << "" << "\n";
                 return buffer.full();
             }
         }
@@ -136,13 +137,13 @@ namespace Finn {
          * @return size_t
          */
         size_t size(SIZE_SPECIFIER ss) const {
-            if (ss == SIZE_SPECIFIER::ELEMENTS) {
+            if (ss == SIZE_SPECIFIER::TOTAL_DATA_SIZE) {
                 return buffer.capacity();
             } else if (ss == SIZE_SPECIFIER::BYTES) {
                 return buffer.capacity() * sizeof(T);
-            } else if (ss == SIZE_SPECIFIER::PARTS) {
+            } else if (ss == SIZE_SPECIFIER::BATCHSIZE) {
                 return buffer.capacity() / elementsPerPart;
-            } else if (ss == SIZE_SPECIFIER::ELEMENTS_PER_PART) {
+            } else if (ss == SIZE_SPECIFIER::FEATUREMAP_SIZE) {
                 return elementsPerPart;
             } else {
                 FinnUtils::logAndError<std::runtime_error>("Unknown size specifier!");
@@ -362,7 +363,6 @@ namespace Finn {
                     std::copy(buffer.begin(), buffer.end(), outputIt);
                 } else {
                     std::copy(buffer.begin() + elementsPerPart * index, buffer.begin() + elementsPerPart * (index + 1), outputIt);
-                    std::cout << std::distance(buffer.begin() + elementsPerPart * index, buffer.begin() + elementsPerPart * (index + 1)) << "\n";
                 }
 
                 return true;

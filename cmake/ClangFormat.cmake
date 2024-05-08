@@ -4,7 +4,7 @@ if (NOT CLANG_FORMAT_FOUND)
 endif()
 
 #find all files to check
-file(GLOB_RECURSE ALL_SOURCE_FILES CONFIGURE_DEPENDS ${PROJECT_SOURCE_DIR}/src/*.cpp ${PROJECT_SOURCE_DIR}/src/*.h)
+file(GLOB_RECURSE ALL_SOURCE_FILES CONFIGURE_DEPENDS ${PROJECT_SOURCE_DIR}/src/*.cpp ${PROJECT_SOURCE_DIR}/src/*.h ${PROJECT_SOURCE_DIR}/src/*.hpp)
 
 add_custom_target(
   check_format

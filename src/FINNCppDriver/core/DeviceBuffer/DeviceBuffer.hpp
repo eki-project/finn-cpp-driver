@@ -10,19 +10,27 @@
  *
  */
 
-#ifndef DEVICEBUFFER_H
-#define DEVICEBUFFER_H
+#ifndef DEVICEBUFFER
+#define DEVICEBUFFER
 
 #include <FINNCppDriver/utils/Logger.h>
 #include <FINNCppDriver/utils/Types.h>
 
 #include <FINNCppDriver/utils/RingBuffer.hpp>
 #include <boost/type_index.hpp>
+#include <chrono>
+#include <future>
 #include <span>
+#include <thread>
 
+#include "experimental/xrt_ip.h"
 #include "xrt.h"
 #include "xrt/xrt_bo.h"
 #include "xrt/xrt_kernel.h"
+
+constexpr uint32_t IP_START = 0x1;
+constexpr uint32_t IP_IDLE = 0x4;
+constexpr uint32_t CSR_OFFSET = 0x0;
 
 // Forward declares
 enum ert_cmd_state;
@@ -57,51 +65,71 @@ namespace Finn {
          */
         xrt::bo internalBo;
         /**
-         * @brief XRT kernel associated with this Buffer
+         * @brief XRT IP core associated with this Buffer
          *
          */
-        xrt::kernel associatedKernel;
+        xrt::ip assocIPCore;
         /**
          * @brief Mapped buffer; Part of the XRT buffer object
          *
          */
         T* map;
         /**
+         * @brief 64 bit adress of the buffer located on the FPGA card
+         *
+         */
+        const long long bufAdr;
+        /**
          * @brief Logger
          *
          */
         logger_type& logger;
 
+        void busyWait() {
+            // Wait until the IP is DONE
+            uint32_t axi_ctrl = 0;
+            while ((axi_ctrl & IP_IDLE) != IP_IDLE) {
+                axi_ctrl = assocIPCore.read_register(CSR_OFFSET);
+            }
+        }
+
+         private:
+        unsigned int getGroupId(const xrt::device& device, const xrt::uuid& uuid, const std::string& computeUnit) { return xrt::kernel(device, uuid, computeUnit).group_id(0); }
+
+        /**
+         * @brief Used for deciding if execute needs to write data registers or not
+         *
+         */
+        uint32_t oldRepetitions = 0;
 
          public:
         /**
          * @brief Construct a new Device Buffer object
          *
-         * @param pName Name for indentification
+         * @param pCUName Name of compute unit
          * @param device XRT device
          * @param pAssociatedKernel XRT kernel
          * @param pShapePacked packed shape of input
          */
-        DeviceBuffer(const std::string& pName, xrt::device& device, xrt::kernel& pAssociatedKernel, const shapePacked_t& pShapePacked)
-            : name(pName),
+        DeviceBuffer(const std::string& pCUName, xrt::device& device, xrt::uuid& pDevUUID, const shapePacked_t& pShapePacked, unsigned int batchSize = 1)
+            : name(pCUName),
               shapePacked(pShapePacked),
-              mapSize(FinnUtils::getActualBufferSize(FinnUtils::shapeToElements(pShapePacked))),
-              internalBo(xrt::bo(device, mapSize * sizeof(T), pAssociatedKernel.group_id(0))),
-              associatedKernel(pAssociatedKernel),
+              mapSize(FinnUtils::getActualBufferSize(FinnUtils::shapeToElements(pShapePacked) * batchSize)),
+              internalBo(xrt::bo(device, mapSize * sizeof(T), getGroupId(device, pDevUUID, pCUName))),
               map(internalBo.template map<T*>()),
+              assocIPCore(xrt::ip(device, pDevUUID, pCUName)),  // Using xrt::kernel/getGroupId after this point leads to a total bricking of the FPGA card!!
+              bufAdr(internalBo.address()),
               logger(Logger::getLogger()) {
+            shapePacked[0] = batchSize;
             FINN_LOG(logger, loglevel::info) << "[DeviceBuffer] "
-                                             << "New Device Buffer of size " << mapSize * sizeof(T) << "bytes with group id " << pAssociatedKernel.group_id(0) << "\n";
+                                             << "New Device Buffer of size " << mapSize * sizeof(T) << "bytes with group id " << 0 << "\n";
             FINN_LOG(logger, loglevel::info) << "[DeviceBuffer] "
                                              << "Initializing DeviceBuffer " << name << " (SHAPE PACKED: " << FinnUtils::shapeToString(pShapePacked) << " inputs of the given shape, MAP SIZE: " << mapSize << ")\n";
-            for (std::size_t i = 0; i < mapSize; ++i) {
-                map[i] = 0;
-            }
+            std::fill(map, map + mapSize, 0);
         }
 
         /**
          * @brief Construct a new Device Buffer object (Move constructor)
-         *
          * @param buf
          */
         DeviceBuffer(DeviceBuffer&& buf) noexcept
@@ -109,8 +137,9 @@ namespace Finn {
               shapePacked(std::move(buf.shapePacked)),
               mapSize(buf.mapSize),
               internalBo(std::move(buf.internalBo)),
-              associatedKernel(std::move(buf.associatedKernel)),
+              assocIPCore(std::move(buf.assocIPCore)),
               map(std::move(buf.map)),
+              bufAdr(internalBo.address()),
               logger(Logger::getLogger()) {}
 
         /**
@@ -164,21 +193,20 @@ namespace Finn {
          */
         virtual shape_t& getPackedShape() { return shapePacked; }
 
-         protected:
         /**
-         * @brief Internal constructor used by the move constructors of the sub classes !!!NOT THREAD SAFE!!!
+         * @brief Run the associated kernel
          *
-         * @param pName
-         * @param pShapePacked
-         * @param pMapSize
-         * @param pInternalBo
-         * @param pAssociatedKernel
-         * @param pMap
-         * @param pRingBuffer
+         * @return true Success
+         * @return false Fail
          */
-        DeviceBuffer(const std::string& pName, const shape_t& pShapePacked, const std::size_t pMapSize, xrt::bo& pInternalBo, xrt::kernel& pAssociatedKernel, T* pMap, RingBuffer<T>& pRingBuffer)
-            : name(pName), shapePacked(pShapePacked), mapSize(pMapSize), internalBo(std::move(pInternalBo)), associatedKernel(pAssociatedKernel), map(pMap), logger(Logger::getLogger()) {}
+        virtual bool run() = 0;
 
+        virtual bool wait() {
+            busyWait();
+            return true;
+        };
+
+         protected:
         /**
          * @brief Returns a device prefix for logging
          *
@@ -193,12 +221,27 @@ namespace Finn {
          */
         virtual void sync(std::size_t bytes) = 0;
 
-        /**
-         * @brief Executes the associated xrt kernel
-         *
-         * @return ert_cmd_state
-         */
-        virtual ert_cmd_state execute() = 0;
+        void execute(const uint32_t repetitions = 1) {
+            // writes the buffer adress
+            constexpr uint32_t offset_buf = 0x10;
+            constexpr uint32_t offset_rep = 0x1C;
+
+            // If repetition number is the same as for the last call, then nothing has to be written before starting the Kernel
+            if (repetitions == oldRepetitions) {
+                assocIPCore.write_register(CSR_OFFSET, IP_START);
+                return;
+            }
+            oldRepetitions = repetitions;
+
+            assocIPCore.write_register(offset_buf, bufAdr);
+            assocIPCore.write_register(offset_buf + 4, bufAdr >> 32);
+
+            // writes the repetitions
+            assocIPCore.write_register(offset_rep, repetitions);
+
+            // Start inference
+            assocIPCore.write_register(CSR_OFFSET, IP_START);
+        }
     };
 
     /**
@@ -239,18 +282,10 @@ namespace Finn {
          * @param pAssociatedKernel XRT kernel
          * @param pShapePacked packed shape of input
          */
-        DeviceInputBuffer(const std::string& pName, xrt::device& device, xrt::kernel& pAssociatedKernel, const shapePacked_t& pShapePacked) : DeviceBuffer<T>(pName, device, pAssociatedKernel, pShapePacked){};
+        DeviceInputBuffer(const std::string& pCUName, xrt::device& device, xrt::uuid& pDevUUID, const shapePacked_t& pShapePacked, unsigned int batchSize = 1) : DeviceBuffer<T>(pCUName, device, pDevUUID, pShapePacked, batchSize){};
 
         /**
-         * @brief Run the kernel to input data from FPGA memory into the accelerator design
-         *
-         * @return true Success
-         * @return false Fail
-         */
-        virtual bool run() = 0;
-
-        /**
-         * @brief Store the given vector of data in the ring buffer
+         * @brief Store the given vector of data in the FPGA mem map
          * @attention This function is NOT THREAD SAFE!
          *
          * @param data
@@ -321,57 +356,21 @@ namespace Finn {
          * @param pAssociatedKernel XRT kernel
          * @param pShapePacked packed shape of input
          */
-        DeviceOutputBuffer(const std::string& pName, xrt::device& device, xrt::kernel& pAssociatedKernel, const shapePacked_t& pShapePacked) : DeviceBuffer<T>(pName, device, pAssociatedKernel, pShapePacked){};
+        DeviceOutputBuffer(const std::string& pCUName, xrt::device& device, xrt::uuid& pDevUUID, const shapePacked_t& pShapePacked, unsigned int batchSize = 1) : DeviceBuffer<T>(pCUName, device, pDevUUID, pShapePacked, batchSize){};
 
-        /**
-         * @brief Get timeout
-         *
-         * @return unsigned int
-         */
-        virtual unsigned int getMsExecuteTimeout() const = 0;
-        /**
-         * @brief Set timeout
-         *
-         * @param val
-         */
-        virtual void setMsExecuteTimeout(unsigned int val) = 0;
-        /**
-         * @brief Transfer output data from ringbuffer to storage until user requests it
-         *
-         */
-        virtual void archiveValidBufferParts() = 0;
         /**
          * @brief Return stored data from storage
          *
          * @return Finn::vector<T>
          */
-        virtual Finn::vector<T> retrieveArchive() = 0;
+        virtual Finn::vector<T> getData() = 0;
         /**
-         * @brief Start XRT kernel to read data from accelerator design into FPGA memory
+         * @brief Sync data from the FPGA back to the host
          *
-         * @param samples
-         * @return ert_cmd_state
          */
-        virtual ert_cmd_state read(unsigned int samples) = 0;
+        virtual bool read() = 0;
 
          protected:
-        /**
-         * @brief Delete long term storage contents
-         *
-         */
-        virtual void clearArchive() = 0;
-        /**
-         * @brief Make space in long term storage
-         *
-         * @param expectedEntries Number of entries expected to be stored in long term storage
-         */
-        virtual void allocateLongTermStorage(unsigned int expectedEntries) = 0;
-
-        /**
-         * @brief Store the contents of the memory map into the ring buffer
-         *
-         */
-        virtual void saveMap() = 0;
         /**
          * @brief Sync data from the FPGA into the memory map
          *
@@ -410,4 +409,4 @@ namespace Finn {
     };
 }  // namespace Finn
 
-#endif  // DEVICEBUFFER_H
+#endif  // DEVICEBUFFER

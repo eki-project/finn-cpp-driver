@@ -9,7 +9,7 @@ function(add_benchmark benchmark_name)
     ${benchmark_name}
   )
   add_dependencies(Benchmarks ${benchmark})
-  target_include_directories(${benchmark} PRIVATE ${FINNC_SRC_DIR})
+  target_include_directories(${benchmark} PRIVATE ${FINN_SRC_DIR})
 
   target_link_libraries(${benchmark}
     PUBLIC

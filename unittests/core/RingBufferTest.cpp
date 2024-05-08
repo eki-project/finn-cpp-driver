@@ -25,10 +25,6 @@
 #include "xrt/xrt_device.h"
 #include "xrt/xrt_kernel.h"
 
-
-TEST(DummyTest, DT) { EXPECT_TRUE(true); }
-
-
 // Globals
 using RB = Finn::RingBuffer<int, false>;
 const size_t parts = FinnUnittest::parts;
@@ -42,7 +38,7 @@ class RBTest : public ::testing::Test {
     Finn::vector<int> data;
     std::vector<Finn::vector<int>> storedDatas;
     FinnUtils::BufferFiller filler = FinnUtils::BufferFiller(0, 255);
-    void SetUp() override { data.resize(rb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART)); }
+    void SetUp() override { data.resize(rb.size(SIZE_SPECIFIER::FEATUREMAP_SIZE)); }
 
     /**
      * @brief Utility function to completely fill a ringBuffer or a deviceinput/output buffer.
@@ -54,7 +50,7 @@ class RBTest : public ::testing::Test {
      * @param ref Whether to use references (true) or iterators (false)
      */
     void fillCompletely(bool ref) {
-        for (size_t i = 0; i < rb.size(SIZE_SPECIFIER::PARTS); i++) {
+        for (size_t i = 0; i < rb.size(SIZE_SPECIFIER::BATCHSIZE); i++) {
             filler.fillRandom(data.begin(), data.end());
             storedDatas.push_back(data);
 
@@ -75,7 +71,7 @@ class RBTestBlocking : public ::testing::Test {
     Finn::vector<int> data;
     std::vector<Finn::vector<int>> storedDatas;
     FinnUtils::BufferFiller filler = FinnUtils::BufferFiller(0, 255);
-    void SetUp() override { data.resize(rb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART)); }
+    void SetUp() override { data.resize(rb.size(SIZE_SPECIFIER::FEATUREMAP_SIZE)); }
 
     /**
      * @brief Utility function to completely fill a ringBuffer or a deviceinput/output buffer.
@@ -87,7 +83,7 @@ class RBTestBlocking : public ::testing::Test {
      * @param ref Whether to use references (true) or iterators (false)
      */
     void fillCompletely(bool ref) {
-        for (size_t i = 0; i < rb.size(SIZE_SPECIFIER::PARTS); i++) {
+        for (size_t i = 0; i < rb.size(SIZE_SPECIFIER::BATCHSIZE); i++) {
             filler.fillRandom(data.begin(), data.end());
             storedDatas.push_back(data);
 
@@ -110,10 +106,10 @@ TEST(RBTestManual, RBInitTest) {
     EXPECT_TRUE(rb.empty());
 
     // Sizes
-    EXPECT_EQ(rb.size(SIZE_SPECIFIER::PARTS), parts);
-    EXPECT_EQ(rb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART), elementsPerPart);
+    EXPECT_EQ(rb.size(SIZE_SPECIFIER::BATCHSIZE), parts);
+    EXPECT_EQ(rb.size(SIZE_SPECIFIER::FEATUREMAP_SIZE), elementsPerPart);
     EXPECT_EQ(rb.size(SIZE_SPECIFIER::BYTES), parts * elementsPerPart * sizeof(int));
-    EXPECT_EQ(rb.size(SIZE_SPECIFIER::ELEMENTS), parts * elementsPerPart);
+    EXPECT_EQ(rb.size(SIZE_SPECIFIER::TOTAL_DATA_SIZE), parts * elementsPerPart);
 
     // Initial values
     std::vector<int> out;
@@ -195,7 +191,7 @@ TEST_F(RBTest, RBReadTest) {
     fillCompletely(true);
 
     // Check that the read data is equivalent to the saved data and read in the same order (important!)
-    for (unsigned int i = 0; i < rb.size(SIZE_SPECIFIER::PARTS); i++) {
+    for (unsigned int i = 0; i < rb.size(SIZE_SPECIFIER::BATCHSIZE); i++) {
         EXPECT_TRUE(rb.read(data.begin()));
         EXPECT_EQ(storedDatas[i], data);
     }
@@ -206,10 +202,10 @@ TEST_F(RBTest, RBReadTestArray) {
     fillCompletely(true);
 
     // Check that the read data is equivalent to the saved data and read in the same order (important!)
-    int* buf = new int[rb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART)];
-    for (unsigned int i = 0; i < rb.size(SIZE_SPECIFIER::PARTS); i++) {
+    int* buf = new int[rb.size(SIZE_SPECIFIER::FEATUREMAP_SIZE)];
+    for (unsigned int i = 0; i < rb.size(SIZE_SPECIFIER::BATCHSIZE); i++) {
         EXPECT_TRUE(rb.read(buf));
-        for (unsigned int j = 0; j < rb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART); j++) {
+        for (unsigned int j = 0; j < rb.size(SIZE_SPECIFIER::FEATUREMAP_SIZE); j++) {
             EXPECT_EQ(storedDatas[i][j], buf[j]);
         }
         break;
@@ -219,19 +215,19 @@ TEST_F(RBTest, RBReadTestArray) {
 
 TEST_F(RBTest, RBUtilFuncsTest) {
     // Check all sizes
-    EXPECT_EQ(rb.size(SIZE_SPECIFIER::PARTS), parts);
-    EXPECT_EQ(rb.size(SIZE_SPECIFIER::ELEMENTS_PER_PART), elementsPerPart);
+    EXPECT_EQ(rb.size(SIZE_SPECIFIER::BATCHSIZE), parts);
+    EXPECT_EQ(rb.size(SIZE_SPECIFIER::FEATUREMAP_SIZE), elementsPerPart);
     EXPECT_EQ(rb.size(SIZE_SPECIFIER::BYTES), elementsPerPart * sizeof(int) * parts);
-    EXPECT_EQ(rb.size(SIZE_SPECIFIER::ELEMENTS), elementsPerPart * parts);
+    EXPECT_EQ(rb.size(SIZE_SPECIFIER::TOTAL_DATA_SIZE), elementsPerPart * parts);
 
     // Check validity flags
     fillCompletely(true);
     EXPECT_TRUE(rb.full());
-    EXPECT_EQ(rb.size(), rb.size(SIZE_SPECIFIER::PARTS));
+    EXPECT_EQ(rb.size(), rb.size(SIZE_SPECIFIER::BATCHSIZE));
 
     EXPECT_TRUE(rb.read(data.begin()));
     EXPECT_FALSE(rb.full());
-    EXPECT_EQ(rb.size(), rb.size(SIZE_SPECIFIER::PARTS) - 1);
+    EXPECT_EQ(rb.size(), rb.size(SIZE_SPECIFIER::BATCHSIZE) - 1);
 }
 
 int main(int argc, char** argv) {

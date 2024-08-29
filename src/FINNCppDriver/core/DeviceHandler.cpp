@@ -35,6 +35,7 @@
 
 
 namespace fs = std::filesystem;
+using namespace std::chrono_literals;
 
 namespace Finn {
     DeviceHandler::DeviceHandler(const DeviceWrapper& devWrap, bool pSynchronousInference, unsigned int hostBufferSize)
@@ -95,7 +96,7 @@ namespace Finn {
 
     void DeviceHandler::initializeBufferObjects(const DeviceWrapper& devWrap, unsigned int hostBufferSize, bool pSynchronousInference) {
         FINN_LOG(Logger::getLogger(), loglevel::info) << loggerPrefix() << "(" << xrtDeviceIndex << ") "
-                                                      << "Initializing buffer objects\n";
+                                                      << "Initializing buffer objects with buffer size " << hostBufferSize << "\n";
         for (auto&& ebdptr : devWrap.idmas) {
             if (pSynchronousInference) {
                 inputBufferMap.emplace(std::make_pair(ebdptr->kernelName, std::make_shared<Finn::SyncDeviceInputBuffer<uint8_t>>(ebdptr->kernelName, device, uuid, ebdptr->packedShape, hostBufferSize)));
@@ -126,9 +127,13 @@ namespace Finn {
         if (this->batchsize == pBatchsize) {
             return;
         } else {
+            FINN_LOG(Logger::getLogger(), loglevel::info) << loggerPrefix() << "(" << xrtDeviceIndex << ") "
+                                                      << "Change batch size to " << pBatchsize << "\n";
             this->batchsize = pBatchsize;
             inputBufferMap.clear();
             outputBufferMap.clear();
+
+            std::this_thread::sleep_for(2000ms);
             initializeBufferObjects(this->devInformation, pBatchsize, this->synchronousInference);
         }
     }

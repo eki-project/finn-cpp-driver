@@ -23,11 +23,12 @@
 #include <stdexcept>  // for runtime_error
 
 namespace Finn {
+    std::string Accelerator::loggerPrefix() { return "[Accelerator] "; }
+    
     Accelerator::Accelerator(const std::vector<DeviceWrapper>& deviceDefinitions, bool synchronousInference, unsigned int hostBufferSize) {
+        FINN_LOG(Logger::getLogger(), loglevel::info) << loggerPrefix() << "Constructing Accelerator\n";
         std::transform(deviceDefinitions.begin(), deviceDefinitions.end(), std::back_inserter(devices), [hostBufferSize, synchronousInference](const DeviceWrapper& dew) { return DeviceHandler(dew, synchronousInference, hostBufferSize); });
     }
-
-    std::string Accelerator::loggerPrefix() { return "[Accelerator] "; }
 
 
     /****** GETTER / SETTER ******/

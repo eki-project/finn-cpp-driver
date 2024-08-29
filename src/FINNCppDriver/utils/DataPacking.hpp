@@ -435,8 +435,7 @@ namespace Finn {
     Finn::vector<uint8_t> pack(IteratorType first, IteratorType last) {
         using T = typename std::iterator_traits<IteratorType>::value_type;
         if constexpr (std::endian::native == std::endian::big) {
-            []<bool flag = false>() { static_assert(flag, "Big-endian architectures are currently not supported!"); }
-            ();
+            []<bool flag = false>() { static_assert(flag, "Big-endian architectures are currently not supported!"); }();
         } else if constexpr (std::endian::native == std::endian::little) {
             constexpr bool isFix = U().isFixedPoint();
             constexpr bool isInt = U().isInteger();
@@ -462,8 +461,7 @@ namespace Finn {
                     Finn::vector<VecType> input(first, last);
                     return detail::packImpl<U>(input.begin(), input.end());
                 } else {
-                    []<bool flag = false>() { static_assert(flag, "Weird floating point data length. Not supported!"); }
-                    ();
+                    []<bool flag = false>() { static_assert(flag, "Weird floating point data length. Not supported!"); }();
                 }
             } else if constexpr (std::is_floating_point_v<T>) {  // Datatype is floating point number
                 static_assert(sizeof(float) == 4 && sizeof(double) == 8 && std::numeric_limits<T>::is_iec559, "Floating point format is not iee754 or unexpected type width!");
@@ -479,8 +477,7 @@ namespace Finn {
                     std::transform(first, last, input.begin(), [](const T& val) { return std::bit_cast<uint32_t>(val); });
                     return detail::packImpl<U>(input.begin(), input.end());
                 } else {
-                    []<bool flag = false>() { static_assert(flag, "Weird floating point data length. Not supported!"); }
-                    ();
+                    []<bool flag = false>() { static_assert(flag, "Weird floating point data length. Not supported!"); }();
                 }
             } else if constexpr (!isInt && std::is_integral_v<T>) {  // Datatype is float stored in ints
                 Finn::vector<float> vec(first, last);                // This cast is necessary to make sure, that data is in a 32-bit floating point format before the bitcast.
@@ -493,8 +490,7 @@ namespace Finn {
                 return detail::packImpl<U>(first, last);
             }
         } else {
-            []<bool flag = false>() { static_assert(flag, "Mixed-endian architectures are currently not supported!"); }
-            ();
+            []<bool flag = false>() { static_assert(flag, "Mixed-endian architectures are currently not supported!"); }();
         }
     }
 
@@ -540,29 +536,33 @@ namespace Finn {
      */
     template<IsDatatype U, typename IteratorType>
     Finn::vector<uint8_t> packMultiDimensionalInputs(IteratorType first, IteratorType last, const Finn::DynamicMdSpan<IteratorType>& dynamicSpan, const std::size_t elementsInnerMostDim) {
-        auto innerVecs = dynamicSpan.getMostInnerDims();
-        std::size_t innerVecSize = innerVecs.size();
+        if constexpr (U().bitwidth() % 8 == 0) {  // Whole bytes in input used therefore no padding should be needed (TODO(linusjun): Make sure this is true for bw > 8!)
+            return Finn::pack<U>(first, last);
+        } else {
+            auto innerVecs = dynamicSpan.getMostInnerDims();
+            std::size_t innerVecSize = innerVecs.size();
 
-        // preallocate memory to make copy more efficient
-        const std::size_t payloadBitsPerInnerDim = elementsInnerMostDim * U().bitwidth();
-        constexpr std::size_t byte = 8;
-        const std::size_t neededBytesPerInnerDim = FinnUtils::fastDivCeil(payloadBitsPerInnerDim, byte);
-        const std::size_t neededBytesTotal = neededBytesPerInnerDim * innerVecSize;
+            // preallocate memory to make copy more efficient
+            const std::size_t payloadBitsPerInnerDim = elementsInnerMostDim * U().bitwidth();
+            constexpr std::size_t byte = 8;
+            const std::size_t neededBytesPerInnerDim = FinnUtils::fastDivCeil(payloadBitsPerInnerDim, byte);
+            const std::size_t neededBytesTotal = neededBytesPerInnerDim * innerVecSize;
 
-        Finn::vector<uint8_t> packedMerged(neededBytesTotal);
-        std::size_t threadcount = std::min({(innerVecSize >> 5), static_cast<std::size_t>(omp_get_num_procs()), FinnUtils::fastLog2(innerVecSize) << 1});
-        omp_set_num_threads(threadcount);
-        //        std::cout << (std::min({(innerVecSize >> 5), static_cast<std::size_t>(omp_get_num_procs()), FinnUtils::fastLog2(innerVecSize2)<<1})) << "\n";
+            Finn::vector<uint8_t> packedMerged(neededBytesTotal);
+            std::size_t threadcount = std::min({(innerVecSize >> 5), static_cast<std::size_t>(omp_get_num_procs()), FinnUtils::fastLog2(innerVecSize) << 1});
+            omp_set_num_threads(threadcount);
+            //        std::cout << (std::min({(innerVecSize >> 5), static_cast<std::size_t>(omp_get_num_procs()), FinnUtils::fastLog2(innerVecSize2)<<1})) << "\n";
 
-        // for each most inner dimension
+            // for each most inner dimension
 #pragma omp parallel for
-        for (std::size_t i = 0; i < innerVecSize; ++i) {
-            auto packed = Finn::pack<U>(innerVecs[i].begin(), innerVecs[i].end());
-            // combine packing results
-            std::copy(packed.begin(), packed.end(), packedMerged.begin() + i * neededBytesPerInnerDim);
-        }
+            for (std::size_t i = 0; i < innerVecSize; ++i) {
+                auto packed = Finn::pack<U>(innerVecs[i].begin(), innerVecs[i].end());
+                // combine packing results
+                std::copy(packed.begin(), packed.end(), packedMerged.begin() + i * neededBytesPerInnerDim);
+            }
 
-        return packedMerged;
+            return packedMerged;
+        }
     }
 
 
@@ -603,6 +603,7 @@ namespace Finn {
         constexpr bool isSigned = U().sign();
         if constexpr (bitw / 8.0 == neededBytes) {  // complete Bytes, therefore no padding after here
             Finn::vector<RetType> ret(inp.size() / neededBytes, 0);
+#pragma omp simd
             for (std::size_t i = 0; i < ret.size(); ++i) {
                 const std::size_t offset = i * neededBytes;
                 if constexpr (isSigned) {  // TODO(linusjun): Test if this needs to be optimized or put into a seperate loop to allow vectorization.
@@ -681,6 +682,14 @@ namespace Finn {
         return unpack<U, reverseByte, T>(spa, padding);
     }
 
+    template<IsDatatype U, std::input_iterator IteratorType, bool reverseByte = false, typename T = UnpackingAutoRetType::AutoRetType<U>, typename = std::enable_if_t<IsCorrectFinnType<U, T>()>>
+    Finn::vector<T> unpack(IteratorType begin, IteratorType end, std::size_t padding = 0)
+        requires(std::is_same_v<uint8_t, typename std::iterator_traits<IteratorType>::value_type>)
+    {
+        std::span<uint8_t> spa{begin, end};
+        return unpack<U, reverseByte, T>(spa, padding);
+    }
+
     /**
      * @brief Unpacks multi-dimensional output vectors
      *
@@ -698,22 +707,26 @@ namespace Finn {
     Finn::vector<T> unpackMultiDimensionalOutputs(IteratorType begin, IteratorType end, const Finn::DynamicMdSpan<IteratorType>& dynSpan, const shapeFolded_t& foldedShape)
         requires(std::is_same_v<uint8_t, typename std::iterator_traits<IteratorType>::value_type>)
     {
-        constexpr std::size_t bytes = 8;
-        auto innerDimVecs = dynSpan.getMostInnerDims();
-        std::size_t innerVecSize = innerDimVecs.size();
-        const std::size_t padding = innerDimVecs[0].size() * bytes - foldedShape.back() * U().bitwidth();
+        if constexpr (U().bitwidth() % 8 == 0) {
+            return Finn::unpack<U>(begin, end, 0);
+        } else {
+            constexpr std::size_t bytes = 8;
+            auto innerDimVecs = dynSpan.getMostInnerDims();
+            std::size_t innerVecSize = innerDimVecs.size();
+            const std::size_t padding = innerDimVecs[0].size() * bytes - foldedShape.back() * U().bitwidth();
 
-        // preallocate memory to make copy more efficient
-        const std::size_t retSizeTotal = FinnUtils::shapeToElements(foldedShape);
-        Finn::vector<T> unpackedMerged(retSizeTotal);
+            // preallocate memory to make copy more efficient
+            const std::size_t retSizeTotal = FinnUtils::shapeToElements(foldedShape);
+            Finn::vector<T> unpackedMerged(retSizeTotal);
 
 #pragma omp parallel for
-        for (std::size_t i = 0; i < innerDimVecs.size(); ++i) {
-            auto unpacked = Finn::unpack<U>(innerDimVecs[i], padding);
-            std::copy(unpacked.begin(), unpacked.end(), unpackedMerged.begin() + i * foldedShape.back());
-        }
+            for (std::size_t i = 0; i < innerDimVecs.size(); ++i) {
+                auto unpacked = Finn::unpack<U>(innerDimVecs[i], padding);
+                std::copy(unpacked.begin(), unpacked.end(), unpackedMerged.begin() + i * foldedShape.back());
+            }
 
-        return unpackedMerged;
+            return unpackedMerged;
+        }
     }
 
 }  // namespace Finn

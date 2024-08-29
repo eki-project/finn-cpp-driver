@@ -189,7 +189,10 @@ namespace FinnUtils {
      * @param requiredBytes The number of bytes that are needed. The return value will be greater or equal than this
      * @return unsigned int
      */
-    inline constexpr size_t getActualBufferSize(size_t requiredBytes) { return requiredBytes == 0 ? 4096UL : std::max(4096UL, (2UL << fastLog2Ceil(requiredBytes) - 1)); }
+    //inline constexpr size_t getActualBufferSize(size_t requiredBytes) { return requiredBytes == 0 ? 4096UL : std::max(4096UL, (2UL << fastLog2Ceil(requiredBytes) - 1)); }
+    inline size_t getActualBufferSize(size_t requiredBytes) { size_t ret = requiredBytes == 0 ? 4096UL : std::max(4096UL, (2UL << fastLog2Ceil(requiredBytes) - 1)); 
+    std::cout << "Actual buffer size:" << ret << "\n";
+    return ret;}
 
     /**
      * @brief Put some newlines into the log script for clearer reading

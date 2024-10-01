@@ -16,8 +16,6 @@
 #include <FINNCppDriver/utils/FinnUtils.h>
 
 #include <FINNCppDriver/core/DeviceBuffer/DeviceBuffer.hpp>
-#include <functional>
-#include <thread>
 
 #include "ert.h"
 
@@ -99,9 +97,11 @@ namespace Finn {
          private:
         friend class DeviceInputBuffer<T>;
         std::jthread workerThread;
+        std::mutex ltsMutex;
 
         /**
          * @brief Internal run method used by the runner thread
+         * @attention This method is blocking
          *
          */
         void runInternal(std::stop_token stoken) {
@@ -111,9 +111,18 @@ namespace Finn {
                     break;
                 }
                 this->sync(elementCount);
-                // this->execute(); TODO(linusjun): Fix all this shit!
+                
+                auto repetitions = this->shapePacked[0];
+
+                std::jthread async([this, repetitions]() { //blocks
+                    std::lock_guard guard(ltsMutex);
+                    this->execute(repetitions);
+
+                });
+                
             }
-            FINN_LOG(this->logger, loglevel::info) << "Asynchronous Input buffer runner terminated";
+                        
+            FINN_LOG(this->logger, loglevel::info) << "[AsyncDeviceInputBuffer] Asynchronous Input buffer runner terminated";
         }
 
          public:
@@ -148,7 +157,7 @@ namespace Finn {
          *
          */
         ~AsyncDeviceInputBuffer() override {
-            FINN_LOG(this->logger, loglevel::info) << "Destructing Asynchronous input buffer";
+            FINN_LOG(this->logger, loglevel::info) << "[AsyncDeviceInputBuffer] Destructing Asynchronous input buffer";
             workerThread.request_stop();  // Joining will be handled automatically by destruction
         };
         /**
@@ -176,14 +185,16 @@ namespace Finn {
 
         /**
          * @brief Store the given data in the ring buffer
+         * @attention This method is blocking only if buffer is full
          *
          * @param data
          * @return true Store was successful
          * @return false Store failed
          */
-        bool store(std::span<const T> data) override { return this->ringBuffer.store(data.begin(), data.end()); }
+        bool store(std::span<const T> data) override {return this->ringBuffer.store(data.begin(), data.end());}
 
          protected:
+
         /**
          * @brief  Load data from the ring buffer into the memory map of the device.
          * @attention Invalidates the data that was moved to map
@@ -192,7 +203,7 @@ namespace Finn {
          * @return false
          */
         bool loadMap(std::stop_token stoken) {
-            FINN_LOG(this->logger, loglevel::info) << "Data transfer of input data to FPGA!\n";
+            FINN_LOG(this->logger, loglevel::info) << "[AsyncDeviceInputBuffer] Data transfer of input data to FPGA!\n";
             return this->ringBuffer.read(this->map, stoken);
         }
 
@@ -216,21 +227,21 @@ namespace Finn {
         std::mutex ltsMutex;
         std::jthread workerThread;
 
-         private:
+        private:
         void readInternal(std::stop_token stoken) {
-            FINN_LOG_DEBUG(this->logger, loglevel::info) << this->loggerPrefix() << "Starting to read from the device";
+            FINN_LOG_DEBUG(this->logger, loglevel::info) << this->loggerPrefix() << "[AsyncDeviceInputBuffer] Starting to read from the device";
             const std::size_t elementCount = this->ringBuffer.size(SIZE_SPECIFIER::FEATUREMAP_SIZE);
+
             while (!stoken.stop_requested()) {
-                // auto outExecuteResult = execute();
-                // std::cout << outExecuteResult << "\n";
-                // if (outExecuteResult != ERT_CMD_STATE_COMPLETED && outExecuteResult != ERT_CMD_STATE_ERROR && outExecuteResult != ERT_CMD_STATE_ABORT) {
-                //     continue;
-                // }
-                // if (outExecuteResult == ERT_CMD_STATE_ERROR || outExecuteResult == ERT_CMD_STATE_ABORT) {
-                //     FINN_LOG(this->logger, loglevel::error) << "A problem has occured during the read process of the FPGA output.";
-                //     continue;
-                // }
+                auto repetitions = this->shapePacked[0];
+                
+                std::jthread async([this, repetitions]() { //blocks
+                    std::lock_guard guard(ltsMutex);
+                    this->execute(repetitions);
+                });
+                
                 this->sync(elementCount);
+                
                 saveMap();
                 if (this->ringBuffer.full()) {  // TODO(linusjun): Allow registering of callback for this event?
                     archiveValidBufferParts();
@@ -351,7 +362,7 @@ namespace Finn {
          */
         void saveMap() {
             FINN_LOG(this->logger, loglevel::info) << "Data transfer of output from FPGA!\n";
-            this->ringBuffer.template store<T*>(this->map, this->ringBuffer.size(SIZE_SPECIFIER::FEATUREMAP_SIZE));
+            this->ringBuffer.template store<T*>(this->map, this->ringBuffer.size(SIZE_SPECIFIER::FEATUREMAP_SIZE)); //difference
         }
 
         /**
@@ -359,6 +370,7 @@ namespace Finn {
          *
          */
         void clearArchive() { this->longTermStorage.clear(); }
+
     };
 }  // namespace Finn
 

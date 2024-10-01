@@ -54,6 +54,25 @@ TEST_F(DBTest, DBOutputTest) {
     EXPECT_EQ(data, vec);
 }
 
+TEST_F(DBTest, DBStoreTest_async) {
+    Finn::AsyncDeviceInputBuffer<uint8_t> buffer("InputBuffer", device, uuid, FinnUnittest::myShapePacked, FinnUnittest::parts);
+    Finn::vector<uint8_t> data(buffer.size(SIZE_SPECIFIER::FEATUREMAP_SIZE));
+    FinnUtils::BufferFiller(0, 255).fillRandom(data.begin(), data.end());
+    buffer.store({data.begin(), data.end()});
+    sleep(2);  // Adjust timing as necessary
+    EXPECT_EQ(buffer.testGetMap(), data);
+}
+
+TEST_F(DBTest, DBOutputTest_async) {
+    Finn::AsyncDeviceOutputBuffer<uint8_t> buffer("OutputBuffer", device, uuid, FinnUnittest::myShapePacked, FinnUnittest::parts);
+    Finn::vector<uint8_t> data(buffer.size(SIZE_SPECIFIER::TOTAL_DATA_SIZE)*2);
+    FinnUtils::BufferFiller(0, 255).fillRandom(data.begin(), data.end());
+    buffer.testSetMap(data);
+    buffer.read();
+    sleep(2);
+    auto vec = buffer.getData();
+    EXPECT_EQ(data, vec);
+}
 
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);

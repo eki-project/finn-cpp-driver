@@ -176,7 +176,7 @@ if(${FINN_ENABLE_ALLOPT})
   message(STATUS "All optimizations are enabled")
   target_compile_options(
     finnc_options
-    INTERFACE -O3 -march=native -mtune=native -fstack-protector-strong -fopenmp -ffunction-sections -fdata-sections -pipe -funroll-loops)
+    INTERFACE -Ofast -ffast-math -march=native -mtune=native -fstack-protector-strong -fopenmp -ffunction-sections -fdata-sections -pipe -funroll-loops)
 endif()
 
 ### Enable compiler warnings

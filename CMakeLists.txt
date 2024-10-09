@@ -246,4 +246,9 @@ check_include(FINN_CPP_CHECK    "cppcheck"     CppCheck.cmake)
 check_include(FINN_IWYU         "iwyu"         IWYU.cmake)
 list(POP_BACK CMAKE_MESSAGE_INDENT)    #indent -1
 
+
+#Feature Options
+
+set(FINN_USE_HOST_MEMORY "Use Host Memory Access instead of HBM memory (default is ON)" ON)
+
 add_subdirectory(src)

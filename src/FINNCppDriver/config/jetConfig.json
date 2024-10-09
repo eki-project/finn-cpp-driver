@@ -1,7 +1,7 @@
 [
     {
         "xrtDeviceIndex": 0,
-        "xclbinPath": "/scratch/hpc-prf-ekiapp/linusjun/finn_dev/FINN_WORKDIR/finn-on-n2/model-final-host/out_dir_nomt_80/bitfile/finn-accel.xclbin",
+        "xclbinPath": "/scratch/hpc-prf-ekiapp/linusjun/finn_dev/FINN_WORKDIR/finn-on-n2/model-final/out_dir_nomt_80/bitfile/finn-accel.xclbin",
         "name": "MainDevice",
         "idmas": [
             {

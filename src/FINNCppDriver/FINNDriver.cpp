@@ -26,6 +26,7 @@
 #include <utility>      // for move
 #include <vector>       // for vector
 #include <functional>
+#include <omp.h>
 
  // Helper
 #include <FINNCppDriver/core/DeviceHandler.h>          // for DeviceHandler
@@ -134,28 +135,12 @@ Finn::Driver<SynchronousInference> createDriverFromConfig(const std::filesystem:
 
 constinit float a = 254 / (thresholds[254] - thresholds[0]);
 
-// Finn::vector<int8_t> multithresholdLinearPerTensor(const Finn::vector<float>& inp) {
-//     const size_t size = inp.size();
-//     Finn::vector<int8_t> ret(size, -127);
-// #pragma omp simd
-//     for (size_t i = 0; i < size; ++i) {
-//         ret[i] += std::clamp(static_cast<int>((inp[i] - first_thresholds[0]) * a), 0, 254);
-//     }
-//     return ret;
-// }
-
 Finn::vector<int8_t> multithresholdLinearPerTensor(const Finn::vector<float>& inp) {
     const size_t size = inp.size();
-    Finn::vector<int8_t> ret(size, -128);
-    Finn::vector<int> protoRet(size);
+    Finn::vector<int8_t> ret(size, -127);
 #pragma omp simd
     for (size_t i = 0; i < size; ++i) {
-        protoRet[i] = std::clamp(static_cast<int>((inp[i] - thresholds[0]) * a), 0, 254);
-    }
-#pragma omp simd
-    for (size_t i = 0; i < size; ++i) {
-        const int val = protoRet[i];
-        ret[i] += static_cast<int>(inp[i] - thresholds[val] - static_cast<int>(inp[i] - thresholds[val]) + 1.0f) + val;
+        ret[i] += std::clamp(static_cast<int>((inp[i] - first_thresholds[0]) * a), 0, 254);
     }
     return ret;
 }
@@ -180,82 +165,6 @@ void runThroughputTestImpl(Finn::Driver<true>& baseDriver, std::size_t elementCo
     // constexpr size_t nTestruns = 5000;
     // std::chrono::duration<double> sumRuntimeEnd2End{};
 
-    // Warmup
-    std::fill(testInputs.begin(), testInputs.end(), 1);
-    auto quantInputs = multithresholdLinearPerTensor(testInputs);
-    for (size_t i = 0; i < 10; ++i) {
-        auto warmup = baseDriver.inferSynchronous(quantInputs.begin(), quantInputs.end());
-        Finn::DoNotOptimize(warmup);
-    }
-
-    // std::vector<std::chrono::duration<double>> preprocessing;
-    // std::vector<std::chrono::duration<double>> datatransferToFPGA;
-    // std::vector<std::chrono::duration<double>> inference;
-    // std::vector<std::chrono::duration<double>> datatransferFromFPGA;
-    // std::vector<std::chrono::duration<double>> postprocessing;
-
-    // std::cout << "Running for batch size " << batchSize << "\n";
-    // for (size_t i = 0; i < 100; ++i) {
-    //     std::generate(testInputs.begin(), testInputs.end(), gen);
-    //     const auto start = std::chrono::high_resolution_clock::now();
-    //     auto quantInputsReal = multithresholdLinearPerTensor(testInputs);
-    //     static auto foldedShape = static_cast<Finn::ExtendedBufferDescriptor*>(baseDriver.getConfig().deviceWrappers[0].idmas[0].get())->foldedShape;
-    //     foldedShape[0] = batchSize;
-    //     const Finn::DynamicMdSpan reshapedInput(quantInputsReal.begin(), quantInputsReal.end(), foldedShape);
-    //     auto packed = Finn::packMultiDimensionalInputs<InputFinnType>(quantInputsReal.begin(), quantInputsReal.end(), reshapedInput, foldedShape.back());
-    //     const auto endPreprocessing = std::chrono::high_resolution_clock::now();
-
-    //     auto result = baseDriver.infer(packed.begin(), packed.end(), 0, baseDriver.defaultInputKernelName, 0, baseDriver.defaultOutputKernelName, batchSize, true);
-    //     const auto endDFF = std::chrono::high_resolution_clock::now();
-    //     const auto endDTF = baseDriver.endcopy;
-    //     const auto endInf = baseDriver.endinf;
-
-    //     static auto packedOutput = baseDriver.getConfig().deviceWrappers[0].odmas[0]->packedShape;
-    //     packedOutput[0] = batchSize;
-    //     static auto foldedOutput = static_cast<Finn::ExtendedBufferDescriptor*>(baseDriver.getConfig().deviceWrappers[0].odmas[0].get())->foldedShape;
-    //     foldedOutput[0] = batchSize;
-    //     const Finn::DynamicMdSpan reshapedOutput(result.begin(), result.end(), packedOutput);
-    //     auto unpacked = Finn::unpackMultiDimensionalOutputs<OutputFinnType>(result.begin(), result.end(), reshapedOutput, foldedOutput);
-    //     Finn::DoNotOptimize(packed);
-    //     const auto endPostprocessing = std::chrono::high_resolution_clock::now();
-
-    //     preprocessing.emplace_back(endPreprocessing - start);
-    //     datatransferToFPGA.emplace_back(endDTF - endPreprocessing);
-    //     inference.emplace_back(endInf - endDTF);
-    //     datatransferFromFPGA.emplace_back(endDFF - endInf);
-    //     postprocessing.emplace_back(endPostprocessing - endDFF);
-
-    // }
-
-    // std::cout << "%&%&%&%\n";
-    // std::cout << "preprocessing = [";
-    // for (auto&& elem : preprocessing) {
-    //     std::cout << std::chrono::duration_cast<std::chrono::nanoseconds>(elem).count() << ",";
-    // }
-    // std::cout << "]\n";
-    // std::cout << "datatransferToFPGA = [";
-    // for (auto&& elem : datatransferToFPGA) {
-    //     std::cout << std::chrono::duration_cast<std::chrono::nanoseconds>(elem).count() << ",";
-    // }
-    // std::cout << "]\n";
-    // std::cout << "inference = [";
-    // for (auto&& elem : inference) {
-    //     std::cout << std::chrono::duration_cast<std::chrono::nanoseconds>(elem).count() << ",";
-    // }
-    // std::cout << "]\n";
-    // std::cout << "datatransferFromFPGA = [";
-    // for (auto&& elem : datatransferFromFPGA) {
-    //     std::cout << std::chrono::duration_cast<std::chrono::nanoseconds>(elem).count() << ",";
-    // }
-    // std::cout << "]\n";
-    // std::cout << "postprocessing = [";
-    // for (auto&& elem : postprocessing) {
-    //     std::cout << std::chrono::duration_cast<std::chrono::nanoseconds>(elem).count() << ",";
-    // }
-    // std::cout << "]\n";
-    // std::cout << "%&%&%&%\n";
-
-
     constexpr size_t elementsPerRet = 5;
     std::vector<float> retFinal(batchSize * elementsPerRet);
     constexpr float scale = 0.02659747190773487f;
@@ -265,29 +174,124 @@ void runThroughputTestImpl(Finn::Driver<true>& baseDriver, std::size_t elementCo
     0.09384322166442871f,
     -0.3423689603805542f };
 
-    size_t counter = 0;
-    const auto start = std::chrono::high_resolution_clock::now();
-    while (std::chrono::high_resolution_clock::now() - start < std::chrono::duration<float>(runtime)) {
-        auto quantInputsReal = multithresholdLinearPerTensor(testInputs);
-        auto ret = baseDriver.inferSynchronous(quantInputsReal.begin(), quantInputsReal.end());
-#pragma omp simd collapse(2)
+    // Warmup
+    std::fill(testInputs.begin(), testInputs.end(), 1);
+    for (size_t i = 0; i < 10; ++i) {
+        auto quantInputs = multithresholdLinearPerTensor(testInputs);
+        auto warmup = baseDriver.inferSynchronous(quantInputs.begin(), quantInputs.end());
+        #pragma omp simd collapse(2)
         for (size_t i = 0; i < batchSize; ++i) {
             for (size_t j = 0; j < elementsPerRet; ++j) {
-                retFinal[i * elementsPerRet + j] = ret[i * elementsPerRet + j] * scale + addVec[j];
+                retFinal[i * elementsPerRet + j] = warmup[i * elementsPerRet + j] * scale + addVec[j];
             }
         }
         Finn::DoNotOptimize(retFinal);
-        ++counter;
     }
-    const auto stop = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> sumRuntimeEnd2End = (stop - start);
 
-    size_t infered = counter * batchSize;
-    double throughput = infered / (static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(sumRuntimeEnd2End).count()) * 1e-9);
-    size_t starttime = std::chrono::duration_cast<std::chrono::nanoseconds>(start.time_since_epoch()).count();
-    size_t stoptime = std::chrono::duration_cast<std::chrono::nanoseconds>(stop.time_since_epoch()).count();
+    std::vector<std::chrono::duration<double>> preprocessing;
+    std::vector<std::chrono::duration<double>> datatransferToFPGA;
+    std::vector<std::chrono::duration<double>> inference;
+    std::vector<std::chrono::duration<double>> datatransferFromFPGA;
+    std::vector<std::chrono::duration<double>> postprocessing;
 
-    std::cout << throughput << " " << starttime << " " << stoptime << " " << infered;
+    std::cout << "Running for batch size " << batchSize << "\n";
+    for (size_t i = 0; i < 100; ++i) {
+        std::generate(testInputs.begin(), testInputs.end(), gen);
+        const auto start = std::chrono::high_resolution_clock::now();
+        auto quantInputsReal = multithresholdLinearPerTensor(testInputs);
+        static auto foldedShape = static_cast<Finn::ExtendedBufferDescriptor*>(baseDriver.getConfig().deviceWrappers[0].idmas[0].get())->foldedShape;
+        foldedShape[0] = batchSize;
+        const Finn::DynamicMdSpan reshapedInput(quantInputsReal.begin(), quantInputsReal.end(), foldedShape);
+        auto packed = Finn::packMultiDimensionalInputs<InputFinnType>(quantInputsReal.begin(), quantInputsReal.end(), reshapedInput, foldedShape.back());
+        const auto endPreprocessing = std::chrono::high_resolution_clock::now();
+
+        auto result = baseDriver.infer(packed.begin(), packed.end(), 0, baseDriver.defaultInputKernelName, 0, baseDriver.defaultOutputKernelName, batchSize, true);
+        const auto endDFF = std::chrono::high_resolution_clock::now();
+        const auto endDTF = baseDriver.endcopy;
+        const auto endInf = baseDriver.endinf;
+
+        static auto packedOutput = baseDriver.getConfig().deviceWrappers[0].odmas[0]->packedShape;
+        packedOutput[0] = batchSize;
+        static auto foldedOutput = static_cast<Finn::ExtendedBufferDescriptor*>(baseDriver.getConfig().deviceWrappers[0].odmas[0].get())->foldedShape;
+        foldedOutput[0] = batchSize;
+        const Finn::DynamicMdSpan reshapedOutput(result.begin(), result.end(), packedOutput);
+        auto unpacked = Finn::unpackMultiDimensionalOutputs<OutputFinnType>(result.begin(), result.end(), reshapedOutput, foldedOutput);
+        #pragma omp simd collapse(2)
+        for (size_t i = 0; i < batchSize; ++i) {
+            for (size_t j = 0; j < elementsPerRet; ++j) {
+                retFinal[i * elementsPerRet + j] = unpacked[i * elementsPerRet + j] * scale + addVec[j];
+            }
+        }
+        Finn::DoNotOptimize(retFinal);
+        const auto endPostprocessing = std::chrono::high_resolution_clock::now();
+
+        preprocessing.emplace_back(endPreprocessing - start);
+        datatransferToFPGA.emplace_back(endDTF - endPreprocessing);
+        inference.emplace_back(endInf - endDTF);
+        datatransferFromFPGA.emplace_back(endDFF - endInf);
+        postprocessing.emplace_back(endPostprocessing - endDFF);
+
+    }
+
+    std::cout << "%&%&%&%\n";
+    std::cout << "preprocessing = [";
+    for (auto&& elem : preprocessing) {
+        std::cout << std::chrono::duration_cast<std::chrono::nanoseconds>(elem).count() << ",";
+    }
+    std::cout << "]\n";
+    std::cout << "datatransferToFPGA = [";
+    for (auto&& elem : datatransferToFPGA) {
+        std::cout << std::chrono::duration_cast<std::chrono::nanoseconds>(elem).count() << ",";
+    }
+    std::cout << "]\n";
+    std::cout << "inference = [";
+    for (auto&& elem : inference) {
+        std::cout << std::chrono::duration_cast<std::chrono::nanoseconds>(elem).count() << ",";
+    }
+    std::cout << "]\n";
+    std::cout << "datatransferFromFPGA = [";
+    for (auto&& elem : datatransferFromFPGA) {
+        std::cout << std::chrono::duration_cast<std::chrono::nanoseconds>(elem).count() << ",";
+    }
+    std::cout << "]\n";
+    std::cout << "postprocessing = [";
+    for (auto&& elem : postprocessing) {
+        std::cout << std::chrono::duration_cast<std::chrono::nanoseconds>(elem).count() << ",";
+    }
+    std::cout << "]\n";
+    std::cout << "%&%&%&%\n";
+
+
+    
+
+    //omp_set_num_threads(2);
+
+//     Finn::vector<int8_t> testInputsInt(elementCount * batchSize);
+//     std::fill(testInputsInt.begin(), testInputsInt.end(), 1);
+
+//     size_t counter = 0;
+//     const auto start = std::chrono::high_resolution_clock::now();
+//     while (std::chrono::high_resolution_clock::now() - start < std::chrono::duration<float>(runtime)) {
+//         //auto quantInputsReal = multithresholdLinearPerTensor(testInputs);
+//         auto ret = baseDriver.inferSynchronous(testInputsInt.begin(), testInputsInt.end());
+// // #pragma omp simd collapse(2)
+// //         for (size_t i = 0; i < batchSize; ++i) {
+// //             for (size_t j = 0; j < elementsPerRet; ++j) {
+// //                 retFinal[i * elementsPerRet + j] = ret[i * elementsPerRet + j] * scale + addVec[j];
+// //             }
+// //         }
+//         Finn::DoNotOptimize(ret);
+//         ++counter;
+//     }
+//     const auto stop = std::chrono::high_resolution_clock::now();
+//     std::chrono::duration<double> sumRuntimeEnd2End = (stop - start);
+
+//     size_t infered = counter * batchSize;
+//     double throughput = infered / (static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(sumRuntimeEnd2End).count()) * 1e-9);
+//     size_t starttime = std::chrono::duration_cast<std::chrono::nanoseconds>(start.time_since_epoch()).count();
+//     size_t stoptime = std::chrono::duration_cast<std::chrono::nanoseconds>(stop.time_since_epoch()).count();
+
+//     std::cout << throughput << " " << starttime << " " << stoptime << " " << infered;
 
     // for (size_t i = 0; i < nTestruns; ++i) {
 

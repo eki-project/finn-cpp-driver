@@ -115,8 +115,8 @@ namespace Finn {
             : name(pCUName),
               shapePacked(pShapePacked),
               mapSize(FinnUtils::getActualBufferSize(FinnUtils::shapeToElements(pShapePacked) * batchSize)),
-              //internalBo(xrt::bo(device, mapSize * sizeof(T), xrt::bo::flags::host_only, getGroupId(device, pDevUUID, pCUName))),
-              internalBo(xrt::bo(device, mapSize * sizeof(T), xrt::bo::flags::host_only, 0)),
+              internalBo(xrt::bo(device, mapSize * sizeof(T), 0)),
+              //internalBo(xrt::bo(device, mapSize * sizeof(T), xrt::bo::flags::host_only, 0)),
               map(internalBo.template map<T*>()),
               assocIPCore(xrt::ip(device, pDevUUID, pCUName)),  // Using xrt::kernel/getGroupId after this point leads to a total bricking of the FPGA card!!
               bufAdr(internalBo.address()),

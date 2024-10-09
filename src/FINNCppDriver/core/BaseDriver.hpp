@@ -454,6 +454,8 @@ namespace Finn {
 
             FINN_LOG_DEBUG(logger, loglevel::info) << "Reading out buffers";
             accelerator.read();
+            // auto endread = std::chrono::high_resolution_clock::now();
+            // std::cout << std::chrono::duration_cast<std::chrono::nanoseconds>(endread-endinf).count() << "\n";
             return accelerator.getOutputData(outputDeviceIndex, outputBufferKernelName, forceArchival);
         }
 

@@ -35,6 +35,9 @@ namespace xrt {
      */
     class ip {
          public:
+        inline static std::vector<std::string> kernel_name;
+        inline static std::vector<xrt::device> kernel_device;
+        inline static std::vector<xrt::uuid> kernel_uuid;
         /**
          * ip() - Construct empty ip object
          */
@@ -56,7 +59,13 @@ namespace xrt {
          *
          * Constructor throws on error.
          */
-        ip(const xrt::device& device, const xrt::uuid& xclbin_id, const std::string& name){};
+        ip(const xrt::device& device, const xrt::uuid& xclbin_id, const std::string& name) {
+            FINN_LOG(Logger::getLogger(), loglevel::debug) << "[xrt::ip mock]"
+                                                           << "Create kernel with name: " << name;
+            kernel_device.emplace_back(device);
+            kernel_uuid.emplace_back(xclbin_id);
+            kernel_name.emplace_back(name);
+        };
 
         /**
          * write_register() - Write to the address range of an ip

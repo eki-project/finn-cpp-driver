@@ -84,7 +84,7 @@ set(XRT_DIR "${CMAKE_SOURCE_DIR}/cmake")
 find_package(XRT REQUIRED)
 
 #OpenMP
-find_package(OpenMP)
+find_package(OpenMP REQUIRED)
 
 #Boost
 set(Boost_DEBUG OFF)

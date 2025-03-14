@@ -46,7 +46,6 @@ namespace Finn {
      */
     template<bool SynchronousInference, IsDatatype F, IsDatatype S, typename T = uint8_t>
     class BaseDriver {
-         public:
         Accelerator accelerator;
         Config configuration;
         logger_type& logger = Logger::getLogger();
@@ -58,7 +57,6 @@ namespace Finn {
         uint batchElements = 1;
         bool forceAchieval = false;
 
-         private:
         /**
          * @brief A logger prefix to determine the source of a log write
          *

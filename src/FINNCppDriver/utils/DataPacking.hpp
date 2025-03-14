@@ -435,7 +435,8 @@ namespace Finn {
     Finn::vector<uint8_t> pack(IteratorType first, IteratorType last) {
         using T = typename std::iterator_traits<IteratorType>::value_type;
         if constexpr (std::endian::native == std::endian::big) {
-            []<bool flag = false>() { static_assert(flag, "Big-endian architectures are currently not supported!"); }();
+            []<bool flag = false>() { static_assert(flag, "Big-endian architectures are currently not supported!"); }
+            ();
         } else if constexpr (std::endian::native == std::endian::little) {
             constexpr bool isFix = U().isFixedPoint();
             constexpr bool isInt = U().isInteger();
@@ -461,7 +462,8 @@ namespace Finn {
                     Finn::vector<VecType> input(first, last);
                     return detail::packImpl<U>(input.begin(), input.end());
                 } else {
-                    []<bool flag = false>() { static_assert(flag, "Weird floating point data length. Not supported!"); }();
+                    []<bool flag = false>() { static_assert(flag, "Weird floating point data length. Not supported!"); }
+                    ();
                 }
             } else if constexpr (std::is_floating_point_v<T>) {  // Datatype is floating point number
                 static_assert(sizeof(float) == 4 && sizeof(double) == 8 && std::numeric_limits<T>::is_iec559, "Floating point format is not iee754 or unexpected type width!");
@@ -477,7 +479,8 @@ namespace Finn {
                     std::transform(first, last, input.begin(), [](const T& val) { return std::bit_cast<uint32_t>(val); });
                     return detail::packImpl<U>(input.begin(), input.end());
                 } else {
-                    []<bool flag = false>() { static_assert(flag, "Weird floating point data length. Not supported!"); }();
+                    []<bool flag = false>() { static_assert(flag, "Weird floating point data length. Not supported!"); }
+                    ();
                 }
             } else if constexpr (!isInt && std::is_integral_v<T>) {  // Datatype is float stored in ints
                 Finn::vector<float> vec(first, last);                // This cast is necessary to make sure, that data is in a 32-bit floating point format before the bitcast.
@@ -490,7 +493,8 @@ namespace Finn {
                 return detail::packImpl<U>(first, last);
             }
         } else {
-            []<bool flag = false>() { static_assert(flag, "Mixed-endian architectures are currently not supported!"); }();
+            []<bool flag = false>() { static_assert(flag, "Mixed-endian architectures are currently not supported!"); }
+            ();
         }
     }
 

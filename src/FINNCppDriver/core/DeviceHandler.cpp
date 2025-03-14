@@ -128,7 +128,7 @@ namespace Finn {
             return;
         } else {
             FINN_LOG(Logger::getLogger(), loglevel::info) << loggerPrefix() << "(" << xrtDeviceIndex << ") "
-                                                      << "Change batch size to " << pBatchsize << "\n";
+                                                          << "Change batch size to " << pBatchsize << "\n";
             this->batchsize = pBatchsize;
             inputBufferMap.clear();
             outputBufferMap.clear();

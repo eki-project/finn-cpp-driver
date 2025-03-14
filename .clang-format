@@ -41,3 +41,6 @@ SpacesInContainerLiterals: 'false'
 SpacesInParentheses: 'false'
 SpacesInSquareBrackets: 'false'
 TabWidth: '4'
+---
+Language: Json
+BasedOnStyle: llvm

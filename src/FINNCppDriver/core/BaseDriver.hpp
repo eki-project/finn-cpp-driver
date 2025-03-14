@@ -57,7 +57,8 @@ namespace Finn {
         std::string defaultOutputKernelName;
         uint batchElements = 1;
         bool forceAchieval = false;
-        private:
+
+         private:
         /**
          * @brief A logger prefix to determine the source of a log write
          *
@@ -408,7 +409,7 @@ namespace Finn {
             return inferSynchronous(data, defaultInputDeviceIndex, defaultInputKernelName, defaultOutputDeviceIndex, defaultOutputKernelName, batchElements, forceAchieval);
         }
 
-        
+
         /**
          *
          * @brief Do an inference with the given data. This assumes already flattened data in uint8_t's. Specify inputs and outputs.
@@ -467,7 +468,8 @@ namespace Finn {
                                                   bool forceArchival) {
             return infer(data.begin(), data.end(), inputDeviceIndex, inputBufferKernelName, outputDeviceIndex, outputBufferKernelName, batchSize, forceArchival);
         }
-     protected:
+
+         protected:
 #ifdef UNITTEST
         /**
          * @brief Return whether the data that is currently held on the FPGA is equivalent to the passed data

@@ -408,9 +408,6 @@ namespace Finn {
             return inferSynchronous(data, defaultInputDeviceIndex, defaultInputKernelName, defaultOutputDeviceIndex, defaultOutputKernelName, batchElements, forceAchieval);
         }
 
-        std::chrono::time_point<std::chrono::high_resolution_clock> endinf;
-        std::chrono::time_point<std::chrono::high_resolution_clock> endcopy;
-
         
         /**
          *
@@ -440,8 +437,6 @@ namespace Finn {
 
             bool stored = storeFunc(first, last);
 
-            endcopy = std::chrono::high_resolution_clock::now();
-
             accelerator.run();
 
 #ifdef UNITTEST
@@ -450,12 +445,8 @@ namespace Finn {
 #endif
             accelerator.wait();
 
-            endinf = std::chrono::high_resolution_clock::now();
-
             FINN_LOG_DEBUG(logger, loglevel::info) << "Reading out buffers";
             accelerator.read();
-            // auto endread = std::chrono::high_resolution_clock::now();
-            // std::cout << std::chrono::duration_cast<std::chrono::nanoseconds>(endread-endinf).count() << "\n";
             return accelerator.getOutputData(outputDeviceIndex, outputBufferKernelName, forceArchival);
         }
 

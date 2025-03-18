@@ -7,6 +7,8 @@ set(CMAKE_CXX_CPPCHECK cppcheck
 --suppress=unmatchedSuppression;
   --suppress=unmatchedSuppression:{};
   --suppress=missingInclude;
+  --suppress=missingIncludeSystem;
+  --suppress=checkersReport;
   --enable=all;
   --inline-suppr;
   --inconclusive;

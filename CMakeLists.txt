@@ -150,6 +150,8 @@ if(DEFINED FINN_HEADER_LOCATION)
     else()
       message(FATAL_ERROR "Could not find FINN header at ${FINN_HEADER_LOCATION_FOLDER}/${FINN_HEADER_LOCATION_NAME}!")
     endif()
+else()
+    message(WARNING "No custom FINN-compiled header set. This should only be the case for testing purposes!")
 endif()
 
 # Build Unit tests

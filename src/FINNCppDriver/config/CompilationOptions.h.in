@@ -3,8 +3,6 @@
 #ifndef COMPILATIONOPTIONS_H
 #define COMPILATIONOPTIONS_H
 
-#define FINN_HOSTMEMORY = @FINN_USE_HOST_MEMORY_BOOL@
-
 namespace Finn {
     namespace Options {
         constexpr bool hostMemoryAccess = @FINN_USE_HOST_MEMORY_BOOL@;

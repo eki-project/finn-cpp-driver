@@ -28,8 +28,20 @@
 #include "xrt/xrt_bo.h"
 #include "xrt/xrt_kernel.h"
 
+/**
+ * @brief Magic value used by XRT to start kernel
+ *
+ */
 constexpr uint32_t IP_START = 0x1;
+/**
+ * @brief Magic value used by XRT to see if a kernel is idling
+ *
+ */
 constexpr uint32_t IP_IDLE = 0x4;
+/**
+ * @brief Magic value used by XRT as offset
+ *
+ */
 constexpr uint32_t CSR_OFFSET = 0x0;
 
 // Forward declares

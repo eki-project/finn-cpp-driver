@@ -72,7 +72,13 @@ endif()
 
 #INCLUDES
 
-#set(Boost_USE_STATIC_LIBS   ON)
+#Set Boost policies for compatibility
+if(POLICY CMP0167)
+  cmake_policy(SET CMP0167 OLD)
+endif()
+if(POLICY CMP0144)
+  cmake_policy(SET CMP0144 NEW)
+endif()
 
 #Threads
 set(THREADS_PREFER_PTHREAD_FLAG ON)
@@ -117,7 +123,7 @@ include_directories(SYSTEM external/xtensor/include)
 
 #Nlohmann json
 
-set(JSON_BuildTests OFF)
+set(JSON_BuildTests OFF CACHE INTERNAL "")
 add_subdirectory(external/json)
 include_directories(SYSTEM external/json/include/)
 
@@ -192,6 +198,13 @@ if (FINN_ENABLE_WARNINGS)
     "")
 endif (FINN_ENABLE_WARNINGS)
 
+OPTION(FINN_USE_HOST_MEM "Enable the use of host memory access" ON)
+if (FINN_USE_HOST_MEM)
+  message(STATUS "Host Memory Access: enabled")
+else()
+message(STATUS "Host Memory Access: disabled")
+endif (FINN_USE_HOST_MEM)
+
 #
 # Create options for including cmake files from the cmake folder with a bit of output.
 #
@@ -236,6 +249,9 @@ finncpp_enable_sanitizers(finnc_options
 else()
 message(STATUS "All Sanitizers disabled.")
 endif()
+
+# Disable Clang Tidy because of bug with constexpr ifs and constexpr constructors
+set(FINN_CLANG_TIDY OFF)
 
 message(STATUS "Checks:")
 list(APPEND CMAKE_MESSAGE_INDENT "  ") #indent +1

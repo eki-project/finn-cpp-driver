@@ -419,7 +419,7 @@ void validateConfigPath(const std::string& path) {
         throw finnBoost::program_options::error_with_option_name("Cannot find config file at " + configFilePath.string(), "configpath");
     }
 
-    FINN_LOG(Logger::getLogger(), loglevel::info) << finnMainLogPrefix() << "Config file found at " + configFilePath.string();
+    FINN_LOG(Logger::getLogger(), loglevel::info) << finnMainLogPrefix() << "Config file found at " << configFilePath.string();
 }
 
 /**
@@ -433,7 +433,7 @@ void validateInputPath(const std::vector<std::string>& path) {
         if (!std::filesystem::exists(inputFilePath)) {
             throw finnBoost::program_options::error_with_option_name("Cannot find input file at " + inputFilePath.string());
         }
-        FINN_LOG(Logger::getLogger(), loglevel::info) << finnMainLogPrefix() << "Input file found at " + inputFilePath.string();
+        FINN_LOG(Logger::getLogger(), loglevel::info) << finnMainLogPrefix() << "Input file found at " << inputFilePath.string();
     }
 }
 

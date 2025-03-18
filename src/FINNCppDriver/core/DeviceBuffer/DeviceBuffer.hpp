@@ -13,6 +13,7 @@
 #ifndef DEVICEBUFFER
 #define DEVICEBUFFER
 
+#include <FINNCppDriver/config/CompilationOptions.h>
 #include <FINNCppDriver/utils/Logger.h>
 #include <FINNCppDriver/utils/Types.h>
 
@@ -114,6 +115,13 @@ namespace Finn {
          */
         uint32_t oldRepetitions = 0;
 
+        consteval static xrt::bo::flags getFlags(bool hostMemoryAccess) {
+            if (hostMemoryAccess) {
+                return xrt::bo::flags::host_only;
+            }
+            return xrt::bo::flags::normal;
+        }
+
          public:
         /**
          * @brief Construct a new Device Buffer object
@@ -127,8 +135,7 @@ namespace Finn {
             : name(pCUName),
               shapePacked(pShapePacked),
               mapSize(FinnUtils::getActualBufferSize(FinnUtils::shapeToElements(pShapePacked) * batchSize)),
-              internalBo(xrt::bo(device, mapSize * sizeof(T), 0)),
-              // internalBo(xrt::bo(device, mapSize * sizeof(T), xrt::bo::flags::host_only, 0)),
+              internalBo(xrt::bo(device, mapSize * sizeof(T), DeviceBuffer::getFlags(Finn::Options::hostMemoryAccess), 0)),
               map(internalBo.template map<T*>()),
               assocIPCore(xrt::ip(device, pDevUUID, pCUName)),  // Using xrt::kernel/getGroupId after this point leads to a total bricking of the FPGA card!!
               bufAdr(internalBo.address()),
@@ -136,6 +143,8 @@ namespace Finn {
             shapePacked[0] = batchSize;
             FINN_LOG(logger, loglevel::info) << "[DeviceBuffer] "
                                              << "New Device Buffer of size " << mapSize * sizeof(T) << "bytes with group id " << 0 << "\n";
+            FINN_LOG(logger, loglevel::info) << "[DeviceBuffer] "
+                                             << "Host Memory Access enabled: " << Finn::Options::hostMemoryAccess << "\n";
             FINN_LOG(logger, loglevel::info) << "[DeviceBuffer] "
                                              << "Initializing DeviceBuffer " << name << " (SHAPE PACKED: " << FinnUtils::shapeToString(pShapePacked) << " inputs of the given shape, MAP SIZE: " << mapSize << ")\n";
             std::fill(map, map + mapSize, 0);

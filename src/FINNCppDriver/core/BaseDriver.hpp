@@ -77,7 +77,6 @@ namespace Finn {
          * @param batchSize
          */
         void initializeBaseDriver(uint batchSize) {
-            FINN_LOG(logger, loglevel::info) << loggerPrefix() << "Initializing Base Driver.";
             accelerator = Accelerator(configuration.deviceWrappers, SynchronousInference, batchSize);
             defaultInputDeviceIndex = configuration.deviceWrappers[0].xrtDeviceIndex;
             defaultInputKernelName = configuration.deviceWrappers[0].idmas[0]->kernelName;

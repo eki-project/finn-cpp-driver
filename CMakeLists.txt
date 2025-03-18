@@ -198,6 +198,7 @@ if (FINN_ENABLE_WARNINGS)
     "")
 endif (FINN_ENABLE_WARNINGS)
 
+#Feature Options
 OPTION(FINN_USE_HOST_MEM "Enable the use of host memory access" ON)
 if (FINN_USE_HOST_MEM)
   message(STATUS "Host Memory Access: enabled")

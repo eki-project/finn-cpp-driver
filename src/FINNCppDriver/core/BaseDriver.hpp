@@ -46,7 +46,6 @@ namespace Finn {
      */
     template<bool SynchronousInference, IsDatatype F, IsDatatype S, typename T = uint8_t>
     class BaseDriver {
-         private:
         Accelerator accelerator;
         Config configuration;
         logger_type& logger = Logger::getLogger();
@@ -408,7 +407,6 @@ namespace Finn {
         }
 
 
-         protected:
         /**
          *
          * @brief Do an inference with the given data. This assumes already flattened data in uint8_t's. Specify inputs and outputs.
@@ -468,6 +466,7 @@ namespace Finn {
             return infer(data.begin(), data.end(), inputDeviceIndex, inputBufferKernelName, outputDeviceIndex, outputBufferKernelName, batchSize, forceArchival);
         }
 
+         protected:
 #ifdef UNITTEST
         /**
          * @brief Return whether the data that is currently held on the FPGA is equivalent to the passed data

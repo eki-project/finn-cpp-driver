@@ -127,7 +127,7 @@ namespace Finn {
          * @brief Destroy the Device Handler object
          *
          */
-        ~DeviceHandler() = default;
+        ~DeviceHandler() { FINN_LOG(Logger::getLogger(), loglevel::info) << loggerPrefix() << "Tearing down DeviceHandler\n"; };
 
         /**
          * @brief Sets the input batch size. Needs to reinitialize all buffers!

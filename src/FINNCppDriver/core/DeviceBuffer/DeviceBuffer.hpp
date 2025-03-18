@@ -29,8 +29,20 @@
 #include "xrt/xrt_bo.h"
 #include "xrt/xrt_kernel.h"
 
+/**
+ * @brief Magic value used by XRT to start kernel
+ *
+ */
 constexpr uint32_t IP_START = 0x1;
+/**
+ * @brief Magic value used by XRT to see if a kernel is idling
+ *
+ */
 constexpr uint32_t IP_IDLE = 0x4;
+/**
+ * @brief Magic value used by XRT as offset
+ *
+ */
 constexpr uint32_t CSR_OFFSET = 0x0;
 
 // Forward declares
@@ -103,6 +115,13 @@ namespace Finn {
          */
         uint32_t oldRepetitions = 0;
 
+        consteval static xrt::bo::flags getFlags(bool hostMemoryAccess) {
+            if (hostMemoryAccess) {
+                return xrt::bo::flags::host_only;
+            }
+            return xrt::bo::flags::normal;
+        }
+
          public:
         /**
          * @brief Construct a new Device Buffer object
@@ -116,11 +135,7 @@ namespace Finn {
             : name(pCUName),
               shapePacked(pShapePacked),
               mapSize(FinnUtils::getActualBufferSize(FinnUtils::shapeToElements(pShapePacked) * batchSize)),
-#ifdef FINN_HOSTMEMORY
-              internalBo(xrt::bo(device, mapSize * sizeof(T), xrt::bo::flags::host_only, 0)),
-#else
-              internalBo(xrt::bo(device, mapSize * sizeof(T), 0)),
-#endif  // FINN_HOSTMEMORY
+              internalBo(xrt::bo(device, mapSize * sizeof(T), DeviceBuffer::getFlags(Finn::Options::hostMemoryAccess), 0)),
               map(internalBo.template map<T*>()),
               assocIPCore(xrt::ip(device, pDevUUID, pCUName)),  // Using xrt::kernel/getGroupId after this point leads to a total bricking of the FPGA card!!
               bufAdr(internalBo.address()),

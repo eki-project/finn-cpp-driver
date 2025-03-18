@@ -72,7 +72,13 @@ endif()
 
 #INCLUDES
 
-#set(Boost_USE_STATIC_LIBS   ON)
+#Set Boost policies for compatibility
+if(POLICY CMP0167)
+  cmake_policy(SET CMP0167 OLD)
+endif()
+if(POLICY CMP0144)
+  cmake_policy(SET CMP0144 NEW)
+endif()
 
 #Threads
 set(THREADS_PREFER_PTHREAD_FLAG ON)
@@ -84,7 +90,7 @@ set(XRT_DIR "${CMAKE_SOURCE_DIR}/cmake")
 find_package(XRT REQUIRED)
 
 #OpenMP
-find_package(OpenMP)
+find_package(OpenMP REQUIRED)
 
 #Boost
 set(Boost_DEBUG OFF)
@@ -117,7 +123,7 @@ include_directories(SYSTEM external/xtensor/include)
 
 #Nlohmann json
 
-set(JSON_BuildTests OFF)
+set(JSON_BuildTests OFF CACHE INTERNAL "")
 add_subdirectory(external/json)
 include_directories(SYSTEM external/json/include/)
 
@@ -144,6 +150,8 @@ if(DEFINED FINN_HEADER_LOCATION)
     else()
       message(FATAL_ERROR "Could not find FINN header at ${FINN_HEADER_LOCATION_FOLDER}/${FINN_HEADER_LOCATION_NAME}!")
     endif()
+else()
+    message(WARNING "No custom FINN-compiled header set. This should only be the case for testing purposes!")
 endif()
 
 # Build Unit tests
@@ -192,6 +200,14 @@ if (FINN_ENABLE_WARNINGS)
     "")
 endif (FINN_ENABLE_WARNINGS)
 
+#Feature Options
+OPTION(FINN_USE_HOST_MEM "Enable the use of host memory access" ON)
+if (FINN_USE_HOST_MEM)
+  message(STATUS "Host Memory Access: enabled")
+else()
+message(STATUS "Host Memory Access: disabled")
+endif (FINN_USE_HOST_MEM)
+
 #
 # Create options for including cmake files from the cmake folder with a bit of output.
 #
@@ -237,6 +253,9 @@ else()
 message(STATUS "All Sanitizers disabled.")
 endif()
 
+# Disable Clang Tidy because of bug with constexpr ifs and constexpr constructors
+set(FINN_CLANG_TIDY OFF)
+
 message(STATUS "Checks:")
 list(APPEND CMAKE_MESSAGE_INDENT "  ") #indent +1
 check_include(FINN_IPO          "InterproceduralOptimization" InterproceduralOptimization.cmake)
@@ -245,10 +264,5 @@ check_include(FINN_CLANG_TIDY   "clang-tidy"   ClangTidy.cmake)
 check_include(FINN_CPP_CHECK    "cppcheck"     CppCheck.cmake)
 check_include(FINN_IWYU         "iwyu"         IWYU.cmake)
 list(POP_BACK CMAKE_MESSAGE_INDENT)    #indent -1
-
-
-#Feature Options
-
-set(FINN_USE_HOST_MEMORY "Use Host Memory Access instead of HBM memory (default is ON)" ON)
 
 add_subdirectory(src)

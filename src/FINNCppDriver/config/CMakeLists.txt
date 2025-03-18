@@ -1,5 +1,5 @@
 
-if(FINN_USE_HOST_MEMORY)
+if(FINN_USE_HOST_MEM)
     set(FINN_USE_HOST_MEMORY_BOOL true)
 else()
     set(FINN_USE_HOST_MEMORY_BOOL false)

@@ -96,7 +96,7 @@ run-unittests:
       aud: https://git.uni-paderborn.de
   stage: test
   dependencies:
-    - build-job
+    - build-unittests
     - build-dependencies
   variables:
     SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 0:30:00 -N 1 -n 1 --cpus-per-task=2 --mem-per-cpu=2G"

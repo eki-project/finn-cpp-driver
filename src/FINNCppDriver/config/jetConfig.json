@@ -1,45 +1,45 @@
 [
-    {
-        "xrtDeviceIndex": 0,
-        "xclbinPath": "/scratch/hpc-prf-ekiapp/linusjun/finn_dev/FINN_WORKDIR/finn-on-n2/model-final/out_dir_nomt_80/bitfile/finn-accel.xclbin",
-        "name": "MainDevice",
-        "idmas": [
-            {
-                "kernelName": "StreamingDataflowPartition_0:{idma0}",
-                "normalShape": [
-                    1,
-                    24
-                ],
-                "foldedShape": [
-                    1,
-                    1,
-                    24
-                ],
-                "packedShape": [
-                    1,
-                    1,
-                    24
-                ]
-            }
+  {
+    "xrtDeviceIndex": 0,
+    "xclbinPath": "/scratch/hpc-prf-ekiapp/linusjun/finn_dev/FINN_WORKDIR/finn-on-n2/model-final/out_dir_nomt_80/bitfile/finn-accel.xclbin",
+    "name": "MainDevice",
+    "idmas": [
+      {
+        "kernelName": "StreamingDataflowPartition_0:{idma0}",
+        "normalShape": [
+          1,
+          24
         ],
-        "odmas": [
-            {
-                "kernelName": "StreamingDataflowPartition_2:{odma0}",
-                "normalShape": [
-                    1,
-                    5
-                ],
-                "foldedShape": [
-                    1,
-                    1,
-                    5
-                ],
-                "packedShape": [
-                    1,
-                    1,
-                    10
-                ]
-            }
+        "foldedShape": [
+          1,
+          1,
+          24
+        ],
+        "packedShape": [
+          1,
+          1,
+          24
         ]
-    }
+      }
+    ],
+    "odmas": [
+      {
+        "kernelName": "StreamingDataflowPartition_2:{odma0}",
+        "normalShape": [
+          1,
+          5
+        ],
+        "foldedShape": [
+          1,
+          1,
+          5
+        ],
+        "packedShape": [
+          1,
+          1,
+          10
+        ]
+      }
+    ]
+  }
 ]

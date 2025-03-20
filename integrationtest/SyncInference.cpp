@@ -10,7 +10,6 @@
  *
  */
 
-
 #include <FINNCppDriver/core/BaseDriver.hpp>
 #include <FINNCppDriver/utils/FinnDatatypes.hpp>
 #include <FINNCppDriver/utils/join.hpp>
@@ -24,7 +23,7 @@ namespace Finn {
 }
 
 TEST(SyncInference, syncInferenceTest) {
-    std::string exampleNetworkConfig = "config.json";
+    std::string exampleNetworkConfig = "jetConfig.json";
     Finn::Config conf = Finn::createConfigFromPath(exampleNetworkConfig);
 
     auto driver = Finn::Driver<true>(conf, 0, conf.deviceWrappers[0].idmas[0]->kernelName, 0, conf.deviceWrappers[0].odmas[0]->kernelName, 1, true);
@@ -42,7 +41,7 @@ TEST(SyncInference, syncInferenceTest) {
 }
 
 TEST(SyncInference, syncBatchInferenceTest) {
-    std::string exampleNetworkConfig = "config.json";
+    std::string exampleNetworkConfig = "jetConfig.json";
     Finn::Config conf = Finn::createConfigFromPath(exampleNetworkConfig);
     std::size_t batchLength = 10;
 
@@ -69,5 +68,6 @@ TEST(SyncInference, syncBatchInferenceTest) {
 
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);
+
     return RUN_ALL_TESTS();
 }

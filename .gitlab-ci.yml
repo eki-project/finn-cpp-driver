@@ -67,12 +67,17 @@ build-integrationtests:
     SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 1:00:00 -N 1 -n 1 --cpus-per-task=128"
   extends: .load-modules
   script:
-    - mkdir build && cd build
+    - mkdir build-host-mem && cd build-host-mem
     - cmake -DCMAKE_BUILD_TYPE=Release ..
+    - make Integrationtests -j $procs
+    - cd ..
+    - mkdir build-no-host-mem && cd build-no-host-mem
+    - cmake -DCMAKE_BUILD_TYPE=Release -DFINN_USE_HOST_MEM=OFF ..
     - make Integrationtests -j $procs
   artifacts:
     paths:
-      - "build/"
+      - "build-host-mem/"
+      - "build-no-host-mem/"
     expire_in: 1 week
 
 lint:
@@ -121,17 +126,37 @@ run-integrationtests:
     - build-integrationtests
     - build-dependencies
   variables:
-    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p fpga  -t 0:30:00 --constraint=xilinx_u280_xrt2.14"
-  extends: .load-modules
+    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p hacc  -t 0:30:00"
+  before_script:
+    - ml reset
+    - ml fpga
+    - ml xilinx/xrt/2.16
+    - ml xilinx/u55c/u55c_gen3x16_xdma_3_202210_1
+    - ml compiler GCC/13.2.0
   script:
-    - cp example_networks/identity_net/* build/integrationtest
-    - cd build/integrationtest
+    # Reset FPGAs and setup Host Memory Access
     - xbutil reset -d 0000:a1:00.1
     - xbutil reset -d 0000:81:00.1
     - xbutil reset -d 0000:01:00.1
-    - ./SyncInference
-    # - xbutil reset -d 0000:a1:00.1
-    # - xbutil reset -d 0000:81:00.1
-    # - xbutil reset -d 0000:01:00.1
-    # - ./AsyncInference
+    - sudo /opt/software/FPGA/scripts/u280/host_memory/enable_hostmem_single_fpga.sh 0000:a1:00.1
+    - /opt/software/FPGA/scripts/u280/host_memory/verify_single_fpga.sh 0000:a1:00.1
+    - sudo /opt/software/FPGA/scripts/u280/host_memory/enable_hostmem_single_fpga.sh 0000:81:00.1
+    - /opt/software/FPGA/scripts/u280/host_memory/verify_single_fpga.sh 0000:81:00.1
+    - sudo /opt/software/FPGA/scripts/u280/host_memory/enable_hostmem_single_fpga.sh 0000:01:00.1
+    - /opt/software/FPGA/scripts/u280/host_memory/verify_single_fpga.sh 0000:01:00.1
+
+    # Test Synchronous Inference with Host memory
+    - cd example_networks/jet-structure-classification-with-host-mem
+    - ./../../build-host-mem/SyncInference
+
+    # Reset FPGAs again
+    - xbutil reset -d 0000:a1:00.1
+    - xbutil reset -d 0000:81:00.1
+    - xbutil reset -d 0000:01:00.1
+
+    # Test Synchronous Inference without Host memory
+    - cd example_networks/jet-structure-classification-without-host-mem
+    - ./../../build-no-host-mem/SyncInference
+
+    # TODO: Run regression tests + asynchronous inference
 

@@ -1,45 +1,45 @@
 [
-    {
-        "xrtDeviceIndex": 0,
-        "xclbinPath": "/scratch/hpc-prf-ekiapp/linusjun/finn_dev/FINN_WORKDIR/finn-noctua-install/testmodel/out_dir/bitfile/finn-accel.xclbin",
-        "name": "MainDevice",
-        "idmas": [
-            {
-                "kernelName": "StreamingDataflowPartition_0:{idma0}",
-                "normalShape": [
-                    1,
-                    10
-                ],
-                "foldedShape": [
-                    1,
-                    5,
-                    2
-                ],
-                "packedShape": [
-                    1,
-                    5,
-                    2
-                ]
-            }
+  {
+    "xrtDeviceIndex": 0,
+    "xclbinPath": "finn-accel.xclbin",
+    "name": "MainDevice",
+    "idmas": [
+      {
+        "kernelName": "StreamingDataflowPartition_0:{idma0}",
+        "normalShape": [
+          1,
+          10
         ],
-        "odmas": [
-            {
-                "kernelName": "StreamingDataflowPartition_2:{odma0}",
-                "normalShape": [
-                    1,
-                    10
-                ],
-                "foldedShape": [
-                    1,
-                    10,
-                    1
-                ],
-                "packedShape": [
-                    1,
-                    10,
-                    1
-                ]
-            }
+        "foldedShape": [
+          1,
+          5,
+          2
+        ],
+        "packedShape": [
+          1,
+          5,
+          2
         ]
-    }
+      }
+    ],
+    "odmas": [
+      {
+        "kernelName": "StreamingDataflowPartition_2:{odma0}",
+        "normalShape": [
+          1,
+          10
+        ],
+        "foldedShape": [
+          1,
+          10,
+          1
+        ],
+        "packedShape": [
+          1,
+          10,
+          1
+        ]
+      }
+    ]
+  }
 ]

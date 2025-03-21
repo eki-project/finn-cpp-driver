@@ -17,7 +17,7 @@ workflow:
   before_script:
     - ml vis/Graphviz/8.1.0-GCCcore-12.3.0
     - ml fpga
-    - ml xilinx/xrt/2.14
+    - ml xilinx/xrt/2.16
     - ml devel/Doxygen/1.9.7-GCCcore-12.3.0
     - ml compiler/GCC/12.3.0
     - ml devel/CMake/3.26.3-GCCcore-12.3.0
@@ -132,14 +132,11 @@ run-integrationtests:
     - build-dependencies
   variables:
     SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p hacc  -t 0:30:00"
-  before_script:
-    - ml reset
-    - ml fpga
-    - ml xilinx/xrt/2.16
-    - ml xilinx/u55c/u55c_gen3x16_xdma_3_202210_1
-    - ml compiler GCC/13.2.0
+  extends: .load-modules
   script:
     # Reset FPGAs and setup Host Memory Access
+    - ml xilinx/u55c/u55c_gen3x16_xdma_3_202210_1
+    - ml
     - xbutil reset -d 0000:c1:00.1
     - xbutil reset -d 0000:81:00.1
     - sudo /opt/software/FPGA/scripts/u280/host_memory/enable_hostmem_single_fpga.sh 0000:c1:00.1
@@ -147,17 +144,18 @@ run-integrationtests:
     - sudo /opt/software/FPGA/scripts/u280/host_memory/enable_hostmem_single_fpga.sh 0000:81:00.1
     - /opt/software/FPGA/scripts/u280/host_memory/verify_single_fpga.sh 0000:81:00.1
 
+    - cd build-host-mem/integrationtest
     # Test Synchronous Inference with Host memory
-    - cd example_networks/jet-structure-classification-with-host-mem
-    - ./../../build-host-mem/integrationtest/SyncInference
+    - cp example_networks/jet-structure-classification-with-host-mem/* .
+    - ./SyncInference
 
     # Reset FPGAs again
     - xbutil reset -d 0000:c1:00.1
     - xbutil reset -d 0000:81:00.1
 
     # Test Synchronous Inference without Host memory
-    - cd example_networks/jet-structure-classification-without-host-mem
-    - ./../../build-no-host-mem/integrationtest/SyncInference
+    - cp example_networks/jet-structure-classification-without-host-mem/* .
+    - ./SyncInference
 
     # TODO: Run regression tests + asynchronous inference
 

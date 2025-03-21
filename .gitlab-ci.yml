@@ -135,24 +135,20 @@ run-integrationtests:
     - ml compiler GCC/13.2.0
   script:
     # Reset FPGAs and setup Host Memory Access
-    - xbutil reset -d 0000:a1:00.1
+    - xbutil reset -d 0000:c1:00.1
     - xbutil reset -d 0000:81:00.1
-    - xbutil reset -d 0000:01:00.1
-    - sudo /opt/software/FPGA/scripts/u280/host_memory/enable_hostmem_single_fpga.sh 0000:a1:00.1
-    - /opt/software/FPGA/scripts/u280/host_memory/verify_single_fpga.sh 0000:a1:00.1
+    - sudo /opt/software/FPGA/scripts/u280/host_memory/enable_hostmem_single_fpga.sh 0000:c1:00.1
+    - /opt/software/FPGA/scripts/u280/host_memory/verify_single_fpga.sh 0000:c1:00.1
     - sudo /opt/software/FPGA/scripts/u280/host_memory/enable_hostmem_single_fpga.sh 0000:81:00.1
     - /opt/software/FPGA/scripts/u280/host_memory/verify_single_fpga.sh 0000:81:00.1
-    - sudo /opt/software/FPGA/scripts/u280/host_memory/enable_hostmem_single_fpga.sh 0000:01:00.1
-    - /opt/software/FPGA/scripts/u280/host_memory/verify_single_fpga.sh 0000:01:00.1
 
     # Test Synchronous Inference with Host memory
     - cd example_networks/jet-structure-classification-with-host-mem
     - ./../../build-host-mem/SyncInference
 
     # Reset FPGAs again
-    - xbutil reset -d 0000:a1:00.1
+    - xbutil reset -d 0000:c1:00.1
     - xbutil reset -d 0000:81:00.1
-    - xbutil reset -d 0000:01:00.1
 
     # Test Synchronous Inference without Host memory
     - cd example_networks/jet-structure-classification-without-host-mem

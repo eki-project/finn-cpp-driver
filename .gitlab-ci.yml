@@ -28,7 +28,7 @@ build-dependencies:
       aud: https://git.uni-paderborn.de
   stage: build
   variables:
-    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 1:00:00 -N 1 -n 1 --cpus-per-task=128"
+    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 2:00:00 -N 1 -n 1 --cpus-per-task=128"
   extends: .load-modules
   script:
     - ./buildDependencies.sh
@@ -45,7 +45,7 @@ build-unittests:
   needs:
     - build-dependencies
   variables:
-    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 1:00:00 -N 1 -n 1 --cpus-per-task=128"
+    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 2:00:00 -N 1 -n 1 --cpus-per-task=128"
   extends: .load-modules
   script:
     - mkdir build && cd build
@@ -64,7 +64,7 @@ build-integrationtests:
   needs:
     - build-dependencies
   variables:
-    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 1:00:00 -N 1 -n 1 --cpus-per-task=128"
+    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 2:00:00 -N 1 -n 1 --cpus-per-task=128"
   extends: .load-modules
   script:
     - mkdir build-host-mem && cd build-host-mem

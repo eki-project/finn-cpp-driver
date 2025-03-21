@@ -28,7 +28,8 @@ build-dependencies:
       aud: https://git.uni-paderborn.de
   stage: build
   variables:
-    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 2:00:00 -N 1 -n 1 --cpus-per-task=128"
+    #SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 2:00:00 -N 1 -n 1 --cpus-per-task=128"
+    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p hacc -t 2:00:00"
   extends: .load-modules
   script:
     - ./buildDependencies.sh
@@ -45,7 +46,8 @@ build-unittests:
   needs:
     - build-dependencies
   variables:
-    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 2:00:00 -N 1 -n 1 --cpus-per-task=128"
+    #SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 2:00:00 -N 1 -n 1 --cpus-per-task=128"
+    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p hacc -t 2:00:00"
   extends: .load-modules
   script:
     - mkdir build && cd build
@@ -64,7 +66,8 @@ build-integrationtests:
   needs:
     - build-dependencies
   variables:
-    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 2:00:00 -N 1 -n 1 --cpus-per-task=128"
+    #SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 2:00:00 -N 1 -n 1 --cpus-per-task=128"
+    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p hacc -t 2:00:00"
   extends: .load-modules
   script:
     - mkdir build-host-mem && cd build-host-mem
@@ -86,7 +89,8 @@ lint:
       aud: https://git.uni-paderborn.de
   stage: test
   variables:
-    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 0:30:00 -N 1 -n 1 --cpus-per-task=2 --mem-per-cpu=2G"
+    #SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 0:30:00 -N 1 -n 1 --cpus-per-task=2 --mem-per-cpu=2G"
+    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p hacc -t 2:00:00"
   script:
     - ml lang
     - ml Python/3.10.4-GCCcore-11.3.0
@@ -104,7 +108,8 @@ run-unittests:
     - build-unittests
     - build-dependencies
   variables:
-    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 0:30:00 -N 1 -n 1 --cpus-per-task=2 --mem-per-cpu=2G"
+    #SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 0:30:00 -N 1 -n 1 --cpus-per-task=2 --mem-per-cpu=2G"
+    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p hacc -t 2:00:00"
   extends: .load-modules
   script:
     - cd build

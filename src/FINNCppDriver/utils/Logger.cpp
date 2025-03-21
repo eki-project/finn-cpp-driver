@@ -65,12 +65,12 @@ namespace Details {
 }  // namespace Details
 
 // cppcheck-suppress unusedFunction
-logger_type& Logger::getLogger() {
-    static Logger log;
+logger_type& Logger::getLogger(bool console) {
+    static Logger log(console);
     return Details::boostLogger;
 }
 
-Logger::Logger() {
+Logger::Logger(bool console) {
     auto backend = finnBoost::make_shared<backend_type>(kw::file_name = "finnLog_%N.log", kw::rotation_size = 10 * 1024 * 1024, kw::time_based_rotation = bl::sinks::file::rotation_at_time_point(0, 0, 0), kw::auto_flush = true);
 
     auto sink = finnBoost::make_shared<sink_type>(backend);
@@ -80,14 +80,15 @@ Logger::Logger() {
     initLogging();
 }
 
-void Logger::initLogging() {
+void Logger::initLogging(bool console) {
     static bool init = false;
     if (!init) {
         init = !init;
         bl::register_simple_formatter_factory<bl::trivial::severity_level, char>("Severity");
         finnBoost::log::add_common_attributes();
 
-        bl::add_console_log(std::clog, bl::keywords::format = logFormat);
+        if (console)
+            bl::add_console_log(std::clog, bl::keywords::format = logFormat);
         return;
     }
     BOOST_LOG_SEV(Details::boostLogger, bl::trivial::warning) << "Do not init the logger more than once!";

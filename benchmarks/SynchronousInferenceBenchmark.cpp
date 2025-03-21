@@ -64,7 +64,7 @@ static void BM_SynchronousInference(benchmark::State& state) {
     }
 }
 // Register the function as a benchmark
-BENCHMARK(BM_SynchronousInference)->Iterations(10000)->RangeMultiplier(2)->Range(1, 4 << 10);
+BENCHMARK(BM_SynchronousInference)->Iterations(1000000)->RangeMultiplier(2)->Range(1, 4 << 10)->Repetitions(10);
 
 
 BENCHMARK_MAIN();

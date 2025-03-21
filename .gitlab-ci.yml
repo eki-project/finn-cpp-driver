@@ -51,7 +51,7 @@ build-unittests:
   extends: .load-modules
   script:
     - mkdir build && cd build
-    - cmake -DCMAKE_BUILD_TYPE=Release ..
+    - cmake -DCMAKE_BUILD_TYPE=Release -DFINN_BUILD_DOC=OFF -DFINN_ENABLE_SANITIZERS=ON ..
     - make -j $procs
   artifacts:
     paths:
@@ -71,11 +71,11 @@ build-integrationtests:
   extends: .load-modules
   script:
     - mkdir build-host-mem && cd build-host-mem
-    - cmake -DCMAKE_BUILD_TYPE=Release ..
+    - cmake -DCMAKE_BUILD_TYPE=Release -DFINN_BUILD_DOC=OFF -DFINN_ENABLE_SANITIZERS=ON ..
     - make Integrationtests -j $procs
     - cd ..
     - mkdir build-no-host-mem && cd build-no-host-mem
-    - cmake -DCMAKE_BUILD_TYPE=Release -DFINN_USE_HOST_MEM=OFF ..
+    - cmake -DCMAKE_BUILD_TYPE=Release -DFINN_USE_HOST_MEM=OFF -DFINN_BUILD_DOC=OFF -DFINN_ENABLE_SANITIZERS=ON ..
     - make Integrationtests -j $procs
   artifacts:
     paths:

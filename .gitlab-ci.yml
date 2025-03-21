@@ -18,9 +18,9 @@ workflow:
     - ml vis/Graphviz/8.1.0-GCCcore-12.3.0
     - ml fpga
     - ml xilinx/xrt/2.14
-    - ml devel/Doxygen/1.9.5-GCCcore-12.2.0
-    - ml compiler/GCC/12.2.0
-    - ml devel/CMake/3.24.3-GCCcore-12.2.0
+    - ml devel/Doxygen/1.9.7-GCCcore-12.3.0
+    - ml compiler/GCC/12.3.0
+    - ml devel/CMake/3.26.3-GCCcore-12.3.0
 
 build-dependencies:
   id_tokens:
@@ -149,7 +149,7 @@ run-integrationtests:
 
     # Test Synchronous Inference with Host memory
     - cd example_networks/jet-structure-classification-with-host-mem
-    - ./../../build-host-mem/SyncInference
+    - ./../../build-host-mem/integrationtest/SyncInference
 
     # Reset FPGAs again
     - xbutil reset -d 0000:c1:00.1
@@ -157,7 +157,7 @@ run-integrationtests:
 
     # Test Synchronous Inference without Host memory
     - cd example_networks/jet-structure-classification-without-host-mem
-    - ./../../build-no-host-mem/SyncInference
+    - ./../../build-no-host-mem/integrationtest/SyncInference
 
     # TODO: Run regression tests + asynchronous inference
 

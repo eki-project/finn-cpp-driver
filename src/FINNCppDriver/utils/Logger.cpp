@@ -77,7 +77,7 @@ Logger::Logger(bool console) {
     sink->set_formatter(bl::parse_formatter(logFormat));
 
     bl::core::get()->add_sink(sink);
-    initLogging();
+    initLogging(console);
 }
 
 void Logger::initLogging(bool console) {

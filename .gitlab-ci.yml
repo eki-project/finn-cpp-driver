@@ -149,6 +149,7 @@ run-integrationtests:
     - xbutil reset -d 0000:81:00.1
 
     # Test Synchronous Inference without Host memory
+    - cd ../../build-no-host-mem/integrationtest
     - cp ../../example_networks/jet-structure-classification-without-host-mem/* .
     - ./SyncInference
 

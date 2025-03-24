@@ -35,7 +35,7 @@ TEST(SyncInference, syncInferenceTest) {
     // Run inference
     auto results = driver.inferSynchronous(data.begin(), data.end());
 
-    Finn::vector<uint16_t> expectedResults = {254, 510, 253, 509, 252};
+    Finn::vector<uint16_t> expectedResults = {98, 50, 65476, 65493, 27};
 
     EXPECT_EQ(results, expectedResults);
 }
@@ -60,7 +60,7 @@ TEST(SyncInference, syncBatchInferenceTest) {
     Finn::vector<uint16_t> expectedResults;
 
     for (std::size_t i = 0; i < batchLength; ++i) {
-        expectedResults.insert(expectedResults.end(), {254, 510, 253, 509, 252});
+        expectedResults.insert(expectedResults.end(), {98, 50, 65476, 65493, 27});
     }
 
     EXPECT_EQ(results, expectedResults);

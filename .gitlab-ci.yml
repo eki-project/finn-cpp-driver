@@ -1,4 +1,5 @@
 stages:
+  - prepare
   - build
   - test
 
@@ -21,7 +22,7 @@ build-dependencies:
   id_tokens:
     CI_JOB_JWT:
       aud: https://git.uni-paderborn.de
-  stage: build
+  stage: prepare
   variables:
     #SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 2:00:00 -N 1 -n 1 --cpus-per-task=128"
     SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p hacc -t 2:00:00"
@@ -78,6 +79,26 @@ build-integrationtests:
       - "build-no-host-mem/"
     expire_in: 1 week
 
+build-regressiontests:
+  id_tokens:
+    CI_JOB_JWT:
+      aud: https://git.uni-paderborn.de
+  stage: build
+  needs:
+    - build-dependencies
+  variables:
+    #SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 2:00:00 -N 1 -n 1 --cpus-per-task=128"
+    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p hacc -t 2:00:00"
+  extends: .load-modules
+  script:
+    - mkdir build && cd build
+    - cmake -DCMAKE_BUILD_TYPE=Release -DFINN_BUILD_DOC=OFF -DFINN_ENABLE_SANITIZERS=OFF ..
+    - make -j $procs
+  artifacts:
+    paths:
+      - "build/"
+    expire_in: 1 week
+
 lint:
   id_tokens:
     CI_JOB_JWT:
@@ -131,7 +152,6 @@ run-integrationtests:
   script:
     # Reset FPGAs and setup Host Memory Access
     - ml xilinx/u55c/u55c_gen3x16_xdma_3_202210_1
-    - ml
     - xbutil reset -d 0000:c1:00.1
     - xbutil reset -d 0000:81:00.1
     - sudo /opt/software/FPGA/scripts/u280/host_memory/enable_hostmem_single_fpga.sh 0000:c1:00.1
@@ -155,3 +175,30 @@ run-integrationtests:
 
     # TODO: Run regression tests + asynchronous inference
 
+run-regressiontests:
+  id_tokens:
+    CI_JOB_JWT:
+      aud: https://git.uni-paderborn.de
+  stage: test
+  dependencies:
+    - build-regressiontests
+    - build-dependencies
+  variables:
+    #SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 0:30:00 -N 1 -n 1 --cpus-per-task=2 --mem-per-cpu=2G"
+    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p hacc -t 0:30:00"
+  extends: .load-modules
+  script:
+    # Reset FPGAs and setup Host Memory Access
+    - ml xilinx/u55c/u55c_gen3x16_xdma_3_202210_1
+    - xbutil reset -d 0000:c1:00.1
+    - xbutil reset -d 0000:81:00.1
+    - sudo /opt/software/FPGA/scripts/u280/host_memory/enable_hostmem_single_fpga.sh 0000:c1:00.1
+    - /opt/software/FPGA/scripts/u280/host_memory/verify_single_fpga.sh 0000:c1:00.1
+    - sudo /opt/software/FPGA/scripts/u280/host_memory/enable_hostmem_single_fpga.sh 0000:81:00.1
+    - /opt/software/FPGA/scripts/u280/host_memory/verify_single_fpga.sh 0000:81:00.1
+
+    - cd build/benchmarks
+    # Test Synchronous Inference with Host memory
+    - cp ../../example_networks/jet-structure-classification-with-host-mem/* .
+    - ../_deps/googlebenchmark-src/tools/compare.py benchmarks ../../benchmarks/expectedPerformance.json SynchronousInferenceBenchmark
+  

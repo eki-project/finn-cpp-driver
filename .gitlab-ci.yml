@@ -203,18 +203,7 @@ run-regressiontests:
     # Extract the OVERALL_GEOMEAN p-value and check if it exceeds the threshold
     - THRESHOLD=0.05
     - GEOMEAN=$(grep "OVERALL_GEOMEAN" benchmark_output.txt)
-    - |
-      if [[ -z "$GEOMEAN" ]]; then
-        echo "No OVERALL_GEOMEAN found in the input."
-        exit 1  # Fail the pipeline if the line is missing
-      fi
+    - if [[ -z "$GEOMEAN" ]]; then echo "No OVERALL_GEOMEAN found in the input.";exit 1;fi
     - VALUE=$(echo "$GEOMEAN" | awk '{print $2}')
-    - |
-      if (( $(echo "$VALUE > $THRESHOLD" | bc -l) )); then
-        echo "Failure: OVERALL_GEOMEAN value $VALUE exceeds threshold $THRESHOLD."
-        exit 1  # Fail the pipeline if p-value exceeds the threshold
-      else
-        echo "Success: OVERALL_GEOMEAN value $VALUE is within the threshold $THRESHOLD."
-        exit 0  # Pass the pipeline
-      fi
+    - if (( $(echo "$VALUE > $THRESHOLD" | bc -l) )); then echo "Failure: OVERALL_GEOMEAN value $VALUE exceeds threshold $THRESHOLD."; exit 1; else echo "Success: OVERALL_GEOMEAN value $VALUE is within the threshold $THRESHOLD."; exit 0; fi
   

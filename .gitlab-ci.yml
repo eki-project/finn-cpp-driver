@@ -120,7 +120,7 @@ run-unittests:
     CI_JOB_JWT:
       aud: https://git.uni-paderborn.de
   stage: test
-  dependencies:
+  needs:
     - build-unittests
   variables:
     #SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 0:30:00 -N 1 -n 1 --cpus-per-task=2 --mem-per-cpu=2G"
@@ -142,7 +142,7 @@ run-integrationtests:
     CI_JOB_JWT:
       aud: https://git.uni-paderborn.de
   stage: test
-  dependencies:
+  needs:
     - build-integrationtests
   variables:
     SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p hacc  -t 0:30:00"
@@ -178,7 +178,7 @@ run-regressiontests:
     CI_JOB_JWT:
       aud: https://git.uni-paderborn.de
   stage: test
-  dependencies:
+  needs:
     - build-regressiontests
   variables:
     #SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 0:30:00 -N 1 -n 1 --cpus-per-task=2 --mem-per-cpu=2G"

@@ -103,7 +103,7 @@ lint:
   id_tokens:
     CI_JOB_JWT:
       aud: https://git.uni-paderborn.de
-  stage: test
+  stage: prepare
   variables:
     #SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 0:30:00 -N 1 -n 1 --cpus-per-task=2 --mem-per-cpu=2G"
     SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p hacc -t 2:00:00"
@@ -198,7 +198,23 @@ run-regressiontests:
     - /opt/software/FPGA/scripts/u280/host_memory/verify_single_fpga.sh 0000:81:00.1
 
     - cd build/benchmarks
-    # Test Synchronous Inference with Host memory
     - cp ../../example_networks/jet-structure-classification-with-host-mem/* .
-    - ../_deps/googlebenchmark-src/tools/compare.py benchmarks ../../benchmarks/expectedPerformance.json SynchronousInferenceBenchmark
+    - ../_deps/googlebenchmark-src/tools/compare.py -a -d results.json benchmarks ../../benchmarks/expectedPerformance.json ./SynchronousInferenceBenchmark | tee benchmark_output.txt
+    # Extract the OVERALL_GEOMEAN p-value and check if it exceeds the threshold
+    - THRESHOLD=0.05
+    - GEOMEAN=$(grep "OVERALL_GEOMEAN" benchmark_output.txt)
+    - |
+      if [[ -z "$GEOMEAN" ]]; then
+        echo "No OVERALL_GEOMEAN found in the input."
+        exit 1  # Fail the pipeline if the line is missing
+      fi
+    - VALUE=$(echo "$GEOMEAN" | awk '{print $2}')
+    - |
+      if (( $(echo "$VALUE > $THRESHOLD" | bc -l) )); then
+        echo "Failure: OVERALL_GEOMEAN value $VALUE exceeds threshold $THRESHOLD."
+        exit 1  # Fail the pipeline if p-value exceeds the threshold
+      else
+        echo "Success: OVERALL_GEOMEAN value $VALUE is within the threshold $THRESHOLD."
+        exit 0  # Pass the pipeline
+      fi
   

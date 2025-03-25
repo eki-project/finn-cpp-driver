@@ -122,7 +122,6 @@ run-unittests:
   stage: test
   dependencies:
     - build-unittests
-    - build-dependencies
   variables:
     #SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 0:30:00 -N 1 -n 1 --cpus-per-task=2 --mem-per-cpu=2G"
     SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p hacc -t 2:00:00"
@@ -145,7 +144,6 @@ run-integrationtests:
   stage: test
   dependencies:
     - build-integrationtests
-    - build-dependencies
   variables:
     SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p hacc  -t 0:30:00"
   extends: .load-modules
@@ -182,7 +180,6 @@ run-regressiontests:
   stage: test
   dependencies:
     - build-regressiontests
-    - build-dependencies
   variables:
     #SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 0:30:00 -N 1 -n 1 --cpus-per-task=2 --mem-per-cpu=2G"
     SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p hacc -t 0:30:00"
@@ -205,5 +202,5 @@ run-regressiontests:
     - GEOMEAN=$(grep "OVERALL_GEOMEAN" benchmark_output.txt)
     - if [[ -z "$GEOMEAN" ]]; then echo "No OVERALL_GEOMEAN found in the input.";exit 1;fi
     - VALUE=$(echo "$GEOMEAN" | awk '{print $2}')
-    - if (( $(echo "$VALUE > $THRESHOLD" | bc -l) )); then echo "Failure: OVERALL_GEOMEAN value $VALUE exceeds threshold $THRESHOLD."; exit 1; else echo "Success: OVERALL_GEOMEAN value $VALUE is within the threshold $THRESHOLD."; exit 0; fi
+    - if (( $(echo "$VALUE > $THRESHOLD" | bc -l) )); then exit 1; else exit 0; fi
   

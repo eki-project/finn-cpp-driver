@@ -207,7 +207,7 @@ run-regressiontests:
     - THRESHOLD=0.05
     - GEOMEAN=$(grep "OVERALL_GEOMEAN" benchmark_output.txt)
     - if [[ -z "$GEOMEAN" ]]; then exit 1;fi
-    - VALUE=$(echo "$GEOMEAN" | awk '{print $2}')
+    - VALUE=$(echo "$GEOMEAN" | awk '{print $2}' | sed -r 's/\x1b\[[0-9;]*m//g')
     - printf '%s\n' "$VALUE" | hexdump -C
     - if [[ $(echo "$VALUE > $THRESHOLD" | bc -l) ]]; then exit 1;fi
   

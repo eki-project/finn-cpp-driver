@@ -48,7 +48,7 @@ build-unittests:
   script:
     - mkdir build && cd build
     - cmake -DCMAKE_BUILD_TYPE=Release -DFINN_BUILD_DOC=OFF -DFINN_ENABLE_SANITIZERS=ON ..
-    - make -j $procs
+    - make -j $(nproc)
   artifacts:
     paths:
       - "build/"
@@ -68,11 +68,11 @@ build-integrationtests:
   script:
     - mkdir build-host-mem && cd build-host-mem
     - cmake -DCMAKE_BUILD_TYPE=Release -DFINN_BUILD_DOC=OFF -DFINN_ENABLE_SANITIZERS=ON ..
-    - make Integrationtests -j $procs
+    - make Integrationtests -j $(nproc)
     - cd ..
     - mkdir build-no-host-mem && cd build-no-host-mem
     - cmake -DCMAKE_BUILD_TYPE=Release -DFINN_USE_HOST_MEM=OFF -DFINN_BUILD_DOC=OFF -DFINN_ENABLE_SANITIZERS=ON ..
-    - make Integrationtests -j $procs
+    - make Integrationtests -j $(nproc)
   artifacts:
     paths:
       - "build-host-mem/"
@@ -93,7 +93,7 @@ build-regressiontests:
   script:
     - mkdir build && cd build
     - cmake -DCMAKE_BUILD_TYPE=Release -DFINN_BUILD_DOC=OFF -DFINN_ENABLE_SANITIZERS=OFF ..
-    - make -j $procs
+    - make -j $(nproc)
   artifacts:
     paths:
       - "build/"
@@ -206,7 +206,7 @@ run-regressiontests:
     # Extract the OVERALL_GEOMEAN p-value and check if it exceeds the threshold
     - THRESHOLD=0.05
     - GEOMEAN=$(grep "OVERALL_GEOMEAN" benchmark_output.txt)
-    - if [[ -z "$GEOMEAN" ]]; then echo "No OVERALL_GEOMEAN found in the input.";exit 1;fi
+    - if [[ -z "$GEOMEAN" ]]; then exit 1;fi
     - VALUE=$(echo "$GEOMEAN" | awk '{print $2}')
-    - if (( $(echo "$VALUE > $THRESHOLD" | bc -l) )); then exit 1; else exit 0; fi
+    - if [[ "$VALUE" -gt "$THRESHOLD" ]]; then exit 1;fi
   

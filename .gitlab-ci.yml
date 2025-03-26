@@ -208,5 +208,5 @@ run-regressiontests:
     - GEOMEAN=$(grep "OVERALL_GEOMEAN" benchmark_output.txt)
     - if [[ -z "$GEOMEAN" ]]; then exit 1;fi
     - VALUE=$(echo "$GEOMEAN" | awk '{print $2}')
-    - if [[ "$VALUE" -gt "$THRESHOLD" ]]; then exit 1;fi
+    - if [ "$VALUE" -gt "$THRESHOLD" ]; then exit 1;fi
   

@@ -127,6 +127,7 @@ run-unittests:
     SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p hacc -t 2:00:00"
   extends: .load-modules
   script:
+    - export LD_LIBRARY_PATH="$(pwd)/deps/finn_boost/stage/lib/boost/:$LD_LIBRARY_PATH"
     - cd build
     - ctest --output-on-failure --output-junit ctest-results.xml
   artifacts:
@@ -148,6 +149,7 @@ run-integrationtests:
     SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p hacc  -t 0:30:00"
   extends: .load-modules
   script:
+    - export LD_LIBRARY_PATH="$(pwd)/deps/finn_boost/stage/lib/boost/:$LD_LIBRARY_PATH"
     # Reset FPGAs and setup Host Memory Access
     - ml xilinx/u55c/u55c_gen3x16_xdma_3_202210_1
     - xbutil reset -d 0000:c1:00.1
@@ -185,6 +187,7 @@ run-regressiontests:
     SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p hacc -t 0:30:00"
   extends: .load-modules
   script:
+    - export LD_LIBRARY_PATH="$(pwd)/deps/finn_boost/stage/lib/boost/:$LD_LIBRARY_PATH"
     # Reset FPGAs and setup Host Memory Access
     - ml xilinx/u55c/u55c_gen3x16_xdma_3_202210_1
     - xbutil reset -d 0000:c1:00.1

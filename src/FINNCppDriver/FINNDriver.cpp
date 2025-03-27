@@ -119,13 +119,12 @@ void logDeviceInformation(logger_type& logger, xrt::device& device, const std::s
  *
  * @tparam SynchronousInference true=Sync Mode; false=Async Mode
  * @param configFilePath
- * @param hostBufferSize
+ * @param batchSize
  * @return Finn::Driver
  */
 template<bool SynchronousInference>
-Finn::Driver<SynchronousInference> createDriverFromConfig(const std::filesystem::path& configFilePath, unsigned int hostBufferSize) {
-    Finn::Driver<SynchronousInference> driver(configFilePath, hostBufferSize);
-    driver.setBatchSize(hostBufferSize);
+Finn::Driver<SynchronousInference> createDriverFromConfig(const std::filesystem::path& configFilePath, unsigned int batchSize) {
+    Finn::Driver<SynchronousInference> driver(configFilePath, batchSize);
     driver.setForceAchieval(true);
     return driver;
 }
@@ -420,7 +419,7 @@ void validateConfigPath(const std::string& path) {
         throw finnBoost::program_options::error_with_option_name("Cannot find config file at " + configFilePath.string(), "configpath");
     }
 
-    FINN_LOG(Logger::getLogger(), loglevel::info) << finnMainLogPrefix() << "Config file found at " + configFilePath.string();
+    FINN_LOG(Logger::getLogger(), loglevel::info) << finnMainLogPrefix() << "Config file found at " << configFilePath.string();
 }
 
 /**
@@ -434,7 +433,7 @@ void validateInputPath(const std::vector<std::string>& path) {
         if (!std::filesystem::exists(inputFilePath)) {
             throw finnBoost::program_options::error_with_option_name("Cannot find input file at " + inputFilePath.string());
         }
-        FINN_LOG(Logger::getLogger(), loglevel::info) << finnMainLogPrefix() << "Input file found at " + inputFilePath.string();
+        FINN_LOG(Logger::getLogger(), loglevel::info) << finnMainLogPrefix() << "Input file found at " << inputFilePath.string();
     }
 }
 

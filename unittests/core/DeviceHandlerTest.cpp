@@ -45,9 +45,9 @@ TEST_F(DeviceHandlerSetup, InitTest) {
     EXPECT_EQ(xrt::device::device_costum_constructor_called, 1);
     EXPECT_EQ(xrt::device::device_param_didx, 0);
 
-    auto& kernel_names = xrt::kernel::kernel_name;
-    auto& kernel_devices = xrt::kernel::kernel_device;
-    auto& kernel_uuids = xrt::kernel::kernel_uuid;
+    auto& kernel_names = xrt::ip::kernel_name;
+    auto& kernel_devices = xrt::ip::kernel_device;
+    auto& kernel_uuids = xrt::ip::kernel_uuid;
 
     ASSERT_EQ(kernel_names.size(), 2);
     ASSERT_EQ(kernel_devices.size(), 2);

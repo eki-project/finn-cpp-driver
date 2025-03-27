@@ -13,6 +13,7 @@
 #ifndef DEVICEBUFFER
 #define DEVICEBUFFER
 
+#include <FINNCppDriver/config/CompilationOptions.h>
 #include <FINNCppDriver/utils/Logger.h>
 #include <FINNCppDriver/utils/Types.h>
 
@@ -28,8 +29,20 @@
 #include "xrt/xrt_bo.h"
 #include "xrt/xrt_kernel.h"
 
+/**
+ * @brief Magic value used by XRT to start kernel
+ *
+ */
 constexpr uint32_t IP_START = 0x1;
+/**
+ * @brief Magic value used by XRT to see if a kernel is idling
+ *
+ */
 constexpr uint32_t IP_IDLE = 0x4;
+/**
+ * @brief Magic value used by XRT as offset
+ *
+ */
 constexpr uint32_t CSR_OFFSET = 0x0;
 
 // Forward declares
@@ -102,6 +115,13 @@ namespace Finn {
          */
         uint32_t oldRepetitions = 0;
 
+        consteval static xrt::bo::flags getFlags(bool hostMemoryAccess) {
+            if (hostMemoryAccess) {
+                return xrt::bo::flags::host_only;
+            }
+            return xrt::bo::flags::normal;
+        }
+
          public:
         /**
          * @brief Construct a new Device Buffer object
@@ -115,7 +135,7 @@ namespace Finn {
             : name(pCUName),
               shapePacked(pShapePacked),
               mapSize(FinnUtils::getActualBufferSize(FinnUtils::shapeToElements(pShapePacked) * batchSize)),
-              internalBo(xrt::bo(device, mapSize * sizeof(T), getGroupId(device, pDevUUID, pCUName))),
+              internalBo(xrt::bo(device, mapSize * sizeof(T), DeviceBuffer::getFlags(Finn::Options::hostMemoryAccess), 0)),
               map(internalBo.template map<T*>()),
               assocIPCore(xrt::ip(device, pDevUUID, pCUName)),  // Using xrt::kernel/getGroupId after this point leads to a total bricking of the FPGA card!!
               bufAdr(internalBo.address()),
@@ -123,6 +143,8 @@ namespace Finn {
             shapePacked[0] = batchSize;
             FINN_LOG(logger, loglevel::info) << "[DeviceBuffer] "
                                              << "New Device Buffer of size " << mapSize * sizeof(T) << "bytes with group id " << 0 << "\n";
+            FINN_LOG(logger, loglevel::info) << "[DeviceBuffer] "
+                                             << "Host Memory Access enabled: " << Finn::Options::hostMemoryAccess << "\n";
             FINN_LOG(logger, loglevel::info) << "[DeviceBuffer] "
                                              << "Initializing DeviceBuffer " << name << " (SHAPE PACKED: " << FinnUtils::shapeToString(pShapePacked) << " inputs of the given shape, MAP SIZE: " << mapSize << ")\n";
             std::fill(map, map + mapSize, 0);

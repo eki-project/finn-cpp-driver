@@ -46,7 +46,6 @@ namespace Finn {
      */
     template<bool SynchronousInference, IsDatatype F, IsDatatype S, typename T = uint8_t>
     class BaseDriver {
-         private:
         Accelerator accelerator;
         Config configuration;
         logger_type& logger = Logger::getLogger();
@@ -408,7 +407,6 @@ namespace Finn {
         }
 
 
-         protected:
         /**
          *
          * @brief Do an inference with the given data. This assumes already flattened data in uint8_t's. Specify inputs and outputs.
@@ -426,7 +424,6 @@ namespace Finn {
         template<typename IteratorType>
         [[nodiscard]] Finn::vector<uint8_t> infer(IteratorType first, IteratorType last, uint inputDeviceIndex, const std::string& inputBufferKernelName, uint outputDeviceIndex, const std::string& outputBufferKernelName, uint batchSize,
                                                   bool forceArchival) {
-            const auto start = std::chrono::high_resolution_clock::now();
             FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "Starting inference (raw data)";
             auto storeFunc = accelerator.storeFactory(inputDeviceIndex, inputBufferKernelName);
 
@@ -435,10 +432,6 @@ namespace Finn {
                                                            std::to_string(size(SIZE_SPECIFIER::FEATUREMAP_SIZE, inputDeviceIndex, inputBufferKernelName)) + "*" + std::to_string(batchSize) + "=" +
                                                            std::to_string(size(SIZE_SPECIFIER::TOTAL_DATA_SIZE, inputDeviceIndex, inputBufferKernelName)) + ")");
             }
-            const auto end = std::chrono::high_resolution_clock::now();
-
-            auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-            std::cout << "preamble infer took " << ns << " ns\n";
 
             bool stored = storeFunc(first, last);
 
@@ -473,6 +466,7 @@ namespace Finn {
             return infer(data.begin(), data.end(), inputDeviceIndex, inputBufferKernelName, outputDeviceIndex, outputBufferKernelName, batchSize, forceArchival);
         }
 
+         protected:
 #ifdef UNITTEST
         /**
          * @brief Return whether the data that is currently held on the FPGA is equivalent to the passed data

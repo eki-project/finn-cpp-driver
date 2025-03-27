@@ -1,4 +1,5 @@
 stages:
+  - prepare
   - build
   - test
 
@@ -15,20 +16,16 @@ workflow:
 
 .load-modules:
   before_script:
-    - ml vis/Graphviz/2.50.0-GCCcore-11.2.0
-    - ml fpga
-    - ml xilinx/xrt/2.14
-    - ml devel/Doxygen/1.9.5-GCCcore-12.2.0
-    - ml compiler/GCC/12.2.0
-    - ml devel/CMake/3.24.3-GCCcore-12.2.0
+    - ml vis/Graphviz/8.1.0-GCCcore-12.3.0 fpga xilinx/xrt/2.16 devel/Doxygen/1.9.7-GCCcore-12.3.0 compiler/GCC/12.3.0 devel/CMake/3.26.3-GCCcore-12.3.0
 
 build-dependencies:
   id_tokens:
     CI_JOB_JWT:
       aud: https://git.uni-paderborn.de
-  stage: build
+  stage: prepare
   variables:
-    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 1:00:00 -N 1 -n 1 --cpus-per-task=128"
+    #SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 2:00:00 -N 1 -n 1 --cpus-per-task=128"
+    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p hacc -t 2:00:00"
   extends: .load-modules
   script:
     - ./buildDependencies.sh
@@ -45,12 +42,13 @@ build-unittests:
   needs:
     - build-dependencies
   variables:
-    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 1:00:00 -N 1 -n 1 --cpus-per-task=128"
+    #SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 2:00:00 -N 1 -n 1 --cpus-per-task=128"
+    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p hacc -t 2:00:00"
   extends: .load-modules
   script:
     - mkdir build && cd build
-    - cmake -DCMAKE_BUILD_TYPE=Release ..
-    - make -j $procs
+    - cmake -DCMAKE_BUILD_TYPE=Release -DFINN_BUILD_DOC=OFF -DFINN_ENABLE_SANITIZERS=ON ..
+    - make -j $(nproc)
   artifacts:
     paths:
       - "build/"
@@ -64,12 +62,38 @@ build-integrationtests:
   needs:
     - build-dependencies
   variables:
-    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 1:00:00 -N 1 -n 1 --cpus-per-task=128"
+    #SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 2:00:00 -N 1 -n 1 --cpus-per-task=128"
+    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p hacc -t 2:00:00"
+  extends: .load-modules
+  script:
+    - mkdir build-host-mem && cd build-host-mem
+    - cmake -DCMAKE_BUILD_TYPE=Release -DFINN_BUILD_DOC=OFF -DFINN_ENABLE_SANITIZERS=ON ..
+    - make Integrationtests -j $(nproc)
+    - cd ..
+    - mkdir build-no-host-mem && cd build-no-host-mem
+    - cmake -DCMAKE_BUILD_TYPE=Release -DFINN_USE_HOST_MEM=OFF -DFINN_BUILD_DOC=OFF -DFINN_ENABLE_SANITIZERS=ON ..
+    - make Integrationtests -j $(nproc)
+  artifacts:
+    paths:
+      - "build-host-mem/"
+      - "build-no-host-mem/"
+    expire_in: 1 week
+
+build-regressiontests:
+  id_tokens:
+    CI_JOB_JWT:
+      aud: https://git.uni-paderborn.de
+  stage: build
+  needs:
+    - build-dependencies
+  variables:
+    #SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 2:00:00 -N 1 -n 1 --cpus-per-task=128"
+    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p hacc -t 2:00:00"
   extends: .load-modules
   script:
     - mkdir build && cd build
-    - cmake -DCMAKE_BUILD_TYPE=Release ..
-    - make Integrationtests -j $procs
+    - cmake -DCMAKE_BUILD_TYPE=Release -DFINN_BUILD_DOC=OFF -DFINN_ENABLE_SANITIZERS=OFF ..
+    - make -j $(nproc)
   artifacts:
     paths:
       - "build/"
@@ -79,9 +103,10 @@ lint:
   id_tokens:
     CI_JOB_JWT:
       aud: https://git.uni-paderborn.de
-  stage: test
+  stage: prepare
   variables:
-    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 0:30:00 -N 1 -n 1 --cpus-per-task=2 --mem-per-cpu=2G"
+    #SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 0:30:00 -N 1 -n 1 --cpus-per-task=2 --mem-per-cpu=2G"
+    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p hacc -t 2:00:00"
   script:
     - ml lang
     - ml Python/3.10.4-GCCcore-11.3.0
@@ -95,13 +120,15 @@ run-unittests:
     CI_JOB_JWT:
       aud: https://git.uni-paderborn.de
   stage: test
-  dependencies:
+  needs:
     - build-unittests
     - build-dependencies
   variables:
-    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 0:30:00 -N 1 -n 1 --cpus-per-task=2 --mem-per-cpu=2G"
+    #SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 0:30:00 -N 1 -n 1 --cpus-per-task=2 --mem-per-cpu=2G"
+    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p hacc -t 2:00:00"
   extends: .load-modules
   script:
+    - export LD_LIBRARY_PATH="$(pwd)/deps/finn_boost/stage/lib/boost/:$LD_LIBRARY_PATH"
     - cd build
     - ctest --output-on-failure --output-junit ctest-results.xml
   artifacts:
@@ -117,21 +144,69 @@ run-integrationtests:
     CI_JOB_JWT:
       aud: https://git.uni-paderborn.de
   stage: test
-  dependencies:
+  needs:
     - build-integrationtests
     - build-dependencies
   variables:
-    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p fpga  -t 0:30:00 --constraint=xilinx_u280_xrt2.14"
+    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p hacc  -t 0:30:00"
   extends: .load-modules
   script:
-    - cp example_networks/identity_net/* build/integrationtest
-    - cd build/integrationtest
-    - xbutil reset -d 0000:a1:00.1
+    - export LD_LIBRARY_PATH="$(pwd)/deps/finn_boost/stage/lib/boost/:$LD_LIBRARY_PATH"
+    # Reset FPGAs and setup Host Memory Access
+    - ml xilinx/u55c/u55c_gen3x16_xdma_3_202210_1
+    - xbutil reset -d 0000:c1:00.1
     - xbutil reset -d 0000:81:00.1
-    - xbutil reset -d 0000:01:00.1
-    - ./SyncInference
-    # - xbutil reset -d 0000:a1:00.1
-    # - xbutil reset -d 0000:81:00.1
-    # - xbutil reset -d 0000:01:00.1
-    # - ./AsyncInference
+    - sudo /opt/software/FPGA/scripts/u280/host_memory/enable_hostmem_single_fpga.sh 0000:c1:00.1
+    - /opt/software/FPGA/scripts/u280/host_memory/verify_single_fpga.sh 0000:c1:00.1
+    - sudo /opt/software/FPGA/scripts/u280/host_memory/enable_hostmem_single_fpga.sh 0000:81:00.1
+    - /opt/software/FPGA/scripts/u280/host_memory/verify_single_fpga.sh 0000:81:00.1
 
+    - cd build-host-mem/integrationtest
+    # Test Synchronous Inference with Host memory
+    - cp ../../example_networks/jet-structure-classification-with-host-mem/* .
+    - ./SyncInference
+
+    # Reset FPGAs again
+    - xbutil reset -d 0000:c1:00.1
+    - xbutil reset -d 0000:81:00.1
+
+    # Test Synchronous Inference without Host memory
+    - cd ../../build-no-host-mem/integrationtest
+    - cp ../../example_networks/jet-structure-classification-without-host-mem/* .
+    - ./SyncInference
+
+    # TODO: Run regression tests + asynchronous inference
+
+run-regressiontests:
+  id_tokens:
+    CI_JOB_JWT:
+      aud: https://git.uni-paderborn.de
+  stage: test
+  needs:
+    - build-regressiontests
+    - build-dependencies
+  variables:
+    #SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 0:30:00 -N 1 -n 1 --cpus-per-task=2 --mem-per-cpu=2G"
+    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p hacc -t 0:30:00"
+  extends: .load-modules
+  script:
+    - export LD_LIBRARY_PATH="$(pwd)/deps/finn_boost/stage/lib/boost/:$LD_LIBRARY_PATH"
+    # Reset FPGAs and setup Host Memory Access
+    - ml xilinx/u55c/u55c_gen3x16_xdma_3_202210_1
+    - xbutil reset -d 0000:c1:00.1
+    - xbutil reset -d 0000:81:00.1
+    - sudo /opt/software/FPGA/scripts/u280/host_memory/enable_hostmem_single_fpga.sh 0000:c1:00.1
+    - /opt/software/FPGA/scripts/u280/host_memory/verify_single_fpga.sh 0000:c1:00.1
+    - sudo /opt/software/FPGA/scripts/u280/host_memory/enable_hostmem_single_fpga.sh 0000:81:00.1
+    - /opt/software/FPGA/scripts/u280/host_memory/verify_single_fpga.sh 0000:81:00.1
+
+    - cd build/benchmarks
+    - cp ../../example_networks/jet-structure-classification-with-host-mem/* .
+    - ../_deps/googlebenchmark-src/tools/compare.py -a -d results.json benchmarks ../../benchmarks/expectedPerformance.json ./SynchronousInferenceBenchmark | tee benchmark_output.txt
+    # Extract the OVERALL_GEOMEAN p-value and check if it exceeds the threshold
+    - THRESHOLD=0.05
+    - GEOMEAN=$(grep "OVERALL_GEOMEAN" benchmark_output.txt)
+    - if [[ -z "$GEOMEAN" ]]; then exit 1;fi
+    - VALUE=$(echo "$GEOMEAN" | awk '{print $3}' | sed 's/\x1B\[[0-9;]\{1,\}[A-Za-z]//g')
+    - if (( $(echo "$VALUE > $THRESHOLD" | bc -l) )); then exit 1;fi
+  

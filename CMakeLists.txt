@@ -224,23 +224,20 @@ macro(check_include)
   endif()
 endmacro()
 
-#Enable all checks in debug mode
-#message(STATUS "Build mode ${CMAKE_BUILD_TYPE}")
-if (CMAKE_BUILD_TYPE STREQUAL "Release")
-    #message(WARNING "Analysers are off for Release build!")
-    set(FINN_CLANG_FORMAT OFF)
-    set(FINN_CLANG_TIDY OFF)
-    set(FINN_CPP_CHECK OFF)
-    set(FINN_IWYU OFF)
-endif ()
-
 #Sanitizers & Checks
 
 include(cmake/Sanitizers.cmake)
 
-OPTION(FINN_ENABLE_SANITIZERS "Enable default analyzers" ON)
-OPTION(FINN_ENABLE_THREAD_SANITIZERS "Enable thread analyzer" OFF)
-OPTION(FINN_ENABLE_MEMORY_SANITIZERS "Enable memory analyzer" OFF)
+#Disable sanitizers by default in release mode
+if (CMAKE_BUILD_TYPE STREQUAL "Release")
+  OPTION(FINN_ENABLE_SANITIZERS "Enable default analyzers" OFF)
+  OPTION(FINN_ENABLE_THREAD_SANITIZERS "Enable thread analyzer" OFF)
+  OPTION(FINN_ENABLE_MEMORY_SANITIZERS "Enable memory analyzer" OFF)
+else()
+  OPTION(FINN_ENABLE_SANITIZERS "Enable default analyzers" ON)
+  OPTION(FINN_ENABLE_THREAD_SANITIZERS "Enable thread analyzer" OFF)
+  OPTION(FINN_ENABLE_MEMORY_SANITIZERS "Enable memory analyzer" OFF)
+endif()
 
 if (FINN_ENABLE_SANITIZERS)
 finncpp_enable_sanitizers(finnc_options
@@ -252,6 +249,16 @@ finncpp_enable_sanitizers(finnc_options
 else()
 message(STATUS "All Sanitizers disabled.")
 endif()
+
+#Enable all checks in debug mode
+#message(STATUS "Build mode ${CMAKE_BUILD_TYPE}")
+if (CMAKE_BUILD_TYPE STREQUAL "Release")
+    #message(WARNING "Analysers are off for Release build!")
+    set(FINN_CLANG_FORMAT OFF)
+    set(FINN_CLANG_TIDY OFF)
+    set(FINN_CPP_CHECK OFF)
+    set(FINN_IWYU OFF)
+endif ()
 
 # Disable Clang Tidy because of bug with constexpr ifs and constexpr constructors
 set(FINN_CLANG_TIDY OFF)

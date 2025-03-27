@@ -77,7 +77,7 @@ class Logger {
      *
      * @return logger_type&
      */
-    static logger_type& getLogger();
+    static logger_type& getLogger(bool console = false);
 
     /**
      * @brief Construct a new Logger object (Deleted)
@@ -108,8 +108,8 @@ class Logger {
     Logger(Logger&&) = default;
 
      private:
-    void initLogging();
-    Logger();
+    void initLogging(bool console = false);
+    Logger(bool console = false);
     const std::string logFormat = "[%TimeStamp%] (%LineID%) [%Severity%]: %Message%";
 };
 

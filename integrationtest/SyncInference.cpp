@@ -10,7 +10,6 @@
  *
  */
 
-
 #include <FINNCppDriver/core/BaseDriver.hpp>
 #include <FINNCppDriver/utils/FinnDatatypes.hpp>
 #include <FINNCppDriver/utils/join.hpp>
@@ -24,7 +23,7 @@ namespace Finn {
 }
 
 TEST(SyncInference, syncInferenceTest) {
-    std::string exampleNetworkConfig = "config.json";
+    std::string exampleNetworkConfig = "jetConfig.json";
     Finn::Config conf = Finn::createConfigFromPath(exampleNetworkConfig);
 
     auto driver = Finn::Driver<true>(conf, 0, conf.deviceWrappers[0].idmas[0]->kernelName, 0, conf.deviceWrappers[0].odmas[0]->kernelName, 1, true);
@@ -36,13 +35,13 @@ TEST(SyncInference, syncInferenceTest) {
     // Run inference
     auto results = driver.inferSynchronous(data.begin(), data.end());
 
-    Finn::vector<uint16_t> expectedResults = {254, 510, 253, 509, 252};
+    Finn::vector<uint16_t> expectedResults = {98, 50, 65476, 65493, 27};
 
     EXPECT_EQ(results, expectedResults);
 }
 
 TEST(SyncInference, syncBatchInferenceTest) {
-    std::string exampleNetworkConfig = "config.json";
+    std::string exampleNetworkConfig = "jetConfig.json";
     Finn::Config conf = Finn::createConfigFromPath(exampleNetworkConfig);
     std::size_t batchLength = 10;
 
@@ -61,7 +60,7 @@ TEST(SyncInference, syncBatchInferenceTest) {
     Finn::vector<uint16_t> expectedResults;
 
     for (std::size_t i = 0; i < batchLength; ++i) {
-        expectedResults.insert(expectedResults.end(), {254, 510, 253, 509, 252});
+        expectedResults.insert(expectedResults.end(), {98, 50, 65476, 65493, 27});
     }
 
     EXPECT_EQ(results, expectedResults);
@@ -69,5 +68,6 @@ TEST(SyncInference, syncBatchInferenceTest) {
 
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);
+
     return RUN_ALL_TESTS();
 }

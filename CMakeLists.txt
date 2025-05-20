@@ -45,10 +45,10 @@ include(cmake/CheckSubmodules.cmake)
 
 # Doxygen
 
-option(FINN_BUILD_DOC "Build documentation" OFF)
-
 if (CMAKE_BUILD_TYPE STREQUAL "Release")
-set(FINN_BUILD_DOC ON)
+option(FINN_BUILD_DOC "Build documentation" ON)
+else()
+option(FINN_BUILD_DOC "Build documentation" OFF)
 endif()
 
 # Setup the doxygen code documentation

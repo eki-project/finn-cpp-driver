@@ -17,29 +17,29 @@
 
 #include <concepts>
 #include <limits>
+#include <source_location>
+#include <string_view>
 #include <type_traits>
 #include <utility>
-#include <string_view>
-#include <source_location>
 
 namespace Finn {
 
     /**
      * @brief Get the name of a type as a string_view
-     * 
+     *
      * @tparam T The type to get the name of
      * @return constexpr std::string_view The name of the type as a string
      */
-    template <typename T> constexpr std::string_view type_name();
+    template<typename T>
+    constexpr std::string_view type_name();
 
     /**
      * @brief Specialization of type_name for void
-     * 
+     *
      * @return constexpr std::string_view "void"
      */
-    template <>
-    constexpr std::string_view type_name<void>()
-    {
+    template<>
+    constexpr std::string_view type_name<void>() {
         return "void";
     }
 
@@ -52,58 +52,46 @@ namespace Finn {
 
         /**
          * @brief Gets the wrapped function name which contains the type name
-         * 
+         *
          * @tparam T The type to extract the name for
          * @return constexpr std::string_view The function signature containing the type name
          */
-        template <typename T>
-        constexpr std::string_view wrapped_type_name()
-        {
+        template<typename T>
+        constexpr std::string_view wrapped_type_name() {
             return std::source_location::current().function_name();
         }
 
         /**
          * @brief Calculates the length of the prefix before the type name in the function signature
-         * 
+         *
          * @return constexpr std::size_t Length of the prefix
          */
-        constexpr std::size_t wrapped_type_name_prefix_length()
-        {
-            return wrapped_type_name<type_name_prober>()
-                .find(type_name<type_name_prober>());
-        }
+        constexpr std::size_t wrapped_type_name_prefix_length() { return wrapped_type_name<type_name_prober>().find(type_name<type_name_prober>()); }
 
         /**
          * @brief Calculates the length of the suffix after the type name in the function signature
-         * 
+         *
          * @return constexpr std::size_t Length of the suffix
          */
-        constexpr std::size_t wrapped_type_name_suffix_length()
-        {
-            return wrapped_type_name<type_name_prober>().length()
-                - wrapped_type_name_prefix_length()
-                - type_name<type_name_prober>().length();
-        }
+        constexpr std::size_t wrapped_type_name_suffix_length() { return wrapped_type_name<type_name_prober>().length() - wrapped_type_name_prefix_length() - type_name<type_name_prober>().length(); }
 
-    } // namespace detail
+    }  // namespace detail
 
     /**
      * @brief Get the name of a type as a string_view
-     * 
+     *
      * This implementation extracts the type name from the function signature
      * provided by std::source_location.
-     * 
+     *
      * @tparam T The type to get the name of
      * @return constexpr std::string_view The name of the type
      */
-    template <typename T>
-    constexpr std::string_view type_name()
-    {
+    template<typename T>
+    constexpr std::string_view type_name() {
         constexpr auto wrapped_name = detail::wrapped_type_name<T>();
         constexpr auto prefix_length = detail::wrapped_type_name_prefix_length();
         constexpr auto suffix_length = detail::wrapped_type_name_suffix_length();
-        constexpr auto type_name_length =
-            wrapped_name.length() - prefix_length - suffix_length;
+        constexpr auto type_name_length = wrapped_name.length() - prefix_length - suffix_length;
         return wrapped_name.substr(prefix_length, type_name_length);
     }
 
@@ -149,7 +137,7 @@ namespace Finn {
      */
     template<typename D>
     class Datatype {
-    public:
+         public:
         /**
          * @brief Query whether type is signed type.
          *
@@ -280,7 +268,7 @@ namespace Finn {
          */
         constexpr virtual ~Datatype() = default;
 
-    protected:
+         protected:
         /**
          * @brief Construct a new Datatype object (Move construction)
          *
@@ -304,7 +292,7 @@ namespace Finn {
          */
         Datatype& operator=(const Datatype&) = default;
 
-    private:
+         private:
         /**
          * @brief Construct a new Datatype object; Some somewhat hacky code to make sure that CRTP is implemented correctly by all Derived classes -> creates error if for class A : public Base<B> A!=B
          *
@@ -331,14 +319,14 @@ namespace Finn {
      *
      */
     class DatatypeFloat : public Datatype<DatatypeFloat> {
-    private:
+         private:
         /**
          * @brief Needed for CRTP
          *
          */
         friend class Datatype<DatatypeFloat>;
 
-    public:
+         public:
         /**
          * @brief Default constructor
          *
@@ -348,8 +336,8 @@ namespace Finn {
          * @brief Destructor
          *
          */
-         // NOLINTNEXTLINE
-        constexpr ~DatatypeFloat() override {};  //{} instead of default because compiler bug
+        // NOLINTNEXTLINE
+        constexpr ~DatatypeFloat() override{};  //{} instead of default because compiler bug
         /**
          * @brief Default move constructor
          *
@@ -402,7 +390,7 @@ namespace Finn {
          */
         constexpr bool isFixedPoint() const override { return false; }
 
-    private:
+         private:
         /**
          * @brief Implementation of the allowed method. Is implemented by each subclass individually.
          *
@@ -424,14 +412,14 @@ namespace Finn {
      */
     template<std::size_t B>
     class DatatypeInt : public Datatype<DatatypeInt<B>> {
-    private:
+         private:
         /**
          * @brief Needed internally for CRTP
          *
          */
         friend class Datatype<DatatypeInt<B>>;
 
-    public:
+         public:
         /**
          * @brief Default Constructor
          *
@@ -441,8 +429,8 @@ namespace Finn {
          * @brief Default destructor
          *
          */
-         // NOLINTNEXTLINE
-        constexpr ~DatatypeInt() override {};  //{} instead of default because compiler bug
+        // NOLINTNEXTLINE
+        constexpr ~DatatypeInt() override{};  //{} instead of default because compiler bug
         /**
          * @brief Default move constructor
          *
@@ -494,7 +482,7 @@ namespace Finn {
          */
         constexpr bool isFixedPoint() const override { return false; }
 
-    private:
+         private:
         /**
          * @brief Implementation of the allowed method. Is implemented by each subclass individually.
          *
@@ -517,14 +505,14 @@ namespace Finn {
      */
     template<std::size_t B, std::size_t I>
     class DatatypeFixed : public Datatype<DatatypeFixed<B, I>> {
-    private:
+         private:
         /**
          * @brief Needed internally for CRTP
          *
          */
         friend class Datatype<DatatypeFixed<B, I>>;
 
-    public:
+         public:
         /**
          * @brief Default Constructor
          *
@@ -534,8 +522,8 @@ namespace Finn {
          * @brief Default destructor
          *
          */
-         // NOLINTNEXTLINE
-        constexpr ~DatatypeFixed() override {};  //{} instead of default because compiler bug
+        // NOLINTNEXTLINE
+        constexpr ~DatatypeFixed() override{};  //{} instead of default because compiler bug
         /**
          * @brief Default move constructor
          *
@@ -600,7 +588,7 @@ namespace Finn {
          */
         constexpr bool isFixedPoint() const override { return true; }
 
-    private:
+         private:
         /**
          * @brief Implementation of the allowed method. Is implemented by each subclass individually.
          *
@@ -623,14 +611,14 @@ namespace Finn {
      */
     template<std::size_t B>
     class DatatypeUInt : public Datatype<DatatypeUInt<B>> {
-    private:
+         private:
         /**
          * @brief Needed internally for CRTP
          *
          */
         friend class Datatype<DatatypeUInt<B>>;
 
-    public:
+         public:
         /**
          * @brief Default Constructor
          *
@@ -641,7 +629,7 @@ namespace Finn {
          * @brief Default destructor
          *
          */
-        constexpr ~DatatypeUInt() override {};  //{} instead of default because compiler bug
+        constexpr ~DatatypeUInt() override{};  //{} instead of default because compiler bug
         /**
          * @brief Default move constructor
          *
@@ -694,7 +682,7 @@ namespace Finn {
          */
         constexpr bool isFixedPoint() const override { return false; }
 
-    private:
+         private:
         /**
          * @brief Implementation of the allowed method. Is implemented by each subclass individually.
          *
@@ -720,14 +708,14 @@ namespace Finn {
      *
      */
     class DatatypeBipolar : public Datatype<DatatypeBipolar> {
-    private:
+         private:
         /**
          * @brief Needed internally for CRTP
          *
          */
         friend class Datatype<DatatypeBipolar>;
 
-    public:
+         public:
         /**
          * @brief Default Constructor
          *
@@ -737,8 +725,8 @@ namespace Finn {
          * @brief Default destructor
          *
          */
-         // NOLINTNEXTLINE
-        constexpr ~DatatypeBipolar() override {};  //{} instead of default because compiler bug
+        // NOLINTNEXTLINE
+        constexpr ~DatatypeBipolar() override{};  //{} instead of default because compiler bug
         /**
          * @brief Default move constructor
          *
@@ -794,7 +782,7 @@ namespace Finn {
          */
         constexpr double getNumPossibleValues() const override { return 2; }
 
-    private:
+         private:
         /**
          * @brief Implementation of the allowed method. Is implemented by each subclass individually.
          *
@@ -814,14 +802,14 @@ namespace Finn {
      *
      */
     class DatatypeTernary : public Datatype<DatatypeTernary> {
-    private:
+         private:
         /**
          * @brief Needed internally for CRTP
          *
          */
         friend class Datatype<DatatypeTernary>;
 
-    public:
+         public:
         /**
          * @brief Default Constructor
          *
@@ -831,8 +819,8 @@ namespace Finn {
          * @brief Default destructor
          *
          */
-         // NOLINTNEXTLINE
-        constexpr ~DatatypeTernary() override {};  //{} instead of default because compiler bug
+        // NOLINTNEXTLINE
+        constexpr ~DatatypeTernary() override{};  //{} instead of default because compiler bug
         /**
          * @brief Default move constructor
          *
@@ -888,7 +876,7 @@ namespace Finn {
          */
         constexpr double getNumPossibleValues() const override { return 3; }
 
-    private:
+         private:
         /**
          * @brief Implementation of the allowed method. Is implemented by each subclass individually.
          *

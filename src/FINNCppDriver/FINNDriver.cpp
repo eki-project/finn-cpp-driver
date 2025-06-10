@@ -454,15 +454,14 @@ int main(int argc, char* argv[]) {
     try {
         // Command Line Argument Parser
         po::options_description desc{"Options"};
-        //clang-format off
+        // clang-format off
         desc.add_options()("help,h", "Display help")("exec_mode,e", po::value<std::string>()->default_value("throughput")->notifier(&validateDriverMode),
-                                                     R"(Please select functional verification ("execute") or throughput test ("throughput")")("configpath,c", po::value<std::string>()->required()->notifier(&validateConfigPath),
-                                                                                                                                              "Required: Path to the config.json file emitted by the FINN compiler")(
-            "input,i", po::value<std::vector<std::string>>()->multitoken()->composing()->notifier(&validateInputPath), "Path to one or more input files (npy format). Only required if mode is set to \"file\"")(
-            "output,o", po::value<std::vector<std::string>>()->multitoken()->composing(), "Path to one or more output files (npy format). Only required if mode is set to \"file\"")(
-            "batchsize,b", po::value<int>()->default_value(1)->notifier(&validateBatchSize), "Number of samples for inference")
-            ("check", "Outputs the compile time configuration");
-        //clang-format on
+            R"(Please select functional verification ("execute") or throughput test ("throughput")")("configpath,c", po::value<std::string>()->required()->notifier(&validateConfigPath),
+                "Required: Path to the config.json file emitted by the FINN compiler")(
+                    "input,i", po::value<std::vector<std::string>>()->multitoken()->composing()->notifier(&validateInputPath), "Path to one or more input files (npy format). Only required if mode is set to \"file\"")(
+                        "output,o", po::value<std::vector<std::string>>()->multitoken()->composing(), "Path to one or more output files (npy format). Only required if mode is set to \"file\"")(
+                            "batchsize,b", po::value<int>()->default_value(1)->notifier(&validateBatchSize), "Number of samples for inference")("check", "Outputs the compile time configuration");
+        // clang-format on
         po::variables_map varMap;
         po::store(po::parse_command_line(argc, argv, desc), varMap);
 

@@ -460,7 +460,8 @@ int main(int argc, char* argv[]) {
                                                                                                                                               "Required: Path to the config.json file emitted by the FINN compiler")(
             "input,i", po::value<std::vector<std::string>>()->multitoken()->composing()->notifier(&validateInputPath), "Path to one or more input files (npy format). Only required if mode is set to \"file\"")(
             "output,o", po::value<std::vector<std::string>>()->multitoken()->composing(), "Path to one or more output files (npy format). Only required if mode is set to \"file\"")(
-            "batchsize,b", po::value<int>()->default_value(1)->notifier(&validateBatchSize), "Number of samples for inference");
+            "batchsize,b", po::value<int>()->default_value(1)->notifier(&validateBatchSize), "Number of samples for inference")
+            ("check", "Outputs the compile time configuration");
         //clang-format on
         po::variables_map varMap;
         po::store(po::parse_command_line(argc, argv, desc), varMap);
@@ -469,6 +470,12 @@ int main(int argc, char* argv[]) {
         // Help option has to be processed before po::notify call to not enforce required options in combination with help
         if (varMap.count("help") != 0) {
             std::cout << desc << "\n";
+            return 0;
+        }
+
+        if (varMap.count("check") != 0) {
+            std::cout << "input_t: " << Finn::type_name<InputFinnType>() << "\n";
+            std::cout << "onput_t: " << Finn::type_name<OutputFinnType>() << "\n";
             return 0;
         }
 

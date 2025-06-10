@@ -17,3 +17,16 @@ target_link_directories(finnc_core_test PRIVATE ${BOOST_LIBRARYDIR})
 # target_link_directories(finnc_core_test PUBLIC ${XRT_LIB_CORE_LOCATION})
 # target_link_directories(finnc_core_test PUBLIC ${XRT_LIB_OCL_LOCATION})
 # target_link_libraries(finnc_core_test PUBLIC ${Boost_LIBRARIES} finnc_options finnc_utils Threads::Threads OpenCL xrt_coreutil uuid)
+
+set_target_properties(finnc_core
+    PROPERTIES
+    ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+)
+set_target_properties(finnc_core_test
+    PROPERTIES
+    ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+)

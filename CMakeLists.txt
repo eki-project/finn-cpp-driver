@@ -95,10 +95,6 @@ find_package(OpenMP REQUIRED)
 #Boost
 find_package(Boost 1.79.0 COMPONENTS system log log_setup program_options filesystem ${BOOST_THREAD} REQUIRED)
 
-
-#mdspan
-include_directories(SYSTEM external/mdspan/include)
-
 #xsimd
 add_subdirectory(external/xsimd)
 include_directories(SYSTEM external/xsimd/include)

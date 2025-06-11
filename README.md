@@ -162,7 +162,4 @@ target_link_libraries(main PRIVATE finnc_core OpenCL xrt_coreutil uuid finnc_uti
 
 ### Known Issues
 
-* Building against Boost results in undefined references:
-  * This issue is caused by namespaces leaking from inside XRT. The C++ has its own renamed (partial) boost version called finnBoost that can be used as a replacement.
-
 Please refer to the git issues for currently known issues and possible ways to mitigate them.

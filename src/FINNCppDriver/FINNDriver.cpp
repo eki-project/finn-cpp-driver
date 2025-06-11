@@ -391,7 +391,7 @@ void runWithInputFile(Finn::Driver<true>& baseDriver, logger_type& logger, const
  */
 void validateDriverMode(const std::string& mode) {
     if (mode != "execute" && mode != "throughput") {
-        throw finnBoost::program_options::error_with_option_name("'" + mode + "' is not a valid driver mode!", "exec_mode");
+        throw boost::program_options::error_with_option_name("'" + mode + "' is not a valid driver mode!", "exec_mode");
     }
 
     FINN_LOG(Logger::getLogger(), loglevel::info) << finnMainLogPrefix() << "Driver Mode: " << mode;
@@ -404,7 +404,7 @@ void validateDriverMode(const std::string& mode) {
  */
 void validateBatchSize(int batch) {
     if (batch <= 0) {
-        throw finnBoost::program_options::error_with_option_name("Batch size must be positive, but is '" + std::to_string(batch) + "'", "batchsize");
+        throw boost::program_options::error_with_option_name("Batch size must be positive, but is '" + std::to_string(batch) + "'", "batchsize");
     }
 }
 
@@ -416,7 +416,7 @@ void validateBatchSize(int batch) {
 void validateConfigPath(const std::string& path) {
     auto configFilePath = std::filesystem::path(path);
     if (!std::filesystem::exists(configFilePath)) {
-        throw finnBoost::program_options::error_with_option_name("Cannot find config file at " + configFilePath.string(), "configpath");
+        throw boost::program_options::error_with_option_name("Cannot find config file at " + configFilePath.string(), "configpath");
     }
 
     FINN_LOG(Logger::getLogger(), loglevel::info) << finnMainLogPrefix() << "Config file found at " << configFilePath.string();
@@ -431,14 +431,14 @@ void validateInputPath(const std::vector<std::string>& path) {
     for (auto&& elem : path) {
         auto inputFilePath = std::filesystem::path(elem);
         if (!std::filesystem::exists(inputFilePath)) {
-            throw finnBoost::program_options::error_with_option_name("Cannot find input file at " + inputFilePath.string());
+            throw boost::program_options::error_with_option_name("Cannot find input file at " + inputFilePath.string());
         }
         FINN_LOG(Logger::getLogger(), loglevel::info) << finnMainLogPrefix() << "Input file found at " << inputFilePath.string();
     }
 }
 
 
-namespace po = finnBoost::program_options;
+namespace po = boost::program_options;
 
 /**
  * @brief Main entrypoint for the frontend of the C++ Finn driver
@@ -454,22 +454,28 @@ int main(int argc, char* argv[]) {
     try {
         // Command Line Argument Parser
         po::options_description desc{"Options"};
-        //clang-format off
+        // clang-format off
         desc.add_options()("help,h", "Display help")("exec_mode,e", po::value<std::string>()->default_value("throughput")->notifier(&validateDriverMode),
-                                                     R"(Please select functional verification ("execute") or throughput test ("throughput")")("configpath,c", po::value<std::string>()->required()->notifier(&validateConfigPath),
-                                                                                                                                              "Required: Path to the config.json file emitted by the FINN compiler")(
-            "input,i", po::value<std::vector<std::string>>()->multitoken()->composing()->notifier(&validateInputPath), "Path to one or more input files (npy format). Only required if mode is set to \"file\"")(
-            "output,o", po::value<std::vector<std::string>>()->multitoken()->composing(), "Path to one or more output files (npy format). Only required if mode is set to \"file\"")(
-            "batchsize,b", po::value<int>()->default_value(1)->notifier(&validateBatchSize), "Number of samples for inference");
-        //clang-format on
+            R"(Please select functional verification ("execute") or throughput test ("throughput")")("configpath,c", po::value<std::string>()->required()->notifier(&validateConfigPath),
+                "Required: Path to the config.json file emitted by the FINN compiler")(
+                    "input,i", po::value<std::vector<std::string>>()->multitoken()->composing()->notifier(&validateInputPath), "Path to one or more input files (npy format). Only required if mode is set to \"file\"")(
+                        "output,o", po::value<std::vector<std::string>>()->multitoken()->composing(), "Path to one or more output files (npy format). Only required if mode is set to \"file\"")(
+                            "batchsize,b", po::value<int>()->default_value(1)->notifier(&validateBatchSize), "Number of samples for inference")("check", "Outputs the compile time configuration");
+        // clang-format on
         po::variables_map varMap;
         po::store(po::parse_command_line(argc, argv, desc), varMap);
 
         // Display help screen
         // Help option has to be processed before po::notify call to not enforce required options in combination with help
         if (varMap.count("help") != 0) {
-            FINN_LOG(logger, loglevel::info) << desc;
-            return 1;
+            std::cout << desc << "\n";
+            return 0;
+        }
+
+        if (varMap.count("check") != 0) {
+            std::cout << "input_t: " << Finn::type_name<InputFinnType>() << "\n";
+            std::cout << "output_t: " << Finn::type_name<OutputFinnType>() << "\n";
+            return 0;
         }
 
         po::notify(varMap);

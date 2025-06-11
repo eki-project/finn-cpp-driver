@@ -45,10 +45,10 @@ include(cmake/CheckSubmodules.cmake)
 
 # Doxygen
 
-option(FINN_BUILD_DOC "Build documentation" OFF)
-
 if (CMAKE_BUILD_TYPE STREQUAL "Release")
-set(FINN_BUILD_DOC ON)
+option(FINN_BUILD_DOC "Build documentation" ON)
+else()
+option(FINN_BUILD_DOC "Build documentation" OFF)
 endif()
 
 # Setup the doxygen code documentation
@@ -93,21 +93,7 @@ find_package(XRT REQUIRED)
 find_package(OpenMP REQUIRED)
 
 #Boost
-set(Boost_DEBUG OFF)
-set(Boost_NO_SYSTEM_PATHS ON)
-set(BOOST_ROOT "${FINN_BASE_DIR}/deps/finn_boost")
-set(BOOST_INCLUDEDIR "${FINN_BASE_DIR}/deps/finn_boost")
-set(BOOST_LIBRARYDIR "${FINN_BASE_DIR}/deps/finn_boost/stage/lib/boost")
-set(Boost_NAMESPACE "finnBoost")
-set(FINN_SAVE_BOOST_ROOT $ENV{BOOST_ROOT})
-set(ENV{BOOST_ROOT} "")
-find_package(Boost 1.80.0 COMPONENTS system log log_setup program_options filesystem ${BOOST_THREAD} REQUIRED)
-include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
-set(ENV{BOOST_ROOT} ${FINN_SAVE_BOOST_ROOT})
-message(STATUS "${Boost_LIBRARIES}")
-
-#mdspan
-include_directories(SYSTEM external/mdspan/include)
+find_package(Boost 1.79.0 COMPONENTS system log log_setup program_options filesystem ${BOOST_THREAD} REQUIRED)
 
 #xsimd
 add_subdirectory(external/xsimd)

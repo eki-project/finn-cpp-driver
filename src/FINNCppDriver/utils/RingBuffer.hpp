@@ -39,7 +39,7 @@ namespace Finn {
      */
     template<typename T, bool multiThreaded = false>
     class RingBuffer {
-        finnBoost::circular_buffer<T> buffer;
+        boost::circular_buffer<T> buffer;
 
         std::mutex readWriteMutex;
         std::condition_variable cv;

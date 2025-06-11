@@ -2,7 +2,7 @@
  * @file FinnDatatypes.hpp
  * @author Linus Jungemann (linus.jungemann@uni-paderborn.de) and others
  * @brief Implements a (mostly) constexpr typesystem for FINN Datatypes
- * @version 0.1
+ * @version 0.2
  * @date 2023-10-31
  *
  * @copyright Copyright (c) 2023
@@ -17,10 +17,84 @@
 
 #include <concepts>
 #include <limits>
+#include <source_location>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 
 namespace Finn {
+
+    /**
+     * @brief Get the name of a type as a string_view
+     *
+     * @tparam T The type to get the name of
+     * @return constexpr std::string_view The name of the type as a string
+     */
+    template<typename T>
+    constexpr std::string_view type_name();
+
+    /**
+     * @brief Specialization of type_name for void
+     *
+     * @return constexpr std::string_view "void"
+     */
+    template<>
+    constexpr std::string_view type_name<void>() {
+        return "void";
+    }
+
+    namespace detail {
+
+        /**
+         * @brief Type used as a probe for determining type name extraction details
+         */
+        using type_name_prober = void;
+
+        /**
+         * @brief Gets the wrapped function name which contains the type name
+         *
+         * @tparam T The type to extract the name for
+         * @return constexpr std::string_view The function signature containing the type name
+         */
+        template<typename T>
+        constexpr std::string_view wrapped_type_name() {
+            return std::source_location::current().function_name();
+        }
+
+        /**
+         * @brief Calculates the length of the prefix before the type name in the function signature
+         *
+         * @return constexpr std::size_t Length of the prefix
+         */
+        constexpr std::size_t wrapped_type_name_prefix_length() { return wrapped_type_name<type_name_prober>().find(type_name<type_name_prober>()); }
+
+        /**
+         * @brief Calculates the length of the suffix after the type name in the function signature
+         *
+         * @return constexpr std::size_t Length of the suffix
+         */
+        constexpr std::size_t wrapped_type_name_suffix_length() { return wrapped_type_name<type_name_prober>().length() - wrapped_type_name_prefix_length() - type_name<type_name_prober>().length(); }
+
+    }  // namespace detail
+
+    /**
+     * @brief Get the name of a type as a string_view
+     *
+     * This implementation extracts the type name from the function signature
+     * provided by std::source_location.
+     *
+     * @tparam T The type to get the name of
+     * @return constexpr std::string_view The name of the type
+     */
+    template<typename T>
+    constexpr std::string_view type_name() {
+        constexpr auto wrapped_name = detail::wrapped_type_name<T>();
+        constexpr auto prefix_length = detail::wrapped_type_name_prefix_length();
+        constexpr auto suffix_length = detail::wrapped_type_name_suffix_length();
+        constexpr auto type_name_length = wrapped_name.length() - prefix_length - suffix_length;
+        return wrapped_name.substr(prefix_length, type_name_length);
+    }
+
     /**
      * @brief Concept for an integral type
      *

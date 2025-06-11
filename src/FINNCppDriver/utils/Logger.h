@@ -29,7 +29,7 @@
 #include <boost/smart_ptr/intrusive_ref_counter.hpp>  // IWYU pragma: keep
 #include <string>                                     // for allocator, string
 
-namespace bl = finnBoost::log;
+namespace bl = boost::log;
 namespace loglevel = bl::trivial;
 
 /**

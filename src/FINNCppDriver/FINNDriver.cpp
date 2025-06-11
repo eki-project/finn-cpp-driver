@@ -474,7 +474,7 @@ int main(int argc, char* argv[]) {
 
         if (varMap.count("check") != 0) {
             std::cout << "input_t: " << Finn::type_name<InputFinnType>() << "\n";
-            std::cout << "onput_t: " << Finn::type_name<OutputFinnType>() << "\n";
+            std::cout << "output_t: " << Finn::type_name<OutputFinnType>() << "\n";
             return 0;
         }
 

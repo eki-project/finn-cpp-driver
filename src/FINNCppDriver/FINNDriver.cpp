@@ -431,7 +431,7 @@ void validateInputPath(const std::vector<std::string>& path) {
     for (auto&& elem : path) {
         auto inputFilePath = std::filesystem::path(elem);
         if (!std::filesystem::exists(inputFilePath)) {
-            throw boost::program_options::error_with_option_name("Cannot find input file at " + inputFilePath.string());
+            throw boost::program_options::error_with_option_name("Cannot find input file at " + inputFilePath.string(), "input");
         }
         FINN_LOG(Logger::getLogger(), loglevel::info) << finnMainLogPrefix() << "Input file found at " << inputFilePath.string();
     }

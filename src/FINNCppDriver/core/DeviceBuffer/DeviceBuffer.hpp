@@ -234,7 +234,7 @@ namespace Finn {
          *
          * @return std::string
          */
-        virtual std::string loggerPrefix() { return "[" + boost::typeindex::type_id<decltype(this)>().pretty_name() + " - " + name + "] "; }
+        virtual std::string loggerPrefix() { return "[" + boost::typeindex::type_id<decltype(*this)>().pretty_name() + " - " + name + "] "; }
 
         /**
          * @brief Synchronizes the Buffer data to the data on the FPGA

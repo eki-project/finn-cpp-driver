@@ -26,7 +26,7 @@ namespace Finn {
     std::string Accelerator::loggerPrefix() { return "[Accelerator] "; }
 
     Accelerator::Accelerator(const std::vector<DeviceWrapper>& deviceDefinitions, bool synchronousInference, unsigned int hostBufferSize) {
-        FINN_LOG(Logger::getLogger(), loglevel::info) << loggerPrefix() << "Constructing Accelerator\n";
+        FINN_LOG(loglevel::info) << loggerPrefix() << "Constructing Accelerator\n";
         std::transform(deviceDefinitions.begin(), deviceDefinitions.end(), std::back_inserter(devices), [hostBufferSize, synchronousInference](const DeviceWrapper& dew) { return DeviceHandler(dew, synchronousInference, hostBufferSize); });
     }
 
@@ -104,11 +104,11 @@ namespace Finn {
 
     Finn::vector<uint8_t> Accelerator::getOutputData(const unsigned int deviceIndex, const std::string& outputBufferKernelName, bool forceArchival) {
         if (containsDevice(deviceIndex)) {
-            FINN_LOG_DEBUG(Logger::getLogger(), loglevel::info) << loggerPrefix() << "Retrieving results from the specified device index! [accelerator.retrieveResults()]";
+            FINN_LOG_DEBUG(loglevel::info) << loggerPrefix() << "Retrieving results from the specified device index! [accelerator.retrieveResults()]";
             return getDeviceHandler(deviceIndex).retrieveResults(outputBufferKernelName, forceArchival);
         } else {
             if (containsDevice(0)) {
-                FINN_LOG_DEBUG(Logger::getLogger(), loglevel::info) << loggerPrefix() << "Retrieving results from 0  device index! [accelerator.retrueveResults()]";
+                FINN_LOG_DEBUG(loglevel::info) << loggerPrefix() << "Retrieving results from 0  device index! [accelerator.retrueveResults()]";
                 return getDeviceHandler(0).retrieveResults(outputBufferKernelName, forceArchival);
             } else {
                 // cppcheck-suppress missingReturn

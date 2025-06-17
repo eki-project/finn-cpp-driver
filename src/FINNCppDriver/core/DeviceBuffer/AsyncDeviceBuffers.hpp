@@ -48,7 +48,7 @@ namespace Finn {
                 if (ringBufferSizeFactor == 0) {
                     FinnUtils::logAndError<std::runtime_error>("DeviceBuffer of size 0 cannot be constructed!");
                 }
-                FINN_LOG(Logger::getLogger(), loglevel::info) << "[AsyncDeviceBuffer] Max buffer size:" << ringBufferSizeFactor << "*" << elementsPerPart << "\n";
+                FINN_LOG(loglevel::info) << "[AsyncDeviceBuffer] Max buffer size:" << ringBufferSizeFactor << "*" << elementsPerPart << "\n";
             }
 
             /**
@@ -113,7 +113,7 @@ namespace Finn {
                 this->sync(elementCount);
                 // this->execute(); TODO(linusjun): Fix all this shit!
             }
-            FINN_LOG(this->logger, loglevel::info) << "Asynchronous Input buffer runner terminated";
+            FINN_LOG(loglevel::info) << "Asynchronous Input buffer runner terminated";
         }
 
          public:
@@ -148,7 +148,7 @@ namespace Finn {
          *
          */
         ~AsyncDeviceInputBuffer() override {
-            FINN_LOG(this->logger, loglevel::info) << "Destructing Asynchronous input buffer";
+            FINN_LOG(loglevel::info) << "Destructing Asynchronous input buffer";
             workerThread.request_stop();  // Joining will be handled automatically by destruction
         };
         /**
@@ -192,7 +192,7 @@ namespace Finn {
          * @return false
          */
         bool loadMap(std::stop_token stoken) {
-            FINN_LOG(this->logger, loglevel::info) << "Data transfer of input data to FPGA!\n";
+            FINN_LOG(loglevel::info) << "Data transfer of input data to FPGA!\n";
             return this->ringBuffer.read(this->map, stoken);
         }
 
@@ -218,7 +218,7 @@ namespace Finn {
 
          private:
         void readInternal(std::stop_token stoken) {
-            FINN_LOG_DEBUG(this->logger, loglevel::info) << this->loggerPrefix() << "Starting to read from the device";
+            FINN_LOG_DEBUG(loglevel::info) << this->loggerPrefix() << "Starting to read from the device";
             const std::size_t elementCount = this->ringBuffer.size(SIZE_SPECIFIER::FEATUREMAP_SIZE);
             while (!stoken.stop_requested()) {
                 // auto outExecuteResult = execute();
@@ -227,7 +227,7 @@ namespace Finn {
                 //     continue;
                 // }
                 // if (outExecuteResult == ERT_CMD_STATE_ERROR || outExecuteResult == ERT_CMD_STATE_ABORT) {
-                //     FINN_LOG(this->logger, loglevel::error) << "A problem has occured during the read process of the FPGA output.";
+                //     FINN_LOG(loglevel::error) << "A problem has occured during the read process of the FPGA output.";
                 //     continue;
                 // }
                 this->sync(elementCount);
@@ -270,7 +270,7 @@ namespace Finn {
          *
          */
         ~AsyncDeviceOutputBuffer() override {
-            FINN_LOG(this->logger, loglevel::info) << "Destruction Asynchronous output buffer";
+            FINN_LOG(loglevel::info) << "Destruction Asynchronous output buffer";
             workerThread.request_stop();  // Joining will be handled automatically by destruction
         };
 
@@ -350,7 +350,7 @@ namespace Finn {
          *
          */
         void saveMap() {
-            FINN_LOG(this->logger, loglevel::info) << "Data transfer of output from FPGA!\n";
+            FINN_LOG(loglevel::info) << "Data transfer of output from FPGA!\n";
             this->ringBuffer.template store<T*>(this->map, this->ringBuffer.size(SIZE_SPECIFIER::FEATUREMAP_SIZE));
         }
 

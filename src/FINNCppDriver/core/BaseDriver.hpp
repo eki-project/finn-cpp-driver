@@ -48,7 +48,6 @@ namespace Finn {
     class BaseDriver {
         Accelerator accelerator;
         Config configuration;
-        logger_type& logger = Logger::getLogger();
 
         uint defaultInputDeviceIndex = 0;
         std::string defaultInputKernelName;
@@ -94,7 +93,7 @@ namespace Finn {
          * @param configPath
          * @param batchSize
          */
-        BaseDriver(const std::filesystem::path& configPath, uint batchSize) : configuration(createConfigFromPath(configPath)), logger(Logger::getLogger()) { initializeBaseDriver(batchSize); };
+        BaseDriver(const std::filesystem::path& configPath, uint batchSize) : configuration(createConfigFromPath(configPath)) { initializeBaseDriver(batchSize); };
 
         /**
          * @brief Create a new base driver based on an existing configuration
@@ -102,7 +101,7 @@ namespace Finn {
          * @param pConfig
          * @param batchSize
          */
-        BaseDriver(const Config& pConfig, uint batchSize) : configuration(pConfig), logger(Logger::getLogger()) { initializeBaseDriver(batchSize); }
+        BaseDriver(const Config& pConfig, uint batchSize) : configuration(pConfig) { initializeBaseDriver(batchSize); }
 
         /**
          * @brief Construct a new Base Driver object
@@ -117,7 +116,7 @@ namespace Finn {
          * @param pForceAchieval
          */
         BaseDriver(const std::filesystem::path& configPath, uint inputDeviceIndex, const std::string& inputKernelName, uint outputDeviceIndex, const std::string& outputKernelName, uint batchSize, bool pForceAchieval)
-            : configuration(createConfigFromPath(configPath)), logger(Logger::getLogger()), forceAchieval(pForceAchieval) {
+            : configuration(createConfigFromPath(configPath)), forceAchieval(pForceAchieval) {
             initializeBaseDriver(batchSize);
         }
 
@@ -134,7 +133,7 @@ namespace Finn {
          * @param pForceAchieval
          */
         BaseDriver(const Config& pConfig, uint inputDeviceIndex, const std::string& inputKernelName, uint outputDeviceIndex, const std::string& outputKernelName, uint batchSize, bool pForceAchieval)
-            : configuration(pConfig), logger(Logger::getLogger()), forceAchieval(pForceAchieval) {
+            : configuration(pConfig), forceAchieval(pForceAchieval) {
             initializeBaseDriver(batchSize);
         }
 
@@ -265,7 +264,7 @@ namespace Finn {
          */
         template<typename IteratorType, typename = std::enable_if<!SynchronousInference>>
         void input(IteratorType first, IteratorType last, uint inputDeviceIndex, const std::string& inputBufferKernelName, uint batchSize) {
-            FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "Store data for asynchronous inference.";
+            FINN_LOG_DEBUG(loglevel::info) << loggerPrefix() << "Store data for asynchronous inference.";
             auto packed = Finn::pack<F>(first, last);
             auto storeFunc = accelerator.storeFactory(inputDeviceIndex, inputBufferKernelName);
 
@@ -424,7 +423,7 @@ namespace Finn {
         template<typename IteratorType>
         [[nodiscard]] Finn::vector<uint8_t> infer(IteratorType first, IteratorType last, uint inputDeviceIndex, const std::string& inputBufferKernelName, uint outputDeviceIndex, const std::string& outputBufferKernelName, uint batchSize,
                                                   bool forceArchival) {
-            FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "Starting inference (raw data)";
+            FINN_LOG_DEBUG(loglevel::info) << loggerPrefix() << "Starting inference (raw data)";
             auto storeFunc = accelerator.storeFactory(inputDeviceIndex, inputBufferKernelName);
 
             if (std::abs(std::distance(first, last)) != size(SIZE_SPECIFIER::TOTAL_DATA_SIZE, inputDeviceIndex, inputBufferKernelName)) {
@@ -439,11 +438,11 @@ namespace Finn {
 
 #ifdef UNITTEST
             Finn::vector<uint8_t> data(first, last);
-            FINN_LOG(logger, loglevel::info) << "Readback from device buffer confirming data was written to board successfully: " << isSyncedDataEquivalent(inputDeviceIndex, inputBufferKernelName, data);
+            FINN_LOG(loglevel::info) << "Readback from device buffer confirming data was written to board successfully: " << isSyncedDataEquivalent(inputDeviceIndex, inputBufferKernelName, data);
 #endif
             accelerator.wait();
 
-            FINN_LOG_DEBUG(logger, loglevel::info) << "Reading out buffers";
+            FINN_LOG_DEBUG(loglevel::info) << "Reading out buffers";
             accelerator.read();
             return accelerator.getOutputData(outputDeviceIndex, outputBufferKernelName, forceArchival);
         }
@@ -488,22 +487,22 @@ namespace Finn {
          *
          */
         void logDriver() {
-            FINN_LOG(logger, loglevel::info) << loggerPrefix() << "Driver Overview:\n";
+            FINN_LOG(loglevel::info) << loggerPrefix() << "Driver Overview:\n";
             for (DeviceHandler& devHandler : accelerator) {
-                FINN_LOG(logger, loglevel::info) << "\tDevice Index: " << devHandler.getDeviceIndex();
+                FINN_LOG(loglevel::info) << "\tDevice Index: " << devHandler.getDeviceIndex();
                 for (auto& keyValuePair : devHandler.getInputBufferMap()) {
-                    FINN_LOG(logger, loglevel::info) << "\t\tInput buffers: ";
-                    FINN_LOG(logger, loglevel::info) << "\t\t\tName: " << keyValuePair.second->getName() << " (in hashmap as " << keyValuePair.first << ")";
-                    FINN_LOG(logger, loglevel::info) << "\t\t\tShape packed: " << FinnUtils::shapeToString(keyValuePair.second->getPackedShape());
-                    FINN_LOG(logger, loglevel::info) << "\t\t\tElements of type T (usually uint8_t) per sample: " << keyValuePair.second->size(SIZE_SPECIFIER::FEATUREMAP_SIZE);
-                    FINN_LOG(logger, loglevel::info) << "\t\t\tElements of type T (usually uint8_t) in buffer overall: " << keyValuePair.second->size(SIZE_SPECIFIER::TOTAL_DATA_SIZE);
+                    FINN_LOG(loglevel::info) << "\t\tInput buffers: ";
+                    FINN_LOG(loglevel::info) << "\t\t\tName: " << keyValuePair.second->getName() << " (in hashmap as " << keyValuePair.first << ")";
+                    FINN_LOG(loglevel::info) << "\t\t\tShape packed: " << FinnUtils::shapeToString(keyValuePair.second->getPackedShape());
+                    FINN_LOG(loglevel::info) << "\t\t\tElements of type T (usually uint8_t) per sample: " << keyValuePair.second->size(SIZE_SPECIFIER::FEATUREMAP_SIZE);
+                    FINN_LOG(loglevel::info) << "\t\t\tElements of type T (usually uint8_t) in buffer overall: " << keyValuePair.second->size(SIZE_SPECIFIER::TOTAL_DATA_SIZE);
                 }
                 for (auto& keyValuePair : devHandler.getOutputBufferMap()) {
-                    FINN_LOG(logger, loglevel::info) << "\t\tOutput buffers: ";
-                    FINN_LOG(logger, loglevel::info) << "\t\t\tName: " << keyValuePair.second->getName() << " (in hashmap as " << keyValuePair.first << ")";
-                    FINN_LOG(logger, loglevel::info) << "\t\t\tShape packed: " << FinnUtils::shapeToString(keyValuePair.second->getPackedShape());
-                    FINN_LOG(logger, loglevel::info) << "\t\t\tElements of type T (usually uint8_t) per sample: " << keyValuePair.second->size(SIZE_SPECIFIER::FEATUREMAP_SIZE);
-                    FINN_LOG(logger, loglevel::info) << "\t\t\tElements of type T (usually uint8_t) in buffer overall: " << keyValuePair.second->size(SIZE_SPECIFIER::TOTAL_DATA_SIZE);
+                    FINN_LOG(loglevel::info) << "\t\tOutput buffers: ";
+                    FINN_LOG(loglevel::info) << "\t\t\tName: " << keyValuePair.second->getName() << " (in hashmap as " << keyValuePair.first << ")";
+                    FINN_LOG(loglevel::info) << "\t\t\tShape packed: " << FinnUtils::shapeToString(keyValuePair.second->getPackedShape());
+                    FINN_LOG(loglevel::info) << "\t\t\tElements of type T (usually uint8_t) per sample: " << keyValuePair.second->size(SIZE_SPECIFIER::FEATUREMAP_SIZE);
+                    FINN_LOG(loglevel::info) << "\t\t\tElements of type T (usually uint8_t) in buffer overall: " << keyValuePair.second->size(SIZE_SPECIFIER::TOTAL_DATA_SIZE);
                 }
             }
         }

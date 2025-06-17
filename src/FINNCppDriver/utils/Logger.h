@@ -13,37 +13,18 @@
 #ifndef LOGGING_H
 #define LOGGING_H
 
-/**
- * @brief Define boost logging to be linked dynamically
- *
- */
-// NOLINTNEXTLINE
-#define BOOST_LOG_DYN_LINK 1
+#include <plog/Log.h>
 
-// IWYU pragma: no_include <FINNCppDriver/utils/Logger.h>
-#include <boost/log/detail/config.hpp>                // IWYU pragma: keep
-#include <boost/log/sources/severity_feature.hpp>     // IWYU pragma: keep
-#include <boost/log/sources/severity_logger.hpp>      // IWYU pragma: keep
-#include <boost/log/trivial.hpp>                      // IWYU pragma: keep
-#include <boost/smart_ptr/intrusive_ptr.hpp>          // IWYU pragma: keep
-#include <boost/smart_ptr/intrusive_ref_counter.hpp>  // IWYU pragma: keep
-#include <string>                                     // for allocator, string
+#include <string>  // for allocator, string
 
-namespace bl = boost::log;
-namespace loglevel = bl::trivial;
+namespace loglevel = plog;
 
 /**
- * @brief Abrieviation of boost logging type
- *
- */
-using logger_type = bl::sources::severity_logger<bl::trivial::severity_level>;
-
-/**
- * @brief redefine Boost Logger for FINN
+ * @brief Redefine plog logging macros for FINN
  *
  */
 // NOLINTBEGIN
-#define FINN_LOG(LOGGER, SEV) BOOST_LOG_SEV(LOGGER, SEV)
+#define FINN_LOG(SEV) PLOG(SEV)
 #ifdef NDEBUG
 extern class [[maybe_unused]] DevNull {
 } dev_null;
@@ -56,28 +37,23 @@ DevNull& operator<<(DevNull& dest, [[maybe_unused]] T) {
      * @brief Defines debug logging macro that is removed when building in Release mode
      *
      */
-    #define FINN_LOG_DEBUG(LOGGER, SEV) dev_null
+    #define FINN_LOG_DEBUG(SEV) dev_null
 #else
     /**
      * @brief Defines debug logging macro that is removed when building in Release mode
      *
      */
-    #define FINN_LOG_DEBUG(LOGGER, SEV) FINN_LOG(LOGGER, SEV)
+    #define FINN_LOG_DEBUG(SEV) FINN_LOG(SEV)
 #endif  // NDEBUG
         // NOLINTEND
 
 /**
- * @brief Singleton class that provides logger functionality for the driver. Based on the boost severity logger
+ * @brief Singleton class that provides logger functionality for the driver.
  *
  */
 class Logger {
      public:
-    /**
-     * @brief Get the Logger object
-     *
-     * @return logger_type&
-     */
-    static logger_type& getLogger(bool console = false);
+    void static initLogger(bool console = false);
 
     /**
      * @brief Construct a new Logger object (Deleted)
@@ -108,7 +84,6 @@ class Logger {
     Logger(Logger&&) = default;
 
      private:
-    void initLogging(bool console = false);
     Logger(bool console = false);
     const std::string logFormat = "[%TimeStamp%] (%LineID%) [%Severity%]: %Message%";
 };

@@ -15,8 +15,6 @@ namespace xrt {
 
         void* memmap = nullptr;
 
-        logger_type& logger;
-
          public:
         /**
          * XCL BO Flags bits layout
@@ -61,12 +59,10 @@ namespace xrt {
             p2p = XRT_BO_FLAGS_P2P,
             svm = XRT_BO_FLAGS_SVM,
         };
-        bo(xrt::device pDevice, size_t pBytesize, unsigned int pGroup) : device(pDevice), byteSize(pBytesize), group(pGroup), logger(Logger::getLogger()) { FINN_LOG(logger, loglevel::debug) << "(xrtMock) xrt::bo object created!\n"; }
-        bo(const xrt::device& pDevice, size_t pBytesize, bo::flags flags, uint32_t pGroup) : device(pDevice), byteSize(pBytesize), group(pGroup), logger(Logger::getLogger()) {
-            FINN_LOG(logger, loglevel::debug) << "(xrtMock) xrt::bo object created with flag!\n";
-        }
+        bo(xrt::device pDevice, size_t pBytesize, unsigned int pGroup) : device(pDevice), byteSize(pBytesize), group(pGroup) { FINN_LOG(loglevel::debug) << "(xrtMock) xrt::bo object created!\n"; }
+        bo(const xrt::device& pDevice, size_t pBytesize, bo::flags flags, uint32_t pGroup) : device(pDevice), byteSize(pBytesize), group(pGroup) { FINN_LOG(loglevel::debug) << "(xrtMock) xrt::bo object created with flag!\n"; }
 
-        bo(bo&& other) noexcept : device(std::move(other.device)), byteSize(other.byteSize), group(other.group), memmap(nullptr), logger(Logger::getLogger()) { std::swap(memmap, other.memmap); }
+        bo(bo&& other) noexcept : device(std::move(other.device)), byteSize(other.byteSize), group(other.group), memmap(nullptr) { std::swap(memmap, other.memmap); }
 
         void sync(xclBOSyncDirection);
         void sync(xclBOSyncDirection dir, size_t sz, size_t offset);
@@ -81,7 +77,7 @@ namespace xrt {
          */
         template<typename T>
         T map() {
-            FINN_LOG(logger, loglevel::debug) << "(xrtMock) Map created from xrt::bo with byte size " << byteSize << "!\n";
+            FINN_LOG(loglevel::debug) << "(xrtMock) Map created from xrt::bo with byte size " << byteSize << "!\n";
             T createdMap = static_cast<T>(malloc(byteSize));
             memmap = createdMap;
             return createdMap;

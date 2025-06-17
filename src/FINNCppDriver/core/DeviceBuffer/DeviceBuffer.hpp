@@ -17,8 +17,8 @@
 #include <FINNCppDriver/utils/Logger.h>
 #include <FINNCppDriver/utils/Types.h>
 
+#include <FINNCppDriver/utils/FinnDatatypes.hpp>
 #include <FINNCppDriver/utils/RingBuffer.hpp>
-#include <boost/type_index.hpp>
 #include <chrono>
 #include <future>
 #include <span>
@@ -92,11 +92,6 @@ namespace Finn {
          *
          */
         const long long bufAdr;
-        /**
-         * @brief Logger
-         *
-         */
-        logger_type& logger;
 
         void busyWait() {
             // Wait until the IP is DONE
@@ -138,15 +133,14 @@ namespace Finn {
               internalBo(xrt::bo(device, mapSize * sizeof(T), DeviceBuffer::getFlags(Finn::Options::hostMemoryAccess), 0)),
               map(internalBo.template map<T*>()),
               assocIPCore(xrt::ip(device, pDevUUID, pCUName)),  // Using xrt::kernel/getGroupId after this point leads to a total bricking of the FPGA card!!
-              bufAdr(internalBo.address()),
-              logger(Logger::getLogger()) {
+              bufAdr(internalBo.address()) {
             shapePacked[0] = batchSize;
-            FINN_LOG(logger, loglevel::info) << "[DeviceBuffer] "
-                                             << "New Device Buffer of size " << mapSize * sizeof(T) << "bytes with group id " << 0 << "\n";
-            FINN_LOG(logger, loglevel::info) << "[DeviceBuffer] "
-                                             << "Host Memory Access enabled: " << Finn::Options::hostMemoryAccess << "\n";
-            FINN_LOG(logger, loglevel::info) << "[DeviceBuffer] "
-                                             << "Initializing DeviceBuffer " << name << " (SHAPE PACKED: " << FinnUtils::shapeToString(pShapePacked) << " inputs of the given shape, MAP SIZE: " << mapSize << ")\n";
+            FINN_LOG(loglevel::info) << "[DeviceBuffer] "
+                                     << "New Device Buffer of size " << mapSize * sizeof(T) << "bytes with group id " << 0 << "\n";
+            FINN_LOG(loglevel::info) << "[DeviceBuffer] "
+                                     << "Host Memory Access enabled: " << Finn::Options::hostMemoryAccess << "\n";
+            FINN_LOG(loglevel::info) << "[DeviceBuffer] "
+                                     << "Initializing DeviceBuffer " << name << " (SHAPE PACKED: " << FinnUtils::shapeToString(pShapePacked) << " inputs of the given shape, MAP SIZE: " << mapSize << ")\n";
             std::fill(map, map + mapSize, 0);
         }
 
@@ -155,14 +149,7 @@ namespace Finn {
          * @param buf
          */
         DeviceBuffer(DeviceBuffer&& buf) noexcept
-            : name(std::move(buf.name)),
-              shapePacked(std::move(buf.shapePacked)),
-              mapSize(buf.mapSize),
-              internalBo(std::move(buf.internalBo)),
-              assocIPCore(std::move(buf.assocIPCore)),
-              map(std::move(buf.map)),
-              bufAdr(internalBo.address()),
-              logger(Logger::getLogger()) {}
+            : name(std::move(buf.name)), shapePacked(std::move(buf.shapePacked)), mapSize(buf.mapSize), internalBo(std::move(buf.internalBo)), assocIPCore(std::move(buf.assocIPCore)), map(std::move(buf.map)), bufAdr(internalBo.address()) {}
 
         /**
          * @brief Construct a new Device Buffer object (Deleted copy constructor)
@@ -175,7 +162,7 @@ namespace Finn {
          * @brief Destroy the Device Buffer object
          *
          */
-        virtual ~DeviceBuffer() { FINN_LOG(logger, loglevel::info) << "[DeviceBuffer] Destructing DeviceBuffer " << name << "\n"; };
+        virtual ~DeviceBuffer() { FINN_LOG(loglevel::info) << "[DeviceBuffer] Destructing DeviceBuffer " << name << "\n"; };
 
         /**
          * @brief Deleted move assignment operator
@@ -234,7 +221,7 @@ namespace Finn {
          *
          * @return std::string
          */
-        virtual std::string loggerPrefix() { return "[" + boost::typeindex::type_id<decltype(*this)>().pretty_name() + " - " + name + "] "; }
+        virtual std::string loggerPrefix() { return "[" + std::string(Finn::type_name<decltype(*this)>()) + " - " + name + "] "; }
 
         /**
          * @brief Synchronizes the Buffer data to the data on the FPGA

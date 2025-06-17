@@ -65,8 +65,7 @@ namespace Finn {
          * @param pElementsPerPart
          */
         RingBuffer(const size_t pParts, const size_t pElementsPerPart) : buffer(pElementsPerPart * pParts), elementsPerPart(pElementsPerPart) {
-            auto logger = Logger::getLogger();
-            FINN_LOG(logger, loglevel::info) << "Ringbuffer initialised with " << pElementsPerPart << " Elements per Part and " << pParts << " Parts.\n";
+            FINN_LOG(loglevel::info) << "Ringbuffer initialised with " << pElementsPerPart << " Elements per Part and " << pParts << " Parts.\n";
             if (pElementsPerPart * pParts == 0) {
                 FinnUtils::logAndError<std::runtime_error>("It is not possible to create a buffer of size 0!");
             }

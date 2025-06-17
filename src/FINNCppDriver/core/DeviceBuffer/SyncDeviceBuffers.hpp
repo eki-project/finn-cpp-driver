@@ -32,8 +32,8 @@ namespace Finn {
          * @param batchSize batch size
          */
         SyncDeviceInputBuffer(const std::string& pCUName, xrt::device& device, xrt::uuid& pDevUUID, const shapePacked_t& pShapePacked, unsigned int batchSize) : DeviceInputBuffer<T>(pCUName, device, pDevUUID, pShapePacked, batchSize) {
-            FINN_LOG(this->logger, loglevel::info) << "[SyncDeviceInputBuffer] "
-                                                   << "Initializing DeviceBuffer " << this->name << " (SHAPE PACKED: " << FinnUtils::shapeToString(pShapePacked) << " inputs of the given shape, MAP SIZE: " << this->mapSize << ")\n";
+            FINN_LOG(loglevel::info) << "[SyncDeviceInputBuffer] "
+                                     << "Initializing DeviceBuffer " << this->name << " (SHAPE PACKED: " << FinnUtils::shapeToString(pShapePacked) << " inputs of the given shape, MAP SIZE: " << this->mapSize << ")\n";
             this->shapePacked[0] = batchSize;
         };
 
@@ -121,7 +121,7 @@ namespace Finn {
          * @return false
          */
         bool run() override {
-            FINN_LOG_DEBUG(this->logger, loglevel::info) << this->loggerPrefix() << "DeviceBuffer (" << this->name << ") executing...";
+            FINN_LOG_DEBUG(loglevel::info) << this->loggerPrefix() << "DeviceBuffer (" << this->name << ") executing...";
             this->sync(FinnUtils::shapeToElements(this->shapePacked));
             this->execute(this->shapePacked[0]);
             return true;
@@ -227,7 +227,7 @@ namespace Finn {
          * @return false
          */
         bool run() override {
-            FINN_LOG_DEBUG(this->logger, loglevel::info) << this->loggerPrefix() << "DeviceBuffer (" << this->name << ") executing...";
+            FINN_LOG_DEBUG(loglevel::info) << this->loggerPrefix() << "DeviceBuffer (" << this->name << ") executing...";
             this->execute(this->shapePacked[0]);
             return true;
         }
@@ -238,7 +238,7 @@ namespace Finn {
          * @return bool
          */
         bool read() override {
-            FINN_LOG_DEBUG(this->logger, loglevel::info) << this->loggerPrefix() << "Synching  " << elementCount << " bytes from the device";
+            FINN_LOG_DEBUG(loglevel::info) << this->loggerPrefix() << "Synching  " << elementCount << " bytes from the device";
             this->sync(elementCount);
             return true;
         }

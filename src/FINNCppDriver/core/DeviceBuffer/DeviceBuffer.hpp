@@ -18,7 +18,6 @@
 #include <FINNCppDriver/utils/Types.h>
 
 #include <FINNCppDriver/utils/FinnDatatypes.hpp>
-#include <FINNCppDriver/utils/RingBuffer.hpp>
 #include <chrono>
 #include <future>
 #include <span>

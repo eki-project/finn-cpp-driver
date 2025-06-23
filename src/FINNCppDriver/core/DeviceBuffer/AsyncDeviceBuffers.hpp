@@ -16,6 +16,7 @@
 #include <FINNCppDriver/utils/FinnUtils.h>
 
 #include <FINNCppDriver/core/DeviceBuffer/DeviceBuffer.hpp>
+#include <FINNCppDriver/utils/RingBuffer.hpp>
 #include <functional>
 #include <thread>
 

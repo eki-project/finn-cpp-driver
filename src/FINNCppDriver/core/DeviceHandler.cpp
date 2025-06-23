@@ -85,6 +85,7 @@ namespace Finn {
         FINN_LOG(loglevel::info) << loggerPrefix() << "(" << xrtDeviceIndex << ") "
                                  << "Initializing xrt::device, loading xclbin and assigning IP\n";
         device = xrt::device(xrtDeviceIndex);
+        std::cout << "Post initialize Device" << std::endl;
     }
 
     void DeviceHandler::loadXclbinSetUUID() {

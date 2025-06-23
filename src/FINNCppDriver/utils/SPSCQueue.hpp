@@ -30,6 +30,8 @@
 #include <thread>
 #include <cstring>
 
+using namespace std::literals::chrono_literals;
+
  // For CPU-specific optimizations
 #if defined(__x86_64__) || defined(_M_X64)
 #include <immintrin.h>
@@ -1335,6 +1337,95 @@ public:
         }
 
         return to_copy;
+    }
+
+    /**
+     * @brief Dequeues multiple elements
+     *
+     * Attempts to dequeue multiple elements.
+     *
+     * @tparam OutputIt Iterator type for destination
+     * @param dest Iterator to the destination to store dequeued elements
+     * @param max_items Maximum number of elements to dequeue
+     * @param stoken Stop token for cancellation
+     * @return Number of elements successfully dequeued
+     */
+    template<typename OutputIt>
+    size_t dequeue_bulk(OutputIt dest, size_t max_items, std::stop_token stoken = {}) {
+        if (max_items == 0) return 0;
+
+        // Try non-blocking fast path first
+        size_t items_dequeued = try_dequeue_bulk(dest, max_items);
+        if (items_dequeued == max_items) {
+            return items_dequeued;
+        }
+
+        // If we got some items but not all, advance the destination iterator
+        if (items_dequeued > 0) {
+            std::advance(dest, items_dequeued);
+            max_items -= items_dequeued;
+        }
+
+        // Spin with exponential backoff for a short time
+        auto start_time = std::chrono::steady_clock::now();
+        auto spin_time = std::chrono::microseconds(200);
+        auto spin_end_time = start_time + spin_time;
+
+        detail::exponential_backoff backoff;
+        while (items_dequeued < max_items && std::chrono::steady_clock::now() < spin_end_time) {
+            size_t batch_dequeued = try_dequeue_bulk(dest, max_items);
+            if (batch_dequeued > 0) {
+                std::advance(dest, batch_dequeued);
+                items_dequeued += batch_dequeued;
+                max_items -= batch_dequeued;
+
+                if (max_items == 0) {
+                    return items_dequeued;
+                }
+            }
+            backoff();
+        }
+
+        if (stoken.stop_requested()) {
+            return items_dequeued;
+        }
+
+        // Fall back to condition variable waiting
+        std::unique_lock<std::mutex> lock(blocking_.mutex_);
+
+        do {
+            // Wait until items are available or timeout
+            while (!blocking_.not_empty_.wait_for(lock, 2000ms, [this] {
+                return !is_empty() || !blocking_.is_active_.load(std::memory_order_acquire);
+                })) {
+                if (stoken.stop_requested()) {
+                    return false;
+                }
+            }
+
+            if (!blocking_.is_active_.load(std::memory_order_acquire)) {
+                break;  // Queue was shut down
+            }
+
+            // Release lock during actual dequeue operation
+            lock.unlock();
+            size_t batch_dequeued = try_dequeue_bulk(dest, max_items);
+            lock.lock();
+
+            if (batch_dequeued > 0) {
+                std::advance(dest, batch_dequeued);
+                items_dequeued += batch_dequeued;
+                max_items -= batch_dequeued;
+
+                if (max_items == 0) {
+                    break;  // All items dequeued
+                }
+            }
+
+        } while (max_items > 0 && !stoken.stop_requested() &&
+            blocking_.is_active_.load(std::memory_order_acquire));
+
+        return items_dequeued;
     }
 
     /**

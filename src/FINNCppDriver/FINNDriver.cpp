@@ -124,9 +124,7 @@ void logDeviceInformation(xrt::device& device, const std::string& filename) {
  */
 template<bool SynchronousInference>
 Finn::Driver<SynchronousInference> createDriverFromConfig(const std::filesystem::path& configFilePath, unsigned int batchSize) {
-    Finn::Driver<SynchronousInference> driver(configFilePath, batchSize);
-    driver.setForceAchieval(true);
-    return driver;
+    return Finn::Driver<SynchronousInference>(configFilePath, batchSize);
 }
 
 template<typename O>

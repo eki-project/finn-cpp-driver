@@ -110,7 +110,6 @@ namespace Finn {
                 outputBufferMap.emplace(std::make_pair(ebdptr->kernelName, ptr));
             } else {
                 auto ptr = std::make_shared<Finn::AsyncDeviceOutputBuffer<uint8_t>>(ebdptr->kernelName, device, uuid, ebdptr->packedShape, hostBufferSize);
-                ptr->allocateLongTermStorage(hostBufferSize * 5);
                 outputBufferMap.emplace(std::make_pair(ebdptr->kernelName, ptr));
             }
         }
@@ -194,25 +193,48 @@ namespace Finn {
     }
 
 
-    [[maybe_unused]] Finn::vector<uint8_t> DeviceHandler::retrieveResults(const std::string& outputBufferKernelName, bool forceArchival) {
+    [[maybe_unused]] Finn::vector<uint8_t> DeviceHandler::retrieveResults(const std::string& outputBufferKernelName) {
         if (!outputBufferMap.contains(outputBufferKernelName)) {
             auto newlineFold = [](std::string a, const auto& b) { return std::move(a) + '\n' + std::move(b.first); };
             std::string existingNames = "Existing buffer names:";
             std::accumulate(inputBufferMap.begin(), inputBufferMap.end(), existingNames, newlineFold);
             FinnUtils::logAndError<std::runtime_error>(loggerPrefix() + " [retrieve] Tried accessing kernel/buffer with name " + outputBufferKernelName + " but this kernel / buffer does not exist! " + existingNames);
         }
-        if (forceArchival) {
-            // TODO(linusjun): Fix for asynchronous inference
-            // outputBufferMap.at(outputBufferKernelName)->archiveValidBufferParts();
-        }
         return outputBufferMap.at(outputBufferKernelName)->getData();
     }
 
-    size_t DeviceHandler::size(SIZE_SPECIFIER ss, const std::string& bufferName) {
+    size_t DeviceHandler::getSizeInBytes(const std::string& bufferName) {
         if (inputBufferMap.contains(bufferName)) {
-            return inputBufferMap.at(bufferName)->size(ss);
+            return inputBufferMap.at(bufferName)->getSizeInBytes();
         } else if (outputBufferMap.contains(bufferName)) {
-            return outputBufferMap.at(bufferName)->size(ss);
+            return outputBufferMap.at(bufferName)->getSizeInBytes();
+        }
+        return 0;
+    }
+
+    size_t DeviceHandler::getFeatureMapSize(const std::string& bufferName) {
+        if (inputBufferMap.contains(bufferName)) {
+            return inputBufferMap.at(bufferName)->getFeatureMapSize();
+        } else if (outputBufferMap.contains(bufferName)) {
+            return outputBufferMap.at(bufferName)->getFeatureMapSize();
+        }
+        return 0;
+    }
+
+    size_t DeviceHandler::getBatchSize(const std::string& bufferName) {
+        if (inputBufferMap.contains(bufferName)) {
+            return inputBufferMap.at(bufferName)->getBatchSize();
+        } else if (outputBufferMap.contains(bufferName)) {
+            return outputBufferMap.at(bufferName)->getBatchSize();
+        }
+        return 0;
+    }
+
+    size_t DeviceHandler::getTotalDataSize(const std::string& bufferName) {
+        if (inputBufferMap.contains(bufferName)) {
+            return inputBufferMap.at(bufferName)->getTotalDataSize();
+        } else if (outputBufferMap.contains(bufferName)) {
+            return outputBufferMap.at(bufferName)->getTotalDataSize();
         }
         return 0;
     }

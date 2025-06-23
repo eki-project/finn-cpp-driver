@@ -102,14 +102,14 @@ namespace Finn {
         return ret;
     }
 
-    Finn::vector<uint8_t> Accelerator::getOutputData(const unsigned int deviceIndex, const std::string& outputBufferKernelName, bool forceArchival) {
+    Finn::vector<uint8_t> Accelerator::getOutputData(const unsigned int deviceIndex, const std::string& outputBufferKernelName) {
         if (containsDevice(deviceIndex)) {
             FINN_LOG_DEBUG(loglevel::info) << loggerPrefix() << "Retrieving results from the specified device index! [accelerator.retrieveResults()]";
-            return getDeviceHandler(deviceIndex).retrieveResults(outputBufferKernelName, forceArchival);
+            return getDeviceHandler(deviceIndex).retrieveResults(outputBufferKernelName);
         } else {
             if (containsDevice(0)) {
-                FINN_LOG_DEBUG(loglevel::info) << loggerPrefix() << "Retrieving results from 0  device index! [accelerator.retrueveResults()]";
-                return getDeviceHandler(0).retrieveResults(outputBufferKernelName, forceArchival);
+                FINN_LOG_DEBUG(loglevel::info) << loggerPrefix() << "Retrieving results from 0  device index! [accelerator.retrieveResults()]";
+                return getDeviceHandler(0).retrieveResults(outputBufferKernelName);
             } else {
                 // cppcheck-suppress missingReturn
                 FinnUtils::logAndError<std::runtime_error>("Tried receiving data in a devicehandler with an invalid deviceIndex!");
@@ -117,6 +117,31 @@ namespace Finn {
         }
     }
 
-    size_t Accelerator::size(SIZE_SPECIFIER ss, unsigned int deviceIndex, const std::string& bufferName) { return getDeviceHandler(deviceIndex).size(ss, bufferName); }
+    size_t Accelerator::getSizeInBytes(unsigned int deviceIndex, const std::string& bufferName) {
+    if (containsDevice(deviceIndex)) {
+        return getDeviceHandler(deviceIndex).getSizeInBytes(bufferName);
+    }
+    return 0;
+}
 
+    size_t Accelerator::getFeatureMapSize(unsigned int deviceIndex, const std::string& bufferName) {
+    if (containsDevice(deviceIndex)) {
+        return getDeviceHandler(deviceIndex).getFeatureMapSize(bufferName);
+    }
+    return 0;
+}
+
+    size_t Accelerator::getBatchSize(unsigned int deviceIndex, const std::string& bufferName) {
+    if (containsDevice(deviceIndex)) {
+        return getDeviceHandler(deviceIndex).getBatchSize(bufferName);
+    }
+    return 0;
+}
+
+    size_t Accelerator::getTotalDataSize(unsigned int deviceIndex, const std::string& bufferName) {
+    if (containsDevice(deviceIndex)) {
+        return getDeviceHandler(deviceIndex).getTotalDataSize(bufferName);
+    }
+    return 0;
+}
 }  // namespace Finn

@@ -32,9 +32,7 @@ namespace Finn {
 
 template<bool SynchronousInference>
 Finn::Driver<SynchronousInference> createDriverFromConfig(const std::filesystem::path& configFilePath, unsigned int batchSize) {
-    Finn::Driver<SynchronousInference> driver(configFilePath, batchSize);
-    driver.setForceAchieval(true);
-    return driver;
+    return Finn::Driver<SynchronousInference>(configFilePath, batchSize);
 }
 
 static void BM_SynchronousInference(benchmark::State& state) {

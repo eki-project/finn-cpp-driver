@@ -165,17 +165,15 @@ namespace Finn {
          * @param forceArchival Whether or not to force a readout into archive. Necessary to get new data. Will be done automatically if a whole multiple of the buffer size is produced
          * @return std::vector<std::vector<uint8_t>>
          */
-        Finn::vector<uint8_t> getOutputData(unsigned int deviceIndex, const std::string& outputBufferKernelName, bool forceArchival);
+        Finn::vector<uint8_t> getOutputData(unsigned int deviceIndex, const std::string& outputBufferKernelName);
 
-        /**
-         * @brief Get the size of the buffer with the specified device index and buffer name
-         *
-         * @param ss
-         * @param deviceIndex
-         * @param bufferName
-         * @return std::size_t
-         */
-        std::size_t size(SIZE_SPECIFIER ss, unsigned int deviceIndex, const std::string& bufferName);
+        size_t getSizeInBytes(unsigned int deviceIndex, const std::string& bufferName);
+
+        size_t getFeatureMapSize(unsigned int deviceIndex, const std::string& bufferName);
+
+        size_t getBatchSize(unsigned int deviceIndex, const std::string& bufferName);
+
+        size_t getTotalDataSize(unsigned int deviceIndex, const std::string& bufferName);
     };
 
 

@@ -72,7 +72,7 @@ It is assumed, that you used FINN and now want to build the generated driver. Co
 Building the driver is as easy as running:
 
 ```bash
-./buildDependencies.sh
+git submodule update --init --recursive
 mkdir build && cd build
 cmake -DCMAKE_BUILD_TYPE=Release -DFINN_ENABLE_SANITIZERS=OFF -DFINN_HEADER_LOCATION=../AcceleratorDatatypes.h -DFINN_USE_HOST_MEM=OFF ..
 make -j $(nprocs)

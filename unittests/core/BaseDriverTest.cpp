@@ -13,12 +13,12 @@
 
 #include <FINNCppDriver/config/FinnDriverUsedDatatypes.h>
 #include <FINNCppDriver/utils/FinnUtils.h>
-#include <FINNCppDriver/utils/Logger.h>
 #include <FINNCppDriver/utils/Types.h>
 
 #include <FINNCppDriver/core/BaseDriver.hpp>
 #include <FINNCppDriver/core/DeviceBuffer/SyncDeviceBuffers.hpp>
 #include <FINNCppDriver/utils/FinnDatatypes.hpp>
+#include <FINNCppDriver/utils/Logger.hpp>
 #include <FINNCppDriver/utils/join.hpp>
 
 #include "gtest/gtest.h"

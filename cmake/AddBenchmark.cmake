@@ -14,7 +14,6 @@ function(add_benchmark benchmark_name)
   target_link_libraries(${benchmark}
     PUBLIC
     finnc_options
-    finnc_utils
     finnc_core_test
     xrt_mock
     benchmark::benchmark

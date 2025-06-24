@@ -31,12 +31,12 @@
 #include <FINNCppDriver/utils/ConfigurationStructs.h>  // for Config
 #include <FINNCppDriver/utils/DoNotOptimize.h>         // for DoNotOptimize
 #include <FINNCppDriver/utils/FinnUtils.h>             // for logAndError
-#include <FINNCppDriver/utils/Logger.h>                // for FINN_LOG, ...
 #include <FINNCppDriver/utils/Types.h>                 // for shape_t
 
 #include <FINNCppDriver/core/BaseDriver.hpp>      // IWYU pragma: keep
 #include <FINNCppDriver/utils/DataPacking.hpp>    // for AutoReturnType
 #include <FINNCppDriver/utils/DynamicMdSpan.hpp>  // for DynamicMdSpan
+#include <FINNCppDriver/utils/Logger.hpp>         // for FINN_LOG, ...
 #include <ext/alloc_traits.h>                     // for __alloc_tr...
 #include <popl.hpp>                               // for program options
 #include <xtensor/xadapt.hpp>                     // for adapt

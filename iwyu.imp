@@ -1,5 +1,5 @@
 [
-{ include: ["@<boost/log/.*>", "private", "<FINNCppDriver/utils/Logger.h>", "public"] },
+{ include: ["@<plog/.*>", "private", "<FINNCppDriver/utils/Logger.hpp>", "public"] },
 { include: [ "<boost/log/core/record.hpp>", "private", "<boost/log/trivial.hpp>", "private" ] },
 { include: [ "<boost/log/sources/record_ostream.hpp>", "private", "<boost/log/trivial.hpp>", "private" ] },
 { include: [ "<boost/log/sinks/basic_sink_frontend.hpp>", "private", "<boost/log/trivial.hpp>", "private" ]},

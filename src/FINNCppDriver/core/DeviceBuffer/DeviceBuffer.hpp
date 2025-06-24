@@ -14,10 +14,10 @@
 #define DEVICEBUFFER
 
 #include <FINNCppDriver/config/CompilationOptions.h>
-#include <FINNCppDriver/utils/Logger.h>
 #include <FINNCppDriver/utils/Types.h>
 
 #include <FINNCppDriver/utils/FinnDatatypes.hpp>
+#include <FINNCppDriver/utils/Logger.hpp>
 #include <chrono>
 #include <future>
 #include <span>

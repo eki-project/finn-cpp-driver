@@ -14,7 +14,7 @@ function(add_integrationtest integrationtest_name)
 
   target_include_directories(${integrationtest} SYSTEM PRIVATE ${XRT_INCLUDE_DIRS} ${FINN_SRC_DIR})
   target_link_directories(${integrationtest} PRIVATE ${XRT_LIB_CORE_LOCATION} ${XRT_LIB_OCL_LOCATION})
-  target_link_libraries(${integrationtest} PRIVATE gtest finnc_core finnc_options Threads::Threads OpenCL xrt_coreutil uuid finnc_utils nlohmann_json::nlohmann_json OpenMP::OpenMP_CXX)
+  target_link_libraries(${integrationtest} PRIVATE gtest finnc_core finnc_options Threads::Threads OpenCL xrt_coreutil uuid nlohmann_json::nlohmann_json OpenMP::OpenMP_CXX)
 
 
 endfunction()

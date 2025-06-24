@@ -2,10 +2,10 @@
  * @file Logger.h
  * @author Linus Jungemann (linus.jungemann@uni-paderborn.de) and others
  * @brief Provides a easy to use logger for the FINN driver
- * @version 0.1
+ * @version 0.2
  * @date 2023-10-31
  *
- * @copyright Copyright (c) 2023
+ * @copyright Copyright (c) 2023-2025
  * @license All rights reserved. This program and the accompanying materials are made available under the terms of the MIT license.
  *
  */
@@ -13,6 +13,10 @@
 #ifndef LOGGING_H
 #define LOGGING_H
 
+#include <plog/Appenders/ColorConsoleAppender.h>
+#include <plog/Appenders/RollingFileAppender.h>
+#include <plog/Formatters/TxtFormatter.h>
+#include <plog/Init.h>
 #include <plog/Log.h>
 
 #include <string>  // for allocator, string
@@ -26,8 +30,9 @@ namespace loglevel = plog;
 // NOLINTBEGIN
 #define FINN_LOG(SEV) PLOG(SEV)
 #ifdef NDEBUG
-extern class [[maybe_unused]] DevNull {
-} dev_null;
+class [[maybe_unused]] DevNull {};
+
+static DevNull dev_null;
 
 template<typename T>
 DevNull& operator<<(DevNull& dest, [[maybe_unused]] T) {
@@ -53,7 +58,7 @@ DevNull& operator<<(DevNull& dest, [[maybe_unused]] T) {
  */
 class Logger {
      public:
-    void static initLogger(bool console = false);
+    void static initLogger(bool console = false) { static Logger log(console); }
 
     /**
      * @brief Construct a new Logger object (Deleted)
@@ -84,7 +89,15 @@ class Logger {
     Logger(Logger&&) = default;
 
      private:
-    Logger(bool console = false);
+    Logger(bool console = false) {
+        static plog::RollingFileAppender<plog::TxtFormatter> fileAppender("finnLog.log", 10 * 1024 * 1024, 3);
+        static plog::ColorConsoleAppender<plog::TxtFormatter> consoleAppender;
+        if (console) {
+            plog::init(plog::debug, &fileAppender).addAppender(&consoleAppender);
+        } else {
+            plog::init(plog::debug, &fileAppender);
+        }
+    }
     const std::string logFormat = "[%TimeStamp%] (%LineID%) [%Severity%]: %Message%";
 };
 

@@ -10,11 +10,10 @@
  *
  */
 
-#include <FINNCppDriver/utils/Logger.h>
-
 #include <FINNCppDriver/core/DeviceBuffer/AsyncDeviceBuffers.hpp>
 #include <FINNCppDriver/core/DeviceBuffer/SyncDeviceBuffers.hpp>
 #include <FINNCppDriver/utils/FinnDatatypes.hpp>
+#include <FINNCppDriver/utils/Logger.hpp>
 #include <memory>
 #include <random>
 #include <span>

@@ -1,7 +1,6 @@
 #include "xrt_kernel.h"
 
-#include <FINNCppDriver/utils/Logger.h>
-
+#include <FINNCppDriver/utils/Logger.hpp>
 #include <iostream>
 
 #include "../ert.h"

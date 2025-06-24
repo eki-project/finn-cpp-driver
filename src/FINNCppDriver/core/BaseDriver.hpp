@@ -15,12 +15,12 @@
 
 #include <FINNCppDriver/utils/ConfigurationStructs.h>
 #include <FINNCppDriver/utils/FinnUtils.h>
-#include <FINNCppDriver/utils/Logger.h>
 #include <FINNCppDriver/utils/Types.h>
 
 #include <FINNCppDriver/utils/DataPacking.hpp>
 #include <FINNCppDriver/utils/DynamicMdSpan.hpp>
 #include <FINNCppDriver/utils/FinnDatatypes.hpp>
+#include <FINNCppDriver/utils/Logger.hpp>  // for FINN_LOG, loglevel, ...
 #include <FINNCppDriver/utils/join.hpp>
 #include <bitset>
 #include <cinttypes>  // for uint8_t

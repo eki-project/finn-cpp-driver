@@ -15,12 +15,12 @@
 #include <FINNCppDriver/core/DeviceHandler.h>          // for DeviceHandler, UncheckedStore, ...
 #include <FINNCppDriver/utils/ConfigurationStructs.h>  // IWYU pragma: keep
 #include <FINNCppDriver/utils/FinnUtils.h>             // for logAndError, unreachable
-#include <FINNCppDriver/utils/Logger.h>                // for operator<<, DevNull
 
-#include <algorithm>  // for count_if, find_if, tra...
-#include <cstddef>    // for size_t
-#include <iterator>   // for back_insert_iterator
-#include <stdexcept>  // for runtime_error
+#include <FINNCppDriver/utils/Logger.hpp>  // for operator<<, DevNull
+#include <algorithm>                       // for count_if, find_if, tra...
+#include <cstddef>                         // for size_t
+#include <iterator>                        // for back_insert_iterator
+#include <stdexcept>                       // for runtime_error
 
 namespace Finn {
     std::string Accelerator::loggerPrefix() { return "[Accelerator] "; }

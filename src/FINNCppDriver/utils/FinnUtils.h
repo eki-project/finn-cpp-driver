@@ -13,9 +13,9 @@
 #ifndef FINN_UTILS_H
 #define FINN_UTILS_H
 
-#include <FINNCppDriver/utils/Logger.h>
 #include <FINNCppDriver/utils/Types.h>
 
+#include <FINNCppDriver/utils/Logger.hpp>  // for FINN_LOG, loglevel, ...
 #include <algorithm>
 #include <array>
 #include <bit>

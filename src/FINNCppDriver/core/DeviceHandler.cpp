@@ -11,12 +11,12 @@
  */
 
 #include <FINNCppDriver/core/DeviceHandler.h>
-#include <FINNCppDriver/utils/Logger.h>
 #include <FINNCppDriver/utils/Types.h>
 
 #include <FINNCppDriver/core/DeviceBuffer/AsyncDeviceBuffers.hpp>
 #include <FINNCppDriver/core/DeviceBuffer/DeviceBuffer.hpp>
 #include <FINNCppDriver/core/DeviceBuffer/SyncDeviceBuffers.hpp>
+#include <FINNCppDriver/utils/Logger.hpp>
 #include <algorithm>  // for copy
 #include <cerrno>
 #include <chrono>

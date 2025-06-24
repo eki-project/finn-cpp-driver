@@ -21,8 +21,9 @@
 namespace Finn {
     template<typename T>
     class SyncDeviceInputBuffer : public DeviceInputBuffer<T> {
-    private:
+         private:
         friend class DeviceInputBuffer<T>;
+
          public:
         /**
          * @brief Construct a new Sync Device Input Buffer object

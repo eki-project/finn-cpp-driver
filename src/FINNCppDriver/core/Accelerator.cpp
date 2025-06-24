@@ -118,30 +118,30 @@ namespace Finn {
     }
 
     size_t Accelerator::getSizeInBytes(unsigned int deviceIndex, const std::string& bufferName) {
-    if (containsDevice(deviceIndex)) {
-        return getDeviceHandler(deviceIndex).getSizeInBytes(bufferName);
+        if (containsDevice(deviceIndex)) {
+            return getDeviceHandler(deviceIndex).getSizeInBytes(bufferName);
+        }
+        return 0;
     }
-    return 0;
-}
 
     size_t Accelerator::getFeatureMapSize(unsigned int deviceIndex, const std::string& bufferName) {
-    if (containsDevice(deviceIndex)) {
-        return getDeviceHandler(deviceIndex).getFeatureMapSize(bufferName);
+        if (containsDevice(deviceIndex)) {
+            return getDeviceHandler(deviceIndex).getFeatureMapSize(bufferName);
+        }
+        return 0;
     }
-    return 0;
-}
 
     size_t Accelerator::getBatchSize(unsigned int deviceIndex, const std::string& bufferName) {
-    if (containsDevice(deviceIndex)) {
-        return getDeviceHandler(deviceIndex).getBatchSize(bufferName);
+        if (containsDevice(deviceIndex)) {
+            return getDeviceHandler(deviceIndex).getBatchSize(bufferName);
+        }
+        return 0;
     }
-    return 0;
-}
 
     size_t Accelerator::getTotalDataSize(unsigned int deviceIndex, const std::string& bufferName) {
-    if (containsDevice(deviceIndex)) {
-        return getDeviceHandler(deviceIndex).getTotalDataSize(bufferName);
+        if (containsDevice(deviceIndex)) {
+            return getDeviceHandler(deviceIndex).getTotalDataSize(bufferName);
+        }
+        return 0;
     }
-    return 0;
-}
 }  // namespace Finn

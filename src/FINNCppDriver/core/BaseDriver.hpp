@@ -114,7 +114,7 @@ namespace Finn {
          * @param batchSize
          */
         BaseDriver(const std::filesystem::path& configPath, uint inputDeviceIndex, const std::string& inputKernelName, uint outputDeviceIndex, const std::string& outputKernelName, uint batchSize)
-            : configuration(createConfigFromPath(configPath)){
+            : configuration(createConfigFromPath(configPath)) {
             initializeBaseDriver(batchSize);
         }
 
@@ -129,10 +129,7 @@ namespace Finn {
          * @param outputKernelName
          * @param batchSize
          */
-        BaseDriver(const Config& pConfig, uint inputDeviceIndex, const std::string& inputKernelName, uint outputDeviceIndex, const std::string& outputKernelName, uint batchSize)
-            : configuration(pConfig) {
-            initializeBaseDriver(batchSize);
-        }
+        BaseDriver(const Config& pConfig, uint inputDeviceIndex, const std::string& inputKernelName, uint outputDeviceIndex, const std::string& outputKernelName, uint batchSize) : configuration(pConfig) { initializeBaseDriver(batchSize); }
 
         /**
          * @brief Construct a new Base Driver object
@@ -231,21 +228,13 @@ namespace Finn {
          */
         std::shared_ptr<DeviceInputBuffer<uint8_t>> getInputBuffer(uint deviceIndex, const std::string& bufferName) { return getDeviceHandler(deviceIndex).getInputBuffer(bufferName); }
 
-        size_t getSizeInBytes(unsigned int deviceIndex, const std::string& bufferName){
-            return accelerator.getSizeInBytes(deviceIndex, bufferName);
-        }
+        size_t getSizeInBytes(unsigned int deviceIndex, const std::string& bufferName) { return accelerator.getSizeInBytes(deviceIndex, bufferName); }
 
-        size_t getFeatureMapSize(unsigned int deviceIndex, const std::string& bufferName){
-            return accelerator.getFeatureMapSize(deviceIndex, bufferName);
-        }
+        size_t getFeatureMapSize(unsigned int deviceIndex, const std::string& bufferName) { return accelerator.getFeatureMapSize(deviceIndex, bufferName); }
 
-        size_t getBatchSize(unsigned int deviceIndex, const std::string& bufferName){
-            return accelerator.getBatchSize(deviceIndex, bufferName);
-        }
+        size_t getBatchSize(unsigned int deviceIndex, const std::string& bufferName) { return accelerator.getBatchSize(deviceIndex, bufferName); }
 
-        size_t getTotalDataSize(unsigned int deviceIndex, const std::string& bufferName){
-            return accelerator.getTotalDataSize(deviceIndex, bufferName);
-        }
+        size_t getTotalDataSize(unsigned int deviceIndex, const std::string& bufferName) { return accelerator.getTotalDataSize(deviceIndex, bufferName); }
 
         /**
          * @brief Store input into the driver for asynchronous inference

@@ -16,27 +16,27 @@
 #ifndef SPSC_QUEUE_HPP
 #define SPSC_QUEUE_HPP
 
-#include <atomic>
 #include <array>
+#include <atomic>
 #include <bit>
 #include <concepts>
-#include <mutex>
 #include <condition_variable>
-#include <new>
 #include <cstdint>
-#include <type_traits>
-#include <vector>
+#include <cstring>
+#include <mutex>
+#include <new>
 #include <stop_token>
 #include <thread>
-#include <cstring>
+#include <type_traits>
+#include <vector>
 
 using namespace std::literals::chrono_literals;
 
- // For CPU-specific optimizations
+// For CPU-specific optimizations
 #if defined(__x86_64__) || defined(_M_X64)
-#include <immintrin.h>
+    #include <immintrin.h>
 #elif defined(__aarch64__)
-#include <arm_neon.h>
+    #include <arm_neon.h>
 #endif
 
 /**
@@ -68,17 +68,17 @@ namespace detail {
      */
     inline SIMDSupport detect_simd_support() {
 #if defined(__x86_64__) || defined(_M_X64)
-#if defined(__AVX512F__)
+    #if defined(__AVX512F__)
         return SIMDSupport::AVX512;
-#elif defined(__AVX2__)
+    #elif defined(__AVX2__)
         return SIMDSupport::AVX2;
-#elif defined(__AVX__)
+    #elif defined(__AVX__)
         return SIMDSupport::AVX;
-#elif defined(__SSE2__)
+    #elif defined(__SSE2__)
         return SIMDSupport::SSE2;
-#else
+    #else
         return SIMDSupport::None;
-#endif
+    #endif
 #elif defined(__aarch64__)
         return SIMDSupport::NEON;
 #else
@@ -99,9 +99,7 @@ namespace detail {
      */
     template<typename T>
     inline void simd_memcpy(T* __restrict dst, const T* __restrict src, size_t count) {
-        static constexpr bool is_suitable_for_simd =
-            std::is_trivially_copyable_v<T> &&
-            (sizeof(T) == 1 || sizeof(T) == 2 || sizeof(T) == 4 || sizeof(T) == 8);
+        static constexpr bool is_suitable_for_simd = std::is_trivially_copyable_v<T> && (sizeof(T) == 1 || sizeof(T) == 2 || sizeof(T) == 4 || sizeof(T) == 8);
 
         // Convert to byte pointers for SIMD operations
         char* d = reinterpret_cast<char*>(dst);
@@ -118,24 +116,20 @@ namespace detail {
 
 #if defined(__x86_64__) || defined(_M_X64)
         // Check if both pointers are aligned for SIMD
-        const bool is_aligned = (reinterpret_cast<uintptr_t>(d) % 32 == 0) &&
-            (reinterpret_cast<uintptr_t>(s) % 32 == 0);
+        const bool is_aligned = (reinterpret_cast<uintptr_t>(d) % 32 == 0) && (reinterpret_cast<uintptr_t>(s) % 32 == 0);
 
-#if defined(__AVX512F__)
+    #if defined(__AVX512F__)
         if (simd_level >= SIMDSupport::AVX512 && bytes >= 64) {
             // AVX-512 implementation (64-byte blocks)
             size_t i = 0;
 
             // Handle 64-byte blocks with AVX-512
             for (; i + 64 <= bytes; i += 64) {
-                __m512i data = is_aligned ?
-                    _mm512_load_si512(reinterpret_cast<const __m512i*>(s + i)) :
-                    _mm512_loadu_si512(reinterpret_cast<const __m512i*>(s + i));
+                __m512i data = is_aligned ? _mm512_load_si512(reinterpret_cast<const __m512i*>(s + i)) : _mm512_loadu_si512(reinterpret_cast<const __m512i*>(s + i));
 
                 if (is_aligned) {
                     _mm512_store_si512(reinterpret_cast<__m512i*>(d + i), data);
-                }
-                else {
+                } else {
                     _mm512_storeu_si512(reinterpret_cast<__m512i*>(d + i), data);
                 }
             }
@@ -146,23 +140,20 @@ namespace detail {
             }
             return;
         }
-#endif
+    #endif
 
-#if defined(__AVX2__) || defined(__AVX__)
+    #if defined(__AVX2__) || defined(__AVX__)
         if (simd_level >= SIMDSupport::AVX && bytes >= 32) {
             // AVX/AVX2 implementation (32-byte blocks)
             size_t i = 0;
 
             // Handle 32-byte blocks with AVX
             for (; i + 32 <= bytes; i += 32) {
-                __m256i data = is_aligned ?
-                    _mm256_load_si256(reinterpret_cast<const __m256i*>(s + i)) :
-                    _mm256_loadu_si256(reinterpret_cast<const __m256i*>(s + i));
+                __m256i data = is_aligned ? _mm256_load_si256(reinterpret_cast<const __m256i*>(s + i)) : _mm256_loadu_si256(reinterpret_cast<const __m256i*>(s + i));
 
                 if (is_aligned) {
                     _mm256_store_si256(reinterpret_cast<__m256i*>(d + i), data);
-                }
-                else {
+                } else {
                     _mm256_storeu_si256(reinterpret_cast<__m256i*>(d + i), data);
                 }
             }
@@ -173,23 +164,20 @@ namespace detail {
             }
             return;
         }
-#endif
+    #endif
 
-#if defined(__SSE2__)
+    #if defined(__SSE2__)
         if (simd_level >= SIMDSupport::SSE2 && bytes >= 16) {
             // SSE2 implementation (16-byte blocks)
             size_t i = 0;
 
             // Handle 16-byte blocks with SSE2
             for (; i + 16 <= bytes; i += 16) {
-                __m128i data = is_aligned ?
-                    _mm_load_si128(reinterpret_cast<const __m128i*>(s + i)) :
-                    _mm_loadu_si128(reinterpret_cast<const __m128i*>(s + i));
+                __m128i data = is_aligned ? _mm_load_si128(reinterpret_cast<const __m128i*>(s + i)) : _mm_loadu_si128(reinterpret_cast<const __m128i*>(s + i));
 
                 if (is_aligned) {
                     _mm_store_si128(reinterpret_cast<__m128i*>(d + i), data);
-                }
-                else {
+                } else {
                     _mm_storeu_si128(reinterpret_cast<__m128i*>(d + i), data);
                 }
             }
@@ -200,7 +188,7 @@ namespace detail {
             }
             return;
         }
-#endif
+    #endif
 
 #elif defined(__aarch64__)
         if (simd_level == SIMDSupport::NEON && bytes >= 16) {
@@ -243,11 +231,7 @@ namespace detail {
      * @tparam T Type to check
      */
     template<typename T>
-    struct is_smart_pointer<T, std::void_t<
-        decltype(std::declval<T>().operator*()),
-        decltype(std::declval<T>().operator->()),
-        decltype(std::declval<T>().get())
-        >> : std::true_type {};
+    struct is_smart_pointer<T, std::void_t<decltype(std::declval<T>().operator*()), decltype(std::declval<T>().operator->()), decltype(std::declval<T>().get())>> : std::true_type {};
 
     /**
      * @brief Specialization for std::weak_ptr
@@ -283,11 +267,7 @@ namespace detail {
      * @tparam T Type to check
      */
     template<typename T>
-    struct is_container_like<T, std::void_t<
-        decltype(std::declval<T>().begin()),
-        decltype(std::declval<T>().end()),
-        decltype(std::declval<T>().size())
-        >> : std::true_type {};
+    struct is_container_like<T, std::void_t<decltype(std::declval<T>().begin()), decltype(std::declval<T>().end()), decltype(std::declval<T>().size())>> : std::true_type {};
 
     /**
      * @brief Helper variable template for is_container_like
@@ -306,10 +286,7 @@ namespace detail {
      * @tparam T Type to check
      */
     template<typename T>
-    inline constexpr bool has_custom_resource_management_v =
-        !std::is_trivially_destructible_v<T> &&
-        (!std::is_trivially_move_constructible_v<T> ||
-            !std::is_trivially_move_assignable_v<T>);
+    inline constexpr bool has_custom_resource_management_v = !std::is_trivially_destructible_v<T> && (!std::is_trivially_move_constructible_v<T> || !std::is_trivially_move_assignable_v<T>);
 
     /**
      * @brief Type trait to detect types with problematic move semantics
@@ -323,10 +300,8 @@ namespace detail {
          *
          * These types are known to have issues with move-then-destroy patterns
          */
-        static constexpr bool explicit_list =
-            std::is_same_v<T, std::string> ||
-            std::is_same_v<T, std::vector<bool>> ||  // vector<bool> is special
-            false; // Extensible for other specific cases
+        static constexpr bool explicit_list = std::is_same_v<T, std::string> || std::is_same_v<T, std::vector<bool>> ||  // vector<bool> is special
+                                              false;                                                                     // Extensible for other specific cases
 
         /**
          * @brief Heuristic detection for potentially problematic types
@@ -334,10 +309,7 @@ namespace detail {
          * Uses type traits to identify types that might have issues
          * when moved from and then destroyed
          */
-        static constexpr bool heuristic_detection =
-            has_custom_resource_management_v<T> &&
-            is_container_like_v<T> &&
-            !std::is_trivially_copyable_v<T>;
+        static constexpr bool heuristic_detection = has_custom_resource_management_v<T> && is_container_like_v<T> && !std::is_trivially_copyable_v<T>;
 
         /**
          * @brief Combined detection result
@@ -351,8 +323,7 @@ namespace detail {
      * @tparam T Type to check
      */
     template<typename T>
-    inline constexpr bool has_problematic_move_semantics_v =
-        has_problematic_move_semantics<T>::value;
+    inline constexpr bool has_problematic_move_semantics_v = has_problematic_move_semantics<T>::value;
 
     /**
      * @brief Type trait to detect types that are unsafe to destroy after moving from
@@ -360,12 +331,7 @@ namespace detail {
      * @tparam T Type to check
      */
     template<typename T>
-    struct unsafe_to_destroy_after_move : std::bool_constant<
-        std::is_pointer_v<T> ||
-        is_smart_pointer_v<T> ||
-        has_problematic_move_semantics_v<T>
-    > {
-    };
+    struct unsafe_to_destroy_after_move : std::bool_constant<std::is_pointer_v<T> || is_smart_pointer_v<T> || has_problematic_move_semantics_v<T>> {};
 
     /**
      * @brief Helper variable template for unsafe_to_destroy_after_move
@@ -373,8 +339,7 @@ namespace detail {
      * @tparam T Type to check
      */
     template<typename T>
-    inline constexpr bool unsafe_to_destroy_after_move_v =
-        unsafe_to_destroy_after_move<T>::value;
+    inline constexpr bool unsafe_to_destroy_after_move_v = unsafe_to_destroy_after_move<T>::value;
 
     /**
      * @brief Prefetches memory for read access
@@ -431,11 +396,11 @@ namespace detail {
      * and power consumption during spin-waiting.
      */
     class exponential_backoff {
-    private:
+         private:
         int current_delay = 1;  ///< Current delay count
         const int max_delay;    ///< Maximum delay limit
 
-    public:
+         public:
         /**
          * @brief Constructs an exponential backoff object
          *
@@ -458,9 +423,7 @@ namespace detail {
         /**
          * @brief Resets the delay back to initial value
          */
-        void reset() noexcept {
-            current_delay = 1;
-        }
+        void reset() noexcept { current_delay = 1; }
     };
 
     /**
@@ -473,17 +436,17 @@ namespace detail {
      * @tparam ActualCapacity Actual capacity of the queue (power of 2)
      * @tparam IsTrivial Whether T is a trivially copyable type
      */
-    template <typename T, size_t ActualCapacity, bool IsTrivial>
+    template<typename T, size_t ActualCapacity, bool IsTrivial>
     class SPSCQueueBase {
-    protected:
-        static constexpr size_t CACHE_LINE_SIZE = 64;  ///< Size of a cache line in bytes
+         protected:
+        static constexpr size_t CACHE_LINE_SIZE = 64;             ///< Size of a cache line in bytes
         static constexpr size_t INDEX_MASK = ActualCapacity - 1;  ///< Mask for index wrapping
 
         /**
          * @brief Cache-aligned atomic size_t with padding to prevent false sharing
          */
         struct alignas(CACHE_LINE_SIZE) AlignedAtomicSize {
-            std::atomic<size_t> value{ 0 };  ///< The atomic value
+            std::atomic<size_t> value{0};  ///< The atomic value
             /// Padding to fill a complete cache line
             char padding[CACHE_LINE_SIZE - sizeof(std::atomic<size_t>)];
 
@@ -493,9 +456,7 @@ namespace detail {
              * @param order Memory order for the operation
              * @return Current value
              */
-            size_t load(std::memory_order order = std::memory_order_seq_cst) const noexcept {
-                return value.load(order);
-            }
+            size_t load(std::memory_order order = std::memory_order_seq_cst) const noexcept { return value.load(order); }
 
             /**
              * @brief Stores a new value
@@ -503,29 +464,27 @@ namespace detail {
              * @param desired Value to store
              * @param order Memory order for the operation
              */
-            void store(size_t desired, std::memory_order order = std::memory_order_seq_cst) noexcept {
-                value.store(desired, order);
-            }
+            void store(size_t desired, std::memory_order order = std::memory_order_seq_cst) noexcept { value.store(desired, order); }
         };
 
         // Cache-aligned elements to prevent false sharing
         alignas(CACHE_LINE_SIZE) std::array<T, ActualCapacity> buffer_;  ///< Element storage buffer
 
         alignas(CACHE_LINE_SIZE) AlignedAtomicSize head_;  ///< Consumer position
-        char head_padding_[CACHE_LINE_SIZE];  ///< Extra padding between head and tail
+        char head_padding_[CACHE_LINE_SIZE];               ///< Extra padding between head and tail
 
         alignas(CACHE_LINE_SIZE) AlignedAtomicSize tail_;  ///< Producer position
-        char tail_padding_[CACHE_LINE_SIZE];  ///< Extra padding after tail
+        char tail_padding_[CACHE_LINE_SIZE];               ///< Extra padding after tail
 
         /**
          * @brief State for blocking operations
          */
         alignas(CACHE_LINE_SIZE) struct BlockingState {
-            mutable std::mutex mutex_;  ///< Mutex for blocking operations
-            std::condition_variable not_full_;  ///< CV for space available notifications
+            mutable std::mutex mutex_;           ///< Mutex for blocking operations
+            std::condition_variable not_full_;   ///< CV for space available notifications
             std::condition_variable not_empty_;  ///< CV for item available notifications
-            std::atomic<bool> is_active_{ true };  ///< Whether the queue is active
-            char padding[CACHE_LINE_SIZE];  ///< Padding to fill a complete cache line
+            std::atomic<bool> is_active_{true};  ///< Whether the queue is active
+            char padding[CACHE_LINE_SIZE];       ///< Padding to fill a complete cache line
         } blocking_;
 
         static constexpr int SPIN_ATTEMPTS = 1000;  ///< Number of spin attempts before blocking
@@ -553,7 +512,7 @@ namespace detail {
             return ((head - tail - 1) & INDEX_MASK);
         }
     };
-}
+}  // namespace detail
 
 /**
  * @brief Single-Producer Single-Consumer lock-free queue
@@ -570,26 +529,24 @@ namespace detail {
  * @tparam T Element type (must be movable)
  * @tparam RequestedCapacity Desired minimum capacity
  */
-template <typename T, size_t RequestedCapacity>
+template<typename T, size_t RequestedCapacity>
     requires std::movable<T>
-class SPSCQueue : private detail::SPSCQueueBase<T, std::bit_ceil(RequestedCapacity),
-    std::is_trivially_copyable_v<T>> {
-private:
+class SPSCQueue : private detail::SPSCQueueBase<T, std::bit_ceil(RequestedCapacity), std::is_trivially_copyable_v<T>> {
+     private:
     // Import base members into this scope
-    using Base = detail::SPSCQueueBase<T, std::bit_ceil(RequestedCapacity),
-        std::is_trivially_copyable_v<T>>;
+    using Base = detail::SPSCQueueBase<T, std::bit_ceil(RequestedCapacity), std::is_trivially_copyable_v<T>>;
+    using Base::blocking_;
     using Base::buffer_;
     using Base::head_;
-    using Base::tail_;
-    using Base::blocking_;
     using Base::INDEX_MASK;
     using Base::SPIN_ATTEMPTS;
+    using Base::tail_;
     using Base::YIELD_ATTEMPTS;
 
     /// Actual capacity rounded up to the next power of 2
     static constexpr size_t ActualCapacity = std::bit_ceil(RequestedCapacity);
 
-public:
+     public:
     /**
      * @brief Constructs an empty queue
      *
@@ -597,9 +554,7 @@ public:
      * The actual capacity will be rounded up to the next power of 2,
      * with one slot reserved for implementation purposes.
      */
-    constexpr SPSCQueue() noexcept {
-        static_assert(ActualCapacity >= 2, "Queue capacity must be at least 2");
-    }
+    constexpr SPSCQueue() noexcept { static_assert(ActualCapacity >= 2, "Queue capacity must be at least 2"); }
 
     /**
      * @brief Destructor
@@ -610,7 +565,7 @@ public:
     ~SPSCQueue() {
         // Wake up any waiting threads and destroy remaining elements
         blocking_.is_active_.store(false, std::memory_order_release);
-        blocking_.not_empty_.notify_all(); // Notify all instead of just one
+        blocking_.not_empty_.notify_all();  // Notify all instead of just one
         blocking_.not_full_.notify_all();
 
         // Clean up any remaining elements if not trivially destructible
@@ -651,8 +606,7 @@ public:
         // For trivially copyable small types, direct assignment is faster than placement new
         if constexpr (std::is_trivially_copyable_v<T> && sizeof(T) <= 16) {
             buffer_[current_tail] = item;
-        }
-        else {
+        } else {
             new (&buffer_[current_tail]) T(item);
         }
 
@@ -713,9 +667,7 @@ public:
 
         // Slow path with blocking
         std::unique_lock<std::mutex> lock(blocking_.mutex_);
-        blocking_.not_full_.wait(lock, [this, &item] {
-            return try_enqueue(item) || !blocking_.is_active_.load(std::memory_order_acquire);
-            });
+        blocking_.not_full_.wait(lock, [this, &item] { return try_enqueue(item) || !blocking_.is_active_.load(std::memory_order_acquire); });
     }
 
     /**
@@ -733,9 +685,7 @@ public:
 
         // Slow path with blocking
         std::unique_lock<std::mutex> lock(blocking_.mutex_);
-        blocking_.not_full_.wait(lock, [this, &item] {
-            return try_enqueue(std::move(item)) || !blocking_.is_active_.load(std::memory_order_acquire);
-            });
+        blocking_.not_full_.wait(lock, [this, &item] { return try_enqueue(std::move(item)) || !blocking_.is_active_.load(std::memory_order_acquire); });
     }
 
     /**
@@ -758,13 +708,10 @@ public:
         std::unique_lock<std::mutex> lock(blocking_.mutex_);
 
         // Wait until space available, queue inactive, or stop requested
-        std::condition_variable_any{}.wait(lock, stop_token, [this, &item] {
-            return try_enqueue(item) || !blocking_.is_active_.load(std::memory_order_acquire);
-            });
+        std::condition_variable_any{}.wait(lock, stop_token, [this, &item] { return try_enqueue(item) || !blocking_.is_active_.load(std::memory_order_acquire); });
 
         // Check if enqueue succeeded or stopped
-        return !stop_token.stop_requested() &&
-            blocking_.is_active_.load(std::memory_order_acquire);
+        return !stop_token.stop_requested() && blocking_.is_active_.load(std::memory_order_acquire);
     }
 
     /**
@@ -786,13 +733,10 @@ public:
 
         // Slow path with blocking and cancellation support
         std::unique_lock<std::mutex> lock(blocking_.mutex_);
-        blocking_.not_full_.wait(lock, [this, &item] {
-            return try_enqueue(std::move(item)) || !blocking_.is_active_.load(std::memory_order_acquire);
-            });
+        blocking_.not_full_.wait(lock, [this, &item] { return try_enqueue(std::move(item)) || !blocking_.is_active_.load(std::memory_order_acquire); });
 
         // Check if enqueue succeeded or stopped
-        return !stop_token.stop_requested() &&
-            blocking_.is_active_.load(std::memory_order_acquire);
+        return !stop_token.stop_requested() && blocking_.is_active_.load(std::memory_order_acquire);
     }
 
     /**
@@ -807,7 +751,8 @@ public:
      */
     template<typename InputIt>
     size_t try_enqueue_bulk(InputIt first, size_t count) noexcept {
-        if (count == 0) return 0;
+        if (count == 0)
+            return 0;
 
         // Fast path with relaxed ordering first
         const size_t current_tail = tail_.load(std::memory_order_relaxed);
@@ -817,7 +762,8 @@ public:
         const size_t capacity = ActualCapacity;
         const size_t available_space = (head + capacity - current_tail - 1) & INDEX_MASK;
 
-        if (available_space == 0) return 0;
+        if (available_space == 0)
+            return 0;
 
         // Calculate actual amount to copy
         const size_t to_copy = std::min(available_space, count);
@@ -829,8 +775,7 @@ public:
 
         // Use the fastest copy method based on type
         if constexpr (std::is_trivially_copyable_v<T>) {
-            if constexpr (std::is_pointer_v<InputIt> &&
-                std::is_same_v<std::remove_pointer_t<InputIt>, T>) {
+            if constexpr (std::is_pointer_v<InputIt> && std::is_same_v<std::remove_pointer_t<InputIt>, T>) {
                 // Pointer to same type - use SIMD-optimized memory transfer
                 // Use SIMD for first chunk
                 detail::simd_memcpy(&buffer_[current_tail], first, first_chunk);
@@ -839,8 +784,7 @@ public:
                 if (second_chunk > 0) {
                     detail::simd_memcpy(&buffer_[0], first + first_chunk, second_chunk);
                 }
-            }
-            else {
+            } else {
                 // Process first chunk
                 auto it = first;
                 for (size_t i = 0; i < first_chunk; i++) {
@@ -852,8 +796,7 @@ public:
                     buffer_[i] = *it++;
                 }
             }
-        }
-        else {
+        } else {
             // Non-trivially copyable type - use placement new with iterator
             auto it = first;
 
@@ -891,7 +834,8 @@ public:
      */
     template<typename InputIt>
     size_t enqueue_bulk(InputIt first, size_t count) {
-        if (count == 0) return 0;
+        if (count == 0)
+            return 0;
 
         // Try non-blocking fast path first
         size_t items_enqueued = try_enqueue_bulk(first, count);
@@ -924,9 +868,7 @@ public:
 
         while (items_enqueued < count && blocking_.is_active_.load(std::memory_order_acquire)) {
             // Wait until space is available
-            blocking_.not_full_.wait(lock, [this] {
-                return !is_full() || !blocking_.is_active_.load(std::memory_order_acquire);
-                });
+            blocking_.not_full_.wait(lock, [this] { return !is_full() || !blocking_.is_active_.load(std::memory_order_acquire); });
 
             if (!blocking_.is_active_.load(std::memory_order_acquire)) {
                 break;  // Queue was shut down
@@ -968,9 +910,9 @@ public:
      * @return Number of elements successfully enqueued
      */
     template<typename InputIt, typename Rep, typename Period>
-    size_t enqueue_bulk_for(InputIt first, size_t count,
-        const std::chrono::duration<Rep, Period>& timeout) {
-        if (count == 0) return 0;
+    size_t enqueue_bulk_for(InputIt first, size_t count, const std::chrono::duration<Rep, Period>& timeout) {
+        if (count == 0)
+            return 0;
 
         // Track start time for timeout
         auto start_time = std::chrono::steady_clock::now();
@@ -1021,9 +963,7 @@ public:
 
         do {
             // Wait until space is available or timeout
-            if (!blocking_.not_full_.wait_until(lock, end_time, [this] {
-                return !is_full() || !blocking_.is_active_.load(std::memory_order_acquire);
-                })) {
+            if (!blocking_.not_full_.wait_until(lock, end_time, [this] { return !is_full() || !blocking_.is_active_.load(std::memory_order_acquire); })) {
                 break;  // Timeout occurred
             }
 
@@ -1046,9 +986,7 @@ public:
                 }
             }
 
-        } while (items_enqueued < count &&
-            std::chrono::steady_clock::now() < end_time &&
-            blocking_.is_active_.load(std::memory_order_acquire));
+        } while (items_enqueued < count && std::chrono::steady_clock::now() < end_time && blocking_.is_active_.load(std::memory_order_acquire));
 
         return items_enqueued;
     }
@@ -1080,15 +1018,14 @@ public:
 
             const size_t next_next_head = (next_head + 1) & INDEX_MASK;
             if (next_next_head != tail_.load(std::memory_order_relaxed)) {
-                detail::prefetch_read(&buffer_[next_next_head], 2); // Lower locality hint
+                detail::prefetch_read(&buffer_[next_next_head], 2);  // Lower locality hint
             }
         }
 
         // Move the item out with optimization for trivial types
         if constexpr (std::is_trivially_copyable_v<T> && sizeof(T) <= 16) {
             item = buffer_[current_head];
-        }
-        else {
+        } else {
             item = std::move(buffer_[current_head]);
 
             // Only call destructor if not an unsafe type after move
@@ -1132,9 +1069,7 @@ public:
 
         // Fall back to blocking wait
         std::unique_lock<std::mutex> lock(blocking_.mutex_);
-        blocking_.not_empty_.wait(lock, [this, &item] {
-            return try_dequeue(item) || !blocking_.is_active_.load(std::memory_order_acquire);
-            });
+        blocking_.not_empty_.wait(lock, [this, &item] { return try_dequeue(item) || !blocking_.is_active_.load(std::memory_order_acquire); });
         return blocking_.is_active_.load(std::memory_order_acquire);
     }
 
@@ -1174,9 +1109,7 @@ public:
 
         // Slow path with timeout
         std::unique_lock<std::mutex> lock(blocking_.mutex_);
-        return blocking_.not_empty_.wait_for(lock, remaining, [this, &item] {
-            return try_dequeue(item) || !blocking_.is_active_.load(std::memory_order_acquire);
-            }) && blocking_.is_active_.load(std::memory_order_acquire);
+        return blocking_.not_empty_.wait_for(lock, remaining, [this, &item] { return try_dequeue(item) || !blocking_.is_active_.load(std::memory_order_acquire); }) && blocking_.is_active_.load(std::memory_order_acquire);
     }
 
     /**
@@ -1199,13 +1132,10 @@ public:
         std::unique_lock<std::mutex> lock(blocking_.mutex_);
 
         // Wait until item available, queue inactive, or stop requested
-        std::condition_variable_any{}.wait(lock, stop_token, [this, &item] {
-            return try_dequeue(item) || !blocking_.is_active_.load(std::memory_order_acquire);
-            });
+        std::condition_variable_any{}.wait(lock, stop_token, [this, &item] { return try_dequeue(item) || !blocking_.is_active_.load(std::memory_order_acquire); });
 
         // Check if we got an item or stopped
-        return !stop_token.stop_requested() &&
-            blocking_.is_active_.load(std::memory_order_acquire);
+        return !stop_token.stop_requested() && blocking_.is_active_.load(std::memory_order_acquire);
     }
 
     /**
@@ -1223,8 +1153,7 @@ public:
      * @return true if an element was dequeued, false otherwise
      */
     template<typename Rep, typename Period, typename StopToken>
-    bool dequeue_for(T& item, const std::chrono::duration<Rep, Period>& timeout,
-        StopToken&& stop_token) {
+    bool dequeue_for(T& item, const std::chrono::duration<Rep, Period>& timeout, StopToken&& stop_token) {
         // Try fast path first
         if (try_dequeue(item))
             return true;
@@ -1233,14 +1162,10 @@ public:
         std::unique_lock<std::mutex> lock(blocking_.mutex_);
 
         // Wait until item available, timeout, queue inactive, or stop requested
-        std::condition_variable_any{}.wait_for(lock, timeout, stop_token, [this, &item] {
-            return try_dequeue(item) || !blocking_.is_active_.load(std::memory_order_acquire);
-            });
+        std::condition_variable_any{}.wait_for(lock, timeout, stop_token, [this, &item] { return try_dequeue(item) || !blocking_.is_active_.load(std::memory_order_acquire); });
 
         // Return success only if we got an item (not stopped or timed out)
-        return !stop_token.stop_requested() &&
-            blocking_.is_active_.load(std::memory_order_acquire) &&
-            !is_empty();
+        return !stop_token.stop_requested() && blocking_.is_active_.load(std::memory_order_acquire) && !is_empty();
     }
 
     /**
@@ -1285,8 +1210,7 @@ public:
 
         // Use the fastest copy method based on type and iterator
         if constexpr (std::is_trivially_copyable_v<T>) {
-            if constexpr (std::is_pointer_v<OutputIt> &&
-                std::is_same_v<std::remove_pointer_t<OutputIt>, T>) {
+            if constexpr (std::is_pointer_v<OutputIt> && std::is_same_v<std::remove_pointer_t<OutputIt>, T>) {
                 // Pointer to same type - use SIMD-optimized memory transfer
                 // Use SIMD for first chunk
                 detail::simd_memcpy(dest, &buffer_[current_head], first_chunk);
@@ -1295,8 +1219,7 @@ public:
                 if (second_chunk > 0) {
                     detail::simd_memcpy(dest + first_chunk, &buffer_[0], second_chunk);
                 }
-            }
-            else {
+            } else {
                 // Other iterator type - use iterator operations
                 std::copy_n(&buffer_[current_head], first_chunk, dest);
 
@@ -1306,8 +1229,7 @@ public:
                     std::copy_n(&buffer_[0], second_chunk, advanced_dest);
                 }
             }
-        }
-        else {
+        } else {
             // Non-trivial type - use move semantics
             for (size_t i = 0; i < first_chunk; i++) {
                 *dest = std::move(buffer_[current_head + i]);
@@ -1352,7 +1274,8 @@ public:
      */
     template<typename OutputIt>
     size_t dequeue_bulk(OutputIt dest, size_t max_items, std::stop_token stoken = {}) {
-        if (max_items == 0) return 0;
+        if (max_items == 0)
+            return 0;
 
         // Try non-blocking fast path first
         size_t items_dequeued = try_dequeue_bulk(dest, max_items);
@@ -1395,9 +1318,7 @@ public:
 
         do {
             // Wait until items are available or timeout
-            while (!blocking_.not_empty_.wait_for(lock, 2000ms, [this] {
-                return !is_empty() || !blocking_.is_active_.load(std::memory_order_acquire);
-                })) {
+            while (!blocking_.not_empty_.wait_for(lock, 2000ms, [this] { return !is_empty() || !blocking_.is_active_.load(std::memory_order_acquire); })) {
                 if (stoken.stop_requested()) {
                     return false;
                 }
@@ -1422,8 +1343,7 @@ public:
                 }
             }
 
-        } while (max_items > 0 && !stoken.stop_requested() &&
-            blocking_.is_active_.load(std::memory_order_acquire));
+        } while (max_items > 0 && !stoken.stop_requested() && blocking_.is_active_.load(std::memory_order_acquire));
 
         return items_dequeued;
     }
@@ -1442,9 +1362,9 @@ public:
      * @return Number of elements successfully dequeued
      */
     template<typename OutputIt, typename Rep, typename Period>
-    size_t dequeue_bulk_for(OutputIt dest, size_t max_items,
-        const std::chrono::duration<Rep, Period>& timeout) {
-        if (max_items == 0) return 0;
+    size_t dequeue_bulk_for(OutputIt dest, size_t max_items, const std::chrono::duration<Rep, Period>& timeout) {
+        if (max_items == 0)
+            return 0;
 
         // Track start time for timeout
         auto start_time = std::chrono::steady_clock::now();
@@ -1492,9 +1412,7 @@ public:
 
         do {
             // Wait until items are available or timeout
-            if (!blocking_.not_empty_.wait_until(lock, end_time, [this] {
-                return !is_empty() || !blocking_.is_active_.load(std::memory_order_acquire);
-                })) {
+            if (!blocking_.not_empty_.wait_until(lock, end_time, [this] { return !is_empty() || !blocking_.is_active_.load(std::memory_order_acquire); })) {
                 break;  // Timeout occurred
             }
 
@@ -1517,9 +1435,7 @@ public:
                 }
             }
 
-        } while (max_items > 0 &&
-            std::chrono::steady_clock::now() < end_time &&
-            blocking_.is_active_.load(std::memory_order_acquire));
+        } while (max_items > 0 && std::chrono::steady_clock::now() < end_time && blocking_.is_active_.load(std::memory_order_acquire));
 
         return items_dequeued;
     }
@@ -1539,9 +1455,9 @@ public:
      * @return Number of elements successfully dequeued
      */
     template<typename OutputIt, typename Rep, typename Period>
-    size_t dequeue_bulk_for_any(OutputIt dest, size_t max_items,
-        const std::chrono::duration<Rep, Period>& timeout) {
-        if (max_items == 0) return 0;
+    size_t dequeue_bulk_for_any(OutputIt dest, size_t max_items, const std::chrono::duration<Rep, Period>& timeout) {
+        if (max_items == 0)
+            return 0;
 
         // Try non-blocking fast path first
         size_t items_dequeued = try_dequeue_bulk(dest, max_items);
@@ -1571,9 +1487,7 @@ public:
         std::unique_lock<std::mutex> lock(blocking_.mutex_);
 
         // Wait until any items are available, timeout, or queue inactive
-        bool has_items = blocking_.not_empty_.wait_until(lock, end_time, [this] {
-            return !is_empty() || !blocking_.is_active_.load(std::memory_order_acquire);
-            });
+        bool has_items = blocking_.not_empty_.wait_until(lock, end_time, [this] { return !is_empty() || !blocking_.is_active_.load(std::memory_order_acquire); });
 
         // If no items or queue shut down, return 0
         if (!has_items || !blocking_.is_active_.load(std::memory_order_acquire)) {
@@ -1638,10 +1552,7 @@ public:
 
         // Slow path with blocking
         std::unique_lock<std::mutex> lock(blocking_.mutex_);
-        blocking_.not_full_.wait(lock, [this, &args...] {
-            return try_emplace(std::forward<Args>(args)...) ||
-                !blocking_.is_active_.load(std::memory_order_acquire);
-            });
+        blocking_.not_full_.wait(lock, [this, &args...] { return try_emplace(std::forward<Args>(args)...) || !blocking_.is_active_.load(std::memory_order_acquire); });
     }
 
     /**
@@ -1665,14 +1576,10 @@ public:
         std::unique_lock<std::mutex> lock(blocking_.mutex_);
 
         // Wait until space available, queue inactive, or stop requested
-        std::condition_variable_any{}.wait(lock, stop_token, [this, &args...] {
-            return try_emplace(std::forward<Args>(args)...) ||
-                !blocking_.is_active_.load(std::memory_order_acquire);
-            });
+        std::condition_variable_any{}.wait(lock, stop_token, [this, &args...] { return try_emplace(std::forward<Args>(args)...) || !blocking_.is_active_.load(std::memory_order_acquire); });
 
         // Check if emplace succeeded or stopped
-        return !stop_token.stop_requested() &&
-            blocking_.is_active_.load(std::memory_order_acquire);
+        return !stop_token.stop_requested() && blocking_.is_active_.load(std::memory_order_acquire);
     }
 
     /////////////UTILITY METHODS//////////
@@ -1682,10 +1589,7 @@ public:
      *
      * @return true if the queue is empty, false otherwise
      */
-    bool is_empty() const noexcept {
-        return head_.load(std::memory_order_relaxed) ==
-            tail_.load(std::memory_order_relaxed);
-    }
+    bool is_empty() const noexcept { return head_.load(std::memory_order_relaxed) == tail_.load(std::memory_order_relaxed); }
 
     /**
      * @brief Checks if the queue is full
@@ -1730,10 +1634,7 @@ public:
      *
      * @return Current size of the queue
      */
-    size_t size() const noexcept {
-        return (tail_.load(std::memory_order_relaxed) -
-            head_.load(std::memory_order_relaxed)) & INDEX_MASK;
-    }
+    size_t size() const noexcept { return (tail_.load(std::memory_order_relaxed) - head_.load(std::memory_order_relaxed)) & INDEX_MASK; }
 
     /**
      * @brief Gets the capacity of the queue
@@ -1753,18 +1654,14 @@ public:
      *
      * @return The minimum capacity requested when the queue was created
      */
-    constexpr size_t requested_capacity() const noexcept {
-        return RequestedCapacity;
-    }
+    constexpr size_t requested_capacity() const noexcept { return RequestedCapacity; }
 
     /**
      * @brief Gets the actual capacity after power-of-2 rounding
      *
      * @return The actual capacity of the queue
      */
-    constexpr size_t actual_capacity() const noexcept {
-        return ActualCapacity - 1;
-    }
+    constexpr size_t actual_capacity() const noexcept { return ActualCapacity - 1; }
 
     /**
      * @brief Shuts down the queue
@@ -1787,7 +1684,7 @@ public:
      * @param consumer Function or functor to process each dequeued element
      * @return Number of elements processed
      */
-    template <typename Consumer>
+    template<typename Consumer>
     size_t drain_all(Consumer&& consumer) {
         size_t count = 0;
         T item;
@@ -1800,7 +1697,8 @@ public:
 
             while (true) {
                 size_t batch_count = try_dequeue_bulk(items.data(), BATCH_SIZE);
-                if (batch_count == 0) break;
+                if (batch_count == 0)
+                    break;
 
                 for (size_t i = 0; i < batch_count; i++) {
                     consumer(std::move(items[i]));
@@ -1808,8 +1706,7 @@ public:
 
                 count += batch_count;
             }
-        }
-        else {
+        } else {
             // For larger/non-trivial types, process one-by-one
             while (try_dequeue(item)) {
                 consumer(std::move(item));
@@ -1821,4 +1718,4 @@ public:
     }
 };
 
-#endif // SPSC_QUEUE_HPP
+#endif  // SPSC_QUEUE_HPP

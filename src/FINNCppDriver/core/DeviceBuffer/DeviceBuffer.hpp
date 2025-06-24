@@ -184,21 +184,13 @@ namespace Finn {
          */
         DeviceBuffer& operator=(const DeviceBuffer& buf) = delete;
 
-        virtual size_t getSizeInBytes() {
-            return totalDataSize * sizeof(T);
-        }
+        virtual size_t getSizeInBytes() { return totalDataSize * sizeof(T); }
 
-        virtual size_t getFeatureMapSize() {
-            return featureMapSize;
-        }
+        virtual size_t getFeatureMapSize() { return featureMapSize; }
 
-        virtual size_t getBatchSize() {
-            return this->shapePacked[0];
-        }
+        virtual size_t getBatchSize() { return this->shapePacked[0]; }
 
-        virtual size_t getTotalDataSize() {
-            return totalDataSize;
-        }
+        virtual size_t getTotalDataSize() { return totalDataSize; }
 
         /**
          * @brief Get the name of the device buffer

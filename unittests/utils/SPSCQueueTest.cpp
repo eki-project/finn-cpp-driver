@@ -1,10 +1,11 @@
 #include <FINNCppDriver/utils/SPSCQueue.hpp>
-#include "gtest/gtest.h"
-#include <thread>
-#include <vector>
+#include <atomic>
 #include <chrono>
 #include <string>
-#include <atomic>
+#include <thread>
+#include <vector>
+
+#include "gtest/gtest.h"
 
 // Basic tests for non-trivial type
 TEST(SPSCQueueTest, BasicOperations) {
@@ -76,7 +77,7 @@ TEST(SPSCQueueTest, FullQueue) {
     EXPECT_TRUE(queue.try_enqueue(1));
     EXPECT_TRUE(queue.try_enqueue(2));
     EXPECT_TRUE(queue.try_enqueue(3));
-    EXPECT_TRUE(queue.is_full());  // Should be full now
+    EXPECT_TRUE(queue.is_full());        // Should be full now
     EXPECT_FALSE(queue.try_enqueue(4));  // Should fail
 
     int item;
@@ -109,7 +110,7 @@ TEST(SPSCQueueTest, WrapAround) {
     }
 
     // Verify correct order
-    std::vector<int> expected = { 1,2,3,4,5,6,7,8,9 };
+    std::vector<int> expected = {1, 2, 3, 4, 5, 6, 7, 8, 9};
     EXPECT_EQ(results, expected);
 }
 
@@ -184,8 +185,8 @@ TEST(SPSCQueueTest, BulkDequeue) {
 // Test blocking behavior with threads
 TEST(SPSCQueueTest, BlockingOperations) {
     SPSCQueue<int, 4> queue;  // Actual capacity: 3
-    std::atomic<bool> producer_done{ false };
-    std::atomic<bool> consumer_done{ false };
+    std::atomic<bool> producer_done{false};
+    std::atomic<bool> consumer_done{false};
     std::vector<int> produced;
     std::vector<int> consumed;
 
@@ -193,10 +194,10 @@ TEST(SPSCQueueTest, BlockingOperations) {
     std::thread producer([&queue, &producer_done, &produced]() {
         for (int i = 0; i < 10; i++) {
             produced.push_back(i);  // No mutex needed - only producer thread touches this
-            queue.enqueue(i);  // Blocking enqueue
+            queue.enqueue(i);       // Blocking enqueue
         }
         producer_done.store(true, std::memory_order_release);
-        });
+    });
 
     // Consumer thread - will consume all items
     std::thread consumer([&queue, &producer_done, &consumer_done, &consumed]() {
@@ -205,8 +206,7 @@ TEST(SPSCQueueTest, BlockingOperations) {
             // Use a timeout to avoid hanging indefinitely
             if (queue.dequeue_for(item, std::chrono::milliseconds(100))) {
                 consumed.push_back(item);  // No mutex needed - only consumer thread touches this
-            }
-            else {
+            } else {
                 // Check if we're done - if producer is done AND queue is empty
                 if (producer_done.load(std::memory_order_acquire) && queue.is_empty()) {
                     break;
@@ -215,11 +215,11 @@ TEST(SPSCQueueTest, BlockingOperations) {
             }
         }
         consumer_done.store(true, std::memory_order_release);
-        });
+    });
 
     // Set a timeout for the entire test
     auto start_time = std::chrono::steady_clock::now();
-    auto timeout = std::chrono::seconds(5); // 5 second timeout should be more than enough
+    auto timeout = std::chrono::seconds(5);  // 5 second timeout should be more than enough
 
     while (!consumer_done.load(std::memory_order_acquire)) {
         if (std::chrono::steady_clock::now() - start_time > timeout) {
@@ -306,7 +306,7 @@ TEST(SPSCQueueTest, BulkTimedAnyOperations) {
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
         queue.try_enqueue(43);
         queue.try_enqueue(44);
-        });
+    });
 
     results.assign(5, 0);
     count = queue.dequeue_bulk_for_any(results.begin(), 5, std::chrono::milliseconds(200));
@@ -327,15 +327,15 @@ TEST(SPSCQueueTest, BulkTimedAnyOperations) {
 // Test shutdown behavior
 TEST(SPSCQueueTest, Shutdown) {
     SPSCQueue<int, 4> queue;
-    std::atomic<bool> consumer_unblocked{ false };
+    std::atomic<bool> consumer_unblocked{false};
 
     // Start a consumer thread that will block
     std::thread consumer([&queue, &consumer_unblocked]() {
         int item;
         bool result = queue.dequeue(item);  // This should block
-        EXPECT_FALSE(result);  // After shutdown, should return false
+        EXPECT_FALSE(result);               // After shutdown, should return false
         consumer_unblocked = true;
-        });
+    });
 
     // Give the consumer time to block
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -358,8 +358,8 @@ TEST(SPSCQueueTest, ConcurrentThroughput) {
     for (size_t runs = 0; runs < 1000; ++runs) {
         constexpr size_t ITEM_COUNT = 1000000;
         SPSCQueue<uint64_t, 1024> queue;
-        std::atomic<bool> error{ false };
-        std::atomic<bool> producer_done{ false };
+        std::atomic<bool> error{false};
+        std::atomic<bool> producer_done{false};
 
         std::thread producer([&queue, &error, &producer_done]() {
             try {
@@ -374,12 +374,9 @@ TEST(SPSCQueueTest, ConcurrentThroughput) {
                         break;
                     }
                 }
-            }
-            catch (...) {
-                error = true;
-            }
+            } catch (...) { error = true; }
             producer_done.store(true, std::memory_order_release);
-            });
+        });
 
         std::thread consumer([&queue, &error, &producer_done]() {
             try {
@@ -394,31 +391,25 @@ TEST(SPSCQueueTest, ConcurrentThroughput) {
                             break;
                         }
                         expected++;
-                    }
-                    else if (producer_done.load(std::memory_order_acquire)) {
+                    } else if (producer_done.load(std::memory_order_acquire)) {
                         // If producer is done and no more items, we're missing items
                         if (expected < ITEM_COUNT) {
                             error = true;
                         }
                         break;
-                    }
-                    else {
+                    } else {
                         std::this_thread::yield();  // Give producer time to produce
                     }
                 }
-            }
-            catch (...) {
-                error = true;
-            }
-            });
+            } catch (...) { error = true; }
+        });
 
         // Set timeout for test to avoid hanging forever
         auto start_time = std::chrono::steady_clock::now();
         bool joined = false;
 
         // Try to join with timeout
-        while (!joined &&
-            std::chrono::steady_clock::now() - start_time < std::chrono::seconds(30)) {
+        while (!joined && std::chrono::steady_clock::now() - start_time < std::chrono::seconds(30)) {
             producer.join();
             consumer.join();
             joined = true;
@@ -435,7 +426,7 @@ TEST(SPSCQueueTest, BulkEnqueue) {
     SPSCQueue<int, 16> queue;  // Actual capacity: 15
 
     // Test basic bulk enqueue
-    std::vector<int> items1 = { 1, 2, 3, 4, 5 };
+    std::vector<int> items1 = {1, 2, 3, 4, 5};
     size_t enqueued = queue.try_enqueue_bulk(items1.begin(), items1.size());
 
     EXPECT_EQ(enqueued, 5);
@@ -460,7 +451,7 @@ TEST(SPSCQueueTest, BulkEnqueue) {
     EXPECT_EQ(results[14], 42);
 
     // Test enqueue with empty queue
-    std::vector<int> items3 = { 10, 20, 30 };
+    std::vector<int> items3 = {10, 20, 30};
     enqueued = queue.try_enqueue_bulk(items3.begin(), items3.size());
 
     EXPECT_EQ(enqueued, 3);
@@ -486,17 +477,17 @@ TEST(SPSCQueueTest, BulkEnqueue) {
 // Test blocking bulk enqueue
 TEST(SPSCQueueTest, BlockingBulkEnqueue) {
     SPSCQueue<int, 8> queue;  // Actual capacity: 7
-    std::atomic<bool> producer_done{ false };
-    std::atomic<bool> consumer_done{ false };
+    std::atomic<bool> producer_done{false};
+    std::atomic<bool> consumer_done{false};
     std::vector<int> all_produced;
     std::vector<int> all_consumed;
 
     // Producer thread - will produce 20 items in batches
     std::thread producer([&queue, &producer_done, &all_produced]() {
-        std::vector<int> batch1 = { 1, 2, 3, 4, 5 };
-        std::vector<int> batch2 = { 6, 7, 8, 9, 10 };
-        std::vector<int> batch3 = { 11, 12, 13, 14, 15 };
-        std::vector<int> batch4 = { 16, 17, 18, 19, 20 };
+        std::vector<int> batch1 = {1, 2, 3, 4, 5};
+        std::vector<int> batch2 = {6, 7, 8, 9, 10};
+        std::vector<int> batch3 = {11, 12, 13, 14, 15};
+        std::vector<int> batch4 = {16, 17, 18, 19, 20};
 
         // Add all items to the produced vector
         all_produced.insert(all_produced.end(), batch1.begin(), batch1.end());
@@ -511,7 +502,7 @@ TEST(SPSCQueueTest, BlockingBulkEnqueue) {
         queue.enqueue_bulk(batch4.begin(), batch4.size());
 
         producer_done = true;
-        });
+    });
 
     // Consumer thread - will consume all items
     std::thread consumer([&queue, &producer_done, &consumer_done, &all_consumed]() {
@@ -521,14 +512,13 @@ TEST(SPSCQueueTest, BlockingBulkEnqueue) {
             size_t dequeued = queue.try_dequeue_bulk(results.begin(), results.size());
             if (dequeued > 0) {
                 all_consumed.insert(all_consumed.end(), results.begin(), results.begin() + dequeued);
-            }
-            else {
+            } else {
                 std::this_thread::yield();  // Give producer time to produce
             }
         }
 
         consumer_done = true;
-        });
+    });
 
     producer.join();
     consumer.join();
@@ -549,7 +539,7 @@ TEST(SPSCQueueTest, TimedBulkEnqueue) {
     EXPECT_TRUE(queue.is_full());
 
     // Test timeout on full queue
-    std::vector<int> items = { 4, 5, 6 };
+    std::vector<int> items = {4, 5, 6};
     auto start = std::chrono::steady_clock::now();
     size_t enqueued = queue.enqueue_bulk_for(items.begin(), items.size(), std::chrono::milliseconds(100));
     auto end = std::chrono::steady_clock::now();

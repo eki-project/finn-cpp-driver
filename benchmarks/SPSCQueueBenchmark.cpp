@@ -1,10 +1,11 @@
-#include <FINNCppDriver/utils/SPSCQueue.hpp>
 #include <benchmark/benchmark.h>
-#include <thread>
-#include <vector>
-#include <string>
+
+#include <FINNCppDriver/utils/SPSCQueue.hpp>
 #include <atomic>
 #include <random>
+#include <string>
+#include <thread>
+#include <vector>
 
 // Benchmark for trivial type enqueue/dequeue operations
 template<size_t QueueSize>
@@ -38,7 +39,7 @@ static void BM_TrivialEnqueueDequeue(benchmark::State& state) {
         }
     }
 
-    state.SetItemsProcessed(static_cast<int64_t>(state.iterations() * operations_per_iteration * 2)); // enqueue + dequeue
+    state.SetItemsProcessed(static_cast<int64_t>(state.iterations() * operations_per_iteration * 2));  // enqueue + dequeue
     state.SetBytesProcessed(static_cast<int64_t>(state.iterations() * operations_per_iteration * sizeof(int) * 2));
 }
 
@@ -85,24 +86,20 @@ static void BM_ProducerConsumer(benchmark::State& state) {
     for (auto _ : state) {
         state.PauseTiming();
         SPSCQueue<T, QueueSize> queue;
-        std::atomic<bool> producer_done{ false };
-        std::atomic<size_t> items_produced{ 0 };
-        std::atomic<size_t> items_consumed{ 0 };
+        std::atomic<bool> producer_done{false};
+        std::atomic<size_t> items_produced{0};
+        std::atomic<size_t> items_consumed{0};
 
         // Initialize value based on type
         T value;
         if constexpr (std::is_same_v<T, int>) {
             value = 42;  // For int type
-        }
-        else if constexpr (std::is_same_v<T, std::string>) {
+        } else if constexpr (std::is_same_v<T, std::string>) {
             value = "test-string";  // For string type
         }
 
         // Use a smaller maximum to avoid potential deadlocks
-        const size_t num_items = std::min<size_t>(
-            static_cast<size_t>(state.range(0)),
-            queue.capacity() * 5
-        );
+        const size_t num_items = std::min<size_t>(static_cast<size_t>(state.range(0)), queue.capacity() * 5);
 
         // Start timing again before creating threads
         state.ResumeTiming();
@@ -112,14 +109,13 @@ static void BM_ProducerConsumer(benchmark::State& state) {
             while (items_produced.load(std::memory_order_relaxed) < num_items) {
                 if (queue.try_enqueue(value)) {
                     items_produced.fetch_add(1, std::memory_order_relaxed);
-                }
-                else {
+                } else {
                     // Small yield to prevent busy waiting
                     std::this_thread::yield();
                 }
             }
             producer_done.store(true, std::memory_order_release);
-            });
+        });
 
         // Consumer thread
         std::thread consumer([&queue, &producer_done, &items_consumed, &num_items, &items_produced]() {
@@ -127,19 +123,15 @@ static void BM_ProducerConsumer(benchmark::State& state) {
             while (items_consumed.load(std::memory_order_relaxed) < num_items) {
                 if (queue.try_dequeue(item)) {
                     items_consumed.fetch_add(1, std::memory_order_relaxed);
-                }
-                else if (producer_done.load(std::memory_order_acquire) &&
-                    items_consumed.load(std::memory_order_relaxed) >=
-                    items_produced.load(std::memory_order_relaxed)) {
+                } else if (producer_done.load(std::memory_order_acquire) && items_consumed.load(std::memory_order_relaxed) >= items_produced.load(std::memory_order_relaxed)) {
                     // All items have been produced and consumed
                     break;
-                }
-                else {
+                } else {
                     // Small yield to prevent busy waiting
                     std::this_thread::yield();
                 }
             }
-            });
+        });
 
         producer.join();
         consumer.join();
@@ -157,8 +149,7 @@ static void BM_ProducerConsumer(benchmark::State& state) {
     state.SetItemsProcessed(static_cast<int64_t>(state.iterations() * num_items * 2));
     if constexpr (std::is_same_v<T, std::string>) {
         state.SetBytesProcessed(static_cast<int64_t>(state.iterations() * num_items * sizeof("test-string") * 2));
-    }
-    else {
+    } else {
         state.SetBytesProcessed(static_cast<int64_t>(state.iterations() * num_items * sizeof(T) * 2));
     }
 }
@@ -189,7 +180,8 @@ static void BM_BulkDequeue(benchmark::State& state) {
         while (total_dequeued < enqueued) {
             size_t batch_size = std::min(bulk_size, enqueued - total_dequeued);
             size_t dequeued = queue.try_dequeue_bulk(items.begin(), batch_size);
-            if (dequeued == 0) break; // Avoid infinite loop if dequeue fails
+            if (dequeued == 0)
+                break;  // Avoid infinite loop if dequeue fails
             total_dequeued += dequeued;
         }
 
@@ -231,19 +223,18 @@ static void BM_IndividualVsBulkDequeue(benchmark::State& state) {
             while (dequeued < enqueued) {
                 size_t batch_size = std::min(static_cast<size_t>(bulk_size), enqueued - dequeued);
                 size_t batch_dequeued = queue.try_dequeue_bulk(items.begin(), batch_size);
-                if (batch_dequeued == 0) break; // Avoid infinite loop
+                if (batch_dequeued == 0)
+                    break;  // Avoid infinite loop
                 dequeued += batch_dequeued;
             }
-        }
-        else {
+        } else {
             // Individual dequeue
             int item;
             for (size_t i = 0; i < enqueued; ++i) {
                 if (queue.try_dequeue(item)) {
                     dequeued++;
-                }
-                else {
-                    break; // Stop if dequeue fails
+                } else {
+                    break;  // Stop if dequeue fails
                 }
             }
         }
@@ -289,10 +280,7 @@ static void BM_EmplaceVsEnqueue(benchmark::State& state) {
     const bool use_emplace = state.range(0) == 1;
 
     // Make sure we don't exceed queue capacity
-    const auto num_items = static_cast<int>(std::min<size_t>(
-        static_cast<size_t>(state.range(1)),
-        static_cast<size_t>(queue.capacity())
-    ));
+    const auto num_items = static_cast<int>(std::min<size_t>(static_cast<size_t>(state.range(1)), static_cast<size_t>(queue.capacity())));
 
     for (auto _ : state) {
         // Track successful operations
@@ -305,8 +293,7 @@ static void BM_EmplaceVsEnqueue(benchmark::State& state) {
                     enqueued++;
                 }
             }
-        }
-        else {
+        } else {
             // Use regular enqueue with constructor
             for (int i = 0; i < num_items; ++i) {
                 if (queue.try_enqueue(std::make_pair(i, "test-string"))) {
@@ -346,8 +333,7 @@ static void BM_BulkEnqueue(benchmark::State& state) {
     }
 
     // Ensure we don't exceed queue capacity
-    const size_t num_operations = std::min<size_t>(static_cast<size_t>(state.range(0)),
-        QueueSize / bulk_size);
+    const size_t num_operations = std::min<size_t>(static_cast<size_t>(state.range(0)), QueueSize / bulk_size);
 
     for (auto _ : state) {
         state.PauseTiming();
@@ -363,7 +349,8 @@ static void BM_BulkEnqueue(benchmark::State& state) {
             total_enqueued += enqueued;
 
             // If we couldn't enqueue the full batch, break to avoid infinite loop
-            if (enqueued < bulk_size) break;
+            if (enqueued < bulk_size)
+                break;
         }
 
         // Make sure we dequeue everything for the next iteration
@@ -408,18 +395,17 @@ static void BM_IndividualVsBulkEnqueue(benchmark::State& state) {
             for (size_t i = 0; i < total_items; i += bulk_size) {
                 size_t batch_size = std::min(static_cast<size_t>(bulk_size), static_cast<size_t>(total_items) - i);
                 size_t batch_enqueued = queue.try_enqueue_bulk(items.begin(), batch_size);
-                if (batch_enqueued < batch_size) break; // Stop if queue is full
+                if (batch_enqueued < batch_size)
+                    break;  // Stop if queue is full
                 enqueued += batch_enqueued;
             }
-        }
-        else {
+        } else {
             // Individual enqueue
             for (int i = 0; i < total_items; ++i) {
                 if (queue.try_enqueue(i)) {
                     enqueued++;
-                }
-                else {
-                    break; // Stop if queue is full
+                } else {
+                    break;  // Stop if queue is full
                 }
             }
         }
@@ -498,45 +484,45 @@ BENCHMARK(BM_ProducerConsumer<128, int>)->Range(1000, 100000);
 BENCHMARK(BM_ProducerConsumer<128, std::string>)->Range(1000, 100000);
 
 BENCHMARK(BM_BulkDequeue<1024>)
-->Args({ 10000, 1 })   // Total items, bulk size of 1
-->Args({ 10000, 10 })  // Total items, bulk size of 10
-->Args({ 10000, 50 })  // Total items, bulk size of 50
-->Args({ 10000, 100 });// Total items, bulk size of 100
+    ->Args({10000, 1})     // Total items, bulk size of 1
+    ->Args({10000, 10})    // Total items, bulk size of 10
+    ->Args({10000, 50})    // Total items, bulk size of 50
+    ->Args({10000, 100});  // Total items, bulk size of 100
 
 BENCHMARK(BM_IndividualVsBulkDequeue)
-->Arg(0)  // Use individual dequeue
-->Arg(1); // Use bulk dequeue
+    ->Arg(0)   // Use individual dequeue
+    ->Arg(1);  // Use bulk dequeue
 
 BENCHMARK(BM_EnqueueDequeueLatency<16>)->UseRealTime();
 BENCHMARK(BM_EnqueueDequeueLatency<128>)->UseRealTime();
 BENCHMARK(BM_EnqueueDequeueLatency<1024>)->UseRealTime();
 
 BENCHMARK(BM_EmplaceVsEnqueue<128>)
-->Args({ 0, 1000 })  // Regular enqueue, 1000 items
-->Args({ 1, 1000 }); // Emplace, 1000 items
+    ->Args({0, 1000})   // Regular enqueue, 1000 items
+    ->Args({1, 1000});  // Emplace, 1000 items
 
 BENCHMARK(BM_BulkEnqueue<1024>)
-->Args({ 100, 1 })   // 100 operations, bulk size of 1
-->Args({ 100, 10 })  // 100 operations, bulk size of 10
-->Args({ 100, 50 })  // 100 operations, bulk size of 50
-->Args({ 100, 100 });// 100 operations, bulk size of 100
+    ->Args({100, 1})     // 100 operations, bulk size of 1
+    ->Args({100, 10})    // 100 operations, bulk size of 10
+    ->Args({100, 50})    // 100 operations, bulk size of 50
+    ->Args({100, 100});  // 100 operations, bulk size of 100
 
 BENCHMARK(BM_IndividualVsBulkEnqueue)
-->Arg(0)  // Use individual enqueue
-->Arg(1); // Use bulk enqueue
+    ->Arg(0)   // Use individual enqueue
+    ->Arg(1);  // Use bulk enqueue
 
 BENCHMARK(BM_BlockingBulkEnqueue<128>)
-->Arg(0)    // Queue 0% full
-->Arg(25)   // Queue 25% full
-->Arg(50)   // Queue 50% full
-->Arg(75)   // Queue 75% full
-->Arg(95);  // Queue 95% full
+    ->Arg(0)    // Queue 0% full
+    ->Arg(25)   // Queue 25% full
+    ->Arg(50)   // Queue 50% full
+    ->Arg(75)   // Queue 75% full
+    ->Arg(95);  // Queue 95% full
 
 BENCHMARK(BM_BlockingBulkEnqueue<1024>)
-->Arg(0)    // Queue 0% full
-->Arg(25)   // Queue 25% full
-->Arg(50)   // Queue 50% full
-->Arg(75)   // Queue 75% full
-->Arg(95);  // Queue 95% full
+    ->Arg(0)    // Queue 0% full
+    ->Arg(25)   // Queue 25% full
+    ->Arg(50)   // Queue 50% full
+    ->Arg(75)   // Queue 75% full
+    ->Arg(95);  // Queue 95% full
 
 BENCHMARK_MAIN();

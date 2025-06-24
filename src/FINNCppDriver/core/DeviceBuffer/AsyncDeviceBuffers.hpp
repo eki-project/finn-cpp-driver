@@ -14,9 +14,9 @@
 #define ASYNCDEVICEBUFFERS
 
 #include <FINNCppDriver/utils/FinnUtils.h>
-#include <FINNCppDriver/utils/SPSCQueue.hpp>
 
 #include <FINNCppDriver/core/DeviceBuffer/DeviceBuffer.hpp>
+#include <FINNCppDriver/utils/SPSCQueue.hpp>
 #include <functional>
 #include <thread>
 
@@ -33,7 +33,7 @@ namespace Finn {
         template<typename T>
         class AsyncBufferWrapper {
              protected:
-             constexpr static size_t queueSize = 1024;  ///< Default size of the internal queue
+            constexpr static size_t queueSize = 1024;  ///< Default size of the internal queue
             /**
              * @brief Internal queue used by all asynchronous buffers
              *
@@ -45,9 +45,10 @@ namespace Finn {
              *
              * @param expectedMaxQueueSize Expected maximum size of the queue
              */
-            AsyncBufferWrapper(std::size_t expectedMaxQueueSize){
-                if (expectedMaxQueueSize > queueSize){
-                    FINN_LOG(loglevel::warning) << "[AsyncDeviceBuffer] Expected maximum queue size (" << expectedMaxQueueSize << ") is larger than the async buffer queue size (" << queueSize << "). This might lead to problems or performance issues. Consider increasing the queue size in the SPSCQueue template parameter.\n";
+            AsyncBufferWrapper(std::size_t expectedMaxQueueSize) {
+                if (expectedMaxQueueSize > queueSize) {
+                    FINN_LOG(loglevel::warning) << "[AsyncDeviceBuffer] Expected maximum queue size (" << expectedMaxQueueSize << ") is larger than the async buffer queue size (" << queueSize
+                                                << "). This might lead to problems or performance issues. Consider increasing the queue size in the SPSCQueue template parameter.\n";
                 }
                 FINN_LOG(loglevel::info) << "[AsyncDeviceBuffer] Max buffer size:" << queueSize << "\n";
             }
@@ -88,7 +89,7 @@ namespace Finn {
             SPSCQueue<T, detail::AsyncBufferWrapper<T>::queueSize>& testGetQueue() { return this->queue; }
 #endif
 
-            public:
+             public:
             /**
              * @brief Return the size of the buffer as specified by the argument.
              *
@@ -117,7 +118,7 @@ namespace Finn {
             while (!stoken.stop_requested()) {
                 this->sync(this->loadMap(stoken));
                 this->execute(this->shapePacked[0]);
-                //TODO(linusjun): Wait until kernel is done executing!
+                // TODO(linusjun): Wait until kernel is done executing!
             }
             FINN_LOG(loglevel::info) << "Asynchronous Input buffer runner terminated";
         }
@@ -134,9 +135,8 @@ namespace Finn {
          */
         AsyncDeviceInputBuffer(const std::string& pCUName, xrt::device& device, xrt::uuid& pDevUUID, const shapePacked_t& pShapePacked, unsigned int ringBufferSizeFactor)
             : DeviceInputBuffer<T>(pCUName, device, pDevUUID, pShapePacked),
-              detail::AsyncBufferWrapper<T>(ringBufferSizeFactor*FinnUtils::shapeToElements(pShapePacked)),
-              workerThread(std::jthread(std::bind_front(&AsyncDeviceInputBuffer::runInternal, this))) {
-        }
+              detail::AsyncBufferWrapper<T>(ringBufferSizeFactor * FinnUtils::shapeToElements(pShapePacked)),
+              workerThread(std::jthread(std::bind_front(&AsyncDeviceInputBuffer::runInternal, this))) {}
 
         /**
          * @brief Construct a new Async Device Input Buffer object
@@ -180,14 +180,15 @@ namespace Finn {
          * @return true Store was successful
          * @return false Store failed
          */
-        bool store(std::span<const T> data) override { if(this->queue.enqueue_bulk(data.data(), data.size())==data.size()) {
-            FINN_LOG_DEBUG(loglevel::info) << this->loggerPrefix() << "Stored " << data.size() << " elements in the ring buffer";
-            return true;
-        } else {
-            FINN_LOG_DEBUG(loglevel::error) << this->loggerPrefix() << "Failed to store data in the ring buffer.";
-            return false;
+        bool store(std::span<const T> data) override {
+            if (this->queue.enqueue_bulk(data.data(), data.size()) == data.size()) {
+                FINN_LOG_DEBUG(loglevel::info) << this->loggerPrefix() << "Stored " << data.size() << " elements in the ring buffer";
+                return true;
+            } else {
+                FINN_LOG_DEBUG(loglevel::error) << this->loggerPrefix() << "Failed to store data in the ring buffer.";
+                return false;
+            }
         }
- }
 
          protected:
         /**
@@ -226,7 +227,7 @@ namespace Finn {
             while (!stoken.stop_requested()) {
                 this->execute(this->shapePacked[0]);
                 this->sync(this->totalDataSize);
-                saveMap(); //TODO: Maybe the queue should have a callback that is called when the queue is full/data is avaible?
+                saveMap();  // TODO: Maybe the queue should have a callback that is called when the queue is full/data is avaible?
             }
         }
 
@@ -242,9 +243,8 @@ namespace Finn {
          */
         AsyncDeviceOutputBuffer(const std::string& pCUName, xrt::device& device, xrt::uuid& pDevUUID, const shapePacked_t& pShapePacked, unsigned int ringBufferSizeFactor)
             : DeviceOutputBuffer<T>(pCUName, device, pDevUUID, pShapePacked),
-              detail::AsyncBufferWrapper<T>(ringBufferSizeFactor*FinnUtils::shapeToElements(pShapePacked)),
-              workerThread(std::jthread(std::bind_front(&AsyncDeviceOutputBuffer::readInternal, this))) {
-        };
+              detail::AsyncBufferWrapper<T>(ringBufferSizeFactor * FinnUtils::shapeToElements(pShapePacked)),
+              workerThread(std::jthread(std::bind_front(&AsyncDeviceOutputBuffer::readInternal, this))){};
 
         /**
          * @brief Construct a new Async Device Output Buffer object (Move constructor)
@@ -265,7 +265,7 @@ namespace Finn {
         ~AsyncDeviceOutputBuffer() override {
             FINN_LOG(loglevel::info) << "Destruction Asynchronous output buffer";
             workerThread.request_stop();  // Joining will be handled automatically by destruction
-            this->queue.shutdown();  // Shutdown the queue to prevent further enqueues
+            this->queue.shutdown();       // Shutdown the queue to prevent further enqueues
         };
 
         /**
@@ -304,7 +304,7 @@ namespace Finn {
          *
          * @return Finn::vector<T>
          */
-        Finn::vector<T> getData() override { //TODO(linusjun): Replace with a variant that takes a output iterator
+        Finn::vector<T> getData() override {  // TODO(linusjun): Replace with a variant that takes a output iterator
             Finn::vector<T> tmp(this->totalDataSize);
             this->queue.dequeue_bulk(tmp.begin(), this->totalDataSize);
             return tmp;
@@ -317,7 +317,7 @@ namespace Finn {
          */
         bool saveMap() {
             FINN_LOG_DEBUG(loglevel::info) << "Data transfer of output from FPGA!\n";
-            if(this->queue.enqueue_bulk(this->map, this->totalDataSize) == this->totalDataSize) {
+            if (this->queue.enqueue_bulk(this->map, this->totalDataSize) == this->totalDataSize) {
                 FINN_LOG_DEBUG(loglevel::info) << this->loggerPrefix() << "Stored " << this->totalDataSize << " elements in the ring buffer";
                 return true;
             } else {

@@ -17,6 +17,7 @@
 #include <FINNCppDriver/utils/Types.h>
 
 #include <algorithm>
+#include <array>
 #include <bit>
 #include <cmath>
 #include <concepts>

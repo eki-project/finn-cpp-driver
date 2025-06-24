@@ -16,6 +16,7 @@
 #ifndef SPSC_QUEUE_HPP
 #define SPSC_QUEUE_HPP
 
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <bit>

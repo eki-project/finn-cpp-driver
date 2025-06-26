@@ -135,8 +135,7 @@ namespace Finn {
               internalBo(xrt::bo(device, mapSize * sizeof(T), DeviceBuffer::getFlags(Finn::Options::hostMemoryAccess), 0)),
               map(internalBo.template map<T*>()),
               assocIPCore(xrt::ip(device, pDevUUID, pCUName)),  // Using xrt::kernel/getGroupId after this point leads to a total bricking of the FPGA card!!
-              bufAdr(internalBo.address()),
-              totalDataSize(FinnUtils::shapeToElements(pShapePacked) * batchSize) {
+              bufAdr(internalBo.address()){
             shapePacked[0] = batchSize;
             FINN_LOG(loglevel::info) << "[DeviceBuffer] "
                                      << "New Device Buffer of size " << mapSize * sizeof(T) << "bytes with group id " << 0 << "\n";
@@ -145,6 +144,7 @@ namespace Finn {
             FINN_LOG(loglevel::info) << "[DeviceBuffer] "
                                      << "Initializing DeviceBuffer " << name << " (SHAPE PACKED: " << FinnUtils::shapeToString(pShapePacked) << " inputs of the given shape, MAP SIZE: " << mapSize << ")\n";
             std::fill(map, map + mapSize, 0);
+            totalDataSize = FinnUtils::shapeToElements(pShapePacked) * batchSize;
             featureMapSize = totalDataSize / shapePacked[0];
         }
 

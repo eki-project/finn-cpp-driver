@@ -68,6 +68,7 @@ TEST(SyncInference, syncBatchInferenceTest) {
 
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);
+    Logger::initLogger(true);
 
     return RUN_ALL_TESTS();
 }

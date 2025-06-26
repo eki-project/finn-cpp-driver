@@ -13,10 +13,11 @@
 #ifndef FINN_UTILS_H
 #define FINN_UTILS_H
 
-#include <FINNCppDriver/utils/Logger.h>
 #include <FINNCppDriver/utils/Types.h>
 
+#include <FINNCppDriver/utils/Logger.hpp>  // for FINN_LOG, loglevel, ...
 #include <algorithm>
+#include <array>
 #include <bit>
 #include <cmath>
 #include <concepts>
@@ -193,10 +194,8 @@ namespace FinnUtils {
 
     /**
      * @brief Put some newlines into the log script for clearer reading
-     *
-     * @param logger
      */
-    inline void logSpacer(logger_type& logger) { FINN_LOG(logger, loglevel::info) << "\n\n\n\n"; }
+    inline void logSpacer() { FINN_LOG(loglevel::info) << "\n\n\n\n"; }
 
     /**
      * @brief Calculates the number of elements in a tensor given its shape.
@@ -265,7 +264,7 @@ namespace FinnUtils {
      */
     template<typename E>
     [[noreturn]] void logAndError(const std::string& msg) {
-        FINN_LOG(Logger::getLogger(), loglevel::error) << msg;
+        FINN_LOG(loglevel::error) << msg;
         throw E(msg);
     }
 

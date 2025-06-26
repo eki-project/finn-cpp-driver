@@ -10,3 +10,9 @@
 [submodule "external/xsimd"]
 	path = external/xsimd
 	url = https://github.com/xtensor-stack/xsimd.git
+[submodule "external/popl"]
+	path = external/popl
+	url = https://github.com/badaix/popl.git
+[submodule "external/plog"]
+	path = external/plog
+	url = https://github.com/SergiusTheBest/plog.git

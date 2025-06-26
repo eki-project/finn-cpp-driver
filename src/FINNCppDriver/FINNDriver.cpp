@@ -31,19 +31,19 @@
 #include <FINNCppDriver/utils/ConfigurationStructs.h>  // for Config
 #include <FINNCppDriver/utils/DoNotOptimize.h>         // for DoNotOptimize
 #include <FINNCppDriver/utils/FinnUtils.h>             // for logAndError
-#include <FINNCppDriver/utils/Logger.h>                // for FINN_LOG, ...
 #include <FINNCppDriver/utils/Types.h>                 // for shape_t
 
 #include <FINNCppDriver/core/BaseDriver.hpp>      // IWYU pragma: keep
 #include <FINNCppDriver/utils/DataPacking.hpp>    // for AutoReturnType
 #include <FINNCppDriver/utils/DynamicMdSpan.hpp>  // for DynamicMdSpan
-#include <boost/program_options.hpp>              // for variables_map
+#include <FINNCppDriver/utils/Logger.hpp>         // for FINN_LOG, ...
 #include <ext/alloc_traits.h>                     // for __alloc_tr...
-#include <xtensor/xadapt.hpp>                     // for adapt
-#include <xtensor/xarray.hpp>                     // for xarray_ada...
-#include <xtensor/xiterator.hpp>                  // for operator==
-#include <xtensor/xlayout.hpp>                    // for layout_type
-#include <xtensor/xnpy.hpp>                       // for dump_npy, ...
+#include <popl.hpp>                               // for program options
+#include <xtensor/containers/xadapt.hpp>          // for adapt
+#include <xtensor/containers/xarray.hpp>          // for xarray_ada...
+#include <xtensor/core/xiterator.hpp>             // for operator==
+#include <xtensor/core/xlayout.hpp>               // for layout_type
+#include <xtensor/io/xnpy.hpp>                    // for dump_npy, ...
 #include <xtl/xiterator_base.hpp>                 // for operator!=
 
 
@@ -96,20 +96,20 @@ std::string finnMainLogPrefix() { return "[FINNDriver] "; }
  * @param device
  * @param filename
  */
-void logDeviceInformation(logger_type& logger, xrt::device& device, const std::string& filename) {
+void logDeviceInformation(xrt::device& device, const std::string& filename) {
     auto bdfInfo = device.get_info<xrt::info::device::bdf>();
-    FINN_LOG(logger, loglevel::info) << "BDF: " << bdfInfo;
+    FINN_LOG(loglevel::info) << "BDF: " << bdfInfo;
     auto xclbin = xrt::xclbin(filename);
     auto kernels = xclbin.get_kernels();
 
     for (auto&& knl : kernels) {
-        FINN_LOG(logger, loglevel::info) << "Kernel: " << knl.get_name() << "\n";
+        FINN_LOG(loglevel::info) << "Kernel: " << knl.get_name() << "\n";
         for (auto&& arg : knl.get_args()) {
-            FINN_LOG(logger, loglevel::info) << "\t\t\tArg: " << arg.get_name() << " Size: " << arg.get_size() << "\n";
+            FINN_LOG(loglevel::info) << "\t\t\tArg: " << arg.get_name() << " Size: " << arg.get_size() << "\n";
         }
 
         for (auto&& compUnit : knl.get_cus()) {
-            FINN_LOG(logger, loglevel::info) << " \t\t\tCU: " << compUnit.get_name() << " Size: " << compUnit.get_size() << "\n";
+            FINN_LOG(loglevel::info) << " \t\t\tCU: " << compUnit.get_name() << " Size: " << compUnit.get_size() << "\n";
         }
     }
 }
@@ -124,9 +124,7 @@ void logDeviceInformation(logger_type& logger, xrt::device& device, const std::s
  */
 template<bool SynchronousInference>
 Finn::Driver<SynchronousInference> createDriverFromConfig(const std::filesystem::path& configFilePath, unsigned int batchSize) {
-    Finn::Driver<SynchronousInference> driver(configFilePath, batchSize);
-    driver.setForceAchieval(true);
-    return driver;
+    return Finn::Driver<SynchronousInference>(configFilePath, batchSize);
 }
 
 template<typename O>
@@ -144,7 +142,7 @@ void runThroughputTestImpl(Finn::Driver<true>& baseDriver, std::size_t elementCo
 
     auto gen = [&dist, &mersenneEngine]() { return dist(mersenneEngine); };
 
-    constexpr size_t nTestruns = 5000;
+    constexpr size_t nTestruns = 10;
     std::chrono::duration<double> sumRuntimeEnd2End{};
 
     // Warmup
@@ -214,14 +212,14 @@ void runThroughputTestImpl(Finn::Driver<true>& baseDriver, std::size_t elementCo
  * @param baseDriver
  * @param logger
  */
-void runThroughputTest(Finn::Driver<true>& baseDriver, logger_type& logger) {
-    FINN_LOG(logger, loglevel::info) << finnMainLogPrefix() << "Device Information: ";
-    logDeviceInformation(logger, baseDriver.getDeviceHandler(0).getDevice(), baseDriver.getConfig().deviceWrappers[0].xclbin);
+void runThroughputTest(Finn::Driver<true>& baseDriver) {
+    FINN_LOG(loglevel::info) << finnMainLogPrefix() << "Device Information: ";
+    logDeviceInformation(baseDriver.getDeviceHandler(0).getDevice(), baseDriver.getConfig().deviceWrappers[0].xclbin);
 
     size_t elementcount = FinnUtils::shapeToElements((std::static_pointer_cast<Finn::ExtendedBufferDescriptor>(baseDriver.getConfig().deviceWrappers[0].idmas[0]))->normalShape);
     uint batchSize = baseDriver.getBatchSize();
-    FINN_LOG(logger, loglevel::info) << finnMainLogPrefix() << "Input element count " << std::to_string(elementcount);
-    FINN_LOG(logger, loglevel::info) << finnMainLogPrefix() << "Batch size: " << batchSize;
+    FINN_LOG(loglevel::info) << finnMainLogPrefix() << "Input element count " << std::to_string(elementcount);
+    FINN_LOG(loglevel::info) << finnMainLogPrefix() << "Batch size: " << batchSize;
 
     constexpr bool isInteger = InputFinnType().isInteger();
     if constexpr (isInteger) {
@@ -333,9 +331,9 @@ void inferUnsignedInteger(Finn::Driver<true>& baseDriver, xt::detail::npy_file& 
  * @param inputFiles Files used for inference input
  * @param outputFiles Filenames used for output files
  */
-void runWithInputFile(Finn::Driver<true>& baseDriver, logger_type& logger, const std::vector<std::string>& inputFiles, const std::vector<std::string>& outputFiles) {
-    FINN_LOG(logger, loglevel::info) << finnMainLogPrefix() << "Running driver on input files";
-    logDeviceInformation(logger, baseDriver.getDeviceHandler(0).getDevice(), baseDriver.getConfig().deviceWrappers[0].xclbin);
+void runWithInputFile(Finn::Driver<true>& baseDriver, const std::vector<std::string>& inputFiles, const std::vector<std::string>& outputFiles) {
+    FINN_LOG(loglevel::info) << finnMainLogPrefix() << "Running driver on input files";
+    logDeviceInformation(baseDriver.getDeviceHandler(0).getDevice(), baseDriver.getConfig().deviceWrappers[0].xclbin);
 
     for (auto&& [inp, out] = std::tuple{inputFiles.begin(), outputFiles.begin()}; inp != inputFiles.end(); ++inp, ++out) {
         // load npy file and process it
@@ -385,62 +383,6 @@ void runWithInputFile(Finn::Driver<true>& baseDriver, logger_type& logger, const
 }
 
 /**
- * @brief Validates the user input for the driver mode switch
- *
- * @param mode User input string for selected mode
- */
-void validateDriverMode(const std::string& mode) {
-    if (mode != "execute" && mode != "throughput") {
-        throw boost::program_options::error_with_option_name("'" + mode + "' is not a valid driver mode!", "exec_mode");
-    }
-
-    FINN_LOG(Logger::getLogger(), loglevel::info) << finnMainLogPrefix() << "Driver Mode: " << mode;
-}
-
-/**
- * @brief Validates the user input for the batch size
- *
- * @param batch User input batch size
- */
-void validateBatchSize(int batch) {
-    if (batch <= 0) {
-        throw boost::program_options::error_with_option_name("Batch size must be positive, but is '" + std::to_string(batch) + "'", "batchsize");
-    }
-}
-
-/**
- * @brief Validates the user input for the config path. Also checks if file exists
- *
- * @param path Path string to be validated
- */
-void validateConfigPath(const std::string& path) {
-    auto configFilePath = std::filesystem::path(path);
-    if (!std::filesystem::exists(configFilePath)) {
-        throw boost::program_options::error_with_option_name("Cannot find config file at " + configFilePath.string(), "configpath");
-    }
-
-    FINN_LOG(Logger::getLogger(), loglevel::info) << finnMainLogPrefix() << "Config file found at " << configFilePath.string();
-}
-
-/**
- * @brief Validates the user input for the input file path. Also checks if input file exists.
- *
- * @param path Path string to be validated
- */
-void validateInputPath(const std::vector<std::string>& path) {
-    for (auto&& elem : path) {
-        auto inputFilePath = std::filesystem::path(elem);
-        if (!std::filesystem::exists(inputFilePath)) {
-            throw boost::program_options::error_with_option_name("Cannot find input file at " + inputFilePath.string(), "input");
-        }
-        FINN_LOG(Logger::getLogger(), loglevel::info) << finnMainLogPrefix() << "Input file found at " << inputFilePath.string();
-    }
-}
-
-
-namespace po = boost::program_options;
-
-/**
  * @brief Main entrypoint for the frontend of the C++ Finn driver
  *
  * @param argc Number of command line parameters
@@ -448,58 +390,105 @@ namespace po = boost::program_options;
  * @return int Exit status code
  */
 int main(int argc, char* argv[]) {
-    auto logger = Logger::getLogger();
-    FINN_LOG(logger, loglevel::info) << "C++ Driver started";
+    Logger::initLogger();
+    FINN_LOG(loglevel::info) << "C++ Driver started";
 
     try {
         // Command Line Argument Parser
-        po::options_description desc{"Options"};
-        // clang-format off
-        desc.add_options()("help,h", "Display help")("exec_mode,e", po::value<std::string>()->default_value("throughput")->notifier(&validateDriverMode),
-            R"(Please select functional verification ("execute") or throughput test ("throughput")")("configpath,c", po::value<std::string>()->required()->notifier(&validateConfigPath),
-                "Required: Path to the config.json file emitted by the FINN compiler")(
-                    "input,i", po::value<std::vector<std::string>>()->multitoken()->composing()->notifier(&validateInputPath), "Path to one or more input files (npy format). Only required if mode is set to \"file\"")(
-                        "output,o", po::value<std::vector<std::string>>()->multitoken()->composing(), "Path to one or more output files (npy format). Only required if mode is set to \"file\"")(
-                            "batchsize,b", po::value<int>()->default_value(1)->notifier(&validateBatchSize), "Number of samples for inference")("check", "Outputs the compile time configuration");
-        // clang-format on
-        po::variables_map varMap;
-        po::store(po::parse_command_line(argc, argv, desc), varMap);
+        popl::OptionParser options("Options");
+
+        auto help_option = options.add<popl::Switch>("h", "help", "Display help");
+        auto mode_option = options.add<popl::Value<std::string>>("e", "exec_mode", R"(Please select functional verification ("execute") or throughput test ("throughput")", "throughput");
+        auto config_option = options.add<popl::Value<std::string>>("c", "configpath", "Required: Path to the config.json file emitted by the FINN compiler");
+        auto input_option = options.add<popl::Value<std::string>>("i", "input", "Path to one or more input files (npy format). Only required if mode is set to \"file\"");
+        auto output_option = options.add<popl::Value<std::string>>("o", "output", "Path to one or more output files (npy format). Only required if mode is set to \"file\"");
+        auto batch_option = options.add<popl::Value<unsigned>>("b", "batchsize", "Number of samples for inference", 1);
+        auto check_option = options.add<popl::Switch>("", "check", "Outputs the compile time configuration");
+
+        options.parse(argc, argv);
 
         // Display help screen
-        // Help option has to be processed before po::notify call to not enforce required options in combination with help
-        if (varMap.count("help") != 0) {
-            std::cout << desc << "\n";
+        if (help_option->is_set()) {
+            std::cout << options << "\n";
             return 0;
         }
 
-        if (varMap.count("check") != 0) {
+        if (check_option->is_set()) {
             std::cout << "input_t: " << Finn::type_name<InputFinnType>() << "\n";
             std::cout << "output_t: " << Finn::type_name<OutputFinnType>() << "\n";
             return 0;
         }
 
-        po::notify(varMap);
 
-        FINN_LOG(logger, loglevel::info) << finnMainLogPrefix() << "Parsed command line params";
+        if (mode_option->count() > 1) {
+            throw std::runtime_error("Command Line Argument Error: exec_mode can only be set once!");
+        }
+
+        std::string mode = mode_option->value();
+
+        if (mode != "execute" && mode != "throughput") {
+            throw std::runtime_error("Command Line Argument Error:'" + mode + "' is not a valid driver mode!");
+        }
+
+        FINN_LOG(loglevel::info) << finnMainLogPrefix() << "Driver Mode: " << mode;
+
+
+        if (config_option->is_set()) {
+            if (config_option->count() != 1) {
+                throw std::runtime_error("Command Line Argument Error: configpath can only be set once!");
+            }
+
+            auto configFilePath = std::filesystem::path(config_option->value());
+            if (!std::filesystem::exists(configFilePath)) {
+                throw std::runtime_error("Command Line Argument Error: Cannot find config file at " + configFilePath.string());
+            }
+
+            FINN_LOG(loglevel::info) << finnMainLogPrefix() << "Config file found at " << configFilePath.string();
+        } else {
+            throw std::runtime_error("Command Line Argument Error: configpath is required to be set!");
+        }
+
+        if (input_option->is_set()) {
+            for (size_t i = 0; i < input_option->count(); ++i) {
+                std::string elem = input_option->value(i);
+                auto inputFilePath = std::filesystem::path(elem);
+                if (!std::filesystem::exists(inputFilePath)) {
+                    throw std::runtime_error("Command Line Argument Error: Cannot find input file at " + inputFilePath.string());
+                }
+                FINN_LOG_DEBUG(loglevel::info) << finnMainLogPrefix() << "Input file found at " << inputFilePath.string();
+            }
+        }
+
+        FINN_LOG(loglevel::info) << finnMainLogPrefix() << "Parsed command line params";
 
         // Switch on modes
-        if (varMap["exec_mode"].as<std::string>() == "execute") {
-            if (varMap.count("input") == 0) {
+        if (mode_option->value() == "execute") {
+            if (!input_option->is_set()) {
                 FinnUtils::logAndError<std::invalid_argument>("No input file(s) specified for file execution mode!");
             }
-            if (varMap.count("output") == 0) {
+            if (!output_option->is_set()) {
                 FinnUtils::logAndError<std::invalid_argument>("No output file(s) specified for file execution mode!");
             }
-            if (varMap.count("input") != varMap.count("output")) {
+            if (input_option->count() != output_option->count()) {
                 FinnUtils::logAndError<std::invalid_argument>("Same amount of input and output files required!");
             }
-            auto driver = createDriverFromConfig<true>(varMap["configpath"].as<std::string>(), static_cast<uint>(varMap["batchsize"].as<int>()));
-            runWithInputFile(driver, logger, varMap["input"].as<std::vector<std::string>>(), varMap["output"].as<std::vector<std::string>>());
-        } else if (varMap["exec_mode"].as<std::string>() == "throughput") {
-            auto driver = createDriverFromConfig<true>(varMap["configpath"].as<std::string>(), static_cast<uint>(varMap["batchsize"].as<int>()));
-            runThroughputTest(driver, logger);
+
+            std::vector<std::string> inputVec;
+            for (size_t i = 0; i < input_option->count(); ++i) {
+                inputVec.emplace_back(input_option->value(i));
+            }
+            std::vector<std::string> outputVec;
+            for (size_t i = 0; i < output_option->count(); ++i) {
+                outputVec.emplace_back(output_option->value(i));
+            }
+
+            auto driver = createDriverFromConfig<true>(config_option->value(), batch_option->value());
+            runWithInputFile(driver, inputVec, outputVec);
+        } else if (mode_option->value() == "throughput") {
+            auto driver = createDriverFromConfig<true>(config_option->value(), batch_option->value());
+            runThroughputTest(driver);
         } else {
-            FinnUtils::logAndError<std::invalid_argument>("Unknown driver mode: " + varMap["exec_mode"].as<std::string>());
+            FinnUtils::logAndError<std::invalid_argument>("Unknown driver mode: " + mode_option->value());
         }
 
         return 1;

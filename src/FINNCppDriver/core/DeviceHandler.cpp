@@ -11,14 +11,13 @@
  */
 
 #include <FINNCppDriver/core/DeviceHandler.h>
-#include <FINNCppDriver/utils/Logger.h>
 #include <FINNCppDriver/utils/Types.h>
 
 #include <FINNCppDriver/core/DeviceBuffer/AsyncDeviceBuffers.hpp>
 #include <FINNCppDriver/core/DeviceBuffer/DeviceBuffer.hpp>
 #include <FINNCppDriver/core/DeviceBuffer/SyncDeviceBuffers.hpp>
+#include <FINNCppDriver/utils/Logger.hpp>
 #include <algorithm>  // for copy
-#include <boost/cstdint.hpp>
 #include <cerrno>
 #include <chrono>
 #include <filesystem>  // for path
@@ -44,7 +43,7 @@ namespace Finn {
         initializeDevice();
         loadXclbinSetUUID();
         initializeBufferObjects(devWrap, hostBufferSize, pSynchronousInference);
-        FINN_LOG(Logger::getLogger(), loglevel::info) << loggerPrefix() << "Finished setting up device " << xrtDeviceIndex;
+        FINN_LOG(loglevel::info) << loggerPrefix() << "Finished setting up device " << xrtDeviceIndex;
     }
 
     std::string DeviceHandler::loggerPrefix() { return "[DeviceHandler] "; }
@@ -83,20 +82,20 @@ namespace Finn {
     }
 
     void DeviceHandler::initializeDevice() {
-        FINN_LOG(Logger::getLogger(), loglevel::info) << loggerPrefix() << "(" << xrtDeviceIndex << ") "
-                                                      << "Initializing xrt::device, loading xclbin and assigning IP\n";
+        FINN_LOG(loglevel::info) << loggerPrefix() << "(" << xrtDeviceIndex << ") "
+                                 << "Initializing xrt::device, loading xclbin and assigning IP\n";
         device = xrt::device(xrtDeviceIndex);
     }
 
     void DeviceHandler::loadXclbinSetUUID() {
-        FINN_LOG(Logger::getLogger(), loglevel::info) << loggerPrefix() << "(" << xrtDeviceIndex << ") "
-                                                      << "Loading XCLBIN and setting uuid\n";
+        FINN_LOG(loglevel::info) << loggerPrefix() << "(" << xrtDeviceIndex << ") "
+                                 << "Loading XCLBIN and setting uuid\n";
         uuid = device.load_xclbin(xclbinPath);
     }
 
     void DeviceHandler::initializeBufferObjects(const DeviceWrapper& devWrap, unsigned int hostBufferSize, bool pSynchronousInference) {
-        FINN_LOG(Logger::getLogger(), loglevel::info) << loggerPrefix() << "(" << xrtDeviceIndex << ") "
-                                                      << "Initializing buffer objects with buffer size " << hostBufferSize << "\n";
+        FINN_LOG(loglevel::info) << loggerPrefix() << "(" << xrtDeviceIndex << ") "
+                                 << "Initializing buffer objects with buffer size " << hostBufferSize << "\n";
         for (auto&& ebdptr : devWrap.idmas) {
             if (pSynchronousInference) {
                 inputBufferMap.emplace(std::make_pair(ebdptr->kernelName, std::make_shared<Finn::SyncDeviceInputBuffer<uint8_t>>(ebdptr->kernelName, device, uuid, ebdptr->packedShape, hostBufferSize)));
@@ -110,11 +109,10 @@ namespace Finn {
                 outputBufferMap.emplace(std::make_pair(ebdptr->kernelName, ptr));
             } else {
                 auto ptr = std::make_shared<Finn::AsyncDeviceOutputBuffer<uint8_t>>(ebdptr->kernelName, device, uuid, ebdptr->packedShape, hostBufferSize);
-                ptr->allocateLongTermStorage(hostBufferSize * 5);
                 outputBufferMap.emplace(std::make_pair(ebdptr->kernelName, ptr));
             }
         }
-        FINN_LOG(Logger::getLogger(), loglevel::info) << loggerPrefix() << "Finished initializing buffer objects on device " << xrtDeviceIndex;
+        FINN_LOG(loglevel::info) << loggerPrefix() << "Finished initializing buffer objects on device " << xrtDeviceIndex;
 
 #ifndef NDEBUG
         isBufferMapCollisionFree();
@@ -127,8 +125,8 @@ namespace Finn {
         if (this->batchsize == pBatchsize) {
             return;
         } else {
-            FINN_LOG(Logger::getLogger(), loglevel::info) << loggerPrefix() << "(" << xrtDeviceIndex << ") "
-                                                          << "Change batch size to " << pBatchsize << "\n";
+            FINN_LOG(loglevel::info) << loggerPrefix() << "(" << xrtDeviceIndex << ") "
+                                     << "Change batch size to " << pBatchsize << "\n";
             this->batchsize = pBatchsize;
             inputBufferMap.clear();
             outputBufferMap.clear();
@@ -194,25 +192,48 @@ namespace Finn {
     }
 
 
-    [[maybe_unused]] Finn::vector<uint8_t> DeviceHandler::retrieveResults(const std::string& outputBufferKernelName, bool forceArchival) {
+    [[maybe_unused]] Finn::vector<uint8_t> DeviceHandler::retrieveResults(const std::string& outputBufferKernelName) {
         if (!outputBufferMap.contains(outputBufferKernelName)) {
             auto newlineFold = [](std::string a, const auto& b) { return std::move(a) + '\n' + std::move(b.first); };
             std::string existingNames = "Existing buffer names:";
             std::accumulate(inputBufferMap.begin(), inputBufferMap.end(), existingNames, newlineFold);
             FinnUtils::logAndError<std::runtime_error>(loggerPrefix() + " [retrieve] Tried accessing kernel/buffer with name " + outputBufferKernelName + " but this kernel / buffer does not exist! " + existingNames);
         }
-        if (forceArchival) {
-            // TODO(linusjun): Fix for asynchronous inference
-            // outputBufferMap.at(outputBufferKernelName)->archiveValidBufferParts();
-        }
         return outputBufferMap.at(outputBufferKernelName)->getData();
     }
 
-    size_t DeviceHandler::size(SIZE_SPECIFIER ss, const std::string& bufferName) {
+    size_t DeviceHandler::getSizeInBytes(const std::string& bufferName) {
         if (inputBufferMap.contains(bufferName)) {
-            return inputBufferMap.at(bufferName)->size(ss);
+            return inputBufferMap.at(bufferName)->getSizeInBytes();
         } else if (outputBufferMap.contains(bufferName)) {
-            return outputBufferMap.at(bufferName)->size(ss);
+            return outputBufferMap.at(bufferName)->getSizeInBytes();
+        }
+        return 0;
+    }
+
+    size_t DeviceHandler::getFeatureMapSize(const std::string& bufferName) {
+        if (inputBufferMap.contains(bufferName)) {
+            return inputBufferMap.at(bufferName)->getFeatureMapSize();
+        } else if (outputBufferMap.contains(bufferName)) {
+            return outputBufferMap.at(bufferName)->getFeatureMapSize();
+        }
+        return 0;
+    }
+
+    size_t DeviceHandler::getBatchSize(const std::string& bufferName) {
+        if (inputBufferMap.contains(bufferName)) {
+            return inputBufferMap.at(bufferName)->getBatchSize();
+        } else if (outputBufferMap.contains(bufferName)) {
+            return outputBufferMap.at(bufferName)->getBatchSize();
+        }
+        return 0;
+    }
+
+    size_t DeviceHandler::getTotalDataSize(const std::string& bufferName) {
+        if (inputBufferMap.contains(bufferName)) {
+            return inputBufferMap.at(bufferName)->getTotalDataSize();
+        } else if (outputBufferMap.contains(bufferName)) {
+            return outputBufferMap.at(bufferName)->getTotalDataSize();
         }
         return 0;
     }
@@ -223,15 +244,15 @@ namespace Finn {
         bool collisionFound = false;
         for (size_t index = 0; index < inputBufferMap.bucket_count(); ++index) {
             if (inputBufferMap.bucket_size(index) > 1) {
-                FINN_LOG_DEBUG(Logger::getLogger(), loglevel::error) << loggerPrefix() << "(" << xrtDeviceIndex << ") "
-                                                                     << "Hash collision in inputBufferMap. This access to the inputBufferMap is no longer constant time!";
+                FINN_LOG_DEBUG(loglevel::error) << loggerPrefix() << "(" << xrtDeviceIndex << ") "
+                                                << "Hash collision in inputBufferMap. This access to the inputBufferMap is no longer constant time!";
                 collisionFound = true;
             }
         }
         for (size_t index = 0; index < outputBufferMap.bucket_count(); ++index) {
             if (outputBufferMap.bucket_size(index) > 1) {
-                FINN_LOG_DEBUG(Logger::getLogger(), loglevel::error) << loggerPrefix() << "(" << xrtDeviceIndex << ") "
-                                                                     << "Hash collision in outputBufferMap. This access to the outputBufferMap is no longer constant time!";
+                FINN_LOG_DEBUG(loglevel::error) << loggerPrefix() << "(" << xrtDeviceIndex << ") "
+                                                << "Hash collision in outputBufferMap. This access to the outputBufferMap is no longer constant time!";
                 collisionFound = true;
             }
         }

@@ -60,8 +60,8 @@ namespace xrt {
          * Constructor throws on error.
          */
         ip(const xrt::device& device, const xrt::uuid& xclbin_id, const std::string& name) {
-            FINN_LOG(Logger::getLogger(), loglevel::debug) << "[xrt::ip mock]"
-                                                           << "Create kernel with name: " << name;
+            FINN_LOG(loglevel::debug) << "[xrt::ip mock]"
+                                      << "Create kernel with name: " << name;
             kernel_device.emplace_back(device);
             kernel_uuid.emplace_back(xclbin_id);
             kernel_name.emplace_back(name);

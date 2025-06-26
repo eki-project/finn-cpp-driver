@@ -12,10 +12,10 @@
 
 #include <FINNCppDriver/utils/ConfigurationStructs.h>
 #include <FINNCppDriver/utils/FinnUtils.h>
-#include <FINNCppDriver/utils/Logger.h>
 #include <FINNCppDriver/utils/Types.h>
 
 #include <FINNCppDriver/utils/FinnDatatypes.hpp>
+#include <FINNCppDriver/utils/Logger.hpp>
 #include <array>
 #include <filesystem>
 #include <memory>

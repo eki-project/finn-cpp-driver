@@ -21,6 +21,9 @@
 namespace Finn {
     template<typename T>
     class SyncDeviceInputBuffer : public DeviceInputBuffer<T> {
+         private:
+        friend class DeviceInputBuffer<T>;
+
          public:
         /**
          * @brief Construct a new Sync Device Input Buffer object
@@ -32,8 +35,8 @@ namespace Finn {
          * @param batchSize batch size
          */
         SyncDeviceInputBuffer(const std::string& pCUName, xrt::device& device, xrt::uuid& pDevUUID, const shapePacked_t& pShapePacked, unsigned int batchSize) : DeviceInputBuffer<T>(pCUName, device, pDevUUID, pShapePacked, batchSize) {
-            FINN_LOG(this->logger, loglevel::info) << "[SyncDeviceInputBuffer] "
-                                                   << "Initializing DeviceBuffer " << this->name << " (SHAPE PACKED: " << FinnUtils::shapeToString(pShapePacked) << " inputs of the given shape, MAP SIZE: " << this->mapSize << ")\n";
+            FINN_LOG(loglevel::info) << "[SyncDeviceInputBuffer] "
+                                     << "Initializing DeviceBuffer " << this->name << " (SHAPE PACKED: " << FinnUtils::shapeToString(pShapePacked) << " inputs of the given shape, MAP SIZE: " << this->mapSize << ")\n";
             this->shapePacked[0] = batchSize;
         };
 
@@ -79,29 +82,6 @@ namespace Finn {
          protected:
 #endif
 
-         private:
-        friend class DeviceInputBuffer<T>;
-
-         public:
-        size_t size(SIZE_SPECIFIER ss) override {
-            switch (ss) {
-                case SIZE_SPECIFIER::BYTES: {
-                    return FinnUtils::shapeToElements(this->shapePacked) * sizeof(T);
-                }
-                case SIZE_SPECIFIER::FEATUREMAP_SIZE: {
-                    return FinnUtils::shapeToElements(this->shapePacked) / this->shapePacked[0];
-                }
-                case SIZE_SPECIFIER::BATCHSIZE: {
-                    return this->shapePacked[0];
-                }
-                case SIZE_SPECIFIER::TOTAL_DATA_SIZE: {
-                    return FinnUtils::shapeToElements(this->shapePacked);
-                }
-                default:
-                    return 0;
-            }
-        }
-
         /**
          * @brief Store the given data in the input map of the FPGA
          *
@@ -121,7 +101,7 @@ namespace Finn {
          * @return false
          */
         bool run() override {
-            FINN_LOG_DEBUG(this->logger, loglevel::info) << this->loggerPrefix() << "DeviceBuffer (" << this->name << ") executing...";
+            FINN_LOG_DEBUG(loglevel::info) << this->loggerPrefix() << "DeviceBuffer (" << this->name << ") executing...";
             this->sync(FinnUtils::shapeToElements(this->shapePacked));
             this->execute(this->shapePacked[0]);
             return true;
@@ -135,9 +115,6 @@ namespace Finn {
      */
     template<typename T>
     class SyncDeviceOutputBuffer : public DeviceOutputBuffer<T> {
-         private:
-        std::size_t elementCount;
-
          public:
         /**
          * @brief Construct a new Synchronous Device Output Buffer object
@@ -148,9 +125,8 @@ namespace Finn {
          * @param pShapePacked packed shape of input
          * @param ringBufferSizeFactor size of ringbuffer in input elements (batch elements)
          */
-        SyncDeviceOutputBuffer(const std::string& pCUName, xrt::device& device, xrt::uuid& pDevUUID, const shapePacked_t& pShapePacked, unsigned int batchSize) : DeviceOutputBuffer<T>(pCUName, device, pDevUUID, pShapePacked) {
+        SyncDeviceOutputBuffer(const std::string& pCUName, xrt::device& device, xrt::uuid& pDevUUID, const shapePacked_t& pShapePacked, unsigned int batchSize) : DeviceOutputBuffer<T>(pCUName, device, pDevUUID, pShapePacked, batchSize) {
             this->shapePacked[0] = batchSize;
-            elementCount = FinnUtils::shapeToElements(this->shapePacked);
         };
 
         /**
@@ -186,37 +162,12 @@ namespace Finn {
         SyncDeviceOutputBuffer& operator=(const SyncDeviceOutputBuffer& buf) = delete;
 
         /**
-         * @brief Return the size of the buffer as specified by the argument. Bytes returns all bytes the buffer takes up, elements returns the number of T-values, numbers the number of F-values.
-         *
-         * @param ss
-         * @return size_t
-         */
-        size_t size(SIZE_SPECIFIER ss) override {
-            switch (ss) {
-                case SIZE_SPECIFIER::BYTES: {
-                    return elementCount * sizeof(T);
-                }
-                case SIZE_SPECIFIER::FEATUREMAP_SIZE: {
-                    return elementCount / this->shapePacked[0];
-                }
-                case SIZE_SPECIFIER::BATCHSIZE: {
-                    return this->shapePacked[0];
-                }
-                case SIZE_SPECIFIER::TOTAL_DATA_SIZE: {
-                    return elementCount;
-                }
-                default:
-                    return 0;
-            }
-        }
-
-        /**
          * @brief Return the data contained in the FPGA Buffer map.
          *
          * @return Finn::vector<T>
          */
         Finn::vector<T> getData() override {
-            Finn::vector<T> tmp(this->map, this->map + elementCount);
+            Finn::vector<T> tmp(this->map, this->map + this->totalDataSize);
             return tmp;
         }
 
@@ -227,7 +178,7 @@ namespace Finn {
          * @return false
          */
         bool run() override {
-            FINN_LOG_DEBUG(this->logger, loglevel::info) << this->loggerPrefix() << "DeviceBuffer (" << this->name << ") executing...";
+            FINN_LOG_DEBUG(loglevel::info) << this->loggerPrefix() << "DeviceBuffer (" << this->name << ") executing...";
             this->execute(this->shapePacked[0]);
             return true;
         }
@@ -238,8 +189,8 @@ namespace Finn {
          * @return bool
          */
         bool read() override {
-            FINN_LOG_DEBUG(this->logger, loglevel::info) << this->loggerPrefix() << "Synching  " << elementCount << " bytes from the device";
-            this->sync(elementCount);
+            FINN_LOG_DEBUG(loglevel::info) << this->loggerPrefix() << "Synching  " << this->totalDataSize << " bytes from the device";
+            this->sync(this->totalDataSize);
             return true;
         }
     };

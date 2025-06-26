@@ -15,12 +15,12 @@
 
 #include <FINNCppDriver/utils/ConfigurationStructs.h>
 #include <FINNCppDriver/utils/FinnUtils.h>
-#include <FINNCppDriver/utils/Logger.h>
 #include <FINNCppDriver/utils/Types.h>
 
 #include <FINNCppDriver/utils/DataPacking.hpp>
 #include <FINNCppDriver/utils/DynamicMdSpan.hpp>
 #include <FINNCppDriver/utils/FinnDatatypes.hpp>
+#include <FINNCppDriver/utils/Logger.hpp>  // for FINN_LOG, loglevel, ...
 #include <FINNCppDriver/utils/join.hpp>
 #include <bitset>
 #include <cinttypes>  // for uint8_t
@@ -48,14 +48,12 @@ namespace Finn {
     class BaseDriver {
         Accelerator accelerator;
         Config configuration;
-        logger_type& logger = Logger::getLogger();
 
         uint defaultInputDeviceIndex = 0;
         std::string defaultInputKernelName;
         uint defaultOutputDeviceIndex = 0;
         std::string defaultOutputKernelName;
         uint batchElements = 1;
-        bool forceAchieval = false;
 
         /**
          * @brief A logger prefix to determine the source of a log write
@@ -94,7 +92,7 @@ namespace Finn {
          * @param configPath
          * @param batchSize
          */
-        BaseDriver(const std::filesystem::path& configPath, uint batchSize) : configuration(createConfigFromPath(configPath)), logger(Logger::getLogger()) { initializeBaseDriver(batchSize); };
+        BaseDriver(const std::filesystem::path& configPath, uint batchSize) : configuration(createConfigFromPath(configPath)) { initializeBaseDriver(batchSize); };
 
         /**
          * @brief Create a new base driver based on an existing configuration
@@ -102,7 +100,7 @@ namespace Finn {
          * @param pConfig
          * @param batchSize
          */
-        BaseDriver(const Config& pConfig, uint batchSize) : configuration(pConfig), logger(Logger::getLogger()) { initializeBaseDriver(batchSize); }
+        BaseDriver(const Config& pConfig, uint batchSize) : configuration(pConfig) { initializeBaseDriver(batchSize); }
 
         /**
          * @brief Construct a new Base Driver object
@@ -114,10 +112,9 @@ namespace Finn {
          * @param outputDeviceIndex
          * @param outputKernelName
          * @param batchSize
-         * @param pForceAchieval
          */
-        BaseDriver(const std::filesystem::path& configPath, uint inputDeviceIndex, const std::string& inputKernelName, uint outputDeviceIndex, const std::string& outputKernelName, uint batchSize, bool pForceAchieval)
-            : configuration(createConfigFromPath(configPath)), logger(Logger::getLogger()), forceAchieval(pForceAchieval) {
+        BaseDriver(const std::filesystem::path& configPath, uint inputDeviceIndex, const std::string& inputKernelName, uint outputDeviceIndex, const std::string& outputKernelName, uint batchSize)
+            : configuration(createConfigFromPath(configPath)) {
             initializeBaseDriver(batchSize);
         }
 
@@ -131,12 +128,8 @@ namespace Finn {
          * @param outputDeviceIndex
          * @param outputKernelName
          * @param batchSize
-         * @param pForceAchieval
          */
-        BaseDriver(const Config& pConfig, uint inputDeviceIndex, const std::string& inputKernelName, uint outputDeviceIndex, const std::string& outputKernelName, uint batchSize, bool pForceAchieval)
-            : configuration(pConfig), logger(Logger::getLogger()), forceAchieval(pForceAchieval) {
-            initializeBaseDriver(batchSize);
-        }
+        BaseDriver(const Config& pConfig, uint inputDeviceIndex, const std::string& inputKernelName, uint outputDeviceIndex, const std::string& outputKernelName, uint batchSize) : configuration(pConfig) { initializeBaseDriver(batchSize); }
 
         /**
          * @brief Construct a new Base Driver object
@@ -212,13 +205,6 @@ namespace Finn {
         uint getBatchSize() { return batchElements; }
 
         /**
-         * @brief Set the Force Achieval
-         *
-         * @param force
-         */
-        void setForceAchieval(bool force) { forceAchieval = force; }
-
-        /**
          * @brief Get the Config object. Simple getter to check things outside the driver
          *
          * @return Config
@@ -242,16 +228,13 @@ namespace Finn {
          */
         std::shared_ptr<DeviceInputBuffer<uint8_t>> getInputBuffer(uint deviceIndex, const std::string& bufferName) { return getDeviceHandler(deviceIndex).getInputBuffer(bufferName); }
 
-        /**
-         * @brief Return the size (type specified by SIZE_SPECIFIER) at the given device at the given buffer
-         *
-         * @param ss
-         * @param deviceIndex
-         * @param bufferName
-         * @return size_t
-         */
-        size_t size(SIZE_SPECIFIER ss, uint deviceIndex, const std::string& bufferName) { return accelerator.size(ss, deviceIndex, bufferName); }
+        size_t getSizeInBytes(unsigned int deviceIndex, const std::string& bufferName) { return accelerator.getSizeInBytes(deviceIndex, bufferName); }
 
+        size_t getFeatureMapSize(unsigned int deviceIndex, const std::string& bufferName) { return accelerator.getFeatureMapSize(deviceIndex, bufferName); }
+
+        size_t getBatchSize(unsigned int deviceIndex, const std::string& bufferName) { return accelerator.getBatchSize(deviceIndex, bufferName); }
+
+        size_t getTotalDataSize(unsigned int deviceIndex, const std::string& bufferName) { return accelerator.getTotalDataSize(deviceIndex, bufferName); }
 
         /**
          * @brief Store input into the driver for asynchronous inference
@@ -265,14 +248,14 @@ namespace Finn {
          */
         template<typename IteratorType, typename = std::enable_if<!SynchronousInference>>
         void input(IteratorType first, IteratorType last, uint inputDeviceIndex, const std::string& inputBufferKernelName, uint batchSize) {
-            FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "Store data for asynchronous inference.";
+            FINN_LOG_DEBUG(loglevel::info) << loggerPrefix() << "Store data for asynchronous inference.";
             auto packed = Finn::pack<F>(first, last);
             auto storeFunc = accelerator.storeFactory(inputDeviceIndex, inputBufferKernelName);
 
-            if (std::abs(std::distance(packed.begin(), packed.end())) != size(SIZE_SPECIFIER::FEATUREMAP_SIZE, inputDeviceIndex, inputBufferKernelName) * batchSize) {
+            if (std::abs(std::distance(packed.begin(), packed.end())) != getFeatureMapSize(inputDeviceIndex, inputBufferKernelName) * batchSize) {
                 FinnUtils::logAndError<std::runtime_error>("Input length (" + std::to_string(std::abs(std::distance(packed.begin(), packed.end()))) + ") does not match up with batches*inputsize_per_batch (" +
-                                                           std::to_string(size(SIZE_SPECIFIER::FEATUREMAP_SIZE, inputDeviceIndex, inputBufferKernelName)) + "*" + std::to_string(batchSize) + "=" +
-                                                           std::to_string(size(SIZE_SPECIFIER::FEATUREMAP_SIZE, inputDeviceIndex, inputBufferKernelName) * batchSize) + ")");
+                                                           std::to_string(getFeatureMapSize(inputDeviceIndex, inputBufferKernelName)) + "*" + std::to_string(batchSize) + "=" +
+                                                           std::to_string(getFeatureMapSize(inputDeviceIndex, inputBufferKernelName) * batchSize) + ")");
             }
 
             storeFunc(packed.begin(), packed.end());
@@ -297,13 +280,12 @@ namespace Finn {
          * @tparam V
          * @param outputDeviceIndex FPGA device from which data should be received
          * @param outputBufferKernelName Identifier of the output kernel
-         * @param forceArchival Should data be explicitly polled?
          * @return Finn::vector<V>
          */
         template<typename V = Finn::UnpackingAutoRetType::AutoRetType<S>, typename = std::enable_if<!SynchronousInference>>
-        [[nodiscard]] Finn::vector<V> getResults(uint outputDeviceIndex, const std::string& outputBufferKernelName, bool forceArchival) {
+        [[nodiscard]] Finn::vector<V> getResults(uint outputDeviceIndex, const std::string& outputBufferKernelName) {
             // TODO(linusjun): maybe this method should block until data is available?
-            auto result = accelerator.getOutputData(outputDeviceIndex, outputBufferKernelName, forceArchival);
+            auto result = accelerator.getOutputData(outputDeviceIndex, outputBufferKernelName);
             return unpack<S, V>(result);
         }
 
@@ -317,7 +299,7 @@ namespace Finn {
         template<typename V = Finn::UnpackingAutoRetType::AutoRetType<S>, typename = std::enable_if<!SynchronousInference>>
         [[nodiscard]] Finn::vector<V> getResults() {
             // TODO(linusjun): maybe this method should block until data is available?
-            auto result = accelerator.getOutputData(defaultOutputDeviceIndex, defaultOutputKernelName, forceAchieval);
+            auto result = accelerator.getOutputData(defaultOutputDeviceIndex, defaultOutputKernelName);
             return unpack<S, V>(result);
         }
 
@@ -333,12 +315,10 @@ namespace Finn {
          * @param inputBufferKernelName name of input kernel
          * @param outputDeviceIndex index of output FPGA
          * @param outputBufferKernelName name of output kernel
-         * @param forceArchival
          * @return Finn::vector<V>
          */
         template<typename IteratorType, typename V = Finn::UnpackingAutoRetType::AutoRetType<S>, typename = std::enable_if<SynchronousInference>>
-        [[nodiscard]] Finn::vector<V> inferSynchronous(IteratorType first, IteratorType last, uint inputDeviceIndex, const std::string& inputBufferKernelName, uint outputDeviceIndex, const std::string& outputBufferKernelName,
-                                                       bool forceArchival) {
+        [[nodiscard]] Finn::vector<V> inferSynchronous(IteratorType first, IteratorType last, uint inputDeviceIndex, const std::string& inputBufferKernelName, uint outputDeviceIndex, const std::string& outputBufferKernelName) {
             using IterValueType = typename std::iterator_traits<IteratorType>::value_type;
             static auto foldedShape = static_cast<Finn::ExtendedBufferDescriptor*>(configuration.deviceWrappers[inputDeviceIndex].idmas[0].get())->foldedShape;
             foldedShape[0] = batchElements;
@@ -346,7 +326,7 @@ namespace Finn {
 
             auto packed = Finn::packMultiDimensionalInputs<F, IteratorType>(first, last, reshapedInput, foldedShape.back());
 
-            auto result = infer(packed.begin(), packed.end(), inputDeviceIndex, inputBufferKernelName, outputDeviceIndex, outputBufferKernelName, batchElements, forceArchival);
+            auto result = infer(packed.begin(), packed.end(), inputDeviceIndex, inputBufferKernelName, outputDeviceIndex, outputBufferKernelName, batchElements);
 
             static auto packedOutput = configuration.deviceWrappers[inputDeviceIndex].odmas[0]->packedShape;
             packedOutput[0] = batchElements;
@@ -370,7 +350,7 @@ namespace Finn {
          */
         template<typename IteratorType, typename V = Finn::UnpackingAutoRetType::AutoRetType<S>, typename = std::enable_if<SynchronousInference>>
         [[nodiscard]] Finn::vector<V> inferSynchronous(IteratorType first, IteratorType last) {
-            return inferSynchronous(first, last, defaultInputDeviceIndex, defaultInputKernelName, defaultOutputDeviceIndex, defaultOutputKernelName, forceAchieval);
+            return inferSynchronous(first, last, defaultInputDeviceIndex, defaultInputKernelName, defaultOutputDeviceIndex, defaultOutputKernelName);
         }
 
         /**
@@ -384,12 +364,11 @@ namespace Finn {
          * @param inputBufferKernelName
          * @param outputDeviceIndex
          * @param outputBufferKernelName
-         * @param forceArchival
          * @return Finn::vector<V>
          */
         template<typename U, typename V = Finn::UnpackingAutoRetType::AutoRetType<S>, typename = std::enable_if<SynchronousInference>>
-        [[nodiscard]] Finn::vector<V> inferSynchronous(const Finn::vector<U>& data, uint inputDeviceIndex, const std::string& inputBufferKernelName, uint outputDeviceIndex, const std::string& outputBufferKernelName, bool forceArchival) {
-            return inferSynchronous(data.begin(), data.end(), inputDeviceIndex, inputBufferKernelName, outputDeviceIndex, outputBufferKernelName, batchElements, forceArchival);
+        [[nodiscard]] Finn::vector<V> inferSynchronous(const Finn::vector<U>& data, uint inputDeviceIndex, const std::string& inputBufferKernelName, uint outputDeviceIndex, const std::string& outputBufferKernelName) {
+            return inferSynchronous(data.begin(), data.end(), inputDeviceIndex, inputBufferKernelName, outputDeviceIndex, outputBufferKernelName, batchElements);
         }
 
         /**
@@ -403,7 +382,7 @@ namespace Finn {
          */
         template<typename U, typename V = Finn::UnpackingAutoRetType::AutoRetType<S>, typename = std::enable_if<SynchronousInference>>
         [[nodiscard]] Finn::vector<V> inferSynchronous(const Finn::vector<U>& data) {
-            return inferSynchronous(data, defaultInputDeviceIndex, defaultInputKernelName, defaultOutputDeviceIndex, defaultOutputKernelName, batchElements, forceAchieval);
+            return inferSynchronous(data, defaultInputDeviceIndex, defaultInputKernelName, defaultOutputDeviceIndex, defaultOutputKernelName, batchElements);
         }
 
 
@@ -418,19 +397,17 @@ namespace Finn {
          * @param outputDeviceIndex
          * @param outputBufferKernelName
          * @param batchSize
-         * @param forceArchival If true, the data gets written to LTS either way, ensuring that there is data to be read!
          * @return Finn::vector<uint8_t>
          */
         template<typename IteratorType>
-        [[nodiscard]] Finn::vector<uint8_t> infer(IteratorType first, IteratorType last, uint inputDeviceIndex, const std::string& inputBufferKernelName, uint outputDeviceIndex, const std::string& outputBufferKernelName, uint batchSize,
-                                                  bool forceArchival) {
-            FINN_LOG_DEBUG(logger, loglevel::info) << loggerPrefix() << "Starting inference (raw data)";
+        [[nodiscard]] Finn::vector<uint8_t> infer(IteratorType first, IteratorType last, uint inputDeviceIndex, const std::string& inputBufferKernelName, uint outputDeviceIndex, const std::string& outputBufferKernelName, uint batchSize) {
+            FINN_LOG_DEBUG(loglevel::info) << loggerPrefix() << "Starting inference (raw data)";
             auto storeFunc = accelerator.storeFactory(inputDeviceIndex, inputBufferKernelName);
 
-            if (std::abs(std::distance(first, last)) != size(SIZE_SPECIFIER::TOTAL_DATA_SIZE, inputDeviceIndex, inputBufferKernelName)) {
+            if (std::abs(std::distance(first, last)) != getTotalDataSize(inputDeviceIndex, inputBufferKernelName)) {
                 FinnUtils::logAndError<std::runtime_error>(loggerPrefix() + " Input length (" + std::to_string(std::abs(std::distance(first, last))) + ") does not match up with batches*inputsize_per_batch (" +
-                                                           std::to_string(size(SIZE_SPECIFIER::FEATUREMAP_SIZE, inputDeviceIndex, inputBufferKernelName)) + "*" + std::to_string(batchSize) + "=" +
-                                                           std::to_string(size(SIZE_SPECIFIER::TOTAL_DATA_SIZE, inputDeviceIndex, inputBufferKernelName)) + ")");
+                                                           std::to_string(getFeatureMapSize(inputDeviceIndex, inputBufferKernelName)) + "*" + std::to_string(batchSize) + "=" +
+                                                           std::to_string(getTotalDataSize(inputDeviceIndex, inputBufferKernelName)) + ")");
             }
 
             bool stored = storeFunc(first, last);
@@ -439,13 +416,13 @@ namespace Finn {
 
 #ifdef UNITTEST
             Finn::vector<uint8_t> data(first, last);
-            FINN_LOG(logger, loglevel::info) << "Readback from device buffer confirming data was written to board successfully: " << isSyncedDataEquivalent(inputDeviceIndex, inputBufferKernelName, data);
+            FINN_LOG(loglevel::info) << "Readback from device buffer confirming data was written to board successfully: " << isSyncedDataEquivalent(inputDeviceIndex, inputBufferKernelName, data);
 #endif
             accelerator.wait();
 
-            FINN_LOG_DEBUG(logger, loglevel::info) << "Reading out buffers";
+            FINN_LOG_DEBUG(loglevel::info) << "Reading out buffers";
             accelerator.read();
-            return accelerator.getOutputData(outputDeviceIndex, outputBufferKernelName, forceArchival);
+            return accelerator.getOutputData(outputDeviceIndex, outputBufferKernelName);
         }
 
         /**
@@ -458,12 +435,10 @@ namespace Finn {
          * @param outputDeviceIndex
          * @param outputBufferKernelName
          * @param batchSize
-         * @param forceArchival If true, the data gets written to LTS either way, ensuring that there is data to be read!
          * @return Finn::vector<uint8_t>
          */
-        [[nodiscard]] Finn::vector<uint8_t> infer(const Finn::vector<uint8_t>& data, uint inputDeviceIndex, const std::string& inputBufferKernelName, uint outputDeviceIndex, const std::string& outputBufferKernelName, uint batchSize,
-                                                  bool forceArchival) {
-            return infer(data.begin(), data.end(), inputDeviceIndex, inputBufferKernelName, outputDeviceIndex, outputBufferKernelName, batchSize, forceArchival);
+        [[nodiscard]] Finn::vector<uint8_t> infer(const Finn::vector<uint8_t>& data, uint inputDeviceIndex, const std::string& inputBufferKernelName, uint outputDeviceIndex, const std::string& outputBufferKernelName, uint batchSize) {
+            return infer(data.begin(), data.end(), inputDeviceIndex, inputBufferKernelName, outputDeviceIndex, outputBufferKernelName, batchSize);
         }
 
          protected:
@@ -488,22 +463,22 @@ namespace Finn {
          *
          */
         void logDriver() {
-            FINN_LOG(logger, loglevel::info) << loggerPrefix() << "Driver Overview:\n";
+            FINN_LOG(loglevel::info) << loggerPrefix() << "Driver Overview:\n";
             for (DeviceHandler& devHandler : accelerator) {
-                FINN_LOG(logger, loglevel::info) << "\tDevice Index: " << devHandler.getDeviceIndex();
+                FINN_LOG(loglevel::info) << "\tDevice Index: " << devHandler.getDeviceIndex();
                 for (auto& keyValuePair : devHandler.getInputBufferMap()) {
-                    FINN_LOG(logger, loglevel::info) << "\t\tInput buffers: ";
-                    FINN_LOG(logger, loglevel::info) << "\t\t\tName: " << keyValuePair.second->getName() << " (in hashmap as " << keyValuePair.first << ")";
-                    FINN_LOG(logger, loglevel::info) << "\t\t\tShape packed: " << FinnUtils::shapeToString(keyValuePair.second->getPackedShape());
-                    FINN_LOG(logger, loglevel::info) << "\t\t\tElements of type T (usually uint8_t) per sample: " << keyValuePair.second->size(SIZE_SPECIFIER::FEATUREMAP_SIZE);
-                    FINN_LOG(logger, loglevel::info) << "\t\t\tElements of type T (usually uint8_t) in buffer overall: " << keyValuePair.second->size(SIZE_SPECIFIER::TOTAL_DATA_SIZE);
+                    FINN_LOG(loglevel::info) << "\t\tInput buffers: ";
+                    FINN_LOG(loglevel::info) << "\t\t\tName: " << keyValuePair.second->getName() << " (in hashmap as " << keyValuePair.first << ")";
+                    FINN_LOG(loglevel::info) << "\t\t\tShape packed: " << FinnUtils::shapeToString(keyValuePair.second->getPackedShape());
+                    FINN_LOG(loglevel::info) << "\t\t\tElements of type T (usually uint8_t) per sample: " << keyValuePair.second->getFeatureMapSize();
+                    FINN_LOG(loglevel::info) << "\t\t\tElements of type T (usually uint8_t) in buffer overall: " << keyValuePair.second->getTotalDataSize();
                 }
                 for (auto& keyValuePair : devHandler.getOutputBufferMap()) {
-                    FINN_LOG(logger, loglevel::info) << "\t\tOutput buffers: ";
-                    FINN_LOG(logger, loglevel::info) << "\t\t\tName: " << keyValuePair.second->getName() << " (in hashmap as " << keyValuePair.first << ")";
-                    FINN_LOG(logger, loglevel::info) << "\t\t\tShape packed: " << FinnUtils::shapeToString(keyValuePair.second->getPackedShape());
-                    FINN_LOG(logger, loglevel::info) << "\t\t\tElements of type T (usually uint8_t) per sample: " << keyValuePair.second->size(SIZE_SPECIFIER::FEATUREMAP_SIZE);
-                    FINN_LOG(logger, loglevel::info) << "\t\t\tElements of type T (usually uint8_t) in buffer overall: " << keyValuePair.second->size(SIZE_SPECIFIER::TOTAL_DATA_SIZE);
+                    FINN_LOG(loglevel::info) << "\t\tOutput buffers: ";
+                    FINN_LOG(loglevel::info) << "\t\t\tName: " << keyValuePair.second->getName() << " (in hashmap as " << keyValuePair.first << ")";
+                    FINN_LOG(loglevel::info) << "\t\t\tShape packed: " << FinnUtils::shapeToString(keyValuePair.second->getPackedShape());
+                    FINN_LOG(loglevel::info) << "\t\t\tElements of type T (usually uint8_t) per sample: " << keyValuePair.second->getFeatureMapSize();
+                    FINN_LOG(loglevel::info) << "\t\t\tElements of type T (usually uint8_t) in buffer overall: " << keyValuePair.second->getTotalDataSize();
                 }
             }
         }

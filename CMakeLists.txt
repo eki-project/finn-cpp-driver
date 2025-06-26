@@ -72,14 +72,6 @@ endif()
 
 #INCLUDES
 
-#Set Boost policies for compatibility
-if(POLICY CMP0167)
-  cmake_policy(SET CMP0167 OLD)
-endif()
-if(POLICY CMP0144)
-  cmake_policy(SET CMP0144 NEW)
-endif()
-
 #Threads
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
@@ -92,8 +84,11 @@ find_package(XRT REQUIRED)
 #OpenMP
 find_package(OpenMP REQUIRED)
 
-#Boost
-find_package(Boost 1.79.0 COMPONENTS system log log_setup program_options filesystem ${BOOST_THREAD} REQUIRED)
+#popl
+include_directories(SYSTEM external/popl/include)
+
+#plog
+include_directories(SYSTEM external/plog/include)
 
 #xsimd
 add_subdirectory(external/xsimd)

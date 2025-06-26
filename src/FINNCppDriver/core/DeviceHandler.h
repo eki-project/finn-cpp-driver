@@ -127,7 +127,7 @@ namespace Finn {
          * @brief Destroy the Device Handler object
          *
          */
-        ~DeviceHandler() { FINN_LOG(Logger::getLogger(), loglevel::info) << loggerPrefix() << "Tearing down DeviceHandler\n"; };
+        ~DeviceHandler() { FINN_LOG(loglevel::info) << loggerPrefix() << "Tearing down DeviceHandler\n"; };
 
         /**
          * @brief Sets the input batch size. Needs to reinitialize all buffers!
@@ -199,19 +199,17 @@ namespace Finn {
          * @brief Read from the output buffer on the host. This does NOT execute the output kernel
          *
          * @param outputBufferKernelName
-         * @param forceArchival If true, the data gets copied from the buffer to the long term storage immediately. If false, the newest read data might not actually be returned by this function
          * @return Finn::vector<uint8_t>
          */
-        Finn::vector<uint8_t> retrieveResults(const std::string& outputBufferKernelName, bool forceArchival);
+        Finn::vector<uint8_t> retrieveResults(const std::string& outputBufferKernelName);
 
-        /**
-         * @brief Return the buffer sizes
-         *
-         * @param ss
-         * @param bufferName
-         * @return size_t
-         */
-        size_t size(SIZE_SPECIFIER ss, const std::string& bufferName);
+        size_t getSizeInBytes(const std::string& bufferName);
+
+        size_t getFeatureMapSize(const std::string& bufferName);
+
+        size_t getBatchSize(const std::string& bufferName);
+
+        size_t getTotalDataSize(const std::string& bufferName);
 
         /**
          * @brief Return whether there is a kernel with the given name in this device

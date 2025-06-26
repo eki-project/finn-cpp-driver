@@ -26,9 +26,9 @@ TEST(SyncInference, syncInferenceTest) {
     std::string exampleNetworkConfig = "jetConfig.json";
     Finn::Config conf = Finn::createConfigFromPath(exampleNetworkConfig);
 
-    auto driver = Finn::Driver<true>(conf, 0, conf.deviceWrappers[0].idmas[0]->kernelName, 0, conf.deviceWrappers[0].odmas[0]->kernelName, 1, true);
+    auto driver = Finn::Driver<true>(conf, 0, conf.deviceWrappers[0].idmas[0]->kernelName, 0, conf.deviceWrappers[0].odmas[0]->kernelName, 1);
 
-    Finn::vector<int8_t> data(driver.size(SIZE_SPECIFIER::FEATUREMAP_SIZE, 0, conf.deviceWrappers[0].idmas[0]->kernelName), 1);
+    Finn::vector<int8_t> data(driver.getFeatureMapSize(0, conf.deviceWrappers[0].idmas[0]->kernelName), 1);
 
     std::iota(data.begin(), data.end(), -127);
 
@@ -45,13 +45,13 @@ TEST(SyncInference, syncBatchInferenceTest) {
     Finn::Config conf = Finn::createConfigFromPath(exampleNetworkConfig);
     std::size_t batchLength = 10;
 
-    auto driver = Finn::Driver<true>(conf, 0, conf.deviceWrappers[0].idmas[0]->kernelName, 0, conf.deviceWrappers[0].odmas[0]->kernelName, static_cast<uint>(batchLength), true);
+    auto driver = Finn::Driver<true>(conf, 0, conf.deviceWrappers[0].idmas[0]->kernelName, 0, conf.deviceWrappers[0].odmas[0]->kernelName, static_cast<uint>(batchLength));
 
-    Finn::vector<int8_t> data(driver.size(SIZE_SPECIFIER::FEATUREMAP_SIZE, 0, conf.deviceWrappers[0].idmas[0]->kernelName) * batchLength, 1);
+    Finn::vector<int8_t> data(driver.getFeatureMapSize(0, conf.deviceWrappers[0].idmas[0]->kernelName) * batchLength, 1);
 
     for (std::size_t i = 0; i < batchLength; ++i) {
-        std::iota(data.begin() + static_cast<decltype(data)::difference_type>(i * driver.size(SIZE_SPECIFIER::FEATUREMAP_SIZE, 0, conf.deviceWrappers[0].idmas[0]->kernelName)),
-                  data.begin() + static_cast<decltype(data)::difference_type>((i + 1) * driver.size(SIZE_SPECIFIER::FEATUREMAP_SIZE, 0, conf.deviceWrappers[0].idmas[0]->kernelName)), -127);
+        std::iota(data.begin() + static_cast<decltype(data)::difference_type>(i * driver.getFeatureMapSize(0, conf.deviceWrappers[0].idmas[0]->kernelName)),
+                  data.begin() + static_cast<decltype(data)::difference_type>((i + 1) * driver.getFeatureMapSize(0, conf.deviceWrappers[0].idmas[0]->kernelName)), -127);
     }
 
     // Run inference
@@ -68,6 +68,7 @@ TEST(SyncInference, syncBatchInferenceTest) {
 
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);
+    Logger::initLogger(true);
 
     return RUN_ALL_TESTS();
 }

@@ -14,14 +14,12 @@ function(add_unittest test_name)
     PUBLIC
     gtest
     finnc_options
-    ${Boost_LIBRARIES}
-    finnc_utils
     finnc_core_test
     xrt_mock
     OpenMP::OpenMP_CXX
   )
 
-  target_link_directories(${test} PRIVATE ${BOOST_LIBRARYDIR})
+  target_link_directories(${test} PRIVATE)
 
   target_include_directories(${test} PRIVATE ${FINN_SRC_DIR})
 

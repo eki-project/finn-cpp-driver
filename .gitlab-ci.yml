@@ -16,7 +16,7 @@ workflow:
 
 .load-modules:
   before_script:
-    - ml vis/Graphviz/8.1.0-GCCcore-12.3.0 fpga xilinx/xrt/2.16 devel/Doxygen/1.9.7-GCCcore-12.3.0 compiler/GCC/12.3.0 devel/CMake/3.26.3-GCCcore-12.3.0
+    - ml vis/Graphviz/8.1.0-GCCcore-12.3.0 fpga xilinx/xrt/2.16 devel/Doxygen/1.9.8-GCCcore-13.2.0 compiler/GCC/13.3.0 devel/CMake/3.29.3-GCCcore-13.3.0
     
 init-repo:
   id_tokens:

@@ -592,7 +592,7 @@ namespace Finn {
         using RetType = typename std::conditional<U().isFixedPoint(), FixedPointType, T>::type;
 
         if (inp.empty()) {
-            FinnUtils::logAndError<std::runtime_error>("Input to unpacking operation is empty! Abord.");
+            Finn::logAndError<std::runtime_error>("Input to unpacking operation is empty! Abord.");
         }
 
         if constexpr (reverseByte) {
@@ -600,7 +600,7 @@ namespace Finn {
         }
 
         if ((inp.size() * 8 - padding) % U().bitwidth() != 0) {
-            FinnUtils::logAndError<std::runtime_error>("Amount of input elements is not a multiple of output elements");
+            Finn::logAndError<std::runtime_error>("Amount of input elements is not a multiple of output elements");
         }
 
         constexpr size_t bitw = U().bitwidth();

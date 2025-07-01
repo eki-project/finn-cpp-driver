@@ -127,7 +127,7 @@ namespace Finn {
          * @brief Destroy the Device Handler object
          *
          */
-        ~DeviceHandler() { FINN_LOG(loglevel::info) << loggerPrefix() << "Tearing down DeviceHandler\n"; };
+        ~DeviceHandler() { FINN_LOG(loglevel::info) << "Tearing down DeviceHandler\n"; };
 
         /**
          * @brief Sets the input batch size. Needs to reinitialize all buffers!
@@ -234,7 +234,7 @@ namespace Finn {
         template<typename IteratorType>
         bool store(IteratorType first, IteratorType last, const std::string& inputBufferKernelName) {
             if (!inputBufferMap.contains(inputBufferKernelName)) {
-                FinnUtils::logAndError<std::runtime_error>("Tried accessing kernel/buffer with name " + inputBufferKernelName + " but this kernel / buffer does not exist!");
+                Finn::logAndError<std::runtime_error>("Tried accessing kernel/buffer with name " + inputBufferKernelName + " but this kernel / buffer does not exist!");
             }
             return inputBufferMap.at(inputBufferKernelName)->store(first, last);
         }
@@ -279,12 +279,6 @@ namespace Finn {
         void initializeBufferObjects(const DeviceWrapper& devWrap, unsigned int hostBufferSize, bool pSynchronousInference);
 
          private:
-        /**
-         * @brief A logger prefix to determine the source of a log write
-         *
-         * @return std::string
-         */
-        static std::string loggerPrefix();
 
         /**
          * @brief Store the provided data into the DeviceBuffer

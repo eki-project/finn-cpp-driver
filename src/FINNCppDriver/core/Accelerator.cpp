@@ -23,10 +23,9 @@
 #include <stdexcept>                       // for runtime_error
 
 namespace Finn {
-    std::string Accelerator::loggerPrefix() { return "[Accelerator] "; }
 
     Accelerator::Accelerator(const std::vector<DeviceWrapper>& deviceDefinitions, bool synchronousInference, unsigned int hostBufferSize) {
-        FINN_LOG(loglevel::info) << loggerPrefix() << "Constructing Accelerator\n";
+        FINN_LOG(loglevel::info) << "Constructing Accelerator\n";
         std::transform(deviceDefinitions.begin(), deviceDefinitions.end(), std::back_inserter(devices), [hostBufferSize, synchronousInference](const DeviceWrapper& dew) { return DeviceHandler(dew, synchronousInference, hostBufferSize); });
     }
 
@@ -34,7 +33,7 @@ namespace Finn {
     /****** GETTER / SETTER ******/
     DeviceHandler& Accelerator::getDeviceHandler(unsigned int deviceIndex) {
         if (!containsDevice(deviceIndex)) {
-            FinnUtils::logAndError<std::runtime_error>("Tried retrieving a deviceHandler with an unknown index " + std::to_string(deviceIndex));
+            Finn::logAndError<std::runtime_error>("Tried retrieving a deviceHandler with an unknown index " + std::to_string(deviceIndex));
         }
         auto isCorrectHandler = [deviceIndex](const DeviceHandler& dhh) { return dhh.getDeviceIndex() == deviceIndex; };
         if (auto dhIt = std::find_if(devices.begin(), devices.end(), isCorrectHandler); dhIt != devices.end()) {
@@ -58,7 +57,7 @@ namespace Finn {
     // cppcheck-suppress unusedFunction
     [[maybe_unused]] UncheckedStore Accelerator::storeFactory(const unsigned int deviceIndex, const std::string& inputBufferKernelName) {
         if (devices.empty()) {
-            FinnUtils::logAndError<std::runtime_error>("Something went wrong. The device list should not be empty.");
+            Finn::logAndError<std::runtime_error>("Something went wrong. The device list should not be empty.");
         }
         if (containsDevice(deviceIndex)) {
             DeviceHandler& devHand = getDeviceHandler(deviceIndex);
@@ -66,7 +65,7 @@ namespace Finn {
                 return {devHand, inputBufferKernelName};
             }
         }
-        FinnUtils::logAndError<std::runtime_error>("Tried creating a store-closure on a deviceIndex or kernelBufferName which don't exist! Queried index: " + std::to_string(deviceIndex) + ", KernelBufferName: " + inputBufferKernelName);
+        Finn::logAndError<std::runtime_error>("Tried creating a store-closure on a deviceIndex or kernelBufferName which don't exist! Queried index: " + std::to_string(deviceIndex) + ", KernelBufferName: " + inputBufferKernelName);
         FinnUtils::unreachable();
         return {devices[0], ""};
     }
@@ -104,15 +103,15 @@ namespace Finn {
 
     Finn::vector<uint8_t> Accelerator::getOutputData(const unsigned int deviceIndex, const std::string& outputBufferKernelName) {
         if (containsDevice(deviceIndex)) {
-            FINN_LOG_DEBUG(loglevel::info) << loggerPrefix() << "Retrieving results from the specified device index! [accelerator.retrieveResults()]";
+            FINN_LOG_DEBUG(loglevel::info) << "Retrieving results from the specified device index! [accelerator.retrieveResults()]";
             return getDeviceHandler(deviceIndex).retrieveResults(outputBufferKernelName);
         } else {
             if (containsDevice(0)) {
-                FINN_LOG_DEBUG(loglevel::info) << loggerPrefix() << "Retrieving results from 0  device index! [accelerator.retrieveResults()]";
+                FINN_LOG_DEBUG(loglevel::info) << "Retrieving results from 0  device index! [accelerator.retrieveResults()]";
                 return getDeviceHandler(0).retrieveResults(outputBufferKernelName);
             } else {
                 // cppcheck-suppress missingReturn
-                FinnUtils::logAndError<std::runtime_error>("Tried receiving data in a devicehandler with an invalid deviceIndex!");
+                Finn::logAndError<std::runtime_error>("Tried receiving data in a devicehandler with an invalid deviceIndex!");
             }
         }
     }

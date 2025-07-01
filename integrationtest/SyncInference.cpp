@@ -51,17 +51,13 @@ TEST(SyncInference, syncBatchInferenceTest) {
 
     for (std::size_t i = 0; i < batchLength; ++i) {
         std::iota(data.begin() + static_cast<decltype(data)::difference_type>(i * driver.getFeatureMapSize(0, conf.deviceWrappers[0].idmas[0]->kernelName)),
-                  data.begin() + static_cast<decltype(data)::difference_type>((i + 1) * driver.getFeatureMapSize(0, conf.deviceWrappers[0].idmas[0]->kernelName)), -127);
+            data.begin() + static_cast<decltype(data)::difference_type>((i + 1) * driver.getFeatureMapSize(0, conf.deviceWrappers[0].idmas[0]->kernelName)), -127 + static_cast<int>(i));
     }
 
     // Run inference
     auto results = driver.inferSynchronous(data.begin(), data.end());
 
-    Finn::vector<uint16_t> expectedResults;
-
-    for (std::size_t i = 0; i < batchLength; ++i) {
-        expectedResults.insert(expectedResults.end(), {98, 50, 65476, 65493, 27});
-    }
+    Finn::vector<uint16_t> expectedResults = { 98,50,65476,65493,27,98,50,65476,65493,27,98,50,65476,65493,27,98,50,65476,65493,27,98,50,65476,65493,27,95,61,65483,65491,12,98,50,65476,65493,27,92,53,65483,65498,15,92,53,65483,65498,15,86,53,65489,65498,9};
 
     EXPECT_EQ(results, expectedResults);
 }

@@ -193,11 +193,6 @@ namespace FinnUtils {
     inline constexpr size_t getActualBufferSize(size_t requiredBytes) { return requiredBytes == 0 ? 4096UL : std::max(4096UL, (2UL << fastLog2Ceil(requiredBytes) - 1)); }
 
     /**
-     * @brief Put some newlines into the log script for clearer reading
-     */
-    inline void logSpacer() { FINN_LOG(loglevel::info) << "\n\n\n\n"; }
-
-    /**
      * @brief Calculates the number of elements in a tensor given its shape.
      * @attention This does NOT calculate the size of a buffer on that same tensor. Due to XRT min page size, every size is atleast 4096 elements large!!!
      *
@@ -256,17 +251,7 @@ namespace FinnUtils {
 #endif
     }
 
-    /**
-     * @brief First log the message as an error into the logger, then throw the passed error!
-     *
-     * @tparam E
-     * @param msg
-     */
-    template<typename E>
-    [[noreturn]] void logAndError(const std::string& msg) {
-        FINN_LOG(loglevel::error) << msg;
-        throw E(msg);
-    }
+
 
 }  // namespace FinnUtils
 

@@ -95,10 +95,10 @@ namespace Finn {
         std::size_t totalDataSize;
         std::size_t featureMapSize;
 
-        void busyWait() {
+        void busyWait(std::stop_token stopToken = {}) {
             // Wait until the IP is DONE
             uint32_t axi_ctrl = 0;
-            while ((axi_ctrl & IP_IDLE) != IP_IDLE) {
+            while ((axi_ctrl & IP_IDLE) != IP_IDLE && !stopToken.stop_requested()) {
                 axi_ctrl = assocIPCore.read_register(CSR_OFFSET);
             }
         }
@@ -137,12 +137,9 @@ namespace Finn {
               assocIPCore(xrt::ip(device, pDevUUID, pCUName)),  // Using xrt::kernel/getGroupId after this point leads to a total bricking of the FPGA card!!
               bufAdr(internalBo.address()) {
             shapePacked[0] = batchSize;
-            FINN_LOG(loglevel::info) << "[DeviceBuffer] "
-                                     << "New Device Buffer of size " << mapSize * sizeof(T) << "bytes with group id " << 0 << "\n";
-            FINN_LOG(loglevel::info) << "[DeviceBuffer] "
-                                     << "Host Memory Access enabled: " << Finn::Options::hostMemoryAccess << "\n";
-            FINN_LOG(loglevel::info) << "[DeviceBuffer] "
-                                     << "Initializing DeviceBuffer " << name << " (SHAPE PACKED: " << FinnUtils::shapeToString(pShapePacked) << " inputs of the given shape, MAP SIZE: " << mapSize << ")\n";
+            FINN_LOG(loglevel::info) << "New Device Buffer of size " << mapSize * sizeof(T) << "bytes with group id " << 0 << "\n";
+            FINN_LOG(loglevel::info) << "Host Memory Access enabled: " << Finn::Options::hostMemoryAccess << "\n";
+            FINN_LOG(loglevel::info) << "Initializing DeviceBuffer " << name << " (SHAPE PACKED: " << FinnUtils::shapeToString(pShapePacked) << " inputs of the given shape, MAP SIZE: " << mapSize << ")\n";
             std::fill(map, map + mapSize, 0);
             totalDataSize = FinnUtils::shapeToElements(pShapePacked) * batchSize;
             featureMapSize = totalDataSize / shapePacked[0];
@@ -166,7 +163,7 @@ namespace Finn {
          * @brief Destroy the Device Buffer object
          *
          */
-        virtual ~DeviceBuffer() { FINN_LOG(loglevel::info) << "[DeviceBuffer] Destructing DeviceBuffer " << name << "\n"; };
+        virtual ~DeviceBuffer() { FINN_LOG(loglevel::info) << "Destructing DeviceBuffer " << name << "\n"; };
 
         /**
          * @brief Deleted move assignment operator
@@ -214,8 +211,8 @@ namespace Finn {
          */
         virtual bool run() = 0;
 
-        virtual bool wait() {
-            busyWait();
+        virtual bool wait(std::stop_token stopToken={}) {
+            busyWait(stopToken);
             return true;
         };
 
@@ -317,7 +314,7 @@ namespace Finn {
          private:
         template<typename InputIt>
         static bool storeImpl(InputIt first, InputIt last) {
-            FinnUtils::logAndError<std::runtime_error>("Base Implementation called! This should not happen.");
+            Finn::logAndError<std::runtime_error>("Base Implementation called! This should not happen.");
             return false;
         }
 
@@ -399,7 +396,7 @@ namespace Finn {
         template<typename IteratorType>
         void testSetMap(IteratorType first, IteratorType last) {
             if (std::distance(first, last) > this->mapSize) {
-                FinnUtils::logAndError<std::length_error>("Error setting test map. Sizes dont match");
+                Finn::logAndError<std::length_error>("Error setting test map. Sizes dont match");
             }
             for (unsigned int i = 0; i < std::distance(first, last); ++i) {
                 this->map[i] = first[i];

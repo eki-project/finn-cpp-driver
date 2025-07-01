@@ -263,7 +263,7 @@ void inferFloatingPoint(Finn::Driver<true>& baseDriver, xt::detail::npy_file& lo
         // double
         loadInferDump<double>(baseDriver, loadedNpyFile, outputFile);
     } else {
-        FinnUtils::logAndError<std::runtime_error>("Unsupported floating point type detected when loading input npy file!");
+        Finn::logAndError<std::runtime_error>("Unsupported floating point type detected when loading input npy file!");
     }
 }
 
@@ -291,7 +291,7 @@ void inferSignedInteger(Finn::Driver<true>& baseDriver, xt::detail::npy_file& lo
         // int64_t
         loadInferDump<int64_t>(baseDriver, loadedNpyFile, outputFile);
     } else {
-        FinnUtils::logAndError<std::runtime_error>("Unsupported signed integer type detected when loading input npy file!");
+        Finn::logAndError<std::runtime_error>("Unsupported signed integer type detected when loading input npy file!");
     }
 }
 
@@ -319,7 +319,7 @@ void inferUnsignedInteger(Finn::Driver<true>& baseDriver, xt::detail::npy_file& 
         // uint64_t
         loadInferDump<uint64_t>(baseDriver, loadedNpyFile, outputFile);
     } else {
-        FinnUtils::logAndError<std::runtime_error>("Unsupported floating point type detected when loading input npy file!");
+        Finn::logAndError<std::runtime_error>("Unsupported floating point type detected when loading input npy file!");
     }
 }
 
@@ -341,7 +341,7 @@ void runWithInputFile(Finn::Driver<true>& baseDriver, const std::vector<std::str
         // instead use xnpy::detail::load_npy_file und then concert by hand based on m_typestring of xnpy::detail::npy_file
         std::ifstream stream(*inp, std::ifstream::binary);
         if (!stream) {
-            FinnUtils::logAndError<std::runtime_error>("io error: failed to open a file.");
+            Finn::logAndError<std::runtime_error>("io error: failed to open a file.");
         }
 
         auto loadedFile = xt::detail::load_npy_file(stream);
@@ -373,11 +373,11 @@ void runWithInputFile(Finn::Driver<true>& baseDriver, const std::vector<std::str
                     std::string errorString = "Loading a numpy array with type identifier string ";
                     errorString += loadedFile.m_typestring[1];
                     errorString += " is currently not supported.";
-                    FinnUtils::logAndError<std::runtime_error>(errorString);
+                    Finn::logAndError<std::runtime_error>(errorString);
             }
         } else {
             // all other endians
-            FinnUtils::logAndError<std::runtime_error>("At the moment only files created on little endian systems are supported!\n");
+            Finn::logAndError<std::runtime_error>("At the moment only files created on little endian systems are supported!\n");
         }
     }
 }
@@ -464,13 +464,13 @@ int main(int argc, char* argv[]) {
         // Switch on modes
         if (mode_option->value() == "execute") {
             if (!input_option->is_set()) {
-                FinnUtils::logAndError<std::invalid_argument>("No input file(s) specified for file execution mode!");
+                Finn::logAndError<std::invalid_argument>("No input file(s) specified for file execution mode!");
             }
             if (!output_option->is_set()) {
-                FinnUtils::logAndError<std::invalid_argument>("No output file(s) specified for file execution mode!");
+                Finn::logAndError<std::invalid_argument>("No output file(s) specified for file execution mode!");
             }
             if (input_option->count() != output_option->count()) {
-                FinnUtils::logAndError<std::invalid_argument>("Same amount of input and output files required!");
+                Finn::logAndError<std::invalid_argument>("Same amount of input and output files required!");
             }
 
             std::vector<std::string> inputVec;
@@ -488,7 +488,7 @@ int main(int argc, char* argv[]) {
             auto driver = createDriverFromConfig<true>(config_option->value(), batch_option->value());
             runThroughputTest(driver);
         } else {
-            FinnUtils::logAndError<std::invalid_argument>("Unknown driver mode: " + mode_option->value());
+            Finn::logAndError<std::invalid_argument>("Unknown driver mode: " + mode_option->value());
         }
 
         return 1;

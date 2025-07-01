@@ -253,7 +253,7 @@ namespace Finn {
             auto storeFunc = accelerator.storeFactory(inputDeviceIndex, inputBufferKernelName);
 
             if (std::abs(std::distance(packed.begin(), packed.end())) != getFeatureMapSize(inputDeviceIndex, inputBufferKernelName) * batchSize) {
-                FinnUtils::logAndError<std::runtime_error>("Input length (" + std::to_string(std::abs(std::distance(packed.begin(), packed.end()))) + ") does not match up with batches*inputsize_per_batch (" +
+                Finn::logAndError<std::runtime_error>("Input length (" + std::to_string(std::abs(std::distance(packed.begin(), packed.end()))) + ") does not match up with batches*inputsize_per_batch (" +
                                                            std::to_string(getFeatureMapSize(inputDeviceIndex, inputBufferKernelName)) + "*" + std::to_string(batchSize) + "=" +
                                                            std::to_string(getFeatureMapSize(inputDeviceIndex, inputBufferKernelName) * batchSize) + ")");
             }
@@ -286,7 +286,15 @@ namespace Finn {
         [[nodiscard]] Finn::vector<V> getResults(uint outputDeviceIndex, const std::string& outputBufferKernelName) {
             // TODO(linusjun): maybe this method should block until data is available?
             auto result = accelerator.getOutputData(outputDeviceIndex, outputBufferKernelName);
-            return unpack<S, V>(result);
+            
+            static auto packedOutput = configuration.deviceWrappers[outputDeviceIndex].odmas[0]->packedShape;
+            packedOutput[0] = batchElements;
+            static auto foldedOutput = static_cast<Finn::ExtendedBufferDescriptor*>(configuration.deviceWrappers[outputDeviceIndex].odmas[0].get())->foldedShape;
+            foldedOutput[0] = batchElements;
+            const Finn::DynamicMdSpan reshapedOutput(result.begin(), result.end(), packedOutput);
+            auto unpacked = Finn::unpackMultiDimensionalOutputs<S, Finn::vector<uint8_t>::iterator, false, V>(result.begin(), result.end(), reshapedOutput, foldedOutput);
+
+            return unpacked;
         }
 
         /**
@@ -300,7 +308,15 @@ namespace Finn {
         [[nodiscard]] Finn::vector<V> getResults() {
             // TODO(linusjun): maybe this method should block until data is available?
             auto result = accelerator.getOutputData(defaultOutputDeviceIndex, defaultOutputKernelName);
-            return unpack<S, V>(result);
+            
+            static auto packedOutput = configuration.deviceWrappers[defaultOutputDeviceIndex].odmas[0]->packedShape;
+            packedOutput[0] = batchElements;
+            static auto foldedOutput = static_cast<Finn::ExtendedBufferDescriptor*>(configuration.deviceWrappers[defaultOutputDeviceIndex].odmas[0].get())->foldedShape;
+            foldedOutput[0] = batchElements;
+            const Finn::DynamicMdSpan reshapedOutput(result.begin(), result.end(), packedOutput);
+            auto unpacked = Finn::unpackMultiDimensionalOutputs<S, Finn::vector<uint8_t>::iterator, false, V>(result.begin(), result.end(), reshapedOutput, foldedOutput);
+        
+            return unpacked;
         }
 
         /**
@@ -405,7 +421,7 @@ namespace Finn {
             auto storeFunc = accelerator.storeFactory(inputDeviceIndex, inputBufferKernelName);
 
             if (std::abs(std::distance(first, last)) != getTotalDataSize(inputDeviceIndex, inputBufferKernelName)) {
-                FinnUtils::logAndError<std::runtime_error>(loggerPrefix() + " Input length (" + std::to_string(std::abs(std::distance(first, last))) + ") does not match up with batches*inputsize_per_batch (" +
+                Finn::logAndError<std::runtime_error>(loggerPrefix() + " Input length (" + std::to_string(std::abs(std::distance(first, last))) + ") does not match up with batches*inputsize_per_batch (" +
                                                            std::to_string(getFeatureMapSize(inputDeviceIndex, inputBufferKernelName)) + "*" + std::to_string(batchSize) + "=" +
                                                            std::to_string(getTotalDataSize(inputDeviceIndex, inputBufferKernelName)) + ")");
             }

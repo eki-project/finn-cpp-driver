@@ -165,6 +165,7 @@ run-integrationtests:
     # Test Synchronous Inference with Host memory
     - cp ../../example_networks/jet-structure-classification-with-host-mem/* .
     - ./SyncInference
+    - ./AsyncInference
 
     # Reset FPGAs again
     - xbutil reset -d 0000:c1:00.1
@@ -174,8 +175,7 @@ run-integrationtests:
     - cd ../../build-no-host-mem/integrationtest
     - cp ../../example_networks/jet-structure-classification-without-host-mem/* .
     - ./SyncInference
-
-    # TODO: Run regression tests + asynchronous inference
+    - ./AsyncInference
 
 run-regressiontests:
   id_tokens:

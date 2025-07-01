@@ -118,7 +118,10 @@ namespace Finn {
             while (!stoken.stop_requested()) {
                 this->sync(this->loadMap(stoken));
                 this->execute(this->shapePacked[0]);
-                // TODO(linusjun): Wait until kernel is done executing!
+                bool success = this->wait(stoken);  // Wait until the kernel is done executing
+                if (!success) {
+                    FINN_LOG_DEBUG(loglevel::error) << "Kernel execution failed";
+                }
             }
             FINN_LOG(loglevel::info) << "Asynchronous Input buffer runner terminated";
         }
@@ -131,11 +134,11 @@ namespace Finn {
          * @param device XRT device
          * @param pAssociatedKernel XRT kernel
          * @param pShapePacked packed shape of input
-         * @param ringBufferSizeFactor size of ringbuffer in input elements (batch elements)
+         * @param batchSize size of ringbuffer in input elements (batch elements)
          */
-        AsyncDeviceInputBuffer(const std::string& pCUName, xrt::device& device, xrt::uuid& pDevUUID, const shapePacked_t& pShapePacked, unsigned int ringBufferSizeFactor)
+        AsyncDeviceInputBuffer(const std::string& pCUName, xrt::device& device, xrt::uuid& pDevUUID, const shapePacked_t& pShapePacked, unsigned int batchSize)
             : DeviceInputBuffer<T>(pCUName, device, pDevUUID, pShapePacked),
-              detail::AsyncBufferWrapper<T>(ringBufferSizeFactor * FinnUtils::shapeToElements(pShapePacked)),
+              detail::AsyncBufferWrapper<T>(batchSize * FinnUtils::shapeToElements(pShapePacked)),
               workerThread(std::jthread(std::bind_front(&AsyncDeviceInputBuffer::runInternal, this))) {}
 
         /**
@@ -223,9 +226,15 @@ namespace Finn {
         std::jthread workerThread;
 
         void readInternal(std::stop_token stoken) {
-            FINN_LOG_DEBUG(loglevel::info) << this->loggerPrefix() << "Starting to read from the device";
+            FINN_LOG_DEBUG(loglevel::info) << "Starting to read from the device";
             while (!stoken.stop_requested()) {
                 this->execute(this->shapePacked[0]);
+                FINN_LOG_DEBUG(loglevel::info) << "PRE WAIT";
+                bool success = this->wait(stoken);  // Wait until the kernel is done executing
+                FINN_LOG_DEBUG(loglevel::info) << "POST WAIT";
+                if (!success) {
+                    FINN_LOG_DEBUG(loglevel::error) << "Kernel execution failed";
+                }
                 this->sync(this->totalDataSize);
                 saveMap();  // TODO: Maybe the queue should have a callback that is called when the queue is full/data is avaible?
             }
@@ -239,11 +248,11 @@ namespace Finn {
          * @param device XRT device
          * @param pAssociatedKernel XRT kernel
          * @param pShapePacked packed shape of input
-         * @param ringBufferSizeFactor size of ringbuffer in input elements (batch elements)
+         * @param batchSize batch size of the output
          */
-        AsyncDeviceOutputBuffer(const std::string& pCUName, xrt::device& device, xrt::uuid& pDevUUID, const shapePacked_t& pShapePacked, unsigned int ringBufferSizeFactor)
-            : DeviceOutputBuffer<T>(pCUName, device, pDevUUID, pShapePacked),
-              detail::AsyncBufferWrapper<T>(ringBufferSizeFactor * FinnUtils::shapeToElements(pShapePacked)),
+        AsyncDeviceOutputBuffer(const std::string& pCUName, xrt::device& device, xrt::uuid& pDevUUID, const shapePacked_t& pShapePacked, unsigned int batchSize)
+            : DeviceOutputBuffer<T>(pCUName, device, pDevUUID, pShapePacked, batchSize),
+              detail::AsyncBufferWrapper<T>(batchSize * FinnUtils::shapeToElements(pShapePacked)),
               workerThread(std::jthread(std::bind_front(&AsyncDeviceOutputBuffer::readInternal, this))){};
 
         /**
@@ -263,9 +272,12 @@ namespace Finn {
          *
          */
         ~AsyncDeviceOutputBuffer() override {
-            FINN_LOG(loglevel::info) << "Destruction Asynchronous output buffer";
-            workerThread.request_stop();  // Joining will be handled automatically by destruction
+            FINN_LOG(loglevel::info) << "Stopping Asynchronous output buffer";
             this->queue.shutdown();       // Shutdown the queue to prevent further enqueues
+            FINN_LOG(loglevel::info) << "Waiting for Asynchronous output buffer to finish";
+            workerThread.request_stop();  // Joining will be handled automatically by destruction
+            workerThread.join();  // Wait for the worker thread to finish
+            FINN_LOG(loglevel::info) << "Destruction Asynchronous output buffer";
         };
 
         /**

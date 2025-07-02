@@ -147,6 +147,12 @@ namespace Finn {
      * Throws runtime_error if no devices are found or if any reset fails
      */
     void resetFPGAS() {
+#ifdef UNITTEST
+        // In unit tests, we might want to mock this function or skip it
+        FINN_LOG(loglevel::info) << "Skipping FPGA reset in unit tests." << std::endl;
+        return;
+#endif
+
         std::vector<std::string> devices = getDevices();
         if (devices.empty()) {
             logAndError<std::runtime_error>("No FPGA devices found. Cannot reset.");

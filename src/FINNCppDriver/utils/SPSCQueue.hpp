@@ -563,7 +563,13 @@ namespace detail {
 
     public:
         explicit DynamicBufferAccessor(size_t capacity) {
-            void* raw_memory = std::aligned_alloc(CACHE_LINE_SIZE, capacity * sizeof(T));
+            // Calculate total size needed
+            size_t size_bytes = capacity * sizeof(T);
+            
+            // Round up to the next multiple of CACHE_LINE_SIZE
+            size_t aligned_size = (size_bytes + CACHE_LINE_SIZE - 1) & ~(CACHE_LINE_SIZE - 1);
+            
+            void* raw_memory = std::aligned_alloc(CACHE_LINE_SIZE, aligned_size);
             if (!raw_memory) throw std::bad_alloc();
 
             buffer_ = std::unique_ptr<T, std::function<void(T*)>>(
@@ -1963,6 +1969,7 @@ public:
 
         // Notify consumer if queue was empty
         if (current_tail == head_.load(std::memory_order_relaxed))
+
             blocking_.not_empty_.notify_one();
 
         return true;
@@ -1974,7 +1981,6 @@ public:
      * Blocks the calling thread until space is available in the queue.
      *
      * @param item Element to enqueue
-
      */
     void enqueue(const T& item) {
         // Try fast path first

@@ -30,6 +30,7 @@
 #include <thread>
 #include <type_traits>
 #include <vector>
+#include <functional>
 
 using namespace std::literals::chrono_literals;
 

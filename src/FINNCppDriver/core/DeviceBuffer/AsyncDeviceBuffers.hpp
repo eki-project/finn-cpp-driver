@@ -33,24 +33,20 @@ namespace Finn {
         template<typename T>
         class AsyncBufferWrapper {
              protected:
-            constexpr static size_t queueSize = 1024;  ///< Default size of the internal queue
+            constexpr static size_t featureMapCount = 5;  //< Number of feature maps that can be buffered in the queue
             /**
              * @brief Internal queue used by all asynchronous buffers
              *
              */
-            SPSCQueue<T, queueSize> queue;
+            DynamicSPSCQueue<T> queue;
 
             /**
              * @brief Construct a new Async Buffer Wrapper object
              *
              * @param expectedMaxQueueSize Expected maximum size of the queue
              */
-            AsyncBufferWrapper(std::size_t expectedMaxQueueSize) {
-                if (expectedMaxQueueSize > queueSize) {
-                    FINN_LOG(loglevel::warning) << "[AsyncDeviceBuffer] Expected maximum queue size (" << expectedMaxQueueSize << ") is larger than the async buffer queue size (" << queueSize
-                                                << "). This might lead to problems or performance issues. Consider increasing the queue size in the SPSCQueue template parameter.\n";
-                }
-                FINN_LOG(loglevel::info) << "[AsyncDeviceBuffer] Max buffer size:" << queueSize << "\n";
+            AsyncBufferWrapper(std::size_t expectedMaxQueueSize) : queue(expectedMaxQueueSize* featureMapCount) {
+                FINN_LOG(loglevel::info) << "[AsyncDeviceBuffer] Max buffer size:" << queue.size() << "\n";
             }
 
             /**
@@ -86,7 +82,7 @@ namespace Finn {
             AsyncBufferWrapper& operator=(const AsyncBufferWrapper& buf) = delete;
 #ifdef UNITTEST
              public:
-            SPSCQueue<T, detail::AsyncBufferWrapper<T>::queueSize>& testGetQueue() { return this->queue; }
+            DynamicSPSCQueue<T>& testGetQueue() { return this->queue; }
 #endif
 
              public:
@@ -137,7 +133,7 @@ namespace Finn {
          * @param batchSize size of ringbuffer in input elements (batch elements)
          */
         AsyncDeviceInputBuffer(const std::string& pCUName, xrt::device& device, xrt::uuid& pDevUUID, const shapePacked_t& pShapePacked, unsigned int batchSize)
-            : DeviceInputBuffer<T>(pCUName, device, pDevUUID, pShapePacked),
+            : DeviceInputBuffer<T>(pCUName, device, pDevUUID, pShapePacked, batchSize),
               detail::AsyncBufferWrapper<T>(batchSize * FinnUtils::shapeToElements(pShapePacked)),
               workerThread(std::jthread(std::bind_front(&AsyncDeviceInputBuffer::runInternal, this))) {}
 
@@ -158,9 +154,38 @@ namespace Finn {
          *
          */
         ~AsyncDeviceInputBuffer() override {
-            FINN_LOG(loglevel::info) << "Destructing Asynchronous input buffer";
-            workerThread.request_stop();  // Joining will be handled automatically by destruction
+            FINN_LOG(loglevel::info) << "Destructing Asynchronous input buffer" << std::endl;
         };
+
+        /**
+         * @brief Prepare the buffer for shutdown
+         *
+         * This method will signal the worker thread to stop and wait for it to finish.
+         */
+        void prepareForShutdown() override {
+            FINN_LOG(loglevel::info) << "Stopping Asynchronous input buffer" << std::endl;
+            DeviceInputBuffer<T>::prepareForShutdown();
+
+            // Signal worker thread to stop
+            this->queue.shutdown();
+            workerThread.request_stop();
+
+            // Attempt to join with timeout
+            auto joinFuture = std::async(std::launch::async, [this]() {
+                if (workerThread.joinable()) {
+                    workerThread.join();
+                }
+                });
+
+            if (joinFuture.wait_for(std::chrono::seconds(1)) == std::future_status::timeout) {
+                FINN_LOG(loglevel::warning) << "Worker thread for " << this->name << " did not exit cleanly" << std::endl;
+                // Thread will be detached automatically when jthread is destroyed
+                throw std::runtime_error("Worker thread did not exit cleanly within timeout period");
+            } else {
+                FINN_LOG(loglevel::info) << "Worker thread for " << this->name << " exited cleanly" << std::endl;
+            }
+        }
+
         /**
          * @brief Deleted move assignment
          *
@@ -202,6 +227,7 @@ namespace Finn {
          */
         size_t loadMap(std::stop_token stoken) {
             FINN_LOG_DEBUG(loglevel::info) << "Data transfer of input data to FPGA!\n";
+            FINN_LOG_DEBUG(loglevel::info) << "Queue size: " << this->queue.size() << "\n";
             return this->queue.dequeue_bulk(this->map, this->totalDataSize, stoken);
         }
 
@@ -224,19 +250,21 @@ namespace Finn {
     class AsyncDeviceOutputBuffer : public DeviceOutputBuffer<T>, public detail::AsyncBufferWrapper<T> {
         std::mutex ltsMutex;
         std::jthread workerThread;
+        std::function<void(std::size_t)> callback = [](std::size_t numItems) {};  ///< Callback that is called when data is available in the queue
+
+         private:
 
         void readInternal(std::stop_token stoken) {
             FINN_LOG_DEBUG(loglevel::info) << "Starting to read from the device";
             while (!stoken.stop_requested()) {
                 this->execute(this->shapePacked[0]);
-                FINN_LOG_DEBUG(loglevel::info) << "PRE WAIT";
                 bool success = this->wait(stoken);  // Wait until the kernel is done executing
-                FINN_LOG_DEBUG(loglevel::info) << "POST WAIT";
                 if (!success) {
                     FINN_LOG_DEBUG(loglevel::error) << "Kernel execution failed";
                 }
                 this->sync(this->totalDataSize);
-                saveMap();  // TODO: Maybe the queue should have a callback that is called when the queue is full/data is avaible?
+                saveMap();
+                callback(this->queue.size()-(this->queue.size()%this->totalDataSize));  // Notify that data is available in the queue
             }
         }
 
@@ -252,7 +280,7 @@ namespace Finn {
          */
         AsyncDeviceOutputBuffer(const std::string& pCUName, xrt::device& device, xrt::uuid& pDevUUID, const shapePacked_t& pShapePacked, unsigned int batchSize)
             : DeviceOutputBuffer<T>(pCUName, device, pDevUUID, pShapePacked, batchSize),
-              detail::AsyncBufferWrapper<T>(batchSize * FinnUtils::shapeToElements(pShapePacked)),
+              detail::AsyncBufferWrapper<T>(2*batchSize * FinnUtils::shapeToElements(pShapePacked)), //Make output buffer map twice as large to circumvent a very rare deadlock in the case where one thread handles IO alone.
               workerThread(std::jthread(std::bind_front(&AsyncDeviceOutputBuffer::readInternal, this))){};
 
         /**
@@ -272,13 +300,37 @@ namespace Finn {
          *
          */
         ~AsyncDeviceOutputBuffer() override {
-            FINN_LOG(loglevel::info) << "Stopping Asynchronous output buffer";
-            this->queue.shutdown();       // Shutdown the queue to prevent further enqueues
-            FINN_LOG(loglevel::info) << "Waiting for Asynchronous output buffer to finish";
-            workerThread.request_stop();  // Joining will be handled automatically by destruction
-            workerThread.join();  // Wait for the worker thread to finish
-            FINN_LOG(loglevel::info) << "Destruction Asynchronous output buffer";
+            FINN_LOG(loglevel::info) << "Destruction Asynchronous output buffer"<< std::endl;
         };
+
+        /**
+         * @brief Prepare the buffer for shutdown
+         *
+         * This method will signal the worker thread to stop and wait for it to finish.
+         */
+        void prepareForShutdown() override {
+            DeviceOutputBuffer<T>::prepareForShutdown();
+
+            // Signal worker thread to stop
+            this->queue.shutdown();
+            workerThread.request_stop();
+
+            // Attempt to join with timeout
+            auto joinFuture = std::async(std::launch::async, [this]() {
+                if (workerThread.joinable()) {
+                    workerThread.join();
+                }
+                });
+
+            if (joinFuture.wait_for(std::chrono::seconds(1)) == std::future_status::timeout) {
+                FINN_LOG(loglevel::warning) << "Worker thread for " << this->name << " did not exit cleanly" << std::endl;
+                // Thread will be detached automatically when jthread is destroyed
+                throw std::runtime_error("Worker thread did not exit cleanly within timeout period");
+            }
+            else {
+                FINN_LOG(loglevel::info) << "Worker thread for " << this->name << " exited cleanly" << std::endl;
+            }
+        }
 
         /**
          * @brief Deleted move assignment operator
@@ -316,10 +368,22 @@ namespace Finn {
          *
          * @return Finn::vector<T>
          */
-        Finn::vector<T> getData() override {  // TODO(linusjun): Replace with a variant that takes a output iterator
-            Finn::vector<T> tmp(this->totalDataSize);
-            this->queue.dequeue_bulk(tmp.begin(), this->totalDataSize);
+        Finn::vector<T> getData(const std::size_t& numItems) override {
+            Finn::vector<T> tmp(numItems);
+            this->queue.dequeue_bulk(tmp.begin(), numItems);
             return tmp;
+        }
+
+        void registerCallback(std::function<void(std::size_t)> callback) override {
+            // Register a callback that is called when data is available in the queue
+            this->callback = callback;
+        }
+
+        void drain() override {
+            // Drain the queue by reading all available items
+            T item;
+            while (this->queue.try_dequeue(item)) {}
+            FINN_LOG_DEBUG(loglevel::info) << "Drained the AsyncDeviceOutputBuffer queue.";
         }
 
          protected:
@@ -330,10 +394,10 @@ namespace Finn {
         bool saveMap() {
             FINN_LOG_DEBUG(loglevel::info) << "Data transfer of output from FPGA!\n";
             if (this->queue.enqueue_bulk(this->map, this->totalDataSize) == this->totalDataSize) {
-                FINN_LOG_DEBUG(loglevel::info) << this->loggerPrefix() << "Stored " << this->totalDataSize << " elements in the ring buffer";
+                FINN_LOG_DEBUG(loglevel::info) << this->loggerPrefix() << "Stored " << this->totalDataSize << " elements in the FIFO";
                 return true;
             } else {
-                FINN_LOG_DEBUG(loglevel::error) << this->loggerPrefix() << "Failed to store data in the ring buffer.";
+                FINN_LOG_DEBUG(loglevel::error) << this->loggerPrefix() << "Failed to store data in the FIFO.";
                 return false;
             }
         }

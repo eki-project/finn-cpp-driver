@@ -127,7 +127,22 @@ namespace Finn {
          * @brief Destroy the Device Handler object
          *
          */
-        ~DeviceHandler() { FINN_LOG(loglevel::info) << "Tearing down DeviceHandler\n"; };
+        ~DeviceHandler() {
+            FINN_LOG(loglevel::info) << "Tearing down DeviceHandler" << std::endl;
+            
+            // First call prepareForShutdown on all buffers
+            for(auto& [_, buffer] : inputBufferMap) {
+                buffer->prepareForShutdown();
+            }
+            for(auto& [_, buffer] : outputBufferMap) {
+                buffer->prepareForShutdown();
+            }
+            
+            // Now safe to destroy buffers
+            inputBufferMap.clear();
+            outputBufferMap.clear();
+            FINN_LOG(loglevel::info) << "Destructed Buffers" << std::endl;
+        };
 
         /**
          * @brief Sets the input batch size. Needs to reinitialize all buffers!
@@ -198,10 +213,11 @@ namespace Finn {
         /**
          * @brief Read from the output buffer on the host. This does NOT execute the output kernel
          *
-         * @param outputBufferKernelName
-         * @return Finn::vector<uint8_t>
+         * @param outputBufferKernelName identifier of the output buffer kernel
+         * @param numItems Number of items to read from the output buffer
+         * @return Finn::vector<uint8_t> 
          */
-        Finn::vector<uint8_t> retrieveResults(const std::string& outputBufferKernelName);
+        Finn::vector<uint8_t> retrieveResults(const std::string& outputBufferKernelName, const std::size_t& numItems);
 
         size_t getSizeInBytes(const std::string& bufferName);
 
@@ -210,6 +226,10 @@ namespace Finn {
         size_t getBatchSize(const std::string& bufferName);
 
         size_t getTotalDataSize(const std::string& bufferName);
+
+        void registerCallback(const std::string& bufferName, std::function<void(std::size_t)> callback);
+
+        void drain(const std::string& bufferName);
 
         /**
          * @brief Return whether there is a kernel with the given name in this device

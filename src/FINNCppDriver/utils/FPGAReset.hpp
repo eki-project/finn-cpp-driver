@@ -10,6 +10,10 @@
 #include <string>
 #include <sstream>
 #include <fcntl.h> // For open()
+#include <chrono>
+#include <thread>
+
+using namespace std::chrono_literals;
 
 namespace Finn {
 
@@ -146,7 +150,7 @@ namespace Finn {
      * Reset all available FPGA devices
      * Throws runtime_error if no devices are found or if any reset fails
      */
-    void resetFPGAS() {
+    void resetFPGAS(const int index = -1) {
 #ifdef UNITTEST
         // In unit tests, we might want to mock this function or skip it
         FINN_LOG(loglevel::info) << "Skipping FPGA reset in unit tests." << std::endl;
@@ -156,6 +160,17 @@ namespace Finn {
         std::vector<std::string> devices = getDevices();
         if (devices.empty()) {
             logAndError<std::runtime_error>("No FPGA devices found. Cannot reset.");
+        }
+
+        if (index != -1) {
+            if (index >= devices.size()) {
+                logAndError<std::runtime_error>("Invalid device index: " + std::to_string(index) + ". Available devices: " + std::to_string(devices.size()));
+            }
+            if (!resetFPGA(devices[index])) {
+                logAndError<std::runtime_error>("Failed to reset FPGA device at index: " + std::to_string(index));
+            }
+            std::this_thread::sleep_for(1000ms); // Wait for the reset to complete
+            return;
         }
 
         bool allSuccessful = true;
@@ -168,6 +183,7 @@ namespace Finn {
                 failedDevices += device;
             }
         }
+        std::this_thread::sleep_for(1000ms); // Wait for the reset to complete
 
         if (!allSuccessful) {
             logAndError<std::runtime_error>("Failed to reset FPGA device(s): " + failedDevices);

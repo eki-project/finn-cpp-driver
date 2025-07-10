@@ -83,7 +83,7 @@ namespace Finn {
     void DeviceHandler::initializeDevice() {
         FINN_LOG(loglevel::info) << "(" << xrtDeviceIndex << ") "
             << "Initializing xrt::device, loading xclbin and assigning IP\n";
-        resetFPGAS();
+        resetFPGAS(xrtDeviceIndex);
         device = xrt::device(xrtDeviceIndex);
     }
 
@@ -196,14 +196,14 @@ namespace Finn {
     }
 
 
-    [[maybe_unused]] Finn::vector<uint8_t> DeviceHandler::retrieveResults(const std::string& outputBufferKernelName) {
+    [[maybe_unused]] Finn::vector<uint8_t> DeviceHandler::retrieveResults(const std::string& outputBufferKernelName, const std::size_t& numItems) {
         if (!outputBufferMap.contains(outputBufferKernelName)) {
             auto newlineFold = [](std::string a, const auto& b) { return std::move(a) + '\n' + std::move(b.first); };
             std::string existingNames = "Existing buffer names:";
             std::accumulate(inputBufferMap.begin(), inputBufferMap.end(), existingNames, newlineFold);
             Finn::logAndError<std::runtime_error>("Tried accessing kernel/buffer with name " + outputBufferKernelName + " but this kernel / buffer does not exist! " + existingNames);
         }
-        return outputBufferMap.at(outputBufferKernelName)->getData();
+        return outputBufferMap.at(outputBufferKernelName)->getData(numItems);
     }
 
     size_t DeviceHandler::getSizeInBytes(const std::string& bufferName) {
@@ -246,6 +246,29 @@ namespace Finn {
         return 0;
     }
 
+    void DeviceHandler::registerCallback(const std::string& bufferName, std::function<void(std::size_t)> callback) {
+        if (inputBufferMap.contains(bufferName)) {
+            Finn::logAndError<std::runtime_error>("Tried registering a callback on an input buffer! This is not allowed! Queried KernelBufferName: " + bufferName);
+        }
+        else if (outputBufferMap.contains(bufferName)) {
+            outputBufferMap.at(bufferName)->registerCallback(callback);
+        }
+        else {
+            Finn::logAndError<std::runtime_error>("Tried registering a callback on a buffer which does not exist! Queried KernelBufferName: " + bufferName);
+        }
+    }
+
+    void DeviceHandler::drain(const std::string& bufferName) {
+        if (inputBufferMap.contains(bufferName)) {
+            Finn::logAndError<std::runtime_error>("Tried draining an input buffer! This is not allowed! Queried KernelBufferName: " + bufferName);
+        }
+        else if (outputBufferMap.contains(bufferName)) {
+            outputBufferMap.at(bufferName)->drain();
+        }
+        else {
+            Finn::logAndError<std::runtime_error>("Tried draining a buffer which does not exist! Queried KernelBufferName: " + bufferName);
+        }
+    }
 
 #ifndef NDEBUG
     bool DeviceHandler::isBufferMapCollisionFree() {

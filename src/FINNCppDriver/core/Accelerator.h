@@ -82,7 +82,9 @@ namespace Finn {
          * @brief Destroy the Accelerator object
          *
          */
-        ~Accelerator() = default;
+        ~Accelerator(){
+            FINN_LOG(loglevel::info) << "Destructing Accelerator" << std::endl;
+        }
 
 
         /**
@@ -162,9 +164,11 @@ namespace Finn {
          *
          * @param deviceIndex
          * @param outputBufferKernelName
-         * @param forceArchival Whether or not to force a readout into archive. Necessary to get new data. Will be done automatically if a whole multiple of the buffer size is produced
+         * @param numItems Number of items to read from the output buffer
          * @return std::vector<std::vector<uint8_t>>
          */
+        Finn::vector<uint8_t> getOutputData(unsigned int deviceIndex, const std::string& outputBufferKernelName, const std::size_t& numItems);
+
         Finn::vector<uint8_t> getOutputData(unsigned int deviceIndex, const std::string& outputBufferKernelName);
 
         size_t getSizeInBytes(unsigned int deviceIndex, const std::string& bufferName);
@@ -174,6 +178,10 @@ namespace Finn {
         size_t getBatchSize(unsigned int deviceIndex, const std::string& bufferName);
 
         size_t getTotalDataSize(unsigned int deviceIndex, const std::string& bufferName);
+
+        void registerCallback(unsigned int deviceIndex, const std::string& bufferName,std::function<void(std::size_t)> callback);
+
+        void drain(unsigned int deviceIndex, const std::string& bufferName);
     };
 
 

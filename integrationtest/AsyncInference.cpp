@@ -16,6 +16,9 @@
 #include <FINNCppDriver/utils/join.hpp>
 #include <numeric>
 #include <thread>
+#include <atomic>
+#include <condition_variable>
+#include <mutex>
 
 #include "gtest/gtest.h"
 
@@ -38,8 +41,7 @@ TEST(AsyncInference, asyncInferenceTest) {
 
     // Run inference
     driver.input(data.begin(), data.end());
-    std::this_thread::sleep_for(200ms);
-    auto results = driver.getResults();
+    auto results = driver.getResults(); // This should block until the results are available
 
     Finn::vector<uint16_t> expectedResults = { 98, 50, 65476, 65493, 27 };
 
@@ -50,8 +52,13 @@ TEST(AsyncInference, asyncBatchInferenceTest) {
     std::string exampleNetworkConfig = "jetConfig.json";
     Finn::Config conf = Finn::createConfigFromPath(exampleNetworkConfig);
     std::size_t batchLength = 10;
+    std::atomic<std::size_t> availableData(0);
+    std::condition_variable cv;
+    std::mutex m;
 
-    auto driver = Finn::Driver<false>(conf, 0, conf.deviceWrappers[0].idmas[0]->kernelName, 0, conf.deviceWrappers[0].odmas[0]->kernelName, batchLength);
+
+    //BUG HIER IRGENDWO SODASS FEATUREMAPSIZE UND TOTALDATASIZE GLEICH SIND
+    auto driver = Finn::Driver<false>(conf, 0, conf.deviceWrappers[0].idmas[0]->kernelName, 0, conf.deviceWrappers[0].odmas[0]->kernelName, static_cast<uint>(batchLength));
 
     Finn::vector<int8_t> data(driver.getFeatureMapSize(0, conf.deviceWrappers[0].idmas[0]->kernelName) * batchLength, 1);
 
@@ -62,8 +69,7 @@ TEST(AsyncInference, asyncBatchInferenceTest) {
 
     // Run inference
     driver.input(data.begin(), data.end());
-    std::this_thread::sleep_for(1000ms);
-    auto results = driver.getResults();
+    auto results = driver.getResults(); // This should block until the results are available
 
     Finn::vector<uint16_t> expectedResults = { 98,50,65476,65493,27,98,50,65476,65493,27,98,50,65476,65493,27,98,50,65476,65493,27,98,50,65476,65493,27,95,61,65483,65491,12,98,50,65476,65493,27,92,53,65483,65498,15,92,53,65483,65498,15,86,53,65489,65498,9 };
 
@@ -76,10 +82,19 @@ TEST(AsyncInference, asyncBatchInferenceTest) {
             data.begin() + static_cast<decltype(data)::difference_type>((i + 1) * driver.getFeatureMapSize(0, conf.deviceWrappers[0].idmas[0]->kernelName)), -127+static_cast<int>(i));
     }
 
+    driver.registerCallback(0, conf.deviceWrappers[0].odmas[0]->kernelName, [&availableData, &cv](std::size_t numItems) {
+        availableData += numItems;
+        cv.notify_all();
+    });
+
     // Run inference
     driver.input(data.begin(), data.end());
-    std::this_thread::sleep_for(1000ms);
     results.clear();
+
+    // wait until output thread notifies
+    std::unique_lock lk(m);
+    cv.wait(lk, [&availableData, &driver, &conf] { return availableData >= driver.getTotalDataSize(0, conf.deviceWrappers[0].odmas[0]->kernelName); });
+
     results = driver.getResults();
 
     EXPECT_EQ(results.size(), expectedResults.size());

@@ -62,7 +62,7 @@ namespace Finn {
          */
         static std::string loggerPrefix() { return "[BaseDriver] "; }
 
-         public:
+    public:
         /**
          * @brief Defines the automatic return type for external use
          *
@@ -237,6 +237,14 @@ namespace Finn {
         size_t getTotalDataSize(unsigned int deviceIndex, const std::string& bufferName) { return accelerator.getTotalDataSize(deviceIndex, bufferName); }
 
         /**
+         * @brief Register a callback function to be called when the inference of a batch is finished
+         */
+        template<typename = std::enable_if<!SynchronousInference>>
+        void registerCallback(unsigned int deviceIndex, const std::string& bufferName, std::function<void(std::size_t)> callback) {
+            accelerator.registerCallback(deviceIndex, bufferName, callback);
+        }
+
+        /**
          * @brief Store input into the driver for asynchronous inference
          *
          * @tparam IteratorType
@@ -254,8 +262,8 @@ namespace Finn {
 
             if (std::abs(std::distance(packed.begin(), packed.end())) != getFeatureMapSize(inputDeviceIndex, inputBufferKernelName) * batchSize) {
                 Finn::logAndError<std::runtime_error>("Input length (" + std::to_string(std::abs(std::distance(packed.begin(), packed.end()))) + ") does not match up with batches*inputsize_per_batch (" +
-                                                           std::to_string(getFeatureMapSize(inputDeviceIndex, inputBufferKernelName)) + "*" + std::to_string(batchSize) + "=" +
-                                                           std::to_string(getFeatureMapSize(inputDeviceIndex, inputBufferKernelName) * batchSize) + ")");
+                    std::to_string(getFeatureMapSize(inputDeviceIndex, inputBufferKernelName)) + "*" + std::to_string(batchSize) + "=" +
+                    std::to_string(getFeatureMapSize(inputDeviceIndex, inputBufferKernelName) * batchSize) + ")");
             }
 
             storeFunc(packed.begin(), packed.end());
@@ -286,7 +294,7 @@ namespace Finn {
         [[nodiscard]] Finn::vector<V> getResults(uint outputDeviceIndex, const std::string& outputBufferKernelName) {
             // TODO(linusjun): maybe this method should block until data is available?
             auto result = accelerator.getOutputData(outputDeviceIndex, outputBufferKernelName);
-            
+
             static auto packedOutput = configuration.deviceWrappers[outputDeviceIndex].odmas[0]->packedShape;
             packedOutput[0] = batchElements;
             static auto foldedOutput = static_cast<Finn::ExtendedBufferDescriptor*>(configuration.deviceWrappers[outputDeviceIndex].odmas[0].get())->foldedShape;
@@ -308,15 +316,33 @@ namespace Finn {
         [[nodiscard]] Finn::vector<V> getResults() {
             // TODO(linusjun): maybe this method should block until data is available?
             auto result = accelerator.getOutputData(defaultOutputDeviceIndex, defaultOutputKernelName);
-            
+
             static auto packedOutput = configuration.deviceWrappers[defaultOutputDeviceIndex].odmas[0]->packedShape;
             packedOutput[0] = batchElements;
             static auto foldedOutput = static_cast<Finn::ExtendedBufferDescriptor*>(configuration.deviceWrappers[defaultOutputDeviceIndex].odmas[0].get())->foldedShape;
             foldedOutput[0] = batchElements;
             const Finn::DynamicMdSpan reshapedOutput(result.begin(), result.end(), packedOutput);
             auto unpacked = Finn::unpackMultiDimensionalOutputs<S, Finn::vector<uint8_t>::iterator, false, V>(result.begin(), result.end(), reshapedOutput, foldedOutput);
-        
+
             return unpacked;
+        }
+
+        /**
+         * @brief Drains the output buffer of the specified device. This is only available in asynchronous inference mode.
+         */
+        template<typename = std::enable_if<!SynchronousInference>>
+        void drain(uint outputDeviceIndex, const std::string& outputBufferKernelName) {
+            accelerator.drain(outputDeviceIndex, outputBufferKernelName);
+        }
+
+        /**
+         * @brief Drains the output buffer of the default device. This is only available in asynchronous inference mode.
+         *
+         * @tparam typename
+         */
+        template<typename = std::enable_if<!SynchronousInference>>
+        void drain() {
+            accelerator.drain(defaultOutputDeviceIndex, defaultOutputKernelName);
         }
 
         /**
@@ -401,7 +427,7 @@ namespace Finn {
             return inferSynchronous(data, defaultInputDeviceIndex, defaultInputKernelName, defaultOutputDeviceIndex, defaultOutputKernelName, batchElements);
         }
 
-
+    protected:
         /**
          *
          * @brief Do an inference with the given data. This assumes already flattened data in uint8_t's. Specify inputs and outputs.
@@ -415,15 +441,15 @@ namespace Finn {
          * @param batchSize
          * @return Finn::vector<uint8_t>
          */
-        template<typename IteratorType>
+        template<typename IteratorType, typename = std::enable_if<SynchronousInference>>
         [[nodiscard]] Finn::vector<uint8_t> infer(IteratorType first, IteratorType last, uint inputDeviceIndex, const std::string& inputBufferKernelName, uint outputDeviceIndex, const std::string& outputBufferKernelName, uint batchSize) {
             FINN_LOG_DEBUG(loglevel::info) << loggerPrefix() << "Starting inference (raw data)";
             auto storeFunc = accelerator.storeFactory(inputDeviceIndex, inputBufferKernelName);
 
             if (std::abs(std::distance(first, last)) != getTotalDataSize(inputDeviceIndex, inputBufferKernelName)) {
                 Finn::logAndError<std::runtime_error>(loggerPrefix() + " Input length (" + std::to_string(std::abs(std::distance(first, last))) + ") does not match up with batches*inputsize_per_batch (" +
-                                                           std::to_string(getFeatureMapSize(inputDeviceIndex, inputBufferKernelName)) + "*" + std::to_string(batchSize) + "=" +
-                                                           std::to_string(getTotalDataSize(inputDeviceIndex, inputBufferKernelName)) + ")");
+                    std::to_string(getFeatureMapSize(inputDeviceIndex, inputBufferKernelName)) + "*" + std::to_string(batchSize) + "=" +
+                    std::to_string(getTotalDataSize(inputDeviceIndex, inputBufferKernelName)) + ")");
             }
 
             bool stored = storeFunc(first, last);
@@ -438,7 +464,7 @@ namespace Finn {
 
             FINN_LOG_DEBUG(loglevel::info) << "Reading out buffers";
             accelerator.read();
-            return accelerator.getOutputData(outputDeviceIndex, outputBufferKernelName);
+            return accelerator.getOutputData(outputDeviceIndex, outputBufferKernelName, getTotalDataSize(outputDeviceIndex, outputBufferKernelName));
         }
 
         /**
@@ -453,11 +479,11 @@ namespace Finn {
          * @param batchSize
          * @return Finn::vector<uint8_t>
          */
+        template<typename = std::enable_if<SynchronousInference>>
         [[nodiscard]] Finn::vector<uint8_t> infer(const Finn::vector<uint8_t>& data, uint inputDeviceIndex, const std::string& inputBufferKernelName, uint outputDeviceIndex, const std::string& outputBufferKernelName, uint batchSize) {
             return infer(data.begin(), data.end(), inputDeviceIndex, inputBufferKernelName, outputDeviceIndex, outputBufferKernelName, batchSize);
         }
 
-         protected:
 #ifdef UNITTEST
         /**
          * @brief Return whether the data that is currently held on the FPGA is equivalent to the passed data

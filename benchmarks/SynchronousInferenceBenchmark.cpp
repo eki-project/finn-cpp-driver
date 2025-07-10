@@ -62,7 +62,51 @@ static void BM_SynchronousInference(benchmark::State& state) {
     }
 }
 // Register the function as a benchmark
-BENCHMARK(BM_SynchronousInference)->Iterations(1000000)->RangeMultiplier(2)->Range(1, 4 << 10)->Repetitions(10);
+//BENCHMARK(BM_SynchronousInference)->Iterations(1000000)->RangeMultiplier(2)->Range(1, 4 << 10)->Repetitions(10);
 
+static void BM_SynchronousInferenceSingleThread(benchmark::State& state) {
+    const std::string exampleNetworkConfig = "jetConfig.json";
+    const uint batchSize = static_cast<uint>(state.range(0));
+    std::cout << "Running single-threaded benchmark with batch size: " << batchSize << std::endl;
+    auto driver = createDriverFromConfig<true>(exampleNetworkConfig, batchSize);
+    using dtype = int8_t;
+
+    // Create buffers for pipelining
+    std::vector<dtype> inputBuffer(24 * batchSize);
+
+    std::random_device rndDevice;
+    std::mt19937 mersenneEngine{ rndDevice() };
+    destribution_t<dtype> dist{ static_cast<dtype>(InputFinnType().min()), static_cast<dtype>(InputFinnType().max()) };
+
+    // Fill all buffers with random data
+    std::generate(inputBuffer.begin(), inputBuffer.end(),
+        [&dist, &mersenneEngine]() { return dist(mersenneEngine); });
+
+    // Warmup
+    auto warmup = driver.inferSynchronous(inputBuffer.begin(), inputBuffer.end());
+    benchmark::DoNotOptimize(warmup);
+
+    std::chrono::duration<float> runtime = std::chrono::seconds(90); // Fixed runtime for the benchmark
+
+    for (auto _ : state) {
+        std::size_t processedCount = 0;
+
+        // Set a fixed time for the benchmark
+        const auto start = std::chrono::high_resolution_clock::now();
+
+        while (std::chrono::high_resolution_clock::now() - start < std::chrono::duration<float>(runtime)) {
+            auto results = driver.inferSynchronous(inputBuffer.begin(), inputBuffer.end());
+            benchmark::DoNotOptimize(results);
+            ++processedCount;
+        }
+        std::size_t infered = processedCount * batchSize;
+
+        // Report items processed in this iteration
+        state.SetItemsProcessed(static_cast<int64_t>(infered));
+    }
+}
+
+// Register the function as a benchmark
+BENCHMARK(BM_SynchronousInferenceSingleThread)->RangeMultiplier(2)->Range(1, 4096)->Repetitions(5);
 
 BENCHMARK_MAIN();

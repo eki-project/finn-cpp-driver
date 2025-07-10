@@ -14,8 +14,8 @@ function(add_benchmark benchmark_name)
   target_link_libraries(${benchmark}
     PUBLIC
     finnc_options
-    finnc_core_test
-    xrt_mock
+    finnc_core
+    xrt_coreutil
     benchmark::benchmark
     OpenMP::OpenMP_CXX
   )

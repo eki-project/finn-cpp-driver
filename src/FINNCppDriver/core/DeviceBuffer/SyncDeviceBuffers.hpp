@@ -166,8 +166,8 @@ namespace Finn {
          *
          * @return Finn::vector<T>
          */
-        Finn::vector<T> getData() override {
-            Finn::vector<T> tmp(this->map, this->map + this->totalDataSize);
+        Finn::vector<T> getData(const std::size_t& numItems) override {
+            Finn::vector<T> tmp(this->map, this->map + numItems);
             return tmp;
         }
 

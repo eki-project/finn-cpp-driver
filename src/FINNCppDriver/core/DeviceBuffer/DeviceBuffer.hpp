@@ -143,6 +143,7 @@ namespace Finn {
             std::fill(map, map + mapSize, 0);
             totalDataSize = FinnUtils::shapeToElements(pShapePacked) * batchSize;
             featureMapSize = totalDataSize / shapePacked[0];
+            FINN_LOG(loglevel::info) << "Map has totalSize " << totalDataSize << " and featureMapSize " << featureMapSize << "\n";
         }
 
         /**
@@ -160,10 +161,22 @@ namespace Finn {
         DeviceBuffer(const DeviceBuffer& buf) noexcept = delete;
 
         /**
+         * @brief Prepare the DeviceBuffer for shutdown
+         *
+         * This function is called before the application is shutting down.
+         * It can be used to release resources or perform cleanup tasks.
+         * The default implementation does nothing.
+         */
+        virtual void prepareForShutdown() {
+            // Base implementation does nothing
+            FINN_LOG(loglevel::info) << "Preparing " << name << " for shutdown";
+        }
+
+        /**
          * @brief Destroy the Device Buffer object
          *
          */
-        virtual ~DeviceBuffer() { FINN_LOG(loglevel::info) << "Destructing DeviceBuffer " << name << "\n"; };
+        virtual ~DeviceBuffer() { FINN_LOG(loglevel::info) << "Destructing DeviceBuffer " << name << std::endl; };
 
         /**
          * @brief Deleted move assignment operator
@@ -364,16 +377,34 @@ namespace Finn {
         DeviceOutputBuffer(const std::string& pCUName, xrt::device& device, xrt::uuid& pDevUUID, const shapePacked_t& pShapePacked, unsigned int batchSize = 1) : DeviceBuffer<T>(pCUName, device, pDevUUID, pShapePacked, batchSize){};
 
         /**
-         * @brief Return stored data from storage
+         * @brief Get the data from the buffer and return it as a vector
          *
          * @return Finn::vector<T>
          */
-        virtual Finn::vector<T> getData() = 0;
+        virtual Finn::vector<T> getData(const std::size_t& numItems) = 0;
+
         /**
          * @brief Sync data from the FPGA back to the host
          *
          */
         virtual bool read() = 0;
+
+        /**
+         * @brief Register a callback that is called when data is available in the queue (Only for AsyncDeviceOutputBuffer)
+         * 
+         * @param callback Callback function that takes the number of items available in the queue
+         */
+        virtual void registerCallback(std::function<void(std::size_t)> callback) {
+            // Default implementation does nothing
+            // This can be overridden by derived classes if needed
+            Finn::logAndError<std::runtime_error>("Callback not supported by this DeviceOutputBuffer implementation.");
+        }
+
+        virtual void drain() {
+            // Default implementation does nothing
+            // This can be overridden by derived classes if needed
+            Finn::logAndError<std::runtime_error>("Drain not supported by this DeviceOutputBuffer implementation.");
+        }
 
          protected:
         /**

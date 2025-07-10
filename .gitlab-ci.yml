@@ -202,7 +202,7 @@ run-regressiontests:
 
     - cd build/benchmarks
     - cp ../../example_networks/jet-structure-classification-with-host-mem/* .
-    - ../_deps/googlebenchmark-src/tools/compare.py -a -d results.json benchmarks ../../benchmarks/expectedPerformance.json ./SynchronousInferenceBenchmark | tee benchmark_output.txt
+    - ../_deps/googlebenchmark-src/tools/compare.py -a -d results.json benchmarks ../../benchmarks/expectedPerformance.json ./RegressionTest | tee benchmark_output.txt
     # Extract the OVERALL_GEOMEAN p-value and check if it exceeds the threshold
     - THRESHOLD=0.05
     - GEOMEAN=$(grep "OVERALL_GEOMEAN" benchmark_output.txt)

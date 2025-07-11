@@ -102,18 +102,18 @@ class Logger {
 };
 
 namespace Finn {
-/**
- * @brief First log the message as an error into the logger, then throw the passed error!
- *
- * @tparam E
- * @param msg
- */
-template<typename E>
-[[noreturn]] void logAndError(const std::string& msg) {
-    FINN_LOG(loglevel::error) << msg;
-    throw E(msg);
-}
-} // namespace Finn
+    /**
+     * @brief First log the message as an error into the logger, then throw the passed error!
+     *
+     * @tparam E
+     * @param msg
+     */
+    template<typename E>
+    [[noreturn]] void logAndError(const std::string& msg) {
+        FINN_LOG(loglevel::error) << msg;
+        throw E(msg);
+    }
+}  // namespace Finn
 
 
 #endif  // !LOGGING_H

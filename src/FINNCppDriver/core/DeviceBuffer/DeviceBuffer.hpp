@@ -224,7 +224,7 @@ namespace Finn {
          */
         virtual bool run() = 0;
 
-        virtual bool wait(std::stop_token stopToken={}) {
+        virtual bool wait(std::stop_token stopToken = {}) {
             busyWait(stopToken);
             return true;
         };
@@ -391,7 +391,7 @@ namespace Finn {
 
         /**
          * @brief Register a callback that is called when data is available in the queue (Only for AsyncDeviceOutputBuffer)
-         * 
+         *
          * @param callback Callback function that takes the number of items available in the queue
          */
         virtual void registerCallback(std::function<void(std::size_t)> callback) {

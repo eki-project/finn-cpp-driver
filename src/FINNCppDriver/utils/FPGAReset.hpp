@@ -1,17 +1,18 @@
 #ifndef FPGARESET_HPP
 #define FPGARESET_HPP
 
-#include <FINNCppDriver/utils/Logger.hpp>
-#include <unistd.h>
+#include <fcntl.h>  // For open()
 #include <sys/wait.h>
-#include <iostream>
-#include <cstring>
-#include <vector>
-#include <string>
-#include <sstream>
-#include <fcntl.h> // For open()
+#include <unistd.h>
+
+#include <FINNCppDriver/utils/Logger.hpp>
 #include <chrono>
+#include <cstring>
+#include <iostream>
+#include <sstream>
+#include <string>
 #include <thread>
+#include <vector>
 
 using namespace std::chrono_literals;
 
@@ -24,15 +25,13 @@ namespace Finn {
      * @param silenceOutput Whether to silence command's stdout and stderr
      * @return Pair of (success status, command output if requested)
      */
-    std::pair<bool, std::string> executeCommand(const std::vector<std::string>& args,
-        bool captureOutput = false,
-        bool silenceOutput = false) {
+    std::pair<bool, std::string> executeCommand(const std::vector<std::string>& args, bool captureOutput = false, bool silenceOutput = false) {
         int pipefd[2];
         std::string output;
 
         if (captureOutput && pipe(pipefd) == -1) {
             std::cerr << "Pipe creation failed: " << strerror(errno) << std::endl;
-            return { false, output };
+            return {false, output};
         }
 
         pid_t pid = fork();
@@ -43,16 +42,14 @@ namespace Finn {
                 close(pipefd[0]);
                 close(pipefd[1]);
             }
-            return { false, output };
-        }
-        else if (pid == 0) {
+            return {false, output};
+        } else if (pid == 0) {
             // Child process
             if (captureOutput) {
-                close(pipefd[0]); // Close read end
+                close(pipefd[0]);  // Close read end
                 dup2(pipefd[1], STDOUT_FILENO);
                 close(pipefd[1]);
-            }
-            else if (silenceOutput) {
+            } else if (silenceOutput) {
                 // Redirect stdout and stderr to /dev/null
                 int devnull = open("/dev/null", O_WRONLY);
                 if (devnull >= 0) {
@@ -74,11 +71,10 @@ namespace Finn {
             // If we get here, exec failed
             std::cerr << "Exec failed for " << args[0] << ": " << strerror(errno) << std::endl;
             _exit(EXIT_FAILURE);
-        }
-        else {
+        } else {
             // Parent process
             if (captureOutput) {
-                close(pipefd[1]); // Close write end
+                close(pipefd[1]);  // Close write end
 
                 // Read output from pipe
                 char buffer[4096];
@@ -96,7 +92,7 @@ namespace Finn {
             int status;
             waitpid(pid, &status, 0);
 
-            return { WIFEXITED(status) && WEXITSTATUS(status) == 0, output };
+            return {WIFEXITED(status) && WEXITSTATUS(status) == 0, output};
         }
     }
 
@@ -106,11 +102,10 @@ namespace Finn {
      * @return Whether the reset was successful
      */
     bool resetFPGA(const std::string& deviceId) {
-        auto [success, _] = executeCommand({ "xbutil", "reset", "--force", "-d", deviceId }, false, true);
+        auto [success, _] = executeCommand({"xbutil", "reset", "--force", "-d", deviceId}, false, true);
         if (success) {
             FINN_LOG(loglevel::info) << "Successfully reset FPGA device: " << deviceId << std::endl;
-        }
-        else {
+        } else {
             std::cerr << "Failed to reset FPGA device: " << deviceId << std::endl;
         }
         return success;
@@ -122,7 +117,7 @@ namespace Finn {
      */
     std::vector<std::string> getDevices() {
         std::vector<std::string> devices;
-        auto [success, output] = executeCommand({ "xbutil", "examine" }, true);
+        auto [success, output] = executeCommand({"xbutil", "examine"}, true);
 
         if (!success) {
             std::cerr << "Failed to execute 'xbutil examine'" << std::endl;
@@ -169,7 +164,7 @@ namespace Finn {
             if (!resetFPGA(devices[index])) {
                 logAndError<std::runtime_error>("Failed to reset FPGA device at index: " + std::to_string(index));
             }
-            std::this_thread::sleep_for(1000ms); // Wait for the reset to complete
+            std::this_thread::sleep_for(1000ms);  // Wait for the reset to complete
             return;
         }
 
@@ -179,20 +174,20 @@ namespace Finn {
         for (const auto& device : devices) {
             if (!resetFPGA(device)) {
                 allSuccessful = false;
-                if (!failedDevices.empty()) failedDevices += ", ";
+                if (!failedDevices.empty())
+                    failedDevices += ", ";
                 failedDevices += device;
             }
         }
-        std::this_thread::sleep_for(1000ms); // Wait for the reset to complete
+        std::this_thread::sleep_for(1000ms);  // Wait for the reset to complete
 
         if (!allSuccessful) {
             logAndError<std::runtime_error>("Failed to reset FPGA device(s): " + failedDevices);
-        }
-        else {
+        } else {
             FINN_LOG(loglevel::info) << "Successfully reset all " << devices.size() << " FPGA device(s)" << std::endl;
         }
     }
 
-} // namespace Finn
+}  // namespace Finn
 
-#endif // !FPGARESET_HPP
+#endif  // !FPGARESET_HPP

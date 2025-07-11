@@ -252,7 +252,6 @@ namespace FinnUtils {
     }
 
 
-
 }  // namespace FinnUtils
 
 #endif

@@ -82,9 +82,7 @@ namespace Finn {
          * @brief Destroy the Accelerator object
          *
          */
-        ~Accelerator(){
-            FINN_LOG(loglevel::info) << "Destructing Accelerator" << std::endl;
-        }
+        ~Accelerator() { FINN_LOG(loglevel::info) << "Destructing Accelerator" << std::endl; }
 
 
         /**
@@ -179,7 +177,7 @@ namespace Finn {
 
         size_t getTotalDataSize(unsigned int deviceIndex, const std::string& bufferName);
 
-        void registerCallback(unsigned int deviceIndex, const std::string& bufferName,std::function<void(std::size_t)> callback);
+        void registerCallback(unsigned int deviceIndex, const std::string& bufferName, std::function<void(std::size_t)> callback);
 
         void drain(unsigned int deviceIndex, const std::string& bufferName);
     };

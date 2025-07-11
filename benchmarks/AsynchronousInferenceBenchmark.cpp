@@ -16,14 +16,14 @@
 #include <FINNCppDriver/utils/FinnDatatypes.hpp>
 #include <FINNCppDriver/utils/Logger.hpp>
 #include <algorithm>
-#include <cstdint>
-#include <random>
-#include <vector>
-#include <thread>
 #include <atomic>
-#include <queue>
-#include <mutex>
 #include <condition_variable>
+#include <cstdint>
+#include <mutex>
+#include <queue>
+#include <random>
+#include <thread>
+#include <vector>
 
 template<typename O>
 using destribution_t = typename std::conditional_t<std::is_same_v<O, float>, std::uniform_real_distribution<O>, std::uniform_int_distribution<O>>;
@@ -52,18 +52,17 @@ static void BM_AsynchronousInferenceSingleThread(benchmark::State& state) {
     std::vector<dtype> inputBuffer(24 * batchSize);
 
     std::random_device rndDevice;
-    std::mt19937 mersenneEngine{ rndDevice() };
-    destribution_t<dtype> dist{ static_cast<dtype>(InputFinnType().min()), static_cast<dtype>(InputFinnType().max()) };
+    std::mt19937 mersenneEngine{rndDevice()};
+    destribution_t<dtype> dist{static_cast<dtype>(InputFinnType().min()), static_cast<dtype>(InputFinnType().max())};
 
     // Fill all buffers with random data
-    std::generate(inputBuffer.begin(), inputBuffer.end(),
-        [&dist, &mersenneEngine]() { return dist(mersenneEngine); });
+    std::generate(inputBuffer.begin(), inputBuffer.end(), [&dist, &mersenneEngine]() { return dist(mersenneEngine); });
 
     // Warmup
     driver.input(inputBuffer.begin(), inputBuffer.end());
     auto warmup = driver.getResults();
     benchmark::DoNotOptimize(warmup);
-    std::chrono::duration<float> runtime = std::chrono::seconds(90); // Fixed runtime for the benchmark
+    std::chrono::duration<float> runtime = std::chrono::seconds(90);  // Fixed runtime for the benchmark
 
     for (auto _ : state) {
         int processedCount = 0;
@@ -79,7 +78,6 @@ static void BM_AsynchronousInferenceSingleThread(benchmark::State& state) {
             auto results = driver.getResults();
             benchmark::DoNotOptimize(results);
             ++processedCount;
-
         }
         std::size_t infered = processedCount * batchSize;
 
@@ -89,7 +87,7 @@ static void BM_AsynchronousInferenceSingleThread(benchmark::State& state) {
 }
 
 // Register the function as a benchmark
-//BENCHMARK(BM_AsynchronousInferenceSingleThread)->RangeMultiplier(2)->Range(1, 4096)->Repetitions(5);
+// BENCHMARK(BM_AsynchronousInferenceSingleThread)->RangeMultiplier(2)->Range(1, 4096)->Repetitions(5);
 
 static void BM_AsynchronousInferenceMultiThread(benchmark::State& state) {
     const std::string exampleNetworkConfig = "jetConfig.json";
@@ -102,18 +100,17 @@ static void BM_AsynchronousInferenceMultiThread(benchmark::State& state) {
     std::vector<dtype> inputBuffer(24 * batchSize);
 
     std::random_device rndDevice;
-    std::mt19937 mersenneEngine{ rndDevice() };
-    destribution_t<dtype> dist{ static_cast<dtype>(InputFinnType().min()), static_cast<dtype>(InputFinnType().max()) };
+    std::mt19937 mersenneEngine{rndDevice()};
+    destribution_t<dtype> dist{static_cast<dtype>(InputFinnType().min()), static_cast<dtype>(InputFinnType().max())};
 
     // Fill all buffers with random data
-    std::generate(inputBuffer.begin(), inputBuffer.end(),
-        [&dist, &mersenneEngine]() { return dist(mersenneEngine); });
+    std::generate(inputBuffer.begin(), inputBuffer.end(), [&dist, &mersenneEngine]() { return dist(mersenneEngine); });
 
     // Warmup
     driver.input(inputBuffer.begin(), inputBuffer.end());
     auto warmup = driver.getResults();
     benchmark::DoNotOptimize(warmup);
-    std::chrono::duration<float> runtime = std::chrono::seconds(90); // Fixed runtime for the benchmark
+    std::chrono::duration<float> runtime = std::chrono::seconds(90);  // Fixed runtime for the benchmark
 
     for (auto _ : state) {
         std::atomic<std::size_t> processedCount = 0;
@@ -124,7 +121,7 @@ static void BM_AsynchronousInferenceMultiThread(benchmark::State& state) {
             while (!stoken.stop_requested()) {
                 driver.input(inputBuffer.begin(), inputBuffer.end());
             }
-            });
+        });
 
         // Start output thread that retrieves results
         std::jthread outputThread([&](std::stop_token stoken) {
@@ -134,14 +131,14 @@ static void BM_AsynchronousInferenceMultiThread(benchmark::State& state) {
                 benchmark::DoNotOptimize(results);
                 ++processedCount;
             }
-            std::this_thread::sleep_for(std::chrono::milliseconds(100)); // Make sure input thread is already exited
-            driver.drain(); // Drain any remaining results; might need to be accounted for in runtime for inf/s calculation  
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));  // Make sure input thread is already exited
+            driver.drain();                                               // Drain any remaining results; might need to be accounted for in runtime for inf/s calculation
         });
 
         const auto start = std::chrono::high_resolution_clock::now();
-        while (std::chrono::high_resolution_clock::now() - start < std::chrono::duration<float>(runtime)) {} //Looks stupid, but is for some reason more reliable...
-        inputThread.request_stop(); // Stop input thread
-        outputThread.request_stop(); // Stop output thread
+        while (std::chrono::high_resolution_clock::now() - start < std::chrono::duration<float>(runtime)) {}  // Looks stupid, but is for some reason more reliable...
+        inputThread.request_stop();                                                                           // Stop input thread
+        outputThread.request_stop();                                                                          // Stop output thread
 
         inputThread.join();
         outputThread.join();

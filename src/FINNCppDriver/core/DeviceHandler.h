@@ -129,15 +129,15 @@ namespace Finn {
          */
         ~DeviceHandler() {
             FINN_LOG(loglevel::info) << "Tearing down DeviceHandler" << std::endl;
-            
+
             // First call prepareForShutdown on all buffers
-            for(auto& [_, buffer] : inputBufferMap) {
+            for (auto& [_, buffer] : inputBufferMap) {
                 buffer->prepareForShutdown();
             }
-            for(auto& [_, buffer] : outputBufferMap) {
+            for (auto& [_, buffer] : outputBufferMap) {
                 buffer->prepareForShutdown();
             }
-            
+
             // Now safe to destroy buffers
             inputBufferMap.clear();
             outputBufferMap.clear();
@@ -215,7 +215,7 @@ namespace Finn {
          *
          * @param outputBufferKernelName identifier of the output buffer kernel
          * @param numItems Number of items to read from the output buffer
-         * @return Finn::vector<uint8_t> 
+         * @return Finn::vector<uint8_t>
          */
         Finn::vector<uint8_t> retrieveResults(const std::string& outputBufferKernelName, const std::size_t& numItems);
 
@@ -299,7 +299,6 @@ namespace Finn {
         void initializeBufferObjects(const DeviceWrapper& devWrap, unsigned int hostBufferSize, bool pSynchronousInference);
 
          private:
-
         /**
          * @brief Store the provided data into the DeviceBuffer
          *

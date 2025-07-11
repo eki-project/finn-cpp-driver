@@ -14,11 +14,11 @@
 #include <FINNCppDriver/core/BaseDriver.hpp>
 #include <FINNCppDriver/utils/FinnDatatypes.hpp>
 #include <FINNCppDriver/utils/join.hpp>
-#include <numeric>
-#include <thread>
 #include <atomic>
 #include <condition_variable>
 #include <mutex>
+#include <numeric>
+#include <thread>
 
 #include "gtest/gtest.h"
 
@@ -41,9 +41,9 @@ TEST(AsyncInference, asyncInferenceTest) {
 
     // Run inference
     driver.input(data.begin(), data.end());
-    auto results = driver.getResults(); // This should block until the results are available
+    auto results = driver.getResults();  // This should block until the results are available
 
-    Finn::vector<uint16_t> expectedResults = { 98, 50, 65476, 65493, 27 };
+    Finn::vector<uint16_t> expectedResults = {98, 50, 65476, 65493, 27};
 
     EXPECT_EQ(results, expectedResults);
 }
@@ -57,21 +57,22 @@ TEST(AsyncInference, asyncBatchInferenceTest) {
     std::mutex m;
 
 
-    //BUG HIER IRGENDWO SODASS FEATUREMAPSIZE UND TOTALDATASIZE GLEICH SIND
+    // BUG HIER IRGENDWO SODASS FEATUREMAPSIZE UND TOTALDATASIZE GLEICH SIND
     auto driver = Finn::Driver<false>(conf, 0, conf.deviceWrappers[0].idmas[0]->kernelName, 0, conf.deviceWrappers[0].odmas[0]->kernelName, static_cast<uint>(batchLength));
 
     Finn::vector<int8_t> data(driver.getFeatureMapSize(0, conf.deviceWrappers[0].idmas[0]->kernelName) * batchLength, 1);
 
     for (std::size_t i = 0; i < batchLength; ++i) {
         std::iota(data.begin() + static_cast<decltype(data)::difference_type>(i * driver.getFeatureMapSize(0, conf.deviceWrappers[0].idmas[0]->kernelName)),
-            data.begin() + static_cast<decltype(data)::difference_type>((i + 1) * driver.getFeatureMapSize(0, conf.deviceWrappers[0].idmas[0]->kernelName)), -127+static_cast<int>(i));
+                  data.begin() + static_cast<decltype(data)::difference_type>((i + 1) * driver.getFeatureMapSize(0, conf.deviceWrappers[0].idmas[0]->kernelName)), -127 + static_cast<int>(i));
     }
 
     // Run inference
     driver.input(data.begin(), data.end());
-    auto results = driver.getResults(); // This should block until the results are available
+    auto results = driver.getResults();  // This should block until the results are available
 
-    Finn::vector<uint16_t> expectedResults = { 98,50,65476,65493,27,98,50,65476,65493,27,98,50,65476,65493,27,98,50,65476,65493,27,98,50,65476,65493,27,95,61,65483,65491,12,98,50,65476,65493,27,92,53,65483,65498,15,92,53,65483,65498,15,86,53,65489,65498,9 };
+    Finn::vector<uint16_t> expectedResults = {98, 50, 65476, 65493, 27, 98, 50, 65476, 65493, 27, 98, 50, 65476, 65493, 27, 98, 50, 65476, 65493, 27, 98, 50, 65476, 65493, 27,
+                                              95, 61, 65483, 65491, 12, 98, 50, 65476, 65493, 27, 92, 53, 65483, 65498, 15, 92, 53, 65483, 65498, 15, 86, 53, 65489, 65498, 9};
 
     EXPECT_EQ(results.size(), expectedResults.size());
 
@@ -79,7 +80,7 @@ TEST(AsyncInference, asyncBatchInferenceTest) {
 
     for (std::size_t i = 0; i < batchLength; ++i) {
         std::iota(data.begin() + static_cast<decltype(data)::difference_type>(i * driver.getFeatureMapSize(0, conf.deviceWrappers[0].idmas[0]->kernelName)),
-            data.begin() + static_cast<decltype(data)::difference_type>((i + 1) * driver.getFeatureMapSize(0, conf.deviceWrappers[0].idmas[0]->kernelName)), -127+static_cast<int>(i));
+                  data.begin() + static_cast<decltype(data)::difference_type>((i + 1) * driver.getFeatureMapSize(0, conf.deviceWrappers[0].idmas[0]->kernelName)), -127 + static_cast<int>(i));
     }
 
     driver.registerCallback(0, conf.deviceWrappers[0].odmas[0]->kernelName, [&availableData, &cv](std::size_t numItems) {

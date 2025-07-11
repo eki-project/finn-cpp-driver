@@ -24,21 +24,21 @@
 #include <condition_variable>
 #include <cstdint>
 #include <cstring>
+#include <functional>
 #include <mutex>
 #include <new>
 #include <stop_token>
 #include <thread>
 #include <type_traits>
 #include <vector>
-#include <functional>
 
 using namespace std::literals::chrono_literals;
 
 // For CPU-specific optimizations
 #if defined(__x86_64__) || defined(_M_X64)
-#include <immintrin.h>
+    #include <immintrin.h>
 #elif defined(__aarch64__)
-#include <arm_neon.h>
+    #include <arm_neon.h>
 #endif
 
 /**
@@ -73,17 +73,17 @@ namespace detail {
      */
     inline SIMDSupport detect_simd_support() {
 #if defined(__x86_64__) || defined(_M_X64)
-#if defined(__AVX512F__)
+    #if defined(__AVX512F__)
         return SIMDSupport::AVX512;
-#elif defined(__AVX2__)
+    #elif defined(__AVX2__)
         return SIMDSupport::AVX2;
-#elif defined(__AVX__)
+    #elif defined(__AVX__)
         return SIMDSupport::AVX;
-#elif defined(__SSE2__)
+    #elif defined(__SSE2__)
         return SIMDSupport::SSE2;
-#else
+    #else
         return SIMDSupport::None;
-#endif
+    #endif
 #elif defined(__aarch64__)
         return SIMDSupport::NEON;
 #else
@@ -123,7 +123,7 @@ namespace detail {
         // Check if both pointers are aligned for SIMD
         const bool is_aligned = (reinterpret_cast<uintptr_t>(d) % 32 == 0) && (reinterpret_cast<uintptr_t>(s) % 32 == 0);
 
-#if defined(__AVX512F__)
+    #if defined(__AVX512F__)
         if (simd_level >= SIMDSupport::AVX512 && bytes >= 64) {
             // AVX-512 implementation (64-byte blocks)
             size_t i = 0;
@@ -134,8 +134,7 @@ namespace detail {
 
                 if (is_aligned) {
                     _mm512_store_si512(reinterpret_cast<__m512i*>(d + i), data);
-                }
-                else {
+                } else {
                     _mm512_storeu_si512(reinterpret_cast<__m512i*>(d + i), data);
                 }
             }
@@ -146,9 +145,9 @@ namespace detail {
             }
             return;
         }
-#endif
+    #endif
 
-#if defined(__AVX2__) || defined(__AVX__)
+    #if defined(__AVX2__) || defined(__AVX__)
         if (simd_level >= SIMDSupport::AVX && bytes >= 32) {
             // AVX/AVX2 implementation (32-byte blocks)
             size_t i = 0;
@@ -159,8 +158,7 @@ namespace detail {
 
                 if (is_aligned) {
                     _mm256_store_si256(reinterpret_cast<__m256i*>(d + i), data);
-                }
-                else {
+                } else {
                     _mm256_storeu_si256(reinterpret_cast<__m256i*>(d + i), data);
                 }
             }
@@ -171,9 +169,9 @@ namespace detail {
             }
             return;
         }
-#endif
+    #endif
 
-#if defined(__SSE2__)
+    #if defined(__SSE2__)
         if (simd_level >= SIMDSupport::SSE2 && bytes >= 16) {
             // SSE2 implementation (16-byte blocks)
             size_t i = 0;
@@ -184,8 +182,7 @@ namespace detail {
 
                 if (is_aligned) {
                     _mm_store_si128(reinterpret_cast<__m128i*>(d + i), data);
-                }
-                else {
+                } else {
                     _mm_storeu_si128(reinterpret_cast<__m128i*>(d + i), data);
                 }
             }
@@ -196,7 +193,7 @@ namespace detail {
             }
             return;
         }
-#endif
+    #endif
 
 #elif defined(__aarch64__)
         if (simd_level == SIMDSupport::NEON && bytes >= 16) {
@@ -309,7 +306,7 @@ namespace detail {
          * These types are known to have issues with move-then-destroy patterns
          */
         static constexpr bool explicit_list = std::is_same_v<T, std::string> || std::is_same_v<T, std::vector<bool>> ||  // vector<bool> is special
-            false;                                                                     // Extensible for other specific cases
+                                              false;                                                                     // Extensible for other specific cases
 
         /**
          * @brief Heuristic detection for potentially problematic types
@@ -404,11 +401,11 @@ namespace detail {
      * and power consumption during spin-waiting.
      */
     class exponential_backoff {
-    private:
+         private:
         int current_delay = 1;  ///< Current delay count
         const int max_delay;    ///< Maximum delay limit
 
-    public:
+         public:
         /**
          * @brief Constructs an exponential backoff object
          *
@@ -446,13 +443,13 @@ namespace detail {
      */
     template<typename T, typename IndexMask, typename BufferAccessor, bool IsTrivial>
     class SPSCQueueBase {
-    protected:
+         protected:
         // Buffer access through composition
         BufferAccessor buffer_;
 
         // Cache-aligned elements to prevent false sharing
         alignas(CACHE_LINE_SIZE) struct AlignedAtomicSize {
-            std::atomic<size_t> value{ 0 };  ///< The atomic value
+            std::atomic<size_t> value{0};  ///< The atomic value
             /// Padding to fill a complete cache line
             char padding[CACHE_LINE_SIZE - sizeof(std::atomic<size_t>)];
 
@@ -473,11 +470,11 @@ namespace detail {
             void store(size_t desired, std::memory_order order = std::memory_order_seq_cst) noexcept { value.store(desired, order); }
         };
 
-        AlignedAtomicSize head_;  ///< Consumer position
-        char head_padding_[CACHE_LINE_SIZE];               ///< Extra padding between head and tail
+        AlignedAtomicSize head_;              ///< Consumer position
+        char head_padding_[CACHE_LINE_SIZE];  ///< Extra padding between head and tail
 
-        AlignedAtomicSize tail_;  ///< Producer position
-        char tail_padding_[CACHE_LINE_SIZE];               ///< Extra padding after tail
+        AlignedAtomicSize tail_;              ///< Producer position
+        char tail_padding_[CACHE_LINE_SIZE];  ///< Extra padding after tail
 
         /**
          * @brief State for blocking operations
@@ -486,7 +483,7 @@ namespace detail {
             mutable std::mutex mutex_;           ///< Mutex for blocking operations
             std::condition_variable not_full_;   ///< CV for space available notifications
             std::condition_variable not_empty_;  ///< CV for item available notifications
-            std::atomic<bool> is_active_{ true };  ///< Whether the queue is active
+            std::atomic<bool> is_active_{true};  ///< Whether the queue is active
             char padding[CACHE_LINE_SIZE];       ///< Padding to fill a complete cache line
         } blocking_;
 
@@ -524,10 +521,7 @@ namespace detail {
          * @param index_mask Mask for index wrapping
          * @param buffer Buffer accessor (using move semantics to handle non-copyable element types)
          */
-        SPSCQueueBase(IndexMask index_mask, BufferAccessor&& buffer)
-            : buffer_(std::move(buffer)),
-            index_mask_(index_mask) {
-        }
+        SPSCQueueBase(IndexMask index_mask, BufferAccessor&& buffer) : buffer_(std::move(buffer)), index_mask_(index_mask) {}
     };
 
     /**
@@ -538,17 +532,13 @@ namespace detail {
      */
     template<typename T, size_t Capacity>
     class StaticBufferAccessor {
-    private:
+         private:
         alignas(CACHE_LINE_SIZE) std::array<T, Capacity> buffer_;
 
-    public:
-        T& operator[](size_t index) noexcept {
-            return buffer_[index];
-        }
+         public:
+        T& operator[](size_t index) noexcept { return buffer_[index]; }
 
-        const T& operator[](size_t index) const noexcept {
-            return buffer_[index];
-        }
+        const T& operator[](size_t index) const noexcept { return buffer_[index]; }
     };
 
     /**
@@ -558,36 +548,30 @@ namespace detail {
      */
     template<typename T>
     class DynamicBufferAccessor {
-    private:
+         private:
         std::unique_ptr<T, std::function<void(T*)>> buffer_;
 
-    public:
+         public:
         explicit DynamicBufferAccessor(size_t capacity) {
             // Calculate total size needed
             size_t size_bytes = capacity * sizeof(T);
-            
+
             // Round up to the next multiple of CACHE_LINE_SIZE
             size_t aligned_size = (size_bytes + CACHE_LINE_SIZE - 1) & ~(CACHE_LINE_SIZE - 1);
-            
+
             void* raw_memory = std::aligned_alloc(CACHE_LINE_SIZE, aligned_size);
-            if (!raw_memory) throw std::bad_alloc();
+            if (!raw_memory)
+                throw std::bad_alloc();
 
-            buffer_ = std::unique_ptr<T, std::function<void(T*)>>(
-                static_cast<T*>(raw_memory),
-                [](T* ptr) {
-                    // Cleanup will be handled by the queue class
-                    std::free(ptr);
-                }
-            );
+            buffer_ = std::unique_ptr<T, std::function<void(T*)>>(static_cast<T*>(raw_memory), [](T* ptr) {
+                // Cleanup will be handled by the queue class
+                std::free(ptr);
+            });
         }
 
-        T& operator[](size_t index) noexcept {
-            return buffer_.get()[index];
-        }
+        T& operator[](size_t index) noexcept { return buffer_.get()[index]; }
 
-        const T& operator[](size_t index) const noexcept {
-            return buffer_.get()[index];
-        }
+        const T& operator[](size_t index) const noexcept { return buffer_.get()[index]; }
     };
 
     /**
@@ -616,12 +600,8 @@ namespace detail {
  */
 template<typename T, size_t RequestedCapacity>
     requires std::movable<T>
-class SPSCQueue : private detail::SPSCQueueBase<
-    T,
-    detail::StaticIndexMask<std::bit_ceil(RequestedCapacity) - 1>,
-    detail::StaticBufferAccessor<T, std::bit_ceil(RequestedCapacity)>,
-    std::is_trivially_copyable_v<T>> {
-private:
+class SPSCQueue : private detail::SPSCQueueBase<T, detail::StaticIndexMask<std::bit_ceil(RequestedCapacity) - 1>, detail::StaticBufferAccessor<T, std::bit_ceil(RequestedCapacity)>, std::is_trivially_copyable_v<T>> {
+     private:
     using ActualCapacityValue = std::integral_constant<size_t, std::bit_ceil(RequestedCapacity)>;
     static constexpr size_t ActualCapacity = ActualCapacityValue::value;
     using IndexMask = detail::StaticIndexMask<ActualCapacity - 1>;
@@ -637,7 +617,7 @@ private:
     using Base::tail_;
     using Base::YIELD_ATTEMPTS;
 
-public:
+     public:
     /**
      * @brief Constructs an empty queue
      *
@@ -645,10 +625,7 @@ public:
      * The actual capacity will be rounded up to the next power of 2,
      * with one slot reserved for implementation purposes.
      */
-    constexpr SPSCQueue() noexcept
-        : Base(IndexMask{}, BufferAccessor{}) {
-        static_assert(ActualCapacity >= 2, "Queue capacity must be at least 2");
-    }
+    constexpr SPSCQueue() noexcept : Base(IndexMask{}, BufferAccessor{}) { static_assert(ActualCapacity >= 2, "Queue capacity must be at least 2"); }
 
     /**
      * @brief Destructor
@@ -700,8 +677,7 @@ public:
         // For trivially copyable small types, direct assignment is faster than placement new
         if constexpr (std::is_trivially_copyable_v<T> && sizeof(T) <= 16) {
             buffer_[current_tail] = item;
-        }
-        else {
+        } else {
             new (&buffer_[current_tail]) T(item);
         }
 
@@ -879,8 +855,7 @@ public:
                 if (second_chunk > 0) {
                     detail::simd_memcpy(&buffer_[0], first + first_chunk, second_chunk);
                 }
-            }
-            else {
+            } else {
                 // Process first chunk
                 auto it = first;
                 for (size_t i = 0; i < first_chunk; i++) {
@@ -892,8 +867,7 @@ public:
                     buffer_[i] = *it++;
                 }
             }
-        }
-        else {
+        } else {
             // Non-trivially copyable type - use placement new with iterator
             auto it = first;
 
@@ -1122,8 +1096,7 @@ public:
         // Move the item out with optimization for trivial types
         if constexpr (std::is_trivially_copyable_v<T> && sizeof(T) <= 16) {
             item = buffer_[current_head];
-        }
-        else {
+        } else {
             item = std::move(buffer_[current_head]);
 
             // Only call destructor if not an unsafe type after move
@@ -1137,7 +1110,7 @@ public:
 
         // Selective notification strategy
         const size_t used_capacity = ((tail_.load(std::memory_order_relaxed) - next_head) & index_mask_);
-        if (used_capacity < ActualCapacity / 4) { // Use ActualCapacity instead of buffer_size_
+        if (used_capacity < ActualCapacity / 4) {  // Use ActualCapacity instead of buffer_size_
             blocking_.not_full_.notify_one();
         }
 
@@ -1295,7 +1268,7 @@ public:
         const size_t to_copy = std::min(available, max_items);
 
         // Optimize based on whether the dequeue wraps around the buffer
-        const size_t first_chunk = std::min(to_copy, ActualCapacity - current_head); // Use ActualCapacity instead of buffer_size_
+        const size_t first_chunk = std::min(to_copy, ActualCapacity - current_head);  // Use ActualCapacity instead of buffer_size_
         const size_t second_chunk = to_copy - first_chunk;
 
         // Prefetch the next cache lines ahead of time to reduce false sharing impact
@@ -1317,8 +1290,7 @@ public:
                 if (second_chunk > 0) {
                     detail::simd_memcpy(dest + first_chunk, &buffer_[0], second_chunk);
                 }
-            }
-            else {
+            } else {
                 // Other iterator type - use iterator operations
                 std::copy_n(&buffer_[current_head], first_chunk, dest);
 
@@ -1328,8 +1300,7 @@ public:
                     std::copy_n(&buffer_[0], second_chunk, advanced_dest);
                 }
             }
-        }
-        else {
+        } else {
             // Non-trivial type - use move semantics
             for (size_t i = 0; i < first_chunk; i++) {
                 *dest = std::move(buffer_[current_head + i]);
@@ -1689,9 +1660,7 @@ public:
      *
      * @return true if the queue is empty, false otherwise
      */
-    bool is_empty() const noexcept {
-        return head_.load(std::memory_order_relaxed) == tail_.load(std::memory_order_relaxed);
-    }
+    bool is_empty() const noexcept { return head_.load(std::memory_order_relaxed) == tail_.load(std::memory_order_relaxed); }
 
     /**
      * @brief Checks if the queue is full
@@ -1808,8 +1777,7 @@ public:
 
                 count += batch_count;
             }
-        }
-        else {
+        } else {
             // For larger/non-trivial types, process one-by-one
             while (try_dequeue(item)) {
                 consumer(std::move(item));
@@ -1831,12 +1799,8 @@ public:
  */
 template<typename T>
     requires std::movable<T>
-class DynamicSPSCQueue : private detail::SPSCQueueBase<
-    T,
-    size_t,
-    detail::DynamicBufferAccessor<T>,
-    std::is_trivially_copyable_v<T>> {
-private:
+class DynamicSPSCQueue : private detail::SPSCQueueBase<T, size_t, detail::DynamicBufferAccessor<T>, std::is_trivially_copyable_v<T>> {
+     private:
     using Base = detail::SPSCQueueBase<T, size_t, detail::DynamicBufferAccessor<T>, std::is_trivially_copyable_v<T>>;
 
     // Import base members into this scope
@@ -1848,10 +1812,10 @@ private:
     using Base::tail_;
     using Base::YIELD_ATTEMPTS;
 
-    size_t buffer_size_;     // Actual size of the buffer (power of 2)
-    size_t requested_capacity_; // Original requested capacity
+    size_t buffer_size_;         // Actual size of the buffer (power of 2)
+    size_t requested_capacity_;  // Original requested capacity
 
-public:
+     public:
     /**
      * @brief Constructs an empty queue with dynamic size
      *
@@ -1859,13 +1823,12 @@ public:
      */
     explicit DynamicSPSCQueue(size_t requested_capacity)
         : Base(
-            // Round up to the next power of 2 and create mask
-            std::bit_ceil(requested_capacity) - 1,
-            // Create buffer with the calculated size
-            detail::DynamicBufferAccessor<T>(std::bit_ceil(requested_capacity))
-        ),
-        buffer_size_(std::bit_ceil(requested_capacity)),
-        requested_capacity_(requested_capacity) {
+              // Round up to the next power of 2 and create mask
+              std::bit_ceil(requested_capacity) - 1,
+              // Create buffer with the calculated size
+              detail::DynamicBufferAccessor<T>(std::bit_ceil(requested_capacity))),
+          buffer_size_(std::bit_ceil(requested_capacity)),
+          requested_capacity_(requested_capacity) {
         // Ensure minimum size
         if (buffer_size_ < 2) {
             throw std::invalid_argument("Queue capacity must be at least 2");
@@ -1926,8 +1889,7 @@ public:
         // For trivially copyable small types, direct assignment is faster than placement new
         if constexpr (std::is_trivially_copyable_v<T> && sizeof(T) <= 16) {
             buffer_[current_tail] = item;
-        }
-        else {
+        } else {
             new (&buffer_[current_tail]) T(item);
         }
 
@@ -2081,7 +2043,7 @@ public:
 
         // Calculate available space (optimized)
         const size_t head = head_.load(std::memory_order_acquire);
-        const size_t capacity = buffer_size_; // Use buffer_size_ instead of ActualCapacity
+        const size_t capacity = buffer_size_;  // Use buffer_size_ instead of ActualCapacity
         const size_t available_space = (head + capacity - current_tail - 1) & index_mask_;
 
         if (available_space == 0)
@@ -2106,8 +2068,7 @@ public:
                 if (second_chunk > 0) {
                     detail::simd_memcpy(&buffer_[0], first + first_chunk, second_chunk);
                 }
-            }
-            else {
+            } else {
                 // Process first chunk
                 auto it = first;
                 for (size_t i = 0; i < first_chunk; i++) {
@@ -2119,8 +2080,7 @@ public:
                     buffer_[i] = *it++;
                 }
             }
-        }
-        else {
+        } else {
             // Non-trivially copyable type - use placement new with iterator
             auto it = first;
 
@@ -2349,8 +2309,7 @@ public:
         // Move the item out with optimization for trivial types
         if constexpr (std::is_trivially_copyable_v<T> && sizeof(T) <= 16) {
             item = buffer_[current_head];
-        }
-        else {
+        } else {
             item = std::move(buffer_[current_head]);
 
             // Only call destructor if not an unsafe type after move
@@ -2522,7 +2481,7 @@ public:
         const size_t to_copy = std::min(available, max_items);
 
         // Optimize based on whether the dequeue wraps around the buffer
-        const size_t first_chunk = std::min(to_copy, buffer_size_ - current_head); // Use buffer_size_ instead of ActualCapacity
+        const size_t first_chunk = std::min(to_copy, buffer_size_ - current_head);  // Use buffer_size_ instead of ActualCapacity
         const size_t second_chunk = to_copy - first_chunk;
 
         // Prefetch the next cache lines ahead of time to reduce false sharing impact
@@ -2544,8 +2503,7 @@ public:
                 if (second_chunk > 0) {
                     detail::simd_memcpy(dest + first_chunk, &buffer_[0], second_chunk);
                 }
-            }
-            else {
+            } else {
                 // Other iterator type - use iterator operations
                 std::copy_n(&buffer_[current_head], first_chunk, dest);
 
@@ -2555,8 +2513,7 @@ public:
                     std::copy_n(&buffer_[0], second_chunk, advanced_dest);
                 }
             }
-        }
-        else {
+        } else {
             // Non-trivial type - use move semantics
             for (size_t i = 0; i < first_chunk; i++) {
                 *dest = std::move(buffer_[current_head + i]);
@@ -2916,9 +2873,7 @@ public:
      *
      * @return true if the queue is empty, false otherwise
      */
-    bool is_empty() const noexcept {
-        return head_.load(std::memory_order_relaxed) == tail_.load(std::memory_order_relaxed);
-    }
+    bool is_empty() const noexcept { return head_.load(std::memory_order_relaxed) == tail_.load(std::memory_order_relaxed); }
 
     /**
      * @brief Checks if the queue is full

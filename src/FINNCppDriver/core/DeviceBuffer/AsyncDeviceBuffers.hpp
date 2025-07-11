@@ -45,9 +45,7 @@ namespace Finn {
              *
              * @param expectedMaxQueueSize Expected maximum size of the queue
              */
-            AsyncBufferWrapper(std::size_t expectedMaxQueueSize) : queue(expectedMaxQueueSize* featureMapCount) {
-                FINN_LOG(loglevel::info) << "[AsyncDeviceBuffer] Max buffer size:" << queue.size() << "\n";
-            }
+            AsyncBufferWrapper(std::size_t expectedMaxQueueSize) : queue(expectedMaxQueueSize * featureMapCount) { FINN_LOG(loglevel::info) << "[AsyncDeviceBuffer] Max buffer size:" << queue.size() << "\n"; }
 
             /**
              * @brief Destroy the Async Buffer Wrapper object
@@ -153,9 +151,7 @@ namespace Finn {
          * @brief Destroy the Async Device Input Buffer object
          *
          */
-        ~AsyncDeviceInputBuffer() override {
-            FINN_LOG(loglevel::info) << "Destructing Asynchronous input buffer" << std::endl;
-        };
+        ~AsyncDeviceInputBuffer() override { FINN_LOG(loglevel::info) << "Destructing Asynchronous input buffer" << std::endl; };
 
         /**
          * @brief Prepare the buffer for shutdown
@@ -175,7 +171,7 @@ namespace Finn {
                 if (workerThread.joinable()) {
                     workerThread.join();
                 }
-                });
+            });
 
             if (joinFuture.wait_for(std::chrono::seconds(1)) == std::future_status::timeout) {
                 FINN_LOG(loglevel::warning) << "Worker thread for " << this->name << " did not exit cleanly" << std::endl;
@@ -253,7 +249,6 @@ namespace Finn {
         std::function<void(std::size_t)> callback = [](std::size_t numItems) {};  ///< Callback that is called when data is available in the queue
 
          private:
-
         void readInternal(std::stop_token stoken) {
             FINN_LOG_DEBUG(loglevel::info) << "Starting to read from the device";
             while (!stoken.stop_requested()) {
@@ -264,7 +259,7 @@ namespace Finn {
                 }
                 this->sync(this->totalDataSize);
                 saveMap();
-                callback(this->queue.size()-(this->queue.size()%this->totalDataSize));  // Notify that data is available in the queue
+                callback(this->queue.size() - (this->queue.size() % this->totalDataSize));  // Notify that data is available in the queue
             }
         }
 
@@ -280,7 +275,7 @@ namespace Finn {
          */
         AsyncDeviceOutputBuffer(const std::string& pCUName, xrt::device& device, xrt::uuid& pDevUUID, const shapePacked_t& pShapePacked, unsigned int batchSize)
             : DeviceOutputBuffer<T>(pCUName, device, pDevUUID, pShapePacked, batchSize),
-              detail::AsyncBufferWrapper<T>(2*batchSize * FinnUtils::shapeToElements(pShapePacked)), //Make output buffer map twice as large to circumvent a very rare deadlock in the case where one thread handles IO alone.
+              detail::AsyncBufferWrapper<T>(2 * batchSize * FinnUtils::shapeToElements(pShapePacked)),  // Make output buffer map twice as large to circumvent a very rare deadlock in the case where one thread handles IO alone.
               workerThread(std::jthread(std::bind_front(&AsyncDeviceOutputBuffer::readInternal, this))){};
 
         /**
@@ -299,9 +294,7 @@ namespace Finn {
          * @brief Destroy the Async Device Output Buffer object
          *
          */
-        ~AsyncDeviceOutputBuffer() override {
-            FINN_LOG(loglevel::info) << "Destruction Asynchronous output buffer"<< std::endl;
-        };
+        ~AsyncDeviceOutputBuffer() override { FINN_LOG(loglevel::info) << "Destruction Asynchronous output buffer" << std::endl; };
 
         /**
          * @brief Prepare the buffer for shutdown
@@ -320,14 +313,13 @@ namespace Finn {
                 if (workerThread.joinable()) {
                     workerThread.join();
                 }
-                });
+            });
 
             if (joinFuture.wait_for(std::chrono::seconds(1)) == std::future_status::timeout) {
                 FINN_LOG(loglevel::warning) << "Worker thread for " << this->name << " did not exit cleanly" << std::endl;
                 // Thread will be detached automatically when jthread is destroyed
                 throw std::runtime_error("Worker thread did not exit cleanly within timeout period");
-            }
-            else {
+            } else {
                 FINN_LOG(loglevel::info) << "Worker thread for " << this->name << " exited cleanly" << std::endl;
             }
         }

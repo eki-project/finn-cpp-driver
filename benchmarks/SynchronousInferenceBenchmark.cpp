@@ -46,18 +46,17 @@ static void BM_SynchronousInferenceSingleThread(benchmark::State& state) {
     std::vector<dtype> inputBuffer(24 * batchSize);
 
     std::random_device rndDevice;
-    std::mt19937 mersenneEngine{ rndDevice() };
-    destribution_t<dtype> dist{ static_cast<dtype>(InputFinnType().min()), static_cast<dtype>(InputFinnType().max()) };
+    std::mt19937 mersenneEngine{rndDevice()};
+    destribution_t<dtype> dist{static_cast<dtype>(InputFinnType().min()), static_cast<dtype>(InputFinnType().max())};
 
     // Fill all buffers with random data
-    std::generate(inputBuffer.begin(), inputBuffer.end(),
-        [&dist, &mersenneEngine]() { return dist(mersenneEngine); });
+    std::generate(inputBuffer.begin(), inputBuffer.end(), [&dist, &mersenneEngine]() { return dist(mersenneEngine); });
 
     // Warmup
     auto warmup = driver.inferSynchronous(inputBuffer.begin(), inputBuffer.end());
     benchmark::DoNotOptimize(warmup);
 
-    std::chrono::duration<float> runtime = std::chrono::seconds(90); // Fixed runtime for the benchmark
+    std::chrono::duration<float> runtime = std::chrono::seconds(90);  // Fixed runtime for the benchmark
 
     for (auto _ : state) {
         std::size_t processedCount = 0;

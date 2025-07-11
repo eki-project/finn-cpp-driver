@@ -156,7 +156,7 @@ namespace Finn {
             Finn::logAndError<std::runtime_error>("Tried registering a callback on a deviceIndex which does not exist! Queried index: " + std::to_string(deviceIndex) + ", KernelBufferName: " + bufferName);
         }
     }
-    
+
     void Accelerator::drain(unsigned int deviceIndex, const std::string& bufferName) {
         if (containsDevice(deviceIndex)) {
             getDeviceHandler(deviceIndex).drain(bufferName);

@@ -16,8 +16,8 @@
 #include <FINNCppDriver/core/DeviceBuffer/AsyncDeviceBuffers.hpp>
 #include <FINNCppDriver/core/DeviceBuffer/DeviceBuffer.hpp>
 #include <FINNCppDriver/core/DeviceBuffer/SyncDeviceBuffers.hpp>
-#include <FINNCppDriver/utils/Logger.hpp>
 #include <FINNCppDriver/utils/FPGAReset.hpp>
+#include <FINNCppDriver/utils/Logger.hpp>
 #include <algorithm>  // for copy
 #include <cerrno>
 #include <chrono>
@@ -82,25 +82,24 @@ namespace Finn {
 
     void DeviceHandler::initializeDevice() {
         FINN_LOG(loglevel::info) << "(" << xrtDeviceIndex << ") "
-            << "Initializing xrt::device, loading xclbin and assigning IP\n";
+                                 << "Initializing xrt::device, loading xclbin and assigning IP\n";
         resetFPGAS(xrtDeviceIndex);
         device = xrt::device(xrtDeviceIndex);
     }
 
     void DeviceHandler::loadXclbinSetUUID() {
         FINN_LOG(loglevel::info) << "(" << xrtDeviceIndex << ") "
-            << "Loading XCLBIN and setting uuid\n";
+                                 << "Loading XCLBIN and setting uuid\n";
         uuid = device.load_xclbin(xclbinPath);
     }
 
     void DeviceHandler::initializeBufferObjects(const DeviceWrapper& devWrap, unsigned int hostBufferSize, bool pSynchronousInference) {
         FINN_LOG(loglevel::info) << "(" << xrtDeviceIndex << ") "
-            << "Initializing buffer objects with buffer size " << hostBufferSize << "\n";
+                                 << "Initializing buffer objects with buffer size " << hostBufferSize << "\n";
         for (auto&& ebdptr : devWrap.idmas) {
             if (pSynchronousInference) {
                 inputBufferMap.emplace(std::make_pair(ebdptr->kernelName, std::make_shared<Finn::SyncDeviceInputBuffer<uint8_t>>(ebdptr->kernelName, device, uuid, ebdptr->packedShape, hostBufferSize)));
-            }
-            else {
+            } else {
                 inputBufferMap.emplace(std::make_pair(ebdptr->kernelName, std::make_shared<Finn::AsyncDeviceInputBuffer<uint8_t>>(ebdptr->kernelName, device, uuid, ebdptr->packedShape, hostBufferSize)));
             }
         }
@@ -108,8 +107,7 @@ namespace Finn {
             if (pSynchronousInference) {
                 auto ptr = std::make_shared<Finn::SyncDeviceOutputBuffer<uint8_t>>(ebdptr->kernelName, device, uuid, ebdptr->packedShape, hostBufferSize);
                 outputBufferMap.emplace(std::make_pair(ebdptr->kernelName, ptr));
-            }
-            else {
+            } else {
                 auto ptr = std::make_shared<Finn::AsyncDeviceOutputBuffer<uint8_t>>(ebdptr->kernelName, device, uuid, ebdptr->packedShape, hostBufferSize);
                 outputBufferMap.emplace(std::make_pair(ebdptr->kernelName, ptr));
             }
@@ -126,10 +124,9 @@ namespace Finn {
     void DeviceHandler::setBatchSize(uint pBatchsize) {
         if (this->batchsize == pBatchsize) {
             return;
-        }
-        else {
+        } else {
             FINN_LOG(loglevel::info) << "(" << xrtDeviceIndex << ") "
-                << "Change batch size to " << pBatchsize << "\n";
+                                     << "Change batch size to " << pBatchsize << "\n";
             this->batchsize = pBatchsize;
             inputBufferMap.clear();
             outputBufferMap.clear();
@@ -144,8 +141,7 @@ namespace Finn {
     [[maybe_unused]] bool DeviceHandler::containsBuffer(const std::string& kernelBufferName, IO ioMode) {
         if (ioMode == IO::INPUT) {
             return inputBufferMap.contains(kernelBufferName);
-        }
-        else if (ioMode == IO::OUTPUT) {
+        } else if (ioMode == IO::OUTPUT) {
             return outputBufferMap.contains(kernelBufferName);
         }
         return false;
@@ -209,8 +205,7 @@ namespace Finn {
     size_t DeviceHandler::getSizeInBytes(const std::string& bufferName) {
         if (inputBufferMap.contains(bufferName)) {
             return inputBufferMap.at(bufferName)->getSizeInBytes();
-        }
-        else if (outputBufferMap.contains(bufferName)) {
+        } else if (outputBufferMap.contains(bufferName)) {
             return outputBufferMap.at(bufferName)->getSizeInBytes();
         }
         return 0;
@@ -219,8 +214,7 @@ namespace Finn {
     size_t DeviceHandler::getFeatureMapSize(const std::string& bufferName) {
         if (inputBufferMap.contains(bufferName)) {
             return inputBufferMap.at(bufferName)->getFeatureMapSize();
-        }
-        else if (outputBufferMap.contains(bufferName)) {
+        } else if (outputBufferMap.contains(bufferName)) {
             return outputBufferMap.at(bufferName)->getFeatureMapSize();
         }
         return 0;
@@ -229,8 +223,7 @@ namespace Finn {
     size_t DeviceHandler::getBatchSize(const std::string& bufferName) {
         if (inputBufferMap.contains(bufferName)) {
             return inputBufferMap.at(bufferName)->getBatchSize();
-        }
-        else if (outputBufferMap.contains(bufferName)) {
+        } else if (outputBufferMap.contains(bufferName)) {
             return outputBufferMap.at(bufferName)->getBatchSize();
         }
         return 0;
@@ -239,8 +232,7 @@ namespace Finn {
     size_t DeviceHandler::getTotalDataSize(const std::string& bufferName) {
         if (inputBufferMap.contains(bufferName)) {
             return inputBufferMap.at(bufferName)->getTotalDataSize();
-        }
-        else if (outputBufferMap.contains(bufferName)) {
+        } else if (outputBufferMap.contains(bufferName)) {
             return outputBufferMap.at(bufferName)->getTotalDataSize();
         }
         return 0;
@@ -249,11 +241,9 @@ namespace Finn {
     void DeviceHandler::registerCallback(const std::string& bufferName, std::function<void(std::size_t)> callback) {
         if (inputBufferMap.contains(bufferName)) {
             Finn::logAndError<std::runtime_error>("Tried registering a callback on an input buffer! This is not allowed! Queried KernelBufferName: " + bufferName);
-        }
-        else if (outputBufferMap.contains(bufferName)) {
+        } else if (outputBufferMap.contains(bufferName)) {
             outputBufferMap.at(bufferName)->registerCallback(callback);
-        }
-        else {
+        } else {
             Finn::logAndError<std::runtime_error>("Tried registering a callback on a buffer which does not exist! Queried KernelBufferName: " + bufferName);
         }
     }
@@ -261,11 +251,9 @@ namespace Finn {
     void DeviceHandler::drain(const std::string& bufferName) {
         if (inputBufferMap.contains(bufferName)) {
             Finn::logAndError<std::runtime_error>("Tried draining an input buffer! This is not allowed! Queried KernelBufferName: " + bufferName);
-        }
-        else if (outputBufferMap.contains(bufferName)) {
+        } else if (outputBufferMap.contains(bufferName)) {
             outputBufferMap.at(bufferName)->drain();
-        }
-        else {
+        } else {
             Finn::logAndError<std::runtime_error>("Tried draining a buffer which does not exist! Queried KernelBufferName: " + bufferName);
         }
     }
@@ -276,14 +264,14 @@ namespace Finn {
         for (size_t index = 0; index < inputBufferMap.bucket_count(); ++index) {
             if (inputBufferMap.bucket_size(index) > 1) {
                 FINN_LOG_DEBUG(loglevel::error) << "(" << xrtDeviceIndex << ") "
-                    << "Hash collision in inputBufferMap. This access to the inputBufferMap is no longer constant time!";
+                                                << "Hash collision in inputBufferMap. This access to the inputBufferMap is no longer constant time!";
                 collisionFound = true;
             }
         }
         for (size_t index = 0; index < outputBufferMap.bucket_count(); ++index) {
             if (outputBufferMap.bucket_size(index) > 1) {
                 FINN_LOG_DEBUG(loglevel::error) << "(" << xrtDeviceIndex << ") "
-                    << "Hash collision in outputBufferMap. This access to the outputBufferMap is no longer constant time!";
+                                                << "Hash collision in outputBufferMap. This access to the outputBufferMap is no longer constant time!";
                 collisionFound = true;
             }
         }

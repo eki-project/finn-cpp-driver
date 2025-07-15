@@ -16,10 +16,12 @@
 #include <FINNCppDriver/core/DeviceHandler.h>  // for DeviceHandler, Uncheck...
 #include <FINNCppDriver/utils/Types.h>         // for vector, SIZE_SPECIFIER
 
-#include <cinttypes>  // for uint8_t
-#include <cstddef>    // for size_t
-#include <string>     // for string
-#include <vector>     // for vector, vector<>::iter...
+#include <FINNCppDriver/utils/Logger.hpp>  // for Severity, loglevel
+#include <cinttypes>                       // for uint8_t
+#include <cstddef>                         // for size_t
+#include <functional>                      // for function
+#include <string>                          // for string
+#include <vector>                          // for vector, vector<>::iter...
 
 namespace Finn {
     struct DeviceWrapper;
@@ -82,7 +84,7 @@ namespace Finn {
          * @brief Destroy the Accelerator object
          *
          */
-        ~Accelerator() { FINN_LOG(loglevel::info) << "Destructing Accelerator" << std::endl; }
+        ~Accelerator() { FINN_LOG(loglevel::info) << "Destructing Accelerator"; }
 
 
         /**

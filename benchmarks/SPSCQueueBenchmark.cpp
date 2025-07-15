@@ -39,8 +39,8 @@ static void BM_TrivialEnqueueDequeue(benchmark::State& state) {
         }
     }
 
-    state.SetItemsProcessed(static_cast<int64_t>(state.iterations() * operations_per_iteration * 2));  // enqueue + dequeue
-    state.SetBytesProcessed(static_cast<int64_t>(state.iterations() * operations_per_iteration * sizeof(int) * 2));
+    state.SetItemsProcessed(state.iterations() * static_cast<int64_t>(operations_per_iteration) * 2);  // enqueue + dequeue
+    state.SetBytesProcessed(state.iterations() * static_cast<int64_t>(operations_per_iteration * sizeof(int) * 2));
 }
 
 // Benchmark for non-trivial type enqueue/dequeue operations
@@ -76,8 +76,8 @@ static void BM_NonTrivialEnqueueDequeue(benchmark::State& state) {
         }
     }
 
-    state.SetItemsProcessed(static_cast<int64_t>(state.iterations() * operations_per_iteration * 2));
-    state.SetBytesProcessed(static_cast<int64_t>(state.iterations() * operations_per_iteration * testString.size() * 2));
+    state.SetItemsProcessed(state.iterations() * static_cast<int64_t>(operations_per_iteration) * 2);
+    state.SetBytesProcessed(state.iterations() * static_cast<int64_t>(operations_per_iteration * testString.size() * 2));
 }
 
 // Benchmark for multi-threaded producer-consumer pattern
@@ -99,7 +99,7 @@ static void BM_ProducerConsumer(benchmark::State& state) {
         }
 
         // Use a smaller maximum to avoid potential deadlocks
-        const size_t num_items = std::min<size_t>(static_cast<size_t>(state.range(0)), queue.capacity() * 5);
+        const size_t num_items = std::min<size_t>(static_cast<size_t>(state.range(0)), static_cast<size_t>(state.range(1)) * 5);
 
         // Start timing again before creating threads
         state.ResumeTiming();
@@ -145,12 +145,14 @@ static void BM_ProducerConsumer(benchmark::State& state) {
         }
     }
 
-    const size_t num_items = std::min<size_t>(static_cast<size_t>(state.range(0)), QueueSize * 5);
-    state.SetItemsProcessed(static_cast<int64_t>(state.iterations() * num_items * 2));
+    const size_t num_items = std::min<size_t>(static_cast<size_t>(state.range(0)), static_cast<size_t>(state.range(1)) * 5);
+
+    state.SetItemsProcessed(state.iterations() * static_cast<int64_t>(num_items) * 2);
     if constexpr (std::is_same_v<T, std::string>) {
-        state.SetBytesProcessed(static_cast<int64_t>(state.iterations() * num_items * sizeof("test-string") * 2));
+        constexpr size_t string_size = sizeof("test-string");
+        state.SetBytesProcessed(state.iterations() * static_cast<int64_t>(num_items * string_size * 2));
     } else {
-        state.SetBytesProcessed(static_cast<int64_t>(state.iterations() * num_items * sizeof(T) * 2));
+        state.SetBytesProcessed(state.iterations() * static_cast<int64_t>(num_items * sizeof(T) * 2));
     }
 }
 
@@ -191,8 +193,8 @@ static void BM_BulkDequeue(benchmark::State& state) {
         }
     }
 
-    state.SetItemsProcessed(static_cast<int64_t>(state.iterations() * num_items));
-    state.SetBytesProcessed(static_cast<int64_t>(state.iterations() * num_items * sizeof(int)));
+    state.SetItemsProcessed(state.iterations() * static_cast<int64_t>(num_items));
+    state.SetBytesProcessed(state.iterations() * static_cast<int64_t>(num_items * sizeof(int)));
 }
 
 // Benchmark comparing individual vs bulk dequeue
@@ -204,7 +206,7 @@ static void BM_IndividualVsBulkDequeue(benchmark::State& state) {
     // Make sure we don't exceed queue capacity
     const int total_items = std::min(10000, static_cast<int>(queue.capacity()));
     const int bulk_size = std::min(100, total_items);
-    std::vector<int> items(bulk_size);
+    std::vector<int> items(static_cast<size_t>(bulk_size));
 
     for (auto _ : state) {
         state.PauseTiming();
@@ -245,8 +247,8 @@ static void BM_IndividualVsBulkDequeue(benchmark::State& state) {
         }
     }
 
-    state.SetItemsProcessed(static_cast<int64_t>(state.iterations() * total_items));
-    state.SetBytesProcessed(static_cast<int64_t>(state.iterations() * total_items * sizeof(int)));
+    state.SetItemsProcessed(state.iterations() * static_cast<int64_t>(total_items));
+    state.SetBytesProcessed(state.iterations() * static_cast<int64_t>(total_items) * static_cast<int64_t>(sizeof(int)));
 }
 
 // Benchmark for latency measurement using std::chrono instead of cycleclock
@@ -269,7 +271,7 @@ static void BM_EnqueueDequeueLatency(benchmark::State& state) {
         }
 
         auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
-        state.SetIterationTime(duration.count() / 1e9);
+        state.SetIterationTime(static_cast<double>(duration.count()) / 1e9);
     }
 }
 
@@ -317,7 +319,7 @@ static void BM_EmplaceVsEnqueue(benchmark::State& state) {
         }
     }
 
-    state.SetItemsProcessed(static_cast<int64_t>(state.iterations() * num_items * 2));
+    state.SetItemsProcessed(state.iterations() * static_cast<int64_t>(num_items) * 2);
 }
 
 // Benchmark for bulk enqueue operations
@@ -362,8 +364,8 @@ static void BM_BulkEnqueue(benchmark::State& state) {
         benchmark::DoNotOptimize(total_enqueued);
     }
 
-    state.SetItemsProcessed(static_cast<int64_t>(state.iterations() * bulk_size * num_operations));
-    state.SetBytesProcessed(static_cast<int64_t>(state.iterations() * bulk_size * num_operations * sizeof(int)));
+    state.SetItemsProcessed(state.iterations() * static_cast<int64_t>(bulk_size * num_operations));
+    state.SetBytesProcessed(state.iterations() * static_cast<int64_t>(bulk_size * num_operations * sizeof(int)));
 }
 
 // Benchmark comparing individual vs bulk enqueue
@@ -375,11 +377,11 @@ static void BM_IndividualVsBulkEnqueue(benchmark::State& state) {
     // Make sure we don't exceed queue capacity
     const int total_items = std::min(10000, static_cast<int>(queue.capacity()));
     const int bulk_size = std::min(100, total_items);
-    std::vector<int> items(bulk_size);
+    std::vector<int> items(static_cast<size_t>(bulk_size));
 
     // Fill the items vector with test data
     for (int i = 0; i < bulk_size; ++i) {
-        items[i] = i;
+        items[static_cast<size_t>(i)] = i;
     }
 
     for (auto _ : state) {
@@ -392,8 +394,8 @@ static void BM_IndividualVsBulkEnqueue(benchmark::State& state) {
         size_t enqueued = 0;
         if (use_bulk) {
             // Bulk enqueue
-            for (size_t i = 0; i < total_items; i += bulk_size) {
-                size_t batch_size = std::min(static_cast<size_t>(bulk_size), static_cast<size_t>(total_items) - i);
+            for (int i = 0; i < total_items; i += bulk_size) {
+                size_t batch_size = std::min(static_cast<size_t>(bulk_size), static_cast<size_t>(total_items - i));
                 size_t batch_enqueued = queue.try_enqueue_bulk(items.begin(), batch_size);
                 if (batch_enqueued < batch_size)
                     break;  // Stop if queue is full
@@ -418,8 +420,8 @@ static void BM_IndividualVsBulkEnqueue(benchmark::State& state) {
         benchmark::DoNotOptimize(enqueued);
     }
 
-    state.SetItemsProcessed(static_cast<int64_t>(state.iterations() * total_items));
-    state.SetBytesProcessed(static_cast<int64_t>(state.iterations() * total_items * sizeof(int)));
+    state.SetItemsProcessed(state.iterations() * static_cast<int64_t>(total_items));
+    state.SetBytesProcessed(state.iterations() * static_cast<int64_t>(total_items) * static_cast<int64_t>(sizeof(int)));
 }
 
 // Benchmark for blocking bulk enqueue with varying queue fullness
@@ -428,8 +430,8 @@ static void BM_BlockingBulkEnqueue(benchmark::State& state) {
     SPSCQueue<int, QueueSize> queue;
 
     // Pre-fill the queue to a certain percentage of capacity
-    const double fill_percentage = state.range(0) / 100.0;
-    const size_t fill_count = static_cast<size_t>(queue.capacity() * fill_percentage);
+    const double fill_percentage = static_cast<double>(state.range(0)) / 100.0;
+    const size_t fill_count = static_cast<size_t>(static_cast<double>(queue.capacity()) * fill_percentage);
 
     // Calculate how many more items we can safely enqueue
     // Add 1 to ensure we have at least one item to enqueue
@@ -467,8 +469,8 @@ static void BM_BlockingBulkEnqueue(benchmark::State& state) {
         benchmark::DoNotOptimize(enqueued);
     }
 
-    state.SetItemsProcessed(static_cast<int64_t>(state.iterations() * batch_size));
-    state.SetBytesProcessed(static_cast<int64_t>(state.iterations() * batch_size * sizeof(int)));
+    state.SetItemsProcessed(state.iterations() * static_cast<int64_t>(batch_size));
+    state.SetBytesProcessed(state.iterations() * static_cast<int64_t>(batch_size * sizeof(int)));
 }
 
 // Register the benchmarks
@@ -527,7 +529,7 @@ BENCHMARK(BM_BlockingBulkEnqueue<1024>)
 
 // Benchmark for trivial type enqueue/dequeue operations with DynamicSPSCQueue
 static void BM_DynamicTrivialEnqueueDequeue(benchmark::State& state) {
-    DynamicSPSCQueue<int> queue(state.range(1));  // Use second range value for capacity
+    DynamicSPSCQueue<int> queue(static_cast<size_t>(state.range(1)));  // Use second range value for capacity
     // Ensure we don't exceed queue capacity
     const size_t operations_per_iteration = std::min<size_t>(static_cast<size_t>(state.range(0)), queue.capacity());
 
@@ -556,13 +558,13 @@ static void BM_DynamicTrivialEnqueueDequeue(benchmark::State& state) {
         }
     }
 
-    state.SetItemsProcessed(static_cast<int64_t>(state.iterations() * operations_per_iteration * 2));  // enqueue + dequeue
-    state.SetBytesProcessed(static_cast<int64_t>(state.iterations() * operations_per_iteration * sizeof(int) * 2));
+    state.SetItemsProcessed(state.iterations() * static_cast<int64_t>(operations_per_iteration) * 2);  // enqueue + dequeue
+    state.SetBytesProcessed(state.iterations() * static_cast<int64_t>(operations_per_iteration * sizeof(int) * 2));
 }
 
 // Benchmark for non-trivial type enqueue/dequeue operations with DynamicSPSCQueue
 static void BM_DynamicNonTrivialEnqueueDequeue(benchmark::State& state) {
-    DynamicSPSCQueue<std::string> queue(state.range(1));  // Use second range value for capacity
+    DynamicSPSCQueue<std::string> queue(static_cast<size_t>(state.range(1)));  // Use second range value for capacity
     std::string testString = "benchmark-test-string";
     // Ensure we don't exceed queue capacity
     const size_t operations_per_iteration = std::min<size_t>(static_cast<size_t>(state.range(0)), queue.capacity());
@@ -592,8 +594,8 @@ static void BM_DynamicNonTrivialEnqueueDequeue(benchmark::State& state) {
         }
     }
 
-    state.SetItemsProcessed(static_cast<int64_t>(state.iterations() * operations_per_iteration * 2));
-    state.SetBytesProcessed(static_cast<int64_t>(state.iterations() * operations_per_iteration * testString.size() * 2));
+    state.SetItemsProcessed(state.iterations() * static_cast<int64_t>(operations_per_iteration) * 2);
+    state.SetBytesProcessed(state.iterations() * static_cast<int64_t>(operations_per_iteration * testString.size() * 2));
 }
 
 // Benchmark for multi-threaded producer-consumer pattern with DynamicSPSCQueue
@@ -601,7 +603,7 @@ template<typename T>
 static void BM_DynamicProducerConsumer(benchmark::State& state) {
     for (auto _ : state) {
         state.PauseTiming();
-        DynamicSPSCQueue<T> queue(state.range(1));  // Use second range value for capacity
+        DynamicSPSCQueue<T> queue(static_cast<size_t>(state.range(1)));  // Use second range value for capacity
         std::atomic<bool> producer_done{false};
         std::atomic<size_t> items_produced{0};
         std::atomic<size_t> items_consumed{0};
@@ -615,7 +617,7 @@ static void BM_DynamicProducerConsumer(benchmark::State& state) {
         }
 
         // Use a smaller maximum to avoid potential deadlocks
-        const size_t num_items = std::min<size_t>(static_cast<size_t>(state.range(0)), queue.capacity() * 5);
+        const size_t num_items = std::min<size_t>(static_cast<size_t>(state.range(0)), static_cast<size_t>(state.range(1)) * 5);
 
         // Start timing again before creating threads
         state.ResumeTiming();
@@ -661,18 +663,20 @@ static void BM_DynamicProducerConsumer(benchmark::State& state) {
         }
     }
 
-    const size_t num_items = std::min<size_t>(static_cast<size_t>(state.range(0)), state.range(1) * 5);
-    state.SetItemsProcessed(static_cast<int64_t>(state.iterations() * num_items * 2));
+    const size_t num_items = std::min<size_t>(static_cast<size_t>(state.range(0)), static_cast<size_t>(state.range(1)) * 5);
+
+    state.SetItemsProcessed(state.iterations() * static_cast<int64_t>(num_items) * 2);
     if constexpr (std::is_same_v<T, std::string>) {
-        state.SetBytesProcessed(static_cast<int64_t>(state.iterations() * num_items * sizeof("test-string") * 2));
+        constexpr size_t string_size = sizeof("test-string");
+        state.SetBytesProcessed(state.iterations() * static_cast<int64_t>(num_items * string_size * 2));
     } else {
-        state.SetBytesProcessed(static_cast<int64_t>(state.iterations() * num_items * sizeof(T) * 2));
+        state.SetBytesProcessed(state.iterations() * static_cast<int64_t>(num_items * sizeof(T) * 2));
     }
 }
 
 // Benchmark for bulk dequeue operations with DynamicSPSCQueue
 static void BM_DynamicBulkDequeue(benchmark::State& state) {
-    DynamicSPSCQueue<int> queue(state.range(2));  // Use third range value for capacity
+    DynamicSPSCQueue<int> queue(static_cast<size_t>(state.range(2)));  // Use third range value for capacity
     const auto bulk_size = static_cast<size_t>(state.range(1));
     std::vector<int> items(bulk_size);
 
@@ -706,8 +710,8 @@ static void BM_DynamicBulkDequeue(benchmark::State& state) {
         }
     }
 
-    state.SetItemsProcessed(static_cast<int64_t>(state.iterations() * num_items));
-    state.SetBytesProcessed(static_cast<int64_t>(state.iterations() * num_items * sizeof(int)));
+    state.SetItemsProcessed(state.iterations() * static_cast<int64_t>(num_items));
+    state.SetBytesProcessed(state.iterations() * static_cast<int64_t>(num_items * sizeof(int)));
 }
 
 // Benchmark comparing individual vs bulk dequeue with DynamicSPSCQueue
@@ -718,7 +722,7 @@ static void BM_DynamicIndividualVsBulkDequeue(benchmark::State& state) {
     // Make sure we don't exceed queue capacity
     const int total_items = std::min(10000, static_cast<int>(queue.capacity()));
     const int bulk_size = std::min(100, total_items);
-    std::vector<int> items(bulk_size);
+    std::vector<int> items(static_cast<size_t>(bulk_size));
 
     for (auto _ : state) {
         state.PauseTiming();
@@ -759,13 +763,13 @@ static void BM_DynamicIndividualVsBulkDequeue(benchmark::State& state) {
         }
     }
 
-    state.SetItemsProcessed(static_cast<int64_t>(state.iterations() * total_items));
-    state.SetBytesProcessed(static_cast<int64_t>(state.iterations() * total_items * sizeof(int)));
+    state.SetItemsProcessed(state.iterations() * static_cast<int64_t>(total_items));
+    state.SetBytesProcessed(state.iterations() * static_cast<int64_t>(total_items) * static_cast<int64_t>(sizeof(int)));
 }
 
 // Benchmark for latency measurement with DynamicSPSCQueue
 static void BM_DynamicEnqueueDequeueLatency(benchmark::State& state) {
-    DynamicSPSCQueue<int64_t> queue(state.range(0));  // Use range value for capacity
+    DynamicSPSCQueue<int64_t> queue(static_cast<size_t>(state.range(0)));  // Use range value for capacity
 
     for (auto _ : state) {
         auto start = std::chrono::high_resolution_clock::now();
@@ -782,17 +786,17 @@ static void BM_DynamicEnqueueDequeueLatency(benchmark::State& state) {
         }
 
         auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
-        state.SetIterationTime(duration.count() / 1e9);
+        state.SetIterationTime(static_cast<double>(duration.count()) / 1e9);
     }
 }
 
 // Benchmark for emplace performance with DynamicSPSCQueue
 static void BM_DynamicEmplaceVsEnqueue(benchmark::State& state) {
-    DynamicSPSCQueue<std::pair<int, std::string>> queue(state.range(1));  // Use second range value for capacity
+    DynamicSPSCQueue<std::pair<int, std::string>> queue(static_cast<size_t>(state.range(1)));  // Use second range value for capacity
     const bool use_emplace = state.range(0) == 1;
 
     // Make sure we don't exceed queue capacity
-    const auto num_items = static_cast<int>(std::min<size_t>(static_cast<size_t>(state.range(2)), static_cast<size_t>(queue.capacity())));
+    const auto num_items = static_cast<int>(std::min<size_t>(static_cast<size_t>(state.range(2)), queue.capacity()));
 
     for (auto _ : state) {
         // Track successful operations
@@ -829,12 +833,12 @@ static void BM_DynamicEmplaceVsEnqueue(benchmark::State& state) {
         }
     }
 
-    state.SetItemsProcessed(static_cast<int64_t>(state.iterations() * num_items * 2));
+    state.SetItemsProcessed(state.iterations() * static_cast<int64_t>(num_items) * 2);
 }
 
 // Benchmark for bulk enqueue operations with DynamicSPSCQueue
 static void BM_DynamicBulkEnqueue(benchmark::State& state) {
-    DynamicSPSCQueue<int> queue(state.range(2));  // Use third range value for capacity
+    DynamicSPSCQueue<int> queue(static_cast<size_t>(state.range(2)));  // Use third range value for capacity
     const auto bulk_size = static_cast<size_t>(state.range(1));
     std::vector<int> items(bulk_size);
 
@@ -873,8 +877,8 @@ static void BM_DynamicBulkEnqueue(benchmark::State& state) {
         benchmark::DoNotOptimize(total_enqueued);
     }
 
-    state.SetItemsProcessed(static_cast<int64_t>(state.iterations() * bulk_size * num_operations));
-    state.SetBytesProcessed(static_cast<int64_t>(state.iterations() * bulk_size * num_operations * sizeof(int)));
+    state.SetItemsProcessed(state.iterations() * static_cast<int64_t>(bulk_size * num_operations));
+    state.SetBytesProcessed(state.iterations() * static_cast<int64_t>(bulk_size * num_operations * sizeof(int)));
 }
 
 // Benchmark comparing individual vs bulk enqueue with DynamicSPSCQueue
@@ -885,11 +889,11 @@ static void BM_DynamicIndividualVsBulkEnqueue(benchmark::State& state) {
     // Make sure we don't exceed queue capacity
     const int total_items = std::min(10000, static_cast<int>(queue.capacity()));
     const int bulk_size = std::min(100, total_items);
-    std::vector<int> items(bulk_size);
+    std::vector<int> items(static_cast<size_t>(bulk_size));
 
     // Fill the items vector with test data
     for (int i = 0; i < bulk_size; ++i) {
-        items[i] = i;
+        items[static_cast<size_t>(i)] = i;
     }
 
     for (auto _ : state) {
@@ -902,8 +906,8 @@ static void BM_DynamicIndividualVsBulkEnqueue(benchmark::State& state) {
         size_t enqueued = 0;
         if (use_bulk) {
             // Bulk enqueue
-            for (size_t i = 0; i < total_items; i += bulk_size) {
-                size_t batch_size = std::min(static_cast<size_t>(bulk_size), static_cast<size_t>(total_items) - i);
+            for (int i = 0; i < total_items; i += bulk_size) {
+                size_t batch_size = std::min(static_cast<size_t>(bulk_size), static_cast<size_t>(total_items - i));
                 size_t batch_enqueued = queue.try_enqueue_bulk(items.begin(), batch_size);
                 if (batch_enqueued < batch_size)
                     break;  // Stop if queue is full
@@ -928,17 +932,17 @@ static void BM_DynamicIndividualVsBulkEnqueue(benchmark::State& state) {
         benchmark::DoNotOptimize(enqueued);
     }
 
-    state.SetItemsProcessed(static_cast<int64_t>(state.iterations() * total_items));
-    state.SetBytesProcessed(static_cast<int64_t>(state.iterations() * total_items * sizeof(int)));
+    state.SetItemsProcessed(state.iterations() * static_cast<int64_t>(total_items));
+    state.SetBytesProcessed(state.iterations() * static_cast<int64_t>(total_items) * static_cast<int64_t>(sizeof(int)));
 }
 
 // Benchmark for blocking bulk enqueue with varying queue fullness with DynamicSPSCQueue
 static void BM_DynamicBlockingBulkEnqueue(benchmark::State& state) {
-    DynamicSPSCQueue<int> queue(state.range(1));  // Use second range value for capacity
+    DynamicSPSCQueue<int> queue(static_cast<size_t>(state.range(1)));  // Use second range value for capacity
 
     // Pre-fill the queue to a certain percentage of capacity
-    const double fill_percentage = state.range(0) / 100.0;
-    const size_t fill_count = static_cast<size_t>(queue.capacity() * fill_percentage);
+    const double fill_percentage = static_cast<double>(state.range(0)) / 100.0;
+    const size_t fill_count = static_cast<size_t>(static_cast<double>(queue.capacity()) * fill_percentage);
 
     // Calculate how many more items we can safely enqueue
     // Add 1 to ensure we have at least one item to enqueue
@@ -976,8 +980,8 @@ static void BM_DynamicBlockingBulkEnqueue(benchmark::State& state) {
         benchmark::DoNotOptimize(enqueued);
     }
 
-    state.SetItemsProcessed(static_cast<int64_t>(state.iterations() * batch_size));
-    state.SetBytesProcessed(static_cast<int64_t>(state.iterations() * batch_size * sizeof(int)));
+    state.SetItemsProcessed(state.iterations() * static_cast<int64_t>(batch_size));
+    state.SetBytesProcessed(state.iterations() * static_cast<int64_t>(batch_size * sizeof(int)));
 }
 
 // Register dynamic benchmark variants

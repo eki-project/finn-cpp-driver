@@ -83,7 +83,7 @@ namespace Finn {
     void DeviceHandler::initializeDevice() {
         FINN_LOG(loglevel::info) << "(" << xrtDeviceIndex << ") "
                                  << "Initializing xrt::device, loading xclbin and assigning IP\n";
-        resetFPGAS(xrtDeviceIndex);
+        resetFPGAS(static_cast<int>(xrtDeviceIndex));
         device = xrt::device(xrtDeviceIndex);
     }
 

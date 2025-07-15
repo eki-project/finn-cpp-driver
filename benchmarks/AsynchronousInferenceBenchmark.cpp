@@ -65,7 +65,7 @@ static void BM_AsynchronousInferenceSingleThread(benchmark::State& state) {
     std::chrono::duration<float> runtime = std::chrono::seconds(90);  // Fixed runtime for the benchmark
 
     for (auto _ : state) {
-        int processedCount = 0;
+        size_t processedCount = 0;
 
         // Set a fixed time for the benchmark
         const auto start = std::chrono::high_resolution_clock::now();
@@ -87,7 +87,7 @@ static void BM_AsynchronousInferenceSingleThread(benchmark::State& state) {
 }
 
 // Register the function as a benchmark
-// BENCHMARK(BM_AsynchronousInferenceSingleThread)->RangeMultiplier(2)->Range(1, 4096)->Repetitions(5);
+BENCHMARK(BM_AsynchronousInferenceSingleThread)->RangeMultiplier(2)->Range(1, 4096)->Repetitions(5);
 
 static void BM_AsynchronousInferenceMultiThread(benchmark::State& state) {
     const std::string exampleNetworkConfig = "jetConfig.json";

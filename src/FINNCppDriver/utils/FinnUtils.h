@@ -48,20 +48,20 @@ namespace FinnUtils {
         BufferFiller(uint8_t min, uint8_t max) : sampler(std::uniform_int_distribution<uint8_t>(min, max)) {}
 
         /**
-         * @brief
+         * @brief Create a BufferFiller with specified range
          *
-         * @param min
-         * @param max
-         * @return BufferFiller
+         * @param min Minimum value for random generation
+         * @param max Maximum value for random generation
+         * @return BufferFiller New BufferFiller instance
          */
         static BufferFiller create(uint8_t min, uint8_t max) { return {min, max}; }
 
         /**
-         * @brief
+         * @brief Fill a range with random values
          *
-         * @tparam IteratorType
-         * @param first
-         * @param last
+         * @tparam IteratorType Type of iterator
+         * @param first Iterator to first element
+         * @param last Iterator to end of range
          */
         template<typename IteratorType>
         void fillRandom(IteratorType first, IteratorType last) {
@@ -69,9 +69,9 @@ namespace FinnUtils {
         }
 
         /**
-         * @brief
+         * @brief Fill a vector with random values
          *
-         * @param vec
+         * @param vec Vector to fill with random values
          */
         void fillRandom(std::vector<uint8_t>& vec) { fillRandom(vec.begin(), vec.end()); }
     };
@@ -161,16 +161,38 @@ namespace FinnUtils {
         // NOLINTEND
     }
 
+    /**
+     * @brief Fast implementation of log2 using bit operations
+     *
+     * @tparam T Integral type
+     * @param value Value to compute log2 of
+     * @return constexpr T Floor of log2(value)
+     */
     template<typename T>
     inline constexpr T fastLog2(T value) {
         return (value == 0) ? 0 : std::bit_width(value) - 1;
     }
 
+    /**
+     * @brief Fast implementation of ceiling of log2
+     *
+     * @tparam T Integral type
+     * @param value Value to compute ceil(log2) of
+     * @return constexpr T Ceiling of log2(value)
+     */
     template<typename T>
     inline constexpr T fastLog2Ceil(T value) {
         return (value == 0) ? 0 : fastLog2(value - 1) + 1;
     }
 
+    /**
+     * @brief Fast implementation of ceiling division
+     *
+     * @tparam T Arithmetic type
+     * @param value Dividend
+     * @param value2 Divisor
+     * @return constexpr T Ceiling of value/value2
+     */
     template<typename T>
     inline constexpr T fastDivCeil(T value, T value2) {
         return value == 0 ? 0 : 1 + ((value - 1) / value2);

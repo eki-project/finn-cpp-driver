@@ -87,14 +87,27 @@ namespace Finn {
          */
         T* map;
         /**
-         * @brief 64 bit adress of the buffer located on the FPGA card
+         * @brief 64 bit address of the buffer located on the FPGA card
          *
          */
         const long long bufAdr;
 
+        /**
+         * @brief Total size of data in elements
+         *
+         */
         std::size_t totalDataSize;
+        /**
+         * @brief Size of feature map
+         *
+         */
         std::size_t featureMapSize;
 
+        /**
+         * @brief Busy wait until the IP core is done executing
+         *
+         * @param stopToken Token to request stopping the wait
+         */
         void busyWait(std::stop_token stopToken = {}) {
             // Wait until the IP is DONE
             uint32_t axi_ctrl = 0;
@@ -104,6 +117,14 @@ namespace Finn {
         }
 
          private:
+        /**
+         * @brief Get the group ID for a compute unit
+         *
+         * @param device XRT device
+         * @param uuid Device UUID
+         * @param computeUnit Name of the compute unit
+         * @return unsigned int Group ID
+         */
         unsigned int getGroupId(const xrt::device& device, const xrt::uuid& uuid, const std::string& computeUnit) { return xrt::kernel(device, uuid, computeUnit).group_id(0); }
 
         /**
@@ -112,6 +133,12 @@ namespace Finn {
          */
         uint32_t oldRepetitions = 0;
 
+        /**
+         * @brief Get flags for buffer object creation based on host memory access
+         *
+         * @param hostMemoryAccess Whether host memory access is enabled
+         * @return consteval static xrt::bo::flags Buffer object flags
+         */
         consteval static xrt::bo::flags getFlags(bool hostMemoryAccess) {
             if (hostMemoryAccess) {
                 return xrt::bo::flags::host_only;
@@ -194,12 +221,32 @@ namespace Finn {
          */
         DeviceBuffer& operator=(const DeviceBuffer& buf) = delete;
 
+        /**
+         * @brief Get the size in bytes of the buffer
+         *
+         * @return size_t Size in bytes
+         */
         virtual size_t getSizeInBytes() { return totalDataSize * sizeof(T); }
 
+        /**
+         * @brief Get the feature map size
+         *
+         * @return size_t Feature map size
+         */
         virtual size_t getFeatureMapSize() { return featureMapSize; }
 
+        /**
+         * @brief Get the batch size
+         *
+         * @return size_t Batch size
+         */
         virtual size_t getBatchSize() { return this->shapePacked[0]; }
 
+        /**
+         * @brief Get the total data size
+         *
+         * @return size_t Total data size
+         */
         virtual size_t getTotalDataSize() { return totalDataSize; }
 
         /**
@@ -224,6 +271,13 @@ namespace Finn {
          */
         virtual bool run() = 0;
 
+        /**
+         * @brief Wait for the kernel to complete execution
+         *
+         * @param stopToken Token to request stopping the wait
+         * @return true Success
+         * @return false Failure
+         */
         virtual bool wait(std::stop_token stopToken = {}) {
             busyWait(stopToken);
             return true;
@@ -244,6 +298,11 @@ namespace Finn {
          */
         virtual void sync(std::size_t bytes) = 0;
 
+        /**
+         * @brief Execute the kernel with specified repetitions
+         *
+         * @param repetitions Number of repetitions to execute (default: 1)
+         */
         void execute(const uint32_t repetitions = 1) {
             // writes the buffer adress
             constexpr uint32_t offset_buf = 0x10;

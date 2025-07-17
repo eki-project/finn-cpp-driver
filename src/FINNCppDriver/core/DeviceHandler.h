@@ -219,16 +219,51 @@ namespace Finn {
          */
         Finn::vector<uint8_t> retrieveResults(const std::string& outputBufferKernelName, const std::size_t& numItems);
 
+        /**
+         * @brief Get the size in bytes of a buffer
+         *
+         * @param bufferName The name of the buffer
+         * @return size_t Size in bytes
+         */
         size_t getSizeInBytes(const std::string& bufferName);
 
+        /**
+         * @brief Get the feature map size of a buffer
+         *
+         * @param bufferName The name of the buffer
+         * @return size_t Feature map size
+         */
         size_t getFeatureMapSize(const std::string& bufferName);
 
+        /**
+         * @brief Get the batch size of a buffer
+         *
+         * @param bufferName The name of the buffer
+         * @return size_t Batch size
+         */
         size_t getBatchSize(const std::string& bufferName);
 
+        /**
+         * @brief Get the total data size of a buffer
+         *
+         * @param bufferName The name of the buffer
+         * @return size_t Total data size
+         */
         size_t getTotalDataSize(const std::string& bufferName);
 
+        /**
+         * @brief Register a callback function for a buffer
+         *
+         * @param bufferName The name of the buffer
+         * @param callback Callback function to register
+         */
         void registerCallback(const std::string& bufferName, std::function<void(std::size_t)> callback);
 
+        /**
+         * @brief Drain a buffer
+         *
+         * @param bufferName The name of the buffer to drain
+         */
         void drain(const std::string& bufferName);
 
         /**

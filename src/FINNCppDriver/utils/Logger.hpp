@@ -58,6 +58,11 @@ DevNull& operator<<(DevNull& dest, [[maybe_unused]] T) {
  */
 class Logger {
      public:
+    /**
+     * @brief Initialize the logger with optional console output
+     *
+     * @param console Enable console output in addition to file logging
+     */
     void static initLogger(bool console = false) { static Logger log(console); }
 
     /**

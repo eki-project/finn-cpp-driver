@@ -1,3 +1,15 @@
+/**
+ * @file FPGAReset.hpp
+ * @author Linus Jungemann (linus.jungemann@uni-paderborn.de) and others
+ * @brief Provides functionality to reset FPGA devices
+ * @version 0.1
+ * @date 2025-07-12
+ *
+ * @copyright Copyright (c) 2025
+ * @license All rights reserved. This program and the accompanying materials are made available under the terms of the MIT license.
+ *
+ */
+
 #ifndef FPGARESET_HPP
 #define FPGARESET_HPP
 
@@ -19,11 +31,12 @@ using namespace std::chrono_literals;
 namespace Finn {
 
     /**
-     * Helper function to execute a command and optionally capture its output
+     * @brief Helper function to execute a command and optionally capture its output
+     *
      * @param args Vector of command arguments (first element is the command)
      * @param captureOutput Whether to capture and return the command output
      * @param silenceOutput Whether to silence command's stdout and stderr
-     * @return Pair of (success status, command output if requested)
+     * @return std::pair<bool, std::string> Pair of (success status, command output if requested)
      */
     std::pair<bool, std::string> executeCommand(const std::vector<std::string>& args, bool captureOutput = false, bool silenceOutput = false) {
         int pipefd[2];

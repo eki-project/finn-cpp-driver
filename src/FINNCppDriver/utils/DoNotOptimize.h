@@ -20,9 +20,10 @@
 namespace Finn {
 
     /**
-     * @brief Disables compiler optimization of unused variables for specific variable
+     * @brief Disables compiler optimization of unused variables for specific variable (trivially copyable types <= pointer size)
      *
-     * @tparam Tp
+     * @tparam Tp Type of the value (must be trivially copyable and size <= pointer size)
+     * @param value Reference to the value to prevent optimization
      */
     template<class Tp>
     inline __attribute__((always_inline)) typename std::enable_if<std::is_trivially_copyable<Tp>::value && (sizeof(Tp) <= sizeof(Tp*))>::type DoNotOptimize(Tp& value) {
@@ -30,9 +31,10 @@ namespace Finn {
     }
 
     /**
-     * @brief Disables compiler optimization of unused variables for specific variable
+     * @brief Disables compiler optimization of unused variables for specific variable (non-trivially copyable or large types)
      *
-     * @tparam Tp
+     * @tparam Tp Type of the value (non-trivially copyable or size > pointer size)
+     * @param value Reference to the value to prevent optimization
      */
     template<class Tp>
     inline __attribute__((always_inline)) typename std::enable_if<!std::is_trivially_copyable<Tp>::value || (sizeof(Tp) > sizeof(Tp*))>::type DoNotOptimize(Tp& value) {
@@ -40,9 +42,10 @@ namespace Finn {
     }
 
     /**
-     * @brief Disables compiler optimization of unused variables for specific variable
+     * @brief Disables compiler optimization of unused variables for specific variable (rvalue, trivially copyable <= pointer size)
      *
-     * @tparam Tp
+     * @tparam Tp Type of the value (must be trivially copyable and size <= pointer size)
+     * @param value Rvalue reference to the value to prevent optimization
      */
     template<class Tp>
     inline __attribute__((always_inline)) typename std::enable_if<std::is_trivially_copyable<Tp>::value && (sizeof(Tp) <= sizeof(Tp*))>::type DoNotOptimize(Tp&& value) {
@@ -50,9 +53,10 @@ namespace Finn {
     }
 
     /**
-     * @brief Disables compiler optimization of unused variables for specific variable
+     * @brief Disables compiler optimization of unused variables for specific variable (rvalue, non-trivially copyable or large types)
      *
-     * @tparam Tp
+     * @tparam Tp Type of the value (non-trivially copyable or size > pointer size)
+     * @param value Rvalue reference to the value to prevent optimization
      */
     template<class Tp>
     inline __attribute__((always_inline)) typename std::enable_if<!std::is_trivially_copyable<Tp>::value || (sizeof(Tp) > sizeof(Tp*))>::type DoNotOptimize(Tp&& value) {

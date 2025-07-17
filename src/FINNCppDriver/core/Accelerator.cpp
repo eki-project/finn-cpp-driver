@@ -101,6 +101,7 @@ namespace Finn {
         return ret;
     }
 
+    // cppcheck-suppress unusedFunction
     [[maybe_unused]] Finn::vector<uint8_t> Accelerator::getOutputData(const unsigned int deviceIndex, const std::string& outputBufferKernelName, const std::size_t& numItems) {
         if (containsDevice(deviceIndex)) {
             FINN_LOG_DEBUG(loglevel::info) << "Retrieving results from the specified device index!";

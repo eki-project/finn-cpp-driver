@@ -130,6 +130,14 @@ Finn::Driver<SynchronousInference> createDriverFromConfig(const std::filesystem:
 template<typename O>
 using destribution_t = typename std::conditional_t<std::is_same_v<O, float>, std::uniform_real_distribution<O>, std::uniform_int_distribution<O>>;
 
+/**
+ * @brief Implementation function for running throughput tests
+ *
+ * @tparam T Data type for the test inputs
+ * @param baseDriver Reference to the FINN driver
+ * @param elementCount Number of elements in test data
+ * @param batchSize Batch size for inference
+ */
 template<typename T>
 void runThroughputTestImpl(Finn::Driver<true>& baseDriver, std::size_t elementCount, uint batchSize) {
     using dtype = T;
@@ -231,6 +239,14 @@ void runThroughputTest(Finn::Driver<true>& baseDriver) {
     }
 }
 
+/**
+ * @brief Load data from numpy file, run inference, and dump results
+ *
+ * @tparam T Data type for the loaded data
+ * @param baseDriver Reference to the FINN driver
+ * @param loadedNpyFile Loaded numpy file containing input data
+ * @param outputFile Path to output file for results
+ */
 template<typename T>
 void loadInferDump(Finn::Driver<true>& baseDriver, xt::detail::npy_file& loadedNpyFile, const std::string& outputFile) {
     auto xtensorArray = std::move(loadedNpyFile).cast<T, xt::layout_type::dynamic>();

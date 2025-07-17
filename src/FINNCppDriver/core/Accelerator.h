@@ -10,16 +10,18 @@
  *
  */
 
-#ifndef ACCELERATOR_H
-#define ACCELERATOR_H
+#ifndef ACCELERATOR
+#define ACCELERATOR
 
 #include <FINNCppDriver/core/DeviceHandler.h>  // for DeviceHandler, Uncheck...
 #include <FINNCppDriver/utils/Types.h>         // for vector, SIZE_SPECIFIER
 
-#include <cinttypes>  // for uint8_t
-#include <cstddef>    // for size_t
-#include <string>     // for string
-#include <vector>     // for vector, vector<>::iter...
+#include <FINNCppDriver/utils/Logger.hpp>  // for Severity, loglevel
+#include <cinttypes>                       // for uint8_t
+#include <cstddef>                         // for size_t
+#include <functional>                      // for function
+#include <string>                          // for string
+#include <vector>                          // for vector, vector<>::iter...
 
 namespace Finn {
     struct DeviceWrapper;
@@ -82,7 +84,7 @@ namespace Finn {
          * @brief Destroy the Accelerator object
          *
          */
-        ~Accelerator() = default;
+        ~Accelerator() { FINN_LOG(loglevel::info) << "Destructing Accelerator"; }
 
 
         /**
@@ -162,21 +164,75 @@ namespace Finn {
          *
          * @param deviceIndex
          * @param outputBufferKernelName
-         * @param forceArchival Whether or not to force a readout into archive. Necessary to get new data. Will be done automatically if a whole multiple of the buffer size is produced
+         * @param numItems Number of items to read from the output buffer
          * @return std::vector<std::vector<uint8_t>>
+         */
+        Finn::vector<uint8_t> getOutputData(unsigned int deviceIndex, const std::string& outputBufferKernelName, const std::size_t& numItems);
+
+        /**
+         * @brief Return a vector of output samples.
+         *
+         * @param deviceIndex The index of the device to read from
+         * @param outputBufferKernelName The name of the output buffer kernel
+         * @return Finn::vector<uint8_t> Vector containing output data
          */
         Finn::vector<uint8_t> getOutputData(unsigned int deviceIndex, const std::string& outputBufferKernelName);
 
+        /**
+         * @brief Get the size in bytes of a buffer
+         *
+         * @param deviceIndex The index of the device
+         * @param bufferName The name of the buffer
+         * @return size_t Size in bytes
+         */
         size_t getSizeInBytes(unsigned int deviceIndex, const std::string& bufferName);
 
+        /**
+         * @brief Get the feature map size of a buffer
+         *
+         * @param deviceIndex The index of the device
+         * @param bufferName The name of the buffer
+         * @return size_t Feature map size
+         */
         size_t getFeatureMapSize(unsigned int deviceIndex, const std::string& bufferName);
 
+        /**
+         * @brief Get the batch size of a buffer
+         *
+         * @param deviceIndex The index of the device
+         * @param bufferName The name of the buffer
+         * @return size_t Batch size
+         */
         size_t getBatchSize(unsigned int deviceIndex, const std::string& bufferName);
 
+        /**
+         * @brief Get the total data size of a buffer
+         *
+         * @param deviceIndex The index of the device
+         * @param bufferName The name of the buffer
+         * @return size_t Total data size
+         */
         size_t getTotalDataSize(unsigned int deviceIndex, const std::string& bufferName);
+
+        /**
+         * @brief Register a callback function for a buffer
+         *
+         * @param deviceIndex The index of the device
+         * @param bufferName The name of the buffer
+         * @param callback Callback function to register
+         */
+        void registerCallback(unsigned int deviceIndex, const std::string& bufferName, std::function<void(std::size_t)> callback);
+
+        /**
+         * @brief Drain a buffer on the specified device
+         *
+         * @param deviceIndex The index of the device
+         * @param bufferName The name of the buffer to drain
+         */
+        void drain(unsigned int deviceIndex, const std::string& bufferName);
     };
 
 
 }  // namespace Finn
 
-#endif  // ACCELERATOR_H
+#endif  // ACCELERATOR

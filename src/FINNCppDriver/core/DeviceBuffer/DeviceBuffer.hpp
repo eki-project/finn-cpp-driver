@@ -87,14 +87,27 @@ namespace Finn {
          */
         T* map;
         /**
-         * @brief 64 bit adress of the buffer located on the FPGA card
+         * @brief 64 bit address of the buffer located on the FPGA card
          *
          */
         const long long bufAdr;
 
+        /**
+         * @brief Total size of data in elements
+         *
+         */
         std::size_t totalDataSize;
+        /**
+         * @brief Size of feature map
+         *
+         */
         std::size_t featureMapSize;
 
+        /**
+         * @brief Busy wait until the IP core is done executing
+         *
+         * @param stopToken Token to request stopping the wait
+         */
         void busyWait(std::stop_token stopToken = {}) {
             // Wait until the IP is DONE
             uint32_t axi_ctrl = 0;
@@ -104,6 +117,14 @@ namespace Finn {
         }
 
          private:
+        /**
+         * @brief Get the group ID for a compute unit
+         *
+         * @param device XRT device
+         * @param uuid Device UUID
+         * @param computeUnit Name of the compute unit
+         * @return unsigned int Group ID
+         */
         unsigned int getGroupId(const xrt::device& device, const xrt::uuid& uuid, const std::string& computeUnit) { return xrt::kernel(device, uuid, computeUnit).group_id(0); }
 
         /**
@@ -112,6 +133,12 @@ namespace Finn {
          */
         uint32_t oldRepetitions = 0;
 
+        /**
+         * @brief Get flags for buffer object creation based on host memory access
+         *
+         * @param hostMemoryAccess Whether host memory access is enabled
+         * @return consteval static xrt::bo::flags Buffer object flags
+         */
         consteval static xrt::bo::flags getFlags(bool hostMemoryAccess) {
             if (hostMemoryAccess) {
                 return xrt::bo::flags::host_only;
@@ -143,6 +170,7 @@ namespace Finn {
             std::fill(map, map + mapSize, 0);
             totalDataSize = FinnUtils::shapeToElements(pShapePacked) * batchSize;
             featureMapSize = totalDataSize / shapePacked[0];
+            FINN_LOG(loglevel::info) << "Map has totalSize " << totalDataSize << " and featureMapSize " << featureMapSize << "\n";
         }
 
         /**
@@ -160,10 +188,22 @@ namespace Finn {
         DeviceBuffer(const DeviceBuffer& buf) noexcept = delete;
 
         /**
+         * @brief Prepare the DeviceBuffer for shutdown
+         *
+         * This function is called before the application is shutting down.
+         * It can be used to release resources or perform cleanup tasks.
+         * The default implementation does nothing.
+         */
+        virtual void prepareForShutdown() {
+            // Base implementation does nothing
+            FINN_LOG(loglevel::info) << "Preparing " << name << " for shutdown";
+        }
+
+        /**
          * @brief Destroy the Device Buffer object
          *
          */
-        virtual ~DeviceBuffer() { FINN_LOG(loglevel::info) << "Destructing DeviceBuffer " << name << "\n"; };
+        virtual ~DeviceBuffer() { FINN_LOG(loglevel::info) << "Destructing DeviceBuffer " << name << std::endl; };
 
         /**
          * @brief Deleted move assignment operator
@@ -181,12 +221,32 @@ namespace Finn {
          */
         DeviceBuffer& operator=(const DeviceBuffer& buf) = delete;
 
+        /**
+         * @brief Get the size in bytes of the buffer
+         *
+         * @return size_t Size in bytes
+         */
         virtual size_t getSizeInBytes() { return totalDataSize * sizeof(T); }
 
+        /**
+         * @brief Get the feature map size
+         *
+         * @return size_t Feature map size
+         */
         virtual size_t getFeatureMapSize() { return featureMapSize; }
 
+        /**
+         * @brief Get the batch size
+         *
+         * @return size_t Batch size
+         */
         virtual size_t getBatchSize() { return this->shapePacked[0]; }
 
+        /**
+         * @brief Get the total data size
+         *
+         * @return size_t Total data size
+         */
         virtual size_t getTotalDataSize() { return totalDataSize; }
 
         /**
@@ -211,7 +271,14 @@ namespace Finn {
          */
         virtual bool run() = 0;
 
-        virtual bool wait(std::stop_token stopToken={}) {
+        /**
+         * @brief Wait for the kernel to complete execution
+         *
+         * @param stopToken Token to request stopping the wait
+         * @return true Success
+         * @return false Failure
+         */
+        virtual bool wait(std::stop_token stopToken = {}) {
             busyWait(stopToken);
             return true;
         };
@@ -231,6 +298,11 @@ namespace Finn {
          */
         virtual void sync(std::size_t bytes) = 0;
 
+        /**
+         * @brief Execute the kernel with specified repetitions
+         *
+         * @param repetitions Number of repetitions to execute (default: 1)
+         */
         void execute(const uint32_t repetitions = 1) {
             // writes the buffer adress
             constexpr uint32_t offset_buf = 0x10;
@@ -364,16 +436,34 @@ namespace Finn {
         DeviceOutputBuffer(const std::string& pCUName, xrt::device& device, xrt::uuid& pDevUUID, const shapePacked_t& pShapePacked, unsigned int batchSize = 1) : DeviceBuffer<T>(pCUName, device, pDevUUID, pShapePacked, batchSize){};
 
         /**
-         * @brief Return stored data from storage
+         * @brief Get the data from the buffer and return it as a vector
          *
          * @return Finn::vector<T>
          */
-        virtual Finn::vector<T> getData() = 0;
+        virtual Finn::vector<T> getData(const std::size_t& numItems) = 0;
+
         /**
          * @brief Sync data from the FPGA back to the host
          *
          */
         virtual bool read() = 0;
+
+        /**
+         * @brief Register a callback that is called when data is available in the queue (Only for AsyncDeviceOutputBuffer)
+         *
+         * @param callback Callback function that takes the number of items available in the queue
+         */
+        virtual void registerCallback(std::function<void(std::size_t)> callback) {
+            // Default implementation does nothing
+            // This can be overridden by derived classes if needed
+            Finn::logAndError<std::runtime_error>("Callback not supported by this DeviceOutputBuffer implementation.");
+        }
+
+        virtual void drain() {
+            // Default implementation does nothing
+            // This can be overridden by derived classes if needed
+            Finn::logAndError<std::runtime_error>("Drain not supported by this DeviceOutputBuffer implementation.");
+        }
 
          protected:
         /**

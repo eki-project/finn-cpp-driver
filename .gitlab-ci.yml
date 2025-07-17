@@ -187,7 +187,7 @@ run-regressiontests:
     - init-repo
   variables:
     #SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 0:30:00 -N 1 -n 1 --cpus-per-task=2 --mem-per-cpu=2G"
-    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p hacc -t 0:30:00"
+    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p hacc -t 10:00:00"
   extends: .load-modules
   script:
     - export LD_LIBRARY_PATH="$(pwd)/build/libs:$LD_LIBRARY_PATH"
@@ -202,7 +202,7 @@ run-regressiontests:
 
     - cd build/benchmarks
     - cp ../../example_networks/jet-structure-classification-with-host-mem/* .
-    - ../_deps/googlebenchmark-src/tools/compare.py -a -d results.json benchmarks ../../benchmarks/expectedPerformance.json ./SynchronousInferenceBenchmark | tee benchmark_output.txt
+    - ../_deps/googlebenchmark-src/tools/compare.py -a -d results.json benchmarks ../../benchmarks/expectedPerformance.json ./RegressionTest | tee benchmark_output.txt
     # Extract the OVERALL_GEOMEAN p-value and check if it exceeds the threshold
     - THRESHOLD=0.05
     - GEOMEAN=$(grep "OVERALL_GEOMEAN" benchmark_output.txt)

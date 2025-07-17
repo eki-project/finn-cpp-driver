@@ -101,19 +101,25 @@ namespace Finn {
         return ret;
     }
 
-    Finn::vector<uint8_t> Accelerator::getOutputData(const unsigned int deviceIndex, const std::string& outputBufferKernelName) {
+    // cppcheck-suppress unusedFunction
+    [[maybe_unused]] Finn::vector<uint8_t> Accelerator::getOutputData(const unsigned int deviceIndex, const std::string& outputBufferKernelName, const std::size_t& numItems) {
         if (containsDevice(deviceIndex)) {
-            FINN_LOG_DEBUG(loglevel::info) << "Retrieving results from the specified device index! [accelerator.retrieveResults()]";
-            return getDeviceHandler(deviceIndex).retrieveResults(outputBufferKernelName);
+            FINN_LOG_DEBUG(loglevel::info) << "Retrieving results from the specified device index!";
+            return getDeviceHandler(deviceIndex).retrieveResults(outputBufferKernelName, numItems);
         } else {
             if (containsDevice(0)) {
-                FINN_LOG_DEBUG(loglevel::info) << "Retrieving results from 0  device index! [accelerator.retrieveResults()]";
-                return getDeviceHandler(0).retrieveResults(outputBufferKernelName);
+                FINN_LOG_DEBUG(loglevel::info) << "Retrieving results from 0  device index!";
+                return getDeviceHandler(0).retrieveResults(outputBufferKernelName, numItems);
             } else {
                 // cppcheck-suppress missingReturn
                 Finn::logAndError<std::runtime_error>("Tried receiving data in a devicehandler with an invalid deviceIndex!");
             }
         }
+    }
+
+    Finn::vector<uint8_t> Accelerator::getOutputData(const unsigned int deviceIndex, const std::string& outputBufferKernelName) {
+        std::size_t numItems = getDeviceHandler(deviceIndex).getTotalDataSize(outputBufferKernelName);
+        return getDeviceHandler(deviceIndex).retrieveResults(outputBufferKernelName, numItems);
     }
 
     size_t Accelerator::getSizeInBytes(unsigned int deviceIndex, const std::string& bufferName) {
@@ -142,5 +148,21 @@ namespace Finn {
             return getDeviceHandler(deviceIndex).getTotalDataSize(bufferName);
         }
         return 0;
+    }
+
+    void Accelerator::registerCallback(unsigned int deviceIndex, const std::string& bufferName, std::function<void(std::size_t)> callback) {
+        if (containsDevice(deviceIndex)) {
+            getDeviceHandler(deviceIndex).registerCallback(bufferName, callback);
+        } else {
+            Finn::logAndError<std::runtime_error>("Tried registering a callback on a deviceIndex which does not exist! Queried index: " + std::to_string(deviceIndex) + ", KernelBufferName: " + bufferName);
+        }
+    }
+
+    void Accelerator::drain(unsigned int deviceIndex, const std::string& bufferName) {
+        if (containsDevice(deviceIndex)) {
+            getDeviceHandler(deviceIndex).drain(bufferName);
+        } else {
+            Finn::logAndError<std::runtime_error>("Tried draining a buffer on a deviceIndex which does not exist! Queried index: " + std::to_string(deviceIndex) + ", KernelBufferName: " + bufferName);
+        }
     }
 }  // namespace Finn

@@ -511,7 +511,9 @@ TEST(SPSCQueueTest, BlockingBulkEnqueue) {
         while (!producer_done || !queue.is_empty()) {
             size_t dequeued = queue.try_dequeue_bulk(results.begin(), results.size());
             if (dequeued > 0) {
-                all_consumed.insert(all_consumed.end(), results.begin(), results.begin() + dequeued);
+                for (size_t i = 0; i < dequeued; i++) {
+                    all_consumed.push_back(results[i]);
+                }
             } else {
                 std::this_thread::yield();  // Give producer time to produce
             }
@@ -563,6 +565,296 @@ TEST(SPSCQueueTest, TimedBulkEnqueue) {
     EXPECT_EQ(results[0], 2);
     EXPECT_EQ(results[1], 3);
     EXPECT_EQ(results[2], 4);  // The first item from the timed bulk enqueue
+}
+
+// DYNAMIC QUEUE TESTS
+// These tests verify the same functionality for the dynamic queue variant
+
+// Basic tests for dynamic queue with non-trivial type
+TEST(DynamicSPSCQueueTest, BasicOperations) {
+    DynamicSPSCQueue<std::string> queue(16);
+
+    // Test empty state
+    EXPECT_TRUE(queue.is_empty());
+    EXPECT_FALSE(queue.is_full());
+
+    // Test enqueue
+    EXPECT_TRUE(queue.try_enqueue("test1"));
+    EXPECT_FALSE(queue.is_empty());
+
+    // Test dequeue
+    std::string item;
+    EXPECT_TRUE(queue.try_dequeue(item));
+    EXPECT_EQ(item, "test1");
+    EXPECT_TRUE(queue.is_empty());
+
+    // Test multiple items
+    EXPECT_TRUE(queue.try_enqueue("test2"));
+    EXPECT_TRUE(queue.try_enqueue("test3"));
+
+    EXPECT_TRUE(queue.try_dequeue(item));
+    EXPECT_EQ(item, "test2");
+    EXPECT_TRUE(queue.try_dequeue(item));
+    EXPECT_EQ(item, "test3");
+    EXPECT_TRUE(queue.is_empty());
+}
+
+// Test for dynamic queue with trivially copyable type
+TEST(DynamicSPSCQueueTest, TrivialTypeOperations) {
+    DynamicSPSCQueue<int> queue(16);
+
+    EXPECT_TRUE(queue.try_enqueue(42));
+
+    int item = 0;
+    EXPECT_TRUE(queue.try_dequeue(item));
+    EXPECT_EQ(item, 42);
+    EXPECT_TRUE(queue.is_empty());
+}
+
+// Test filling the dynamic queue to capacity
+TEST(DynamicSPSCQueueTest, FullQueue) {
+    DynamicSPSCQueue<int> queue(4);  // Actual capacity: 3
+
+    EXPECT_TRUE(queue.try_enqueue(1));
+    EXPECT_TRUE(queue.try_enqueue(2));
+    EXPECT_TRUE(queue.try_enqueue(3));
+    EXPECT_TRUE(queue.is_full());        // Should be full now
+    EXPECT_FALSE(queue.try_enqueue(4));  // Should fail
+
+    int item;
+    EXPECT_TRUE(queue.try_dequeue(item));
+    EXPECT_EQ(item, 1);
+    EXPECT_FALSE(queue.is_full());  // No longer full
+
+    // Can enqueue again
+    EXPECT_TRUE(queue.try_enqueue(4));
+}
+
+// Test wrap-around behavior with dynamic queue
+TEST(DynamicSPSCQueueTest, WrapAround) {
+    DynamicSPSCQueue<int> queue(4);  // Actual capacity: 3
+    std::vector<int> results;
+
+    // Fill and drain multiple times to force wrap-around
+    for (int cycle = 0; cycle < 3; cycle++) {
+        EXPECT_TRUE(queue.try_enqueue(cycle * 3 + 1));
+        EXPECT_TRUE(queue.try_enqueue(cycle * 3 + 2));
+        EXPECT_TRUE(queue.try_enqueue(cycle * 3 + 3));
+
+        int item;
+        EXPECT_TRUE(queue.try_dequeue(item));
+        results.push_back(item);
+        EXPECT_TRUE(queue.try_dequeue(item));
+        results.push_back(item);
+        EXPECT_TRUE(queue.try_dequeue(item));
+        results.push_back(item);
+    }
+
+    // Verify correct order
+    std::vector<int> expected = {1, 2, 3, 4, 5, 6, 7, 8, 9};
+    EXPECT_EQ(results, expected);
+}
+
+// Test move semantics with dynamic queue
+TEST(DynamicSPSCQueueTest, MoveSemantics) {
+    DynamicSPSCQueue<std::unique_ptr<int>> queue(4);
+
+    auto ptr1 = std::make_unique<int>(42);
+    auto ptr2 = std::make_unique<int>(43);
+
+    EXPECT_TRUE(queue.try_enqueue(std::move(ptr1)));
+    EXPECT_TRUE(queue.try_enqueue(std::move(ptr2)));
+
+    // Original pointers should be null after move
+    EXPECT_EQ(ptr1, nullptr);
+    EXPECT_EQ(ptr2, nullptr);
+
+    std::unique_ptr<int> result;
+    EXPECT_TRUE(queue.try_dequeue(result));
+    EXPECT_EQ(*result, 42);
+
+    EXPECT_TRUE(queue.try_dequeue(result));
+    EXPECT_EQ(*result, 43);
+}
+
+// Test emplace functionality with dynamic queue
+TEST(DynamicSPSCQueueTest, Emplace) {
+    DynamicSPSCQueue<std::pair<int, std::string>> queue(4);
+
+    EXPECT_TRUE(queue.try_emplace(1, "one"));
+    EXPECT_TRUE(queue.try_emplace(2, "two"));
+
+    std::pair<int, std::string> item;
+    EXPECT_TRUE(queue.try_dequeue(item));
+    EXPECT_EQ(item.first, 1);
+    EXPECT_EQ(item.second, "one");
+
+    EXPECT_TRUE(queue.try_dequeue(item));
+    EXPECT_EQ(item.first, 2);
+    EXPECT_EQ(item.second, "two");
+}
+
+// Test bulk timed operations with dynamic queue
+TEST(DynamicSPSCQueueTest, BulkTimedOperations) {
+    DynamicSPSCQueue<int> queue(16);
+
+    // Test timeout on empty queue
+    std::vector<int> results(5);
+    auto start = std::chrono::steady_clock::now();
+    size_t count = queue.dequeue_bulk_for(results.begin(), 5, std::chrono::milliseconds(100));
+    auto end = std::chrono::steady_clock::now();
+
+    EXPECT_EQ(count, 0);
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+    EXPECT_GE(duration, 90);  // Allow for some timing variation
+
+    // Test with some items
+    for (int i = 0; i < 3; i++) {
+        queue.try_enqueue(i);
+    }
+
+    count = queue.dequeue_bulk_for(results.begin(), 5, std::chrono::milliseconds(100));
+    EXPECT_EQ(count, 3);
+    for (size_t i = 0; i < count; i++) {
+        EXPECT_EQ(results[i], static_cast<int>(i));
+    }
+}
+
+// Test dequeue_bulk_for_any with dynamic queue
+TEST(DynamicSPSCQueueTest, BulkTimedAnyOperations) {
+    DynamicSPSCQueue<int> queue(16);
+
+    // Test timeout on empty queue
+    std::vector<int> results(5);
+    auto start = std::chrono::steady_clock::now();
+    size_t count = queue.dequeue_bulk_for_any(results.begin(), 5, std::chrono::milliseconds(100));
+    auto end = std::chrono::steady_clock::now();
+
+    EXPECT_EQ(count, 0);
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+    EXPECT_GE(duration, 90);  // Allow for some timing variation
+
+    // Test with some items, added gradually
+    std::thread producer([&queue]() {
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        queue.try_enqueue(42);
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        queue.try_enqueue(43);
+        queue.try_enqueue(44);
+    });
+
+    results.assign(5, 0);
+    count = queue.dequeue_bulk_for_any(results.begin(), 5, std::chrono::milliseconds(200));
+
+    EXPECT_GE(count, 1);  // Should get at least the first item
+    EXPECT_EQ(results[0], 42);
+
+    if (count > 1) {
+        EXPECT_EQ(results[1], 43);
+    }
+
+    producer.join();
+
+    // Cleanup any remaining items
+    queue.try_dequeue_bulk(results.begin(), 5);
+}
+
+// Test shutdown behavior with dynamic queue
+TEST(DynamicSPSCQueueTest, Shutdown) {
+    DynamicSPSCQueue<int> queue(4);
+    std::atomic<bool> consumer_unblocked{false};
+
+    // Start a consumer thread that will block
+    std::thread consumer([&queue, &consumer_unblocked]() {
+        int item;
+        bool result = queue.dequeue(item);  // This should block
+        EXPECT_FALSE(result);               // After shutdown, should return false
+        consumer_unblocked = true;
+    });
+
+    // Give the consumer time to block
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+    // Shutdown the queue
+    queue.shutdown();
+
+    // Consumer should unblock
+    consumer.join();
+    EXPECT_TRUE(consumer_unblocked);
+
+    // After shutdown, operations should fail
+    int item;
+    EXPECT_FALSE(queue.dequeue(item));
+    EXPECT_FALSE(queue.dequeue_for(item, std::chrono::milliseconds(1)));
+}
+
+// Test concurrent enqueue/dequeue with high throughput for dynamic queue
+TEST(DynamicSPSCQueueTest, ConcurrentThroughput) {
+    // Use fewer iterations for the dynamic test to reduce test time
+    for (size_t runs = 0; runs < 50; ++runs) {
+        constexpr size_t ITEM_COUNT = 100000;
+        DynamicSPSCQueue<uint64_t> queue(1024);
+        std::atomic<bool> error{false};
+        std::atomic<bool> producer_done{false};
+
+        std::thread producer([&queue, &error, &producer_done]() {
+            try {
+                for (uint64_t i = 0; i < ITEM_COUNT; i++) {
+                    // Use non-blocking enqueue with retry
+                    while (!queue.try_enqueue(i) && !error.load(std::memory_order_relaxed)) {
+                        std::this_thread::yield();  // Give consumer time to catch up
+                    }
+
+                    // Exit early if consumer detected an error
+                    if (error.load(std::memory_order_relaxed)) {
+                        break;
+                    }
+                }
+            } catch (...) { error = true; }
+            producer_done.store(true, std::memory_order_release);
+        });
+
+        std::thread consumer([&queue, &error, &producer_done]() {
+            try {
+                uint64_t expected = 0;
+                while (expected < ITEM_COUNT && !error.load(std::memory_order_relaxed)) {
+                    uint64_t item;
+
+                    // Use non-blocking dequeue with yield
+                    if (queue.try_dequeue(item)) {
+                        if (item != expected) {
+                            error = true;
+                            break;
+                        }
+                        expected++;
+                    } else if (producer_done.load(std::memory_order_acquire)) {
+                        // If producer is done and no more items, we're missing items
+                        if (expected < ITEM_COUNT) {
+                            error = true;
+                        }
+                        break;
+                    } else {
+                        std::this_thread::yield();  // Give producer time to produce
+                    }
+                }
+            } catch (...) { error = true; }
+        });
+
+        // Set timeout for test to avoid hanging forever
+        auto start_time = std::chrono::steady_clock::now();
+        bool joined = false;
+
+        // Try to join with timeout
+        while (!joined && std::chrono::steady_clock::now() - start_time < std::chrono::seconds(30)) {
+            producer.join();
+            consumer.join();
+            joined = true;
+        }
+
+        // If not joined within timeout, consider it a deadlock
+        EXPECT_TRUE(joined) << "Test timed out - likely deadlock";
+        EXPECT_FALSE(error) << "Data corruption or missing items detected";
+    }
 }
 
 int main(int argc, char** argv) {

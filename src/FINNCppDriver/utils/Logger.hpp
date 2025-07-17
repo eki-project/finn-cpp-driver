@@ -58,6 +58,11 @@ DevNull& operator<<(DevNull& dest, [[maybe_unused]] T) {
  */
 class Logger {
      public:
+    /**
+     * @brief Initialize the logger with optional console output
+     *
+     * @param console Enable console output in addition to file logging
+     */
     void static initLogger(bool console = false) { static Logger log(console); }
 
     /**
@@ -102,18 +107,18 @@ class Logger {
 };
 
 namespace Finn {
-/**
- * @brief First log the message as an error into the logger, then throw the passed error!
- *
- * @tparam E
- * @param msg
- */
-template<typename E>
-[[noreturn]] void logAndError(const std::string& msg) {
-    FINN_LOG(loglevel::error) << msg;
-    throw E(msg);
-}
-} // namespace Finn
+    /**
+     * @brief First log the message as an error into the logger, then throw the passed error!
+     *
+     * @tparam E
+     * @param msg
+     */
+    template<typename E>
+    [[noreturn]] void logAndError(const std::string& msg) {
+        FINN_LOG(loglevel::error) << msg;
+        throw E(msg);
+    }
+}  // namespace Finn
 
 
 #endif  // !LOGGING_H

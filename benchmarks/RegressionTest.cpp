@@ -1,8 +1,8 @@
 /**
- * @file SynchronousInferenceBenchmark.cpp
+ * @file RegressionTest.cpp
  * @author Linus Jungemann (linus.jungemann@uni-paderborn.de)
  * @brief Benchmarks the SynchronousInference Performance of the Driver
- * @version 0.1
+ * @version 0.2
  * @date 2025-03-21
  *
  * @copyright Copyright (c) 2025
@@ -35,48 +35,33 @@ Finn::Driver<SynchronousInference> createDriverFromConfig(const std::filesystem:
     return Finn::Driver<SynchronousInference>(configFilePath, batchSize);
 }
 
-static void BM_SynchronousInferenceSingleThread(benchmark::State& state) {
+static void BM_SynchronousInference(benchmark::State& state) {
     const std::string exampleNetworkConfig = "jetConfig.json";
     const uint batchSize = static_cast<uint>(state.range(0));
-    std::cout << "Running single-threaded benchmark with batch size: " << batchSize << std::endl;
     auto driver = createDriverFromConfig<true>(exampleNetworkConfig, batchSize);
     using dtype = int8_t;
-
-    // Create buffers for pipelining
-    std::vector<dtype> inputBuffer(24 * batchSize);
+    Finn::vector<dtype> testInputs(24 * batchSize);
 
     std::random_device rndDevice;
-    std::mt19937 mersenneEngine{rndDevice()};
+    std::mt19937 mersenneEngine{rndDevice()};  // Generates random integers
+
     destribution_t<dtype> dist{static_cast<dtype>(InputFinnType().min()), static_cast<dtype>(InputFinnType().max())};
 
-    // Fill all buffers with random data
-    std::generate(inputBuffer.begin(), inputBuffer.end(), [&dist, &mersenneEngine]() { return dist(mersenneEngine); });
+    auto gen = [&dist, &mersenneEngine]() { return dist(mersenneEngine); };
 
     // Warmup
-    auto warmup = driver.inferSynchronous(inputBuffer.begin(), inputBuffer.end());
+    std::fill(testInputs.begin(), testInputs.end(), 1);
+    auto warmup = driver.inferSynchronous(testInputs.begin(), testInputs.end());
     benchmark::DoNotOptimize(warmup);
 
-    std::chrono::duration<float> runtime = std::chrono::seconds(90);  // Fixed runtime for the benchmark
-
+    std::generate(testInputs.begin(), testInputs.end(), gen);
     for (auto _ : state) {
-        std::size_t processedCount = 0;
-
-        // Set a fixed time for the benchmark
-        const auto start = std::chrono::high_resolution_clock::now();
-
-        while (std::chrono::high_resolution_clock::now() - start < std::chrono::duration<float>(runtime)) {
-            auto results = driver.inferSynchronous(inputBuffer.begin(), inputBuffer.end());
-            benchmark::DoNotOptimize(results);
-            ++processedCount;
-        }
-        std::size_t infered = processedCount * batchSize;
-
-        // Report items processed in this iteration
-        state.SetItemsProcessed(static_cast<int64_t>(infered));
+        auto ret = driver.inferSynchronous(testInputs.begin(), testInputs.end());
+        benchmark::DoNotOptimize(ret);
+        benchmark::ClobberMemory();
     }
 }
-
 // Register the function as a benchmark
-BENCHMARK(BM_SynchronousInferenceSingleThread)->RangeMultiplier(2)->Range(1, 4096)->Repetitions(5);
+BENCHMARK(BM_SynchronousInference)->Iterations(1000000)->RangeMultiplier(2)->Range(1, 4 << 10)->Repetitions(10);
 
 BENCHMARK_MAIN();

@@ -24,6 +24,7 @@
 #include <condition_variable>
 #include <cstdint>
 #include <cstring>
+#include <functional>
 #include <mutex>
 #include <new>
 #include <stop_token>
@@ -47,6 +48,9 @@ using namespace std::literals::chrono_literals;
  * functions that support the main SPSCQueue implementation.
  */
 namespace detail {
+    // Make CACHE_LINE_SIZE accessible throughout the namespace
+    static constexpr size_t CACHE_LINE_SIZE = 64;
+
     /**
      * @brief Enumeration of supported SIMD instruction sets
      *
@@ -428,25 +432,23 @@ namespace detail {
     };
 
     /**
-     * @brief Base class for SPSCQueue implementations
+     * @brief Common base template for SPSC queue implementations
      *
-     * Contains common implementation details shared by all specializations
-     * of the SPSCQueue.
+     * Provides the core functionality for both static and dynamic queue variants.
      *
      * @tparam T Element type
-     * @tparam ActualCapacity Actual capacity of the queue (power of 2)
+     * @tparam IndexMask Type of mask for index wrapping (size_t for dynamic, integral constant for static)
+     * @tparam BufferAccessor Type that provides access to the underlying buffer
      * @tparam IsTrivial Whether T is a trivially copyable type
      */
-    template<typename T, size_t ActualCapacity, bool IsTrivial>
+    template<typename T, typename IndexMask, typename BufferAccessor, bool IsTrivial>
     class SPSCQueueBase {
          protected:
-        static constexpr size_t CACHE_LINE_SIZE = 64;             ///< Size of a cache line in bytes
-        static constexpr size_t INDEX_MASK = ActualCapacity - 1;  ///< Mask for index wrapping
+        // Buffer access through composition
+        BufferAccessor buffer_;
 
-        /**
-         * @brief Cache-aligned atomic size_t with padding to prevent false sharing
-         */
-        struct alignas(CACHE_LINE_SIZE) AlignedAtomicSize {
+        // Cache-aligned elements to prevent false sharing
+        alignas(CACHE_LINE_SIZE) struct AlignedAtomicSize {
             std::atomic<size_t> value{0};  ///< The atomic value
             /// Padding to fill a complete cache line
             char padding[CACHE_LINE_SIZE - sizeof(std::atomic<size_t>)];
@@ -468,14 +470,11 @@ namespace detail {
             void store(size_t desired, std::memory_order order = std::memory_order_seq_cst) noexcept { value.store(desired, order); }
         };
 
-        // Cache-aligned elements to prevent false sharing
-        alignas(CACHE_LINE_SIZE) std::array<T, ActualCapacity> buffer_;  ///< Element storage buffer
+        AlignedAtomicSize head_;              ///< Consumer position
+        char head_padding_[CACHE_LINE_SIZE];  ///< Extra padding between head and tail
 
-        alignas(CACHE_LINE_SIZE) AlignedAtomicSize head_;  ///< Consumer position
-        char head_padding_[CACHE_LINE_SIZE];               ///< Extra padding between head and tail
-
-        alignas(CACHE_LINE_SIZE) AlignedAtomicSize tail_;  ///< Producer position
-        char tail_padding_[CACHE_LINE_SIZE];               ///< Extra padding after tail
+        AlignedAtomicSize tail_;              ///< Producer position
+        char tail_padding_[CACHE_LINE_SIZE];  ///< Extra padding after tail
 
         /**
          * @brief State for blocking operations
@@ -491,6 +490,9 @@ namespace detail {
         static constexpr int SPIN_ATTEMPTS = 1000;  ///< Number of spin attempts before blocking
         static constexpr int YIELD_ATTEMPTS = 50;   ///< Number of yield attempts during spinning
 
+        // Provide access to the index mask - store by value, not by reference
+        IndexMask index_mask_;
+
         /**
          * @brief Calculates the number of items available for consumption
          *
@@ -499,7 +501,7 @@ namespace detail {
         size_t available_items() const noexcept {
             const size_t head = head_.load(std::memory_order_relaxed);
             const size_t tail = tail_.load(std::memory_order_acquire);
-            return (tail - head) & INDEX_MASK;
+            return (tail - head) & static_cast<size_t>(index_mask_);
         }
 
         /**
@@ -510,13 +512,79 @@ namespace detail {
         size_t available_space() const noexcept {
             const size_t head = head_.load(std::memory_order_acquire);
             const size_t tail = tail_.load(std::memory_order_relaxed);
-            return ((head - tail - 1) & INDEX_MASK);
+            return ((head - tail - 1) & static_cast<size_t>(index_mask_));
         }
+
+        /**
+         * @brief Constructs the base queue
+         *
+         * @param index_mask Mask for index wrapping
+         * @param buffer Buffer accessor (using move semantics to handle non-copyable element types)
+         */
+        SPSCQueueBase(IndexMask index_mask, BufferAccessor&& buffer) : buffer_(std::move(buffer)), index_mask_(index_mask) {}
+    };
+
+    /**
+     * @brief Static buffer accessor for fixed-size queues
+     *
+     * @tparam T Element type
+     * @tparam Capacity Capacity of the buffer
+     */
+    template<typename T, size_t Capacity>
+    class StaticBufferAccessor {
+         private:
+        alignas(CACHE_LINE_SIZE) std::array<T, Capacity> buffer_;
+
+         public:
+        T& operator[](size_t index) noexcept { return buffer_[index]; }
+
+        const T& operator[](size_t index) const noexcept { return buffer_[index]; }
+    };
+
+    /**
+     * @brief Dynamic buffer accessor for runtime-sized queues
+     *
+     * @tparam T Element type
+     */
+    template<typename T>
+    class DynamicBufferAccessor {
+         private:
+        std::unique_ptr<T, std::function<void(T*)>> buffer_;
+
+         public:
+        explicit DynamicBufferAccessor(size_t capacity) {
+            // Calculate total size needed
+            size_t size_bytes = capacity * sizeof(T);
+
+            // Round up to the next multiple of CACHE_LINE_SIZE
+            size_t aligned_size = (size_bytes + CACHE_LINE_SIZE - 1) & ~(CACHE_LINE_SIZE - 1);
+
+            void* raw_memory = std::aligned_alloc(CACHE_LINE_SIZE, aligned_size);
+            if (!raw_memory)
+                throw std::bad_alloc();
+
+            buffer_ = std::unique_ptr<T, std::function<void(T*)>>(static_cast<T*>(raw_memory), [](T* ptr) {
+                // Cleanup will be handled by the queue class
+                std::free(ptr);
+            });
+        }
+
+        T& operator[](size_t index) noexcept { return buffer_.get()[index]; }
+
+        const T& operator[](size_t index) const noexcept { return buffer_.get()[index]; }
+    };
+
+    /**
+     * @brief Constant integral wrapper for static index masks
+     */
+    template<size_t Value>
+    struct StaticIndexMask {
+        constexpr operator size_t() const noexcept { return Value; }
     };
 }  // namespace detail
 
 /**
- * @brief Single-Producer Single-Consumer lock-free queue
+ * @brief Single-Producer Single-Consumer lock-free queue with static storage
  *
  * A high-performance queue designed for the single-producer,
  * single-consumer scenario. Features include:
@@ -532,20 +600,22 @@ namespace detail {
  */
 template<typename T, size_t RequestedCapacity>
     requires std::movable<T>
-class SPSCQueue : private detail::SPSCQueueBase<T, std::bit_ceil(RequestedCapacity), std::is_trivially_copyable_v<T>> {
+class SPSCQueue : private detail::SPSCQueueBase<T, detail::StaticIndexMask<std::bit_ceil(RequestedCapacity) - 1>, detail::StaticBufferAccessor<T, std::bit_ceil(RequestedCapacity)>, std::is_trivially_copyable_v<T>> {
      private:
+    using ActualCapacityValue = std::integral_constant<size_t, std::bit_ceil(RequestedCapacity)>;
+    static constexpr size_t ActualCapacity = ActualCapacityValue::value;
+    using IndexMask = detail::StaticIndexMask<ActualCapacity - 1>;
+    using BufferAccessor = detail::StaticBufferAccessor<T, ActualCapacity>;
+    using Base = detail::SPSCQueueBase<T, IndexMask, BufferAccessor, std::is_trivially_copyable_v<T>>;
+
     // Import base members into this scope
-    using Base = detail::SPSCQueueBase<T, std::bit_ceil(RequestedCapacity), std::is_trivially_copyable_v<T>>;
     using Base::blocking_;
     using Base::buffer_;
     using Base::head_;
-    using Base::INDEX_MASK;
+    using Base::index_mask_;
     using Base::SPIN_ATTEMPTS;
     using Base::tail_;
     using Base::YIELD_ATTEMPTS;
-
-    /// Actual capacity rounded up to the next power of 2
-    static constexpr size_t ActualCapacity = std::bit_ceil(RequestedCapacity);
 
      public:
     /**
@@ -555,7 +625,7 @@ class SPSCQueue : private detail::SPSCQueueBase<T, std::bit_ceil(RequestedCapaci
      * The actual capacity will be rounded up to the next power of 2,
      * with one slot reserved for implementation purposes.
      */
-    constexpr SPSCQueue() noexcept { static_assert(ActualCapacity >= 2, "Queue capacity must be at least 2"); }
+    constexpr SPSCQueue() noexcept : Base(IndexMask{}, BufferAccessor{}) { static_assert(ActualCapacity >= 2, "Queue capacity must be at least 2"); }
 
     /**
      * @brief Destructor
@@ -566,7 +636,7 @@ class SPSCQueue : private detail::SPSCQueueBase<T, std::bit_ceil(RequestedCapaci
     ~SPSCQueue() {
         // Wake up any waiting threads and destroy remaining elements
         blocking_.is_active_.store(false, std::memory_order_release);
-        blocking_.not_empty_.notify_all();  // Notify all instead of just one
+        blocking_.not_empty_.notify_all();
         blocking_.not_full_.notify_all();
 
         // Clean up any remaining elements if not trivially destructible
@@ -576,7 +646,7 @@ class SPSCQueue : private detail::SPSCQueueBase<T, std::bit_ceil(RequestedCapaci
 
             while (head != tail) {
                 buffer_[head].~T();
-                head = (head + 1) & INDEX_MASK;
+                head = (head + 1) & static_cast<size_t>(index_mask_);
             }
         }
     }
@@ -593,7 +663,7 @@ class SPSCQueue : private detail::SPSCQueueBase<T, std::bit_ceil(RequestedCapaci
      */
     bool try_enqueue(const T& item) noexcept(std::is_nothrow_copy_constructible_v<T>) {
         const size_t current_tail = tail_.load(std::memory_order_relaxed);
-        const size_t next_tail = (current_tail + 1) & INDEX_MASK;
+        const size_t next_tail = (current_tail + 1) & index_mask_;
 
         // Relaxed load followed by acquire if needed (optimization)
         if (next_tail == head_.load(std::memory_order_relaxed)) {
@@ -632,7 +702,7 @@ class SPSCQueue : private detail::SPSCQueueBase<T, std::bit_ceil(RequestedCapaci
      */
     bool try_enqueue(T&& item) noexcept(std::is_nothrow_move_constructible_v<T>) {
         const size_t current_tail = tail_.load(std::memory_order_relaxed);
-        const size_t next_tail = (current_tail + 1) & INDEX_MASK;
+        const size_t next_tail = (current_tail + 1) & index_mask_;
 
         // Optimization: Relaxed load first, then acquire if needed
         if (next_tail == head_.load(std::memory_order_relaxed)) {
@@ -761,7 +831,7 @@ class SPSCQueue : private detail::SPSCQueueBase<T, std::bit_ceil(RequestedCapaci
         // Calculate available space (optimized)
         const size_t head = head_.load(std::memory_order_acquire);
         const size_t capacity = ActualCapacity;
-        const size_t available_space = (head + capacity - current_tail - 1) & INDEX_MASK;
+        const size_t available_space = (head + capacity - current_tail - 1) & index_mask_;
 
         if (available_space == 0)
             return 0;
@@ -813,7 +883,7 @@ class SPSCQueue : private detail::SPSCQueueBase<T, std::bit_ceil(RequestedCapaci
         }
 
         // Update tail position with a single atomic operation
-        tail_.store((current_tail + to_copy) & INDEX_MASK, std::memory_order_release);
+        tail_.store((current_tail + to_copy) & index_mask_, std::memory_order_release);
 
         // Only notify if queue was empty before
         if (was_empty) {
@@ -1013,11 +1083,11 @@ class SPSCQueue : private detail::SPSCQueueBase<T, std::bit_ceil(RequestedCapaci
         }
 
         // Prefetch next items in queue for better throughput
-        const size_t next_head = (current_head + 1) & INDEX_MASK;
+        const size_t next_head = (current_head + 1) & index_mask_;
         if (next_head != tail_.load(std::memory_order_relaxed)) {
             detail::prefetch_read(&buffer_[next_head], 3);
 
-            const size_t next_next_head = (next_head + 1) & INDEX_MASK;
+            const size_t next_next_head = (next_head + 1) & index_mask_;
             if (next_next_head != tail_.load(std::memory_order_relaxed)) {
                 detail::prefetch_read(&buffer_[next_next_head], 2);  // Lower locality hint
             }
@@ -1039,8 +1109,8 @@ class SPSCQueue : private detail::SPSCQueueBase<T, std::bit_ceil(RequestedCapaci
         head_.store(next_head, std::memory_order_release);
 
         // Selective notification strategy
-        const size_t used_capacity = ((tail_.load(std::memory_order_relaxed) - next_head) & INDEX_MASK);
-        if (used_capacity < ActualCapacity / 4) {
+        const size_t used_capacity = ((tail_.load(std::memory_order_relaxed) - next_head) & index_mask_);
+        if (used_capacity < ActualCapacity / 4) {  // Use ActualCapacity instead of buffer_size_
             blocking_.not_full_.notify_one();
         }
 
@@ -1194,11 +1264,11 @@ class SPSCQueue : private detail::SPSCQueueBase<T, std::bit_ceil(RequestedCapaci
         }
 
         // Calculate items to dequeue with minimal calculations
-        const size_t available = (tail - current_head) & INDEX_MASK;
+        const size_t available = (tail - current_head) & index_mask_;
         const size_t to_copy = std::min(available, max_items);
 
         // Optimize based on whether the dequeue wraps around the buffer
-        const size_t first_chunk = std::min(to_copy, ActualCapacity - current_head);
+        const size_t first_chunk = std::min(to_copy, ActualCapacity - current_head);  // Use ActualCapacity instead of buffer_size_
         const size_t second_chunk = to_copy - first_chunk;
 
         // Prefetch the next cache lines ahead of time to reduce false sharing impact
@@ -1252,7 +1322,7 @@ class SPSCQueue : private detail::SPSCQueueBase<T, std::bit_ceil(RequestedCapaci
         }
 
         // Update head position with a single atomic operation
-        head_.store((current_head + to_copy) & INDEX_MASK, std::memory_order_release);
+        head_.store((current_head + to_copy) & index_mask_, std::memory_order_release);
 
         // Only notify if we freed substantial space
         if (available == to_copy || to_copy > ActualCapacity / 4) {
@@ -1515,7 +1585,7 @@ class SPSCQueue : private detail::SPSCQueueBase<T, std::bit_ceil(RequestedCapaci
     template<typename... Args>
     bool try_emplace(Args&&... args) noexcept(std::is_nothrow_constructible_v<T, Args...>) {
         const size_t current_tail = tail_.load(std::memory_order_relaxed);
-        const size_t next_tail = (current_tail + 1) & INDEX_MASK;
+        const size_t next_tail = (current_tail + 1) & index_mask_;
 
         // Optimization: Relaxed load first, then acquire if needed
         if (next_tail == head_.load(std::memory_order_relaxed)) {
@@ -1598,7 +1668,7 @@ class SPSCQueue : private detail::SPSCQueueBase<T, std::bit_ceil(RequestedCapaci
      * @return true if the queue is full, false otherwise
      */
     bool is_full() const noexcept {
-        const size_t next_tail = (tail_.load(std::memory_order_relaxed) + 1) & INDEX_MASK;
+        const size_t next_tail = (tail_.load(std::memory_order_relaxed) + 1) & index_mask_;
         return next_tail == head_.load(std::memory_order_relaxed);
     }
 
@@ -1612,7 +1682,7 @@ class SPSCQueue : private detail::SPSCQueueBase<T, std::bit_ceil(RequestedCapaci
     bool is_almost_empty() const noexcept {
         const size_t head = head_.load(std::memory_order_relaxed);
         const size_t tail = tail_.load(std::memory_order_relaxed);
-        const size_t size = (tail - head) & INDEX_MASK;
+        const size_t size = (tail - head) & index_mask_;
         return size < ActualCapacity / 8;
     }
 
@@ -1626,7 +1696,7 @@ class SPSCQueue : private detail::SPSCQueueBase<T, std::bit_ceil(RequestedCapaci
     bool is_almost_full() const noexcept {
         const size_t head = head_.load(std::memory_order_relaxed);
         const size_t tail = tail_.load(std::memory_order_relaxed);
-        const size_t free = ((head - tail - 1) & INDEX_MASK);
+        const size_t free = ((head - tail - 1) & index_mask_);
         return free < ActualCapacity / 8;
     }
 
@@ -1635,7 +1705,7 @@ class SPSCQueue : private detail::SPSCQueueBase<T, std::bit_ceil(RequestedCapaci
      *
      * @return Current size of the queue
      */
-    size_t size() const noexcept { return (tail_.load(std::memory_order_relaxed) - head_.load(std::memory_order_relaxed)) & INDEX_MASK; }
+    size_t size() const noexcept { return (tail_.load(std::memory_order_relaxed) - head_.load(std::memory_order_relaxed)) & index_mask_; }
 
     /**
      * @brief Gets the capacity of the queue
@@ -1717,6 +1787,1152 @@ class SPSCQueue : private detail::SPSCQueueBase<T, std::bit_ceil(RequestedCapaci
 
         return count;
     }
+};
+
+/**
+ * @brief Single-Producer Single-Consumer lock-free queue with dynamic storage
+ *
+ * A high-performance queue designed for the single-producer,
+ * single-consumer scenario with capacity determined at runtime.
+ *
+ * @tparam T Element type (must be movable)
+ */
+template<typename T>
+    requires std::movable<T>
+class DynamicSPSCQueue : private detail::SPSCQueueBase<T, size_t, detail::DynamicBufferAccessor<T>, std::is_trivially_copyable_v<T>> {
+     private:
+    using Base = detail::SPSCQueueBase<T, size_t, detail::DynamicBufferAccessor<T>, std::is_trivially_copyable_v<T>>;
+
+    // Import base members into this scope
+    using Base::blocking_;
+    using Base::buffer_;
+    using Base::head_;
+    using Base::index_mask_;
+    using Base::SPIN_ATTEMPTS;
+    using Base::tail_;
+    using Base::YIELD_ATTEMPTS;
+
+    size_t buffer_size_;         // Actual size of the buffer (power of 2)
+    size_t requested_capacity_;  // Original requested capacity
+
+     public:
+    /**
+     * @brief Constructs an empty queue with dynamic size
+     *
+     * @param requested_capacity Desired minimum capacity (will be rounded up to next power of 2)
+     */
+    explicit DynamicSPSCQueue(size_t requested_capacity)
+        : Base(
+              // Round up to the next power of 2 and create mask
+              std::bit_ceil(requested_capacity) - 1,
+              // Create buffer with the calculated size
+              detail::DynamicBufferAccessor<T>(std::bit_ceil(requested_capacity))),
+          buffer_size_(std::bit_ceil(requested_capacity)),
+          requested_capacity_(requested_capacity) {
+        // Ensure minimum size
+        if (buffer_size_ < 2) {
+            throw std::invalid_argument("Queue capacity must be at least 2");
+        }
+    }
+
+    /**
+     * @brief Destructor
+     *
+     * Wakes up any waiting threads and properly destroys
+     * any remaining elements in the queue.
+     */
+    ~DynamicSPSCQueue() {
+        // Wake up any waiting threads
+        blocking_.is_active_.store(false, std::memory_order_release);
+        blocking_.not_empty_.notify_all();
+        blocking_.not_full_.notify_all();
+
+        // Clean up any remaining elements if not trivially destructible
+        if constexpr (!std::is_trivially_destructible_v<T>) {
+            size_t head = head_.load(std::memory_order_relaxed);
+            size_t tail = tail_.load(std::memory_order_relaxed);
+
+            while (head != tail) {
+                buffer_[head].~T();
+                head = (head + 1) & index_mask_;
+            }
+        }
+    }
+
+    // Prevent copying and moving
+    DynamicSPSCQueue(const DynamicSPSCQueue&) = delete;
+    DynamicSPSCQueue& operator=(const DynamicSPSCQueue&) = delete;
+    DynamicSPSCQueue(DynamicSPSCQueue&&) = delete;
+    DynamicSPSCQueue& operator=(DynamicSPSCQueue&&) = delete;
+
+    /**
+     * @brief Attempts to enqueue an element (copy version)
+     *
+     * Non-blocking operation that attempts to add an item to the queue.
+     *
+     * @param item Element to enqueue
+     * @return true if successful, false if the queue was full
+     */
+    bool try_enqueue(const T& item) noexcept(std::is_nothrow_copy_constructible_v<T>) {
+        const size_t current_tail = tail_.load(std::memory_order_relaxed);
+        const size_t next_tail = (current_tail + 1) & index_mask_;
+
+        // Relaxed load followed by acquire if needed (optimization)
+        if (next_tail == head_.load(std::memory_order_relaxed)) {
+            if (next_tail == head_.load(std::memory_order_acquire))
+                return false;
+        }
+
+        // Prefetch with locality hint for next operation
+        detail::prefetch_write(&buffer_[current_tail], 3);
+
+        // For trivially copyable small types, direct assignment is faster than placement new
+        if constexpr (std::is_trivially_copyable_v<T> && sizeof(T) <= 16) {
+            buffer_[current_tail] = item;
+        } else {
+            new (&buffer_[current_tail]) T(item);
+        }
+
+        // Release memory ordering ensures visibility to consumer
+        tail_.store(next_tail, std::memory_order_release);
+
+        // Only notify if queue was empty (reduces contention)
+        if (current_tail == head_.load(std::memory_order_relaxed))
+            blocking_.not_empty_.notify_one();
+
+        return true;
+    }
+
+    /**
+     * @brief Attempts to enqueue an element (move version)
+     *
+     * Non-blocking operation that attempts to add an item to the queue
+     * using move semantics for better performance.
+     *
+     * @param item Element to enqueue
+     * @return true if successful, false if the queue was full
+     */
+    bool try_enqueue(T&& item) noexcept(std::is_nothrow_move_constructible_v<T>) {
+        const size_t current_tail = tail_.load(std::memory_order_relaxed);
+        const size_t next_tail = (current_tail + 1) & index_mask_;
+
+        // Optimization: Relaxed load first, then acquire if needed
+        if (next_tail == head_.load(std::memory_order_relaxed)) {
+            // Double-check with acquire semantics
+            if (next_tail == head_.load(std::memory_order_acquire))
+                return false;  // Queue is full
+        }
+
+        // Optimization: Prefetch for write to reduce cache misses
+        detail::prefetch_write(&buffer_[current_tail]);
+
+        new (&buffer_[current_tail]) T(std::move(item));
+        tail_.store(next_tail, std::memory_order_release);
+
+        // Notify consumer if queue was empty
+        if (current_tail == head_.load(std::memory_order_relaxed))
+
+            blocking_.not_empty_.notify_one();
+
+        return true;
+    }
+
+    /**
+     * @brief Enqueues an element, blocking if necessary (copy version)
+     *
+     * Blocks the calling thread until space is available in the queue.
+     *
+     * @param item Element to enqueue
+     */
+    void enqueue(const T& item) {
+        // Try fast path first
+        if (try_enqueue(item))
+            return;
+
+        // Slow path with blocking
+        std::unique_lock<std::mutex> lock(blocking_.mutex_);
+        blocking_.not_full_.wait(lock, [this, &item] { return try_enqueue(item) || !blocking_.is_active_.load(std::memory_order_acquire); });
+    }
+
+    /**
+     * @brief Enqueues an element, blocking if necessary (move version)
+     *
+     * Blocks the calling thread until space is available in the queue.
+     * Uses move semantics for better performance.
+     *
+     * @param item Element to enqueue
+     */
+    void enqueue(T&& item) {
+        // Try fast path first
+        if (try_enqueue(std::move(item)))
+            return;
+
+        // Slow path with blocking
+        std::unique_lock<std::mutex> lock(blocking_.mutex_);
+        blocking_.not_full_.wait(lock, [this, &item] { return try_enqueue(std::move(item)) || !blocking_.is_active_.load(std::memory_order_acquire); });
+    }
+
+    /**
+     * @brief Enqueues an element with cancellation support (copy version)
+     *
+     * Blocks until space is available or the operation is cancelled.
+     *
+     * @tparam StopToken Type meeting the StopToken concept
+     * @param item Element to enqueue
+     * @param stop_token Token that can be used to cancel the operation
+     * @return true if the element was enqueued, false if cancelled
+     */
+    template<typename StopToken>
+    bool enqueue(const T& item, StopToken&& stop_token) {
+        // Try fast path first
+        if (try_enqueue(item))
+            return true;
+
+        // Slow path with blocking and cancellation support
+        std::unique_lock<std::mutex> lock(blocking_.mutex_);
+
+        // Wait until space available, queue inactive, or stop requested
+        std::condition_variable_any{}.wait(lock, stop_token, [this, &item] { return try_enqueue(item) || !blocking_.is_active_.load(std::memory_order_acquire); });
+
+        // Check if enqueue succeeded or stopped
+        return !stop_token.stop_requested() && blocking_.is_active_.load(std::memory_order_acquire);
+    }
+
+    /**
+     * @brief Enqueues an element with cancellation support (move version)
+     *
+     * Blocks until space is available or the operation is cancelled.
+     * Uses move semantics for better performance.
+     *
+     * @tparam StopToken Type meeting the StopToken concept
+     * @param item Element to enqueue
+     * @param stop_token Token that can be used to cancel the operation
+     * @return true if the element was enqueued, false if cancelled
+     */
+    template<typename StopToken>
+    bool enqueue(T&& item, StopToken&& stop_token) {
+        // Try fast path first
+        if (try_enqueue(std::move(item)))
+            return true;
+
+        // Slow path with blocking and cancellation support
+        std::unique_lock<std::mutex> lock(blocking_.mutex_);
+        blocking_.not_full_.wait(lock, [this, &item] { return try_enqueue(std::move(item)) || !blocking_.is_active_.load(std::memory_order_acquire); });
+
+        // Check if enqueue succeeded or stopped
+        return !stop_token.stop_requested() && blocking_.is_active_.load(std::memory_order_acquire);
+    }
+
+    /**
+     * @brief Attempts to enqueue multiple elements in a single operation
+     *
+     * Non-blocking operation that attempts to add multiple items to the queue.
+     *
+     * @tparam InputIt Iterator type pointing to elements
+     * @param first Iterator to the first element to enqueue
+     * @param count Number of elements to enqueue
+     * @return Number of elements successfully enqueued
+     */
+    template<typename InputIt>
+    size_t try_enqueue_bulk(InputIt first, size_t count) noexcept {
+        if (count == 0)
+            return 0;
+
+        // Fast path with relaxed ordering first
+        const size_t current_tail = tail_.load(std::memory_order_relaxed);
+
+        // Calculate available space (optimized)
+        const size_t head = head_.load(std::memory_order_acquire);
+        const size_t capacity = buffer_size_;  // Use buffer_size_ instead of ActualCapacity
+        const size_t available_space = (head + capacity - current_tail - 1) & index_mask_;
+
+        if (available_space == 0)
+            return 0;
+
+        // Calculate actual amount to copy
+        const size_t to_copy = std::min(available_space, count);
+        const bool was_empty = (current_tail == head);
+
+        // Optimize based on whether the enqueue wraps around the buffer
+        const size_t first_chunk = std::min(to_copy, capacity - current_tail);
+        const size_t second_chunk = to_copy - first_chunk;
+
+        // Use the fastest copy method based on type
+        if constexpr (std::is_trivially_copyable_v<T>) {
+            if constexpr (std::is_pointer_v<InputIt> && std::is_same_v<std::remove_pointer_t<InputIt>, T>) {
+                // Pointer to same type - use SIMD-optimized memory transfer
+                // Use SIMD for first chunk
+                detail::simd_memcpy(&buffer_[current_tail], first, first_chunk);
+
+                // Handle wrap-around if needed with SIMD
+                if (second_chunk > 0) {
+                    detail::simd_memcpy(&buffer_[0], first + first_chunk, second_chunk);
+                }
+            } else {
+                // Process first chunk
+                auto it = first;
+                for (size_t i = 0; i < first_chunk; i++) {
+                    buffer_[current_tail + i] = *it++;
+                }
+
+                // Process second chunk if needed
+                for (size_t i = 0; i < second_chunk; i++) {
+                    buffer_[i] = *it++;
+                }
+            }
+        } else {
+            // Non-trivially copyable type - use placement new with iterator
+            auto it = first;
+
+            // Process first chunk
+            for (size_t i = 0; i < first_chunk; i++) {
+                new (&buffer_[current_tail + i]) T(*it++);
+            }
+
+            // Process second chunk if needed
+            for (size_t i = 0; i < second_chunk; i++) {
+                new (&buffer_[i]) T(*it++);
+            }
+        }
+
+        // Update tail position with a single atomic operation
+        tail_.store((current_tail + to_copy) & index_mask_, std::memory_order_release);
+
+        // Only notify if queue was empty before
+        if (was_empty) {
+            blocking_.not_empty_.notify_one();
+        }
+
+        return to_copy;
+    }
+
+    /**
+     * @brief Enqueues multiple elements, blocking if necessary
+     *
+     * Blocks until all elements are enqueued or the queue is shut down.
+     *
+     * @tparam InputIt Iterator type pointing to elements
+     * @param first Iterator to the first element to enqueue
+     * @param count Number of elements to enqueue
+     * @return Number of elements successfully enqueued
+     */
+    template<typename InputIt>
+    size_t enqueue_bulk(InputIt first, size_t count) {
+        if (count == 0)
+            return 0;
+
+        // Try non-blocking fast path first
+        size_t items_enqueued = try_enqueue_bulk(first, count);
+        if (items_enqueued == count) {
+            return items_enqueued;
+        }
+
+        // Advance iterator by items already enqueued
+        std::advance(first, items_enqueued);
+        size_t remaining = count - items_enqueued;
+
+        // Exponential backoff spinning before falling back to mutex
+        detail::exponential_backoff backoff;
+        for (int i = 0; i < SPIN_ATTEMPTS; i++) {  // Try spinning a few times first
+            size_t batch_enqueued = try_enqueue_bulk(first, remaining);
+            if (batch_enqueued > 0) {
+                std::advance(first, batch_enqueued);
+                items_enqueued += batch_enqueued;
+                remaining -= batch_enqueued;
+
+                if (items_enqueued == count) {
+                    return items_enqueued;
+                }
+            }
+            backoff();
+        }
+
+        // Fall back to mutex-based waiting
+        std::unique_lock<std::mutex> lock(blocking_.mutex_);
+
+        while (items_enqueued < count && blocking_.is_active_.load(std::memory_order_acquire)) {
+            // Wait until space is available
+            blocking_.not_full_.wait(lock, [this] { return !is_full() || !blocking_.is_active_.load(std::memory_order_acquire); });
+
+            if (!blocking_.is_active_.load(std::memory_order_acquire)) {
+                break;  // Queue was shut down
+            }
+
+            // Critical section - minimize time with lock held
+            lock.unlock();
+
+            // Try to enqueue multiple items in one go
+            size_t batch_enqueued = try_enqueue_bulk(first, remaining);
+
+            lock.lock();
+
+            if (batch_enqueued > 0) {
+                std::advance(first, batch_enqueued);
+                items_enqueued += batch_enqueued;
+                remaining -= batch_enqueued;
+
+                if (items_enqueued == count) {
+                    break;
+                }
+            }
+        }
+
+        return items_enqueued;
+    }
+
+    /**
+     * @brief Enqueues multiple elements with a timeout
+     *
+     * Attempts to enqueue elements until the specified timeout expires.
+     *
+     * @tparam InputIt Iterator type pointing to elements
+     * @tparam Rep Duration representation type
+     * @tparam Period Duration period type
+     * @param first Iterator to the first element to enqueue
+     * @param count Number of elements to enqueue
+     * @param timeout Maximum time to wait
+     * @return Number of elements successfully enqueued
+     */
+    template<typename InputIt, typename Rep, typename Period>
+    size_t enqueue_bulk_for(InputIt first, size_t count, const std::chrono::duration<Rep, Period>& timeout) {
+        if (count == 0)
+            return 0;
+
+        // Track start time for timeout
+        auto start_time = std::chrono::steady_clock::now();
+        auto end_time = start_time + timeout;
+
+        // Try non-blocking fast path first
+        size_t items_enqueued = try_enqueue_bulk(first, count);
+        if (items_enqueued == count) {
+            return items_enqueued;
+        }
+
+        // Advance iterator by items already enqueued
+        std::advance(first, items_enqueued);
+        size_t remaining = count - items_enqueued;
+
+        // Adaptive spinning phase - use up to 20% of timeout for spinning
+        // Fix: convert both durations to microseconds for comparison
+        auto timeout_us = std::chrono::duration_cast<std::chrono::microseconds>(timeout);
+        auto spin_time = std::min(timeout_us / 5, std::chrono::microseconds(200));
+        auto spin_end_time = start_time + spin_time;
+
+        // Spin with exponential backoff
+        detail::exponential_backoff backoff;
+        while (items_enqueued < count && std::chrono::steady_clock::now() < spin_end_time) {
+            size_t batch_enqueued = try_enqueue_bulk(first, remaining);
+            if (batch_enqueued > 0) {
+                std::advance(first, batch_enqueued);
+                items_enqueued += batch_enqueued;
+                remaining -= batch_enqueued;
+
+                if (items_enqueued == count) {
+                    return items_enqueued;
+                }
+
+                // Reset backoff on progress
+                backoff.reset();
+            }
+            backoff();
+        }
+
+        // Check if timeout expired during spinning
+        if (std::chrono::steady_clock::now() >= end_time) {
+            return items_enqueued;
+        }
+
+        // Fall back to condition variable waiting
+        std::unique_lock<std::mutex> lock(blocking_.mutex_);
+
+        do {
+            // Wait until space is available or timeout
+            if (!blocking_.not_full_.wait_until(lock, end_time, [this] { return !is_full() || !blocking_.is_active_.load(std::memory_order_acquire); })) {
+                break;  // Timeout occurred
+            }
+
+            if (!blocking_.is_active_.load(std::memory_order_acquire)) {
+                break;  // Queue was shut down
+            }
+
+            // Release lock during actual enqueue operation
+            lock.unlock();
+            size_t batch_enqueued = try_enqueue_bulk(first, remaining);
+            lock.lock();
+
+            if (batch_enqueued > 0) {
+                std::advance(first, batch_enqueued);
+                items_enqueued += batch_enqueued;
+                remaining -= batch_enqueued;
+
+                if (items_enqueued == count) {
+                    break;  // All items enqueued
+                }
+            }
+
+        } while (items_enqueued < count && std::chrono::steady_clock::now() < end_time && blocking_.is_active_.load(std::memory_order_acquire));
+
+        return items_enqueued;
+    }
+
+
+    //////////DEQUEUE OPERATIONS//////////
+
+    /**
+     * @brief Attempts to dequeue an element
+     *
+     * Non-blocking operation that attempts to remove an item from the queue.
+     *
+     * @param item Reference to store the dequeued element
+     * @return true if successful, false if the queue was empty
+     */
+    bool try_dequeue(T& item) noexcept(std::is_nothrow_move_assignable_v<T>) {
+        const size_t current_head = head_.load(std::memory_order_relaxed);
+
+        // Early relaxed check before acquiring
+        if (current_head == tail_.load(std::memory_order_relaxed)) {
+            if (current_head == tail_.load(std::memory_order_acquire))
+                return false;
+        }
+
+        // Prefetch next items in queue for better throughput
+        const size_t next_head = (current_head + 1) & index_mask_;
+        if (next_head != tail_.load(std::memory_order_relaxed)) {
+            detail::prefetch_read(&buffer_[next_head], 3);
+
+            const size_t next_next_head = (next_head + 1) & index_mask_;
+            if (next_next_head != tail_.load(std::memory_order_relaxed)) {
+                detail::prefetch_read(&buffer_[next_next_head], 2);  // Lower locality hint
+            }
+        }
+
+        // Move the item out with optimization for trivial types
+        if constexpr (std::is_trivially_copyable_v<T> && sizeof(T) <= 16) {
+            item = buffer_[current_head];
+        } else {
+            item = std::move(buffer_[current_head]);
+
+            // Only call destructor if not an unsafe type after move
+            if constexpr (!detail::unsafe_to_destroy_after_move_v<T>) {
+                buffer_[current_head].~T();
+            }
+        }
+
+        // Release memory ordering ensures visibility to producer
+        head_.store(next_head, std::memory_order_release);
+
+        // Selective notification strategy
+        const size_t used_capacity = ((tail_.load(std::memory_order_relaxed) - next_head) & index_mask_);
+        if (used_capacity < buffer_size_ / 4) {
+            blocking_.not_full_.notify_one();
+        }
+
+        return true;
+    }
+
+    /**
+     * @brief Dequeues an element, blocking if necessary
+     *
+     * Blocks the calling thread until an item is available in the queue.
+     *
+     * @param item Reference to store the dequeued element
+     * @return true if an element was dequeued, false if the queue was shut down
+     */
+    bool dequeue(T& item) {
+        // Try optimistic fast path first
+        if (try_dequeue(item))
+            return true;
+
+        // Use exponential backoff with CPU hints
+        detail::exponential_backoff backoff;
+        for (int i = 0; i < SPIN_ATTEMPTS; ++i) {
+            if (try_dequeue(item))
+                return true;
+            backoff();
+        }
+
+        // Fall back to blocking wait
+        std::unique_lock<std::mutex> lock(blocking_.mutex_);
+        blocking_.not_empty_.wait(lock, [this, &item] { return try_dequeue(item) || !blocking_.is_active_.load(std::memory_order_acquire); });
+        return blocking_.is_active_.load(std::memory_order_acquire);
+    }
+
+    /**
+     * @brief Add a timed wait method with adaptive waiting
+     *
+     * @tparam Rep Duration representation type
+     * @tparam Period Duration period type
+     * @param timeout Maximum time to wait
+     * @return true if an element was dequeued, false if timeout expired during spinning
+     */
+    template<typename Rep, typename Period>
+    bool dequeue_for(T& item, const std::chrono::duration<Rep, Period>& timeout) {
+        // Try fast path first
+        if (try_dequeue(item))
+            return true;
+
+        // Calculate how much time to allocate for spinning vs blocking
+        auto start_time = std::chrono::steady_clock::now();
+        auto spin_duration = std::min(timeout / 2, std::chrono::milliseconds(1));
+        auto spin_end_time = start_time + spin_duration;
+
+        // Spin with increasing backoff until spin time elapsed
+        detail::exponential_backoff backoff;
+        while (std::chrono::steady_clock::now() < spin_end_time) {
+            if (try_dequeue(item))
+                return true;
+
+            backoff();
+        }
+
+        // Calculate remaining time for blocking wait
+        auto current_time = std::chrono::steady_clock::now();
+        auto remaining = timeout - (current_time - start_time);
+        if (remaining <= std::chrono::duration<Rep, Period>::zero())
+            return false;  // Timeout already expired during spinning
+
+        // Slow path with timeout
+        std::unique_lock<std::mutex> lock(blocking_.mutex_);
+        return blocking_.not_empty_.wait_for(lock, remaining, [this, &item] { return try_dequeue(item) || !blocking_.is_active_.load(std::memory_order_acquire); }) && blocking_.is_active_.load(std::memory_order_acquire);
+    }
+
+    /**
+     * @brief Dequeues an element with cancellation support
+     *
+     * Blocks until an item is available or the operation is cancelled.
+     *
+     * @tparam StopToken Type meeting the StopToken concept
+     * @param item Reference to store the dequeued element
+     * @param stop_token Token that can be used to cancel the operation
+     * @return true if an element was dequeued, false if cancelled or queue shut down
+     */
+    template<typename StopToken>
+    bool dequeue(T& item, StopToken&& stop_token) {
+        // Try fast path first
+        if (try_dequeue(item))
+            return true;
+
+        // Slow path with blocking and cancellation support
+        std::unique_lock<std::mutex> lock(blocking_.mutex_);
+
+        // Wait until item available, queue inactive, or stop requested
+        std::condition_variable_any{}.wait(lock, stop_token, [this, &item] { return try_dequeue(item) || !blocking_.is_active_.load(std::memory_order_acquire); });
+
+        // Check if we got an item or stopped
+        return !stop_token.stop_requested() && blocking_.is_active_.load(std::memory_order_acquire);
+    }
+
+    /**
+     * @brief Dequeues an element with timeout and cancellation support
+     *
+     * Attempts to dequeue an element, waiting up to the specified timeout
+     * or until the operation is cancelled.
+     *
+     * @tparam Rep Duration representation type
+     * @tparam Period Duration period type
+     * @tparam StopToken Type meeting the StopToken concept
+     * @param item Reference to store the dequeued element
+     * @param timeout Maximum time to wait
+     * @param stop_token Token that can be used to cancel the operation
+     * @return true if an element was dequeued, false otherwise
+     */
+    template<typename Rep, typename Period, typename StopToken>
+    bool dequeue_for(T& item, const std::chrono::duration<Rep, Period>& timeout, StopToken&& stop_token) {
+        // Try fast path first
+        if (try_dequeue(item))
+            return true;
+
+        // Slow path with timeout and cancellation support
+        std::unique_lock<std::mutex> lock(blocking_.mutex_);
+
+        // Wait until item available, timeout, queue inactive, or stop requested
+        std::condition_variable_any{}.wait_for(lock, timeout, stop_token, [this, &item] { return try_dequeue(item) || !blocking_.is_active_.load(std::memory_order_acquire); });
+
+        // Return success only if we got an item (not stopped or timed out)
+        return !stop_token.stop_requested() && blocking_.is_active_.load(std::memory_order_acquire) && !is_empty();
+    }
+
+    /**
+     * @brief Attempts to dequeue multiple elements in a single operation
+     *
+     * Non-blocking operation that attempts to remove multiple items from the queue.
+     *
+     * @tparam OutputIt Iterator type for destination
+     * @param dest Iterator to the destination to store dequeued elements
+     * @param max_items Maximum number of elements to dequeue
+     * @return Number of elements successfully dequeued
+     */
+    template<typename OutputIt>
+    size_t try_dequeue_bulk(OutputIt dest, size_t max_items) noexcept {
+        // Quick empty check with relaxed ordering (fastest path)
+        const size_t current_head = head_.load(std::memory_order_relaxed);
+
+        // Use relaxed first, then acquire only if needed
+        size_t tail = tail_.load(std::memory_order_relaxed);
+        if (current_head == tail) {
+            tail = tail_.load(std::memory_order_acquire);
+            if (current_head == tail) {
+                return 0;
+            }
+        }
+
+        // Calculate items to dequeue with minimal calculations
+        const size_t available = (tail - current_head) & index_mask_;
+        const size_t to_copy = std::min(available, max_items);
+
+        // Optimize based on whether the dequeue wraps around the buffer
+        const size_t first_chunk = std::min(to_copy, buffer_size_ - current_head);  // Use buffer_size_ instead of ActualCapacity
+        const size_t second_chunk = to_copy - first_chunk;
+
+        // Prefetch the next cache lines ahead of time to reduce false sharing impact
+        if (first_chunk > 1) {
+            // Prefetch several cache lines ahead to minimize false sharing effects
+            for (size_t i = 0; i < std::min(first_chunk, size_t(4)); i++) {
+                detail::prefetch_read(&buffer_[current_head + i], 3);
+            }
+        }
+
+        // Use the fastest copy method based on type and iterator
+        if constexpr (std::is_trivially_copyable_v<T>) {
+            if constexpr (std::is_pointer_v<OutputIt> && std::is_same_v<std::remove_pointer_t<OutputIt>, T>) {
+                // Pointer to same type - use SIMD-optimized memory transfer
+                // Use SIMD for first chunk
+                detail::simd_memcpy(dest, &buffer_[current_head], first_chunk);
+
+                // Handle wrap-around if needed with SIMD
+                if (second_chunk > 0) {
+                    detail::simd_memcpy(dest + first_chunk, &buffer_[0], second_chunk);
+                }
+            } else {
+                // Other iterator type - use iterator operations
+                std::copy_n(&buffer_[current_head], first_chunk, dest);
+
+                if (second_chunk > 0) {
+                    auto advanced_dest = dest;
+                    std::advance(advanced_dest, first_chunk);
+                    std::copy_n(&buffer_[0], second_chunk, advanced_dest);
+                }
+            }
+        } else {
+            // Non-trivial type - use move semantics
+            for (size_t i = 0; i < first_chunk; i++) {
+                *dest = std::move(buffer_[current_head + i]);
+                ++dest;
+
+                if constexpr (!detail::unsafe_to_destroy_after_move_v<T>) {
+                    buffer_[current_head + i].~T();
+                }
+            }
+
+            for (size_t i = 0; i < second_chunk; i++) {
+                *dest = std::move(buffer_[i]);
+                ++dest;
+
+                if constexpr (!detail::unsafe_to_destroy_after_move_v<T>) {
+                    buffer_[i].~T();
+                }
+            }
+        }
+
+        // Update head position with a single atomic operation
+        head_.store((current_head + to_copy) & index_mask_, std::memory_order_release);
+
+        // Only notify if we freed substantial space
+        if (available == to_copy || to_copy > buffer_size_ / 4) {
+            blocking_.not_full_.notify_one();
+        }
+
+        return to_copy;
+    }
+
+    /**
+     * @brief Dequeues multiple elements
+     *
+     * Attempts to dequeue multiple elements.
+     *
+     * @tparam OutputIt Iterator type for destination
+     * @param dest Iterator to the destination to store dequeued elements
+     * @param max_items Maximum number of elements to dequeue
+     * @param stoken Stop token for cancellation
+     * @return Number of elements successfully dequeued
+     */
+    template<typename OutputIt>
+    size_t dequeue_bulk(OutputIt dest, size_t max_items, std::stop_token stoken = {}) {
+        if (max_items == 0)
+            return 0;
+
+        // Try non-blocking fast path first
+        size_t items_dequeued = try_dequeue_bulk(dest, max_items);
+        if (items_dequeued == max_items) {
+            return items_dequeued;
+        }
+
+        // If we got some items but not all, advance the destination iterator
+        if (items_dequeued > 0) {
+            std::advance(dest, items_dequeued);
+            max_items -= items_dequeued;
+        }
+
+        // Spin with exponential backoff for a short time
+        auto start_time = std::chrono::steady_clock::now();
+        auto spin_time = std::chrono::microseconds(200);
+        auto spin_end_time = start_time + spin_time;
+
+        detail::exponential_backoff backoff;
+        while (items_dequeued < max_items && std::chrono::steady_clock::now() < spin_end_time) {
+            size_t batch_dequeued = try_dequeue_bulk(dest, max_items);
+            if (batch_dequeued > 0) {
+                std::advance(dest, batch_dequeued);
+                items_dequeued += batch_dequeued;
+                max_items -= batch_dequeued;
+
+                if (max_items == 0) {
+                    return items_dequeued;
+                }
+            }
+            backoff();
+        }
+
+        if (stoken.stop_requested()) {
+            return items_dequeued;
+        }
+
+        // Fall back to condition variable waiting
+        std::unique_lock<std::mutex> lock(blocking_.mutex_);
+
+        do {
+            // Wait until items are available or timeout
+            while (!blocking_.not_empty_.wait_for(lock, 2000ms, [this] { return !is_empty() || !blocking_.is_active_.load(std::memory_order_acquire); })) {
+                if (stoken.stop_requested()) {
+                    return false;
+                }
+            }
+
+            if (!blocking_.is_active_.load(std::memory_order_acquire)) {
+                break;  // Queue was shut down
+            }
+
+            // Release lock during actual dequeue operation
+            lock.unlock();
+            size_t batch_dequeued = try_dequeue_bulk(dest, max_items);
+            lock.lock();
+
+            if (batch_dequeued > 0) {
+                std::advance(dest, batch_dequeued);
+                items_dequeued += batch_dequeued;
+                max_items -= batch_dequeued;
+
+                if (max_items == 0) {
+                    break;  // All items dequeued
+                }
+            }
+
+        } while (max_items > 0 && !stoken.stop_requested() && blocking_.is_active_.load(std::memory_order_acquire));
+
+        return items_dequeued;
+    }
+
+    /**
+     * @brief Dequeues multiple elements with timeout
+     *
+     * Attempts to dequeue multiple elements, waiting up to the specified timeout.
+     *
+     * @tparam OutputIt Iterator type for destination
+     * @tparam Rep Duration representation type
+     * @tparam Period Duration period type
+     * @param dest Iterator to the destination to store dequeued elements
+     * @param max_items Maximum number of elements to dequeue
+     * @param timeout Maximum time to wait
+     * @return Number of elements successfully dequeued
+     */
+    template<typename OutputIt, typename Rep, typename Period>
+    size_t dequeue_bulk_for(OutputIt dest, size_t max_items, const std::chrono::duration<Rep, Period>& timeout) {
+        if (max_items == 0)
+            return 0;
+
+        // Track start time for timeout
+        auto start_time = std::chrono::steady_clock::now();
+        auto end_time = start_time + timeout;
+
+        // Try non-blocking fast path first
+        size_t items_dequeued = try_dequeue_bulk(dest, max_items);
+        if (items_dequeued == max_items) {
+            return items_dequeued;
+        }
+
+        // If we got some items but not all, advance the destination iterator
+        if (items_dequeued > 0) {
+            std::advance(dest, items_dequeued);
+            max_items -= items_dequeued;
+        }
+
+        // Spin with exponential backoff for a short time
+        auto timeout_us = std::chrono::duration_cast<std::chrono::microseconds>(timeout);
+        auto spin_time = std::min(timeout_us / 5, std::chrono::microseconds(200));
+        auto spin_end_time = start_time + spin_time;
+
+        detail::exponential_backoff backoff;
+        while (items_dequeued < max_items && std::chrono::steady_clock::now() < spin_end_time) {
+            size_t batch_dequeued = try_dequeue_bulk(dest, max_items);
+            if (batch_dequeued > 0) {
+                std::advance(dest, batch_dequeued);
+                items_dequeued += batch_dequeued;
+                max_items -= batch_dequeued;
+
+                if (max_items == 0) {
+                    return items_dequeued;
+                }
+            }
+            backoff();
+        }
+
+        // Check if timeout expired during spinning
+        if (std::chrono::steady_clock::now() >= end_time) {
+            return items_dequeued;
+        }
+
+        // Fall back to condition variable waiting
+        std::unique_lock<std::mutex> lock(blocking_.mutex_);
+
+        do {
+            // Wait until items are available or timeout
+            if (!blocking_.not_empty_.wait_until(lock, end_time, [this] { return !is_empty() || !blocking_.is_active_.load(std::memory_order_acquire); })) {
+                break;  // Timeout occurred
+            }
+
+            if (!blocking_.is_active_.load(std::memory_order_acquire)) {
+                break;  // Queue was shut down
+            }
+
+            // Release lock during actual dequeue operation
+            lock.unlock();
+            size_t batch_dequeued = try_dequeue_bulk(dest, max_items);
+            lock.lock();
+
+            if (batch_dequeued > 0) {
+                std::advance(dest, batch_dequeued);
+                items_dequeued += batch_dequeued;
+                max_items -= batch_dequeued;
+
+                if (max_items == 0) {
+                    break;  // All items dequeued
+                }
+            }
+
+        } while (max_items > 0 && std::chrono::steady_clock::now() < end_time && blocking_.is_active_.load(std::memory_order_acquire));
+
+        return items_dequeued;
+    }
+
+    /**
+     * @brief Dequeues any available elements with timeout
+     *
+     * Attempts to dequeue elements, returning as soon as any are available
+     * or the timeout expires.
+     *
+     * @tparam OutputIt Iterator type for destination
+     * @tparam Rep Duration representation type
+     * @tparam Period Duration period type
+     * @param dest Iterator to the destination to store dequeued elements
+     * @param max_items Maximum number of elements to dequeue
+     * @param timeout Maximum time to wait
+     * @return Number of elements successfully dequeued
+     */
+    template<typename OutputIt, typename Rep, typename Period>
+    size_t dequeue_bulk_for_any(OutputIt dest, size_t max_items, const std::chrono::duration<Rep, Period>& timeout) {
+        if (max_items == 0)
+            return 0;
+
+        // Try non-blocking fast path first
+        size_t items_dequeued = try_dequeue_bulk(dest, max_items);
+        if (items_dequeued > 0) {
+            return items_dequeued;  // Return immediately if any items were dequeued
+        }
+
+        // Track time for timeout
+        auto start_time = std::chrono::steady_clock::now();
+        auto end_time = start_time + timeout;
+
+        // Spin with exponential backoff for a short time
+        auto timeout_us = std::chrono::duration_cast<std::chrono::microseconds>(timeout);
+        auto spin_time = std::min(timeout_us / 5, std::chrono::microseconds(100));
+        auto spin_end_time = start_time + spin_time;
+
+        detail::exponential_backoff backoff;
+        while (std::chrono::steady_clock::now() < spin_end_time) {
+            size_t batch_dequeued = try_dequeue_bulk(dest, max_items);
+            if (batch_dequeued > 0) {
+                return batch_dequeued;  // Return immediately with any items
+            }
+            backoff();
+        }
+
+        // Fall back to condition variable waiting
+        std::unique_lock<std::mutex> lock(blocking_.mutex_);
+
+        // Wait until any items are available, timeout, or queue inactive
+        bool has_items = blocking_.not_empty_.wait_until(lock, end_time, [this] { return !is_empty() || !blocking_.is_active_.load(std::memory_order_acquire); });
+
+        // If no items or queue shut down, return 0
+        if (!has_items || !blocking_.is_active_.load(std::memory_order_acquire)) {
+            return 0;
+        }
+
+        // Try to dequeue with lock released
+        lock.unlock();
+        return try_dequeue_bulk(dest, max_items);
+    }
+
+    //////////EMPLACE OPERATIONS//////////
+
+    /**
+     * @brief Attempts to construct an element in-place in the queue
+     *
+     * Non-blocking operation that attempts to construct an element
+     * directly in the queue's buffer.
+     *
+     * @tparam Args Types of arguments to forward to the constructor
+     * @param args Arguments to forward to the constructor
+     * @return true if successful, false if the queue was full
+     */
+    template<typename... Args>
+    bool try_emplace(Args&&... args) noexcept(std::is_nothrow_constructible_v<T, Args...>) {
+        const size_t current_tail = tail_.load(std::memory_order_relaxed);
+        const size_t next_tail = (current_tail + 1) & index_mask_;
+
+        // Optimization: Relaxed load first, then acquire if needed
+        if (next_tail == head_.load(std::memory_order_relaxed)) {
+            // Double-check with acquire semantics
+            if (next_tail == head_.load(std::memory_order_acquire))
+                return false;  // Queue is full
+        }
+
+        // Optimization: Prefetch for write to reduce cache misses
+        detail::prefetch_write(&buffer_[current_tail]);
+
+        new (&buffer_[current_tail]) T(std::forward<Args>(args)...);
+        tail_.store(next_tail, std::memory_order_release);
+
+        // Notify if queue was empty
+        if (current_tail == head_.load(std::memory_order_relaxed))
+            blocking_.not_empty_.notify_one();
+
+        return true;
+    }
+
+    /**
+     * @brief Constructs an element in-place in the queue, blocking if necessary
+     *
+     * Blocks the calling thread until space is available in the queue.
+     *
+     * @tparam Args Types of arguments to forward to the constructor
+     * @param args Arguments to forward to the constructor
+     */
+    template<typename... Args>
+    void emplace(Args&&... args) {
+        // Try fast path first
+        if (try_emplace(std::forward<Args>(args)...))
+            return;
+
+        // Slow path with blocking
+        std::unique_lock<std::mutex> lock(blocking_.mutex_);
+        blocking_.not_full_.wait(lock, [this, &args...] { return try_emplace(std::forward<Args>(args)...) || !blocking_.is_active_.load(std::memory_order_acquire); });
+    }
+
+    /**
+     * @brief Constructs an element in-place with cancellation support
+     *
+     * Blocks until space is available or the operation is cancelled.
+     *
+     * @tparam StopToken Type meeting the StopToken concept
+     * @tparam Args Types of arguments to forward to the constructor
+     * @param stop_token Token that can be used to cancel the operation
+     * @param args Arguments to forward to the constructor
+     * @return true if the element was emplaced, false if cancelled
+     */
+    template<typename StopToken, typename... Args>
+    bool emplace(StopToken&& stop_token, Args&&... args) {
+        // Try fast path first
+        if (try_emplace(std::forward<Args>(args)...))
+            return true;
+
+        // Slow path with blocking and cancellation support
+        std::unique_lock<std::mutex> lock(blocking_.mutex_);
+
+        // Wait until space available, queue inactive, or stop requested
+        std::condition_variable_any{}.wait(lock, stop_token, [this, &args...] { return try_emplace(std::forward<Args>(args)...) || !blocking_.is_active_.load(std::memory_order_acquire); });
+
+        // Check if emplace succeeded or stopped
+        return !stop_token.stop_requested() && blocking_.is_active_.load(std::memory_order_acquire);
+    }
+
+    /////////////UTILITY METHODS//////////
+
+    /**
+     * @brief Checks if the queue is empty
+     *
+     * @return true if the queue is empty, false otherwise
+     */
+    bool is_empty() const noexcept { return head_.load(std::memory_order_relaxed) == tail_.load(std::memory_order_relaxed); }
+
+    /**
+     * @brief Checks if the queue is full
+     *
+     * @return true if the queue is full, false otherwise
+     */
+    bool is_full() const noexcept {
+        const size_t next_tail = (tail_.load(std::memory_order_relaxed) + 1) & index_mask_;
+        return next_tail == head_.load(std::memory_order_relaxed);
+    }
+
+    /**
+     * @brief Gets the current number of elements in the queue
+     *
+     * @return Current size of the queue
+     */
+    size_t size() const noexcept { return (tail_.load(std::memory_order_relaxed) - head_.load(std::memory_order_relaxed)) & index_mask_; }
+
+    /**
+     * @brief Gets the capacity of the queue
+     *
+     * Returns the actual usable capacity, which is one less than
+     * the internal buffer size due to the need to distinguish
+     * between empty and full states.
+     *
+     * @return Maximum number of elements the queue can hold
+     */
+    constexpr size_t capacity() const noexcept {
+        return buffer_size_ - 1;  // One slot is always kept empty
+    }
+
+    /**
+     * @brief Gets the requested capacity from construction
+     *
+     * @return The minimum capacity requested when the queue was created
+     */
+    constexpr size_t requested_capacity() const noexcept { return requested_capacity_; }
+
+    /**
+     * @brief Gets the actual capacity after power-of-2 rounding
+     *
+     * @return The actual capacity of the queue
+     */
+    constexpr size_t actual_capacity() const noexcept { return buffer_size_ - 1; }
+
+
+    /**
+     * @brief Shuts down the queue
+     *
+     * Wakes up all waiting threads and marks the queue as inactive.
+     * No new blocking operations will succeed after shutdown.
+     */
+    void shutdown() noexcept {
+        blocking_.is_active_.store(false, std::memory_order_release);
+        blocking_.not_empty_.notify_all();
+        blocking_.not_full_.notify_all();
+    }
+
+    // Additional methods would be implemented similarly to the original SPSCQueue
 };
 
 #endif  // SPSC_QUEUE_HPP

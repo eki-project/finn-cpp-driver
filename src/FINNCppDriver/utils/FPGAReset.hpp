@@ -73,9 +73,10 @@ namespace Finn {
             }
 
             // Prepare arguments for exec
+            std::vector<std::string> mutableArgs(args.begin(), args.end());
             std::vector<char*> c_args;
-            for (const auto& arg : args) {
-                c_args.push_back(const_cast<char*>(arg.c_str()));
+            for (auto& arg : mutableArgs) {
+                c_args.push_back(arg.data());
             }
             c_args.push_back(nullptr);
 

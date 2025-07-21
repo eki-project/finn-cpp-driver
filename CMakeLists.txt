@@ -44,7 +44,6 @@ set(BENCHMARK_ENABLE_TESTING OFF)
 include(cmake/CheckSubmodules.cmake)
 
 # Doxygen
-
 if (CMAKE_BUILD_TYPE STREQUAL "Release")
 option(FINN_BUILD_DOC "Build documentation" ON)
 else()

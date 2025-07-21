@@ -83,7 +83,12 @@ namespace Finn {
     void DeviceHandler::initializeDevice() {
         FINN_LOG(loglevel::info) << "(" << xrtDeviceIndex << ") "
                                  << "Initializing xrt::device, loading xclbin and assigning IP\n";
-        resetFPGAS(static_cast<int>(xrtDeviceIndex));
+        try {
+            resetFPGAS(static_cast<int>(xrtDeviceIndex));
+        } catch (const std::exception& e) {
+            FINN_LOG(loglevel::error) << "Failed to reset FPGA: " << e.what();
+            throw;  // Rethrow the exception to propagate the error
+        }
         device = xrt::device(xrtDeviceIndex);
     }
 

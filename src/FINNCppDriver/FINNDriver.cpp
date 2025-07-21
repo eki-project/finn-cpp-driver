@@ -150,7 +150,7 @@ void runThroughputTestImpl(Finn::Driver<true>& baseDriver, std::size_t elementCo
 
     auto gen = [&dist, &mersenneEngine]() { return dist(mersenneEngine); };
 
-    constexpr size_t nTestruns = 10;
+    constexpr size_t nTestruns = 5000;
     std::chrono::duration<double> sumRuntimeEnd2End{};
 
     // Warmup

@@ -127,10 +127,6 @@ ml compiler/GCCcore/11.3.0 compiler/GCC/11.3.0 lib/pybind11/2.9.2-GCCcore-11.3.0
 ml devel Autoconf/2.71-GCCcore-11.3.0
 ml lang Bison/3.8.2-GCCcore-11.3.0 flex/2.6.4-GCCcore-11.3.0
 ml fpga xilinx/xrt/2.14
-ml compiler/GCCcore/11.3.0 compiler/GCC/11.3.0 lib/pybind11/2.9.2-GCCcore-11.3.0 devel/Boost/1.79.0-GCC-11.3.0 lib/fmt/9.1.0-GCCcore-11.3.0
-ml devel Autoconf/2.71-GCCcore-11.3.0
-ml lang Bison/3.8.2-GCCcore-11.3.0 flex/2.6.4-GCCcore-11.3.0
-ml fpga xilinx/xrt/2.14
 ```
 
 To execute the driver on the boards, write a job script. The job script should look something like this:
@@ -147,12 +143,7 @@ ml compiler/GCCcore/11.3.0 compiler/GCC/11.3.0 lib/pybind11/2.9.2-GCCcore-11.3.0
 ml devel Autoconf/2.71-GCCcore-11.3.0
 ml lang Bison/3.8.2-GCCcore-11.3.0 flex/2.6.4-GCCcore-11.3.0
 ml fpga xilinx/xrt/2.14
-ml compiler/GCCcore/11.3.0 compiler/GCC/11.3.0 lib/pybind11/2.9.2-GCCcore-11.3.0 devel/Boost/1.79.0-GCC-11.3.0 lib/fmt/9.1.0-GCCcore-11.3.0
-ml devel Autoconf/2.71-GCCcore-11.3.0
-ml lang Bison/3.8.2-GCCcore-11.3.0 flex/2.6.4-GCCcore-11.3.0
-ml fpga xilinx/xrt/2.14
 
-#DO YOUR WORK WITH FINN HERE. FOR EXAMPLE CALL ./finnhpc --help
 #DO YOUR WORK WITH FINN HERE. FOR EXAMPLE CALL ./finnhpc --help
 ```
 
@@ -162,22 +153,15 @@ Use ```xbutil``` to get information about the cards and configure them manually 
 (Project name, resource usage, output filename, xrt version etc. are all examples and have to be set by the user themselves).
 
 ### Using the driver as a library
-### Using the driver as a library
 
-The C++ Driver can be used as a submodule in your own projects. **Please make sure to initialize all submodules recursively!** It is then possible to use the C++ Driver as a CMake submodule:
 The C++ Driver can be used as a submodule in your own projects. **Please make sure to initialize all submodules recursively!** It is then possible to use the C++ Driver as a CMake submodule:
 
 ```CMake
 #Add the C++ driver as a submodule
 #Change the path to match your submodule location
-#Change the path to match your submodule location
 add_subdirectory(external/finn-cpp-driver)
 
 #Link an example application against the finn driver
-add_executable(example example.cpp)
-target_include_directories(example SYSTEM PRIVATE ${XRT_INCLUDE_DIRS} ${FINN_SRC_DIR})
-target_link_directories(example PRIVATE ${XRT_LIB_CORE_LOCATION} ${XRT_LIB_OCL_LOCATION} ${BOOST_LIBRARYDIR})
-target_link_libraries(example PRIVATE finnc_core finnc_options Threads::Threads OpenCL xrt_coreutil uuid finnc_utils finn_config ${Boost_LIBRARIES} nlohmann_json::nlohmann_json OpenMP::OpenMP_CXX)
 add_executable(example example.cpp)
 target_include_directories(example SYSTEM PRIVATE ${XRT_INCLUDE_DIRS} ${FINN_SRC_DIR})
 target_link_directories(example PRIVATE ${XRT_LIB_CORE_LOCATION} ${XRT_LIB_OCL_LOCATION} ${BOOST_LIBRARYDIR})

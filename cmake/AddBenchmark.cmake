@@ -18,6 +18,7 @@ function(add_benchmark benchmark_name)
     xrt_coreutil
     benchmark::benchmark
     OpenMP::OpenMP_CXX
+    pybind11::embed
   )
 
 endfunction()

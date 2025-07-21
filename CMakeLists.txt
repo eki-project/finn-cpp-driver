@@ -101,6 +101,11 @@ include_directories(SYSTEM external/xtl/include)
 add_subdirectory(external/xtensor)
 include_directories(SYSTEM external/xtensor/include)
 
+#NNenergyprofiler
+find_package(pybind11 REQUIRED)
+add_subdirectory(external/NNenergyprofiler/cpp)
+include_directories(SYSTEM external/NNenergyprofiler/cpp)
+
 #Nlohmann json
 
 set(JSON_BuildTests OFF CACHE INTERNAL "")

@@ -16,3 +16,6 @@
 [submodule "external/plog"]
 	path = external/plog
 	url = https://github.com/SergiusTheBest/plog.git
+[submodule "external/NNenergyprofiler"]
+	path = external/NNenergyprofiler
+	url = https://github.com/eki-project/NNenergyprofiler.git

@@ -6,9 +6,6 @@
 ![GitHub Release Date](https://img.shields.io/github/release-date/eki-project/finn-cpp-driver)
 ![GitHub branch status](https://img.shields.io/github/checks-status/eki-project/finn-cpp-driver/main)
 
-![GitHub Release Date](https://img.shields.io/github/release-date/eki-project/finn-cpp-driver)
-![GitHub branch status](https://img.shields.io/github/checks-status/eki-project/finn-cpp-driver/main)
-
 
 ## Getting Started
 
@@ -35,9 +32,7 @@ FINN+ on the other hand will configure and build the driver for you completely a
 
 You can either use the driver as a standalone executable or as a library. For the use of the C++ driver as a library, please have a look at the section for [library use](#using-the-driver-as-a-library).
 
-If you ever need help on which arguments the driver requires, simply use the ```--help``` flag on the driver.
-
-The following options are supported by the C++ driver executable to match the PYNQ driver:
+If you ever need help on which arguments the driver requires, simply use the ```--help``` flag on the driver. The executable for the driver is, by default, located in the `build/bin` folder after compiling the driver.
 
 The following options are supported by the C++ driver executable to match the PYNQ driver:
 
@@ -53,7 +48,7 @@ Options:
   --check                              Outputs the compile time configuration
 ```
 
-If the execution of the C++ driver fails due to missing libraries such as `libfinnc_core.so`, it might be necessary to set the `LD_LIBRARY_PATH` environment variable:
+If the execution of the C++ driver fails due to missing libraries such as `libfinn_core.so`, it might be necessary to set the `LD_LIBRARY_PATH` environment variable:
 
 ```bash
 export LD_LIBRARY_PATH="$(pwd)/build/libs:$LD_LIBRARY_PATH"
@@ -67,7 +62,6 @@ export LD_LIBRARY_PATH="$(pwd)/build/libs:$LD_LIBRARY_PATH"
 
 * Install XRT Runtime and development packages. You can find them here: [Download](https://www.xilinx.com/support/download/index.html/content/xilinx/en/downloadNav/alveo/u280.html)
 * If you use a non default install directory for XRT (default: ```/opt/xilinx/xrt```) set the XRT env var to your XRT development package installation ```export XILINX_XRT=<path>```.
-* Additionally, an installation of boost>=1.79.0 is required. You can install it on debian based sytems using `sudo apt install libboost-all-dev`
 
 **General information for building and using the C++ driver**:
 
@@ -123,7 +117,7 @@ If left undefined, the path will be ```../../src/config/exampleConfig.json``` (a
 You will first have to load a few dependencies before being able to build the project:
 
 ```bash
-ml compiler/GCCcore/11.3.0 compiler/GCC/11.3.0 lib/pybind11/2.9.2-GCCcore-11.3.0 devel/Boost/1.79.0-GCC-11.3.0 lib/fmt/9.1.0-GCCcore-11.3.0
+ml compiler/GCCcore/11.3.0 compiler/GCC/11.3.0 lib/pybind11/2.9.2-GCCcore-11.3.0 lib/fmt/9.1.0-GCCcore-11.3.0
 ml devel Autoconf/2.71-GCCcore-11.3.0
 ml lang Bison/3.8.2-GCCcore-11.3.0 flex/2.6.4-GCCcore-11.3.0
 ml fpga xilinx/xrt/2.14
@@ -139,7 +133,7 @@ To execute the driver on the boards, write a job script. The job script should l
 #SBATCH -o cpp-finn_out_%j.out
 #SBATCH --constraint=xilinx_u280_xrt2.14
 
-ml compiler/GCCcore/11.3.0 compiler/GCC/11.3.0 lib/pybind11/2.9.2-GCCcore-11.3.0 devel/Boost/1.79.0-GCC-11.3.0 lib/fmt/9.1.0-GCCcore-11.3.0
+ml compiler/GCCcore/11.3.0 compiler/GCC/11.3.0 lib/pybind11/2.9.2-GCCcore-11.3.0 lib/fmt/9.1.0-GCCcore-11.3.0
 ml devel Autoconf/2.71-GCCcore-11.3.0
 ml lang Bison/3.8.2-GCCcore-11.3.0 flex/2.6.4-GCCcore-11.3.0
 ml fpga xilinx/xrt/2.14
@@ -164,8 +158,8 @@ add_subdirectory(external/finn-cpp-driver)
 #Link an example application against the finn driver
 add_executable(example example.cpp)
 target_include_directories(example SYSTEM PRIVATE ${XRT_INCLUDE_DIRS} ${FINN_SRC_DIR})
-target_link_directories(example PRIVATE ${XRT_LIB_CORE_LOCATION} ${XRT_LIB_OCL_LOCATION} ${BOOST_LIBRARYDIR})
-target_link_libraries(example PRIVATE finnc_core finnc_options Threads::Threads OpenCL xrt_coreutil uuid finnc_utils finn_config ${Boost_LIBRARIES} nlohmann_json::nlohmann_json OpenMP::OpenMP_CXX)
+target_link_directories(example PRIVATE ${XRT_LIB_CORE_LOCATION} ${XRT_LIB_OCL_LOCATION})
+target_link_libraries(example PRIVATE finnc_core finnc_options Threads::Threads OpenCL xrt_coreutil uuid finnc_utils finn_config nlohmann_json::nlohmann_json OpenMP::OpenMP_CXX)
 ```
 
 ### Known Issues

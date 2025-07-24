@@ -20,17 +20,6 @@ FINN+ on the other hand will configure and build the driver for you completely a
 ### Using the driver
 
 You can either use the driver as a standalone executable or as a library. For the use of the C++ driver as a library, please have a look at the section for [library use](#using-the-driver-as-a-library).
-If you just want to use the C++ driver for FINN as an alternative for the default PYNQ driver, it is now possible to directly generate the C++ driver and all of its configutation files from [FINN](https://github.com/Xilinx/finn) and [FINN+](https://github.com/eki-project/finn-plus)!
-
-Just select `build_cfg.DataflowOutputType.CPP_DRIVER` instead of `build_cfg.DataflowOutputType.PYNQ_DRIVER` in your build script in `generate_outputs`.
-
-FINN will then generate all config files for you. For FINN it is then necessary to build the driver yourself. See section [Building the Driver](#building-the-driver).
-
-FINN+ on the other hand will configure and build the driver for you completely automatically. We would therefore recommend using FINN+ instead of standard FINN.
-
-### Using the driver
-
-You can either use the driver as a standalone executable or as a library. For the use of the C++ driver as a library, please have a look at the section for [library use](#using-the-driver-as-a-library).
 
 If you ever need help on which arguments the driver requires, simply use the ```--help``` flag on the driver. The executable for the driver is, by default, located in the `build/bin` folder after compiling the driver.
 

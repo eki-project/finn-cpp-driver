@@ -112,6 +112,89 @@ set(JSON_BuildTests OFF CACHE INTERNAL "")
 add_subdirectory(external/json)
 include_directories(SYSTEM external/json/include/)
 
+#Python
+# Python from Conda environment
+if(DEFINED ENV{CONDA_PREFIX})
+    message(STATUS "Conda environment detected: $ENV{CONDA_PREFIX}")
+    
+    # Clear any cached Python variables
+    unset(Python_EXECUTABLE CACHE)
+    unset(Python_LIBRARIES CACHE)
+    unset(Python_INCLUDE_DIRS CACHE)
+    unset(PYTHON_EXECUTABLE CACHE)
+    unset(PYTHONINTERP_FOUND CACHE)
+    
+    # Construct the exact path to the Python executable in the active environment
+    if(WIN32)
+        set(ENV_PYTHON_EXECUTABLE "$ENV{CONDA_PREFIX}/python.exe")
+    else()
+        set(ENV_PYTHON_EXECUTABLE "$ENV{CONDA_PREFIX}/bin/python")
+    endif()
+    
+    # Verify the Python executable exists
+    if(EXISTS ${ENV_PYTHON_EXECUTABLE})
+        message(STATUS "Using Python interpreter: ${ENV_PYTHON_EXECUTABLE}")
+        # Force CMake to use our specified Python
+        set(Python_EXECUTABLE ${ENV_PYTHON_EXECUTABLE} CACHE FILEPATH "Python Interpreter" FORCE)
+        set(PYTHON_EXECUTABLE ${ENV_PYTHON_EXECUTABLE} CACHE FILEPATH "Python Interpreter" FORCE)
+        set(PYTHONINTERP_FOUND TRUE)
+        
+        # Get Python version directly
+        execute_process(
+            COMMAND ${ENV_PYTHON_EXECUTABLE} -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"
+            OUTPUT_VARIABLE PYTHON_VERSION
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+        )
+        message(STATUS "Python version (direct check): ${PYTHON_VERSION}")
+        
+        # Set Python paths explicitly
+        execute_process(
+            COMMAND ${ENV_PYTHON_EXECUTABLE} -c "import sysconfig; print(sysconfig.get_path('include'))"
+            OUTPUT_VARIABLE PYTHON_INCLUDE_DIR
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+        )
+        
+        execute_process(
+            COMMAND ${ENV_PYTHON_EXECUTABLE} -c "import sysconfig; print(sysconfig.get_config_var('LIBDIR'))"
+            OUTPUT_VARIABLE PYTHON_LIBRARY_DIR
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+        )
+        
+        # Set these variables to guide find_package
+        set(Python_ROOT_DIR "$ENV{CONDA_PREFIX}" CACHE PATH "Python Root" FORCE)
+        set(Python_INCLUDE_DIR "${PYTHON_INCLUDE_DIR}" CACHE PATH "Python Include Dir" FORCE)
+        set(Python_LIBRARY_DIR "${PYTHON_LIBRARY_DIR}" CACHE PATH "Python Library Dir" FORCE)
+        
+        # Force CMake to not look elsewhere
+        set(Python_FIND_REGISTRY NEVER CACHE STRING "Don't use registry" FORCE)
+        set(Python_FIND_FRAMEWORK NEVER CACHE STRING "Don't use framework" FORCE)
+        set(Python_FIND_VIRTUALENV ONLY CACHE STRING "Only use virtualenv" FORCE)
+        set(Python_FIND_STRATEGY LOCATION CACHE STRING "Find by location" FORCE)
+    else()
+        message(WARNING "Python executable not found at ${ENV_PYTHON_EXECUTABLE}")
+    endif()
+    
+    # Find Python package with our constraints
+    find_package(Python 3.10 REQUIRED COMPONENTS Interpreter Development)
+    
+    # Verify we found the correct Python
+    message(STATUS "Found Python executable: ${Python_EXECUTABLE}")
+    message(STATUS "Found Python version: ${Python_VERSION}")
+    message(STATUS "Found Python libraries: ${Python_LIBRARIES}")
+    message(STATUS "Found Python include dirs: ${Python_INCLUDE_DIRS}")
+    
+    # Double-check the paths match
+    if(NOT Python_EXECUTABLE STREQUAL ENV_PYTHON_EXECUTABLE)
+        message(WARNING "CMake is still using the wrong Python executable!")
+        message(WARNING "Expected: ${ENV_PYTHON_EXECUTABLE}")
+        message(WARNING "Found: ${Python_EXECUTABLE}")
+        message(FATAL_ERROR "Cannot continue with incorrect Python - please clear your CMake cache and try again")
+    endif()
+else()
+    message(WARNING "No active Conda environment detected!")
+    find_package(Python 3.10 REQUIRED COMPONENTS Interpreter Development)
+endif()
+
 # Custom paths for the unittest configuration and the header for in-use compilation
 if(DEFINED FINN_CUSTOM_UNITTEST_CONFIG)
     message(STATUS "Added custom unittest config path (${FINN_CUSTOM_UNITTEST_CONFIG})!")

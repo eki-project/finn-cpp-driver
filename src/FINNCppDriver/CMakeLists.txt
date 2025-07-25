@@ -3,6 +3,16 @@ add_subdirectory(core)
 add_subdirectory(config) 
 
 add_executable(finnhpc FINNDriver.cpp)
+
+add_custom_target(
+ genHeader ALL
+ COMMAND ${PYTHON_EXECUTABLE} ${FINN_BASE_DIR}/scripts/generateQuantHeader.py
+ BYPRODUCTS hostParameters.h
+ COMMENT "Generating enums"
+)
+
+add_dependencies(finnhpc genHeader)
+
 target_include_directories(finnhpc SYSTEM PRIVATE ${XRT_INCLUDE_DIRS})
 target_include_directories(finnhpc PRIVATE ${FINN_SRC_DIR})
 target_link_directories(finnhpc PRIVATE ${XRT_LIB_CORE_LOCATION} ${XRT_LIB_OCL_LOCATION})

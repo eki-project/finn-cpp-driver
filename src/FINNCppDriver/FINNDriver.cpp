@@ -46,6 +46,8 @@
 #include <xtensor/io/xnpy.hpp>                    // for dump_npy, ...
 #include <xtl/xiterator_base.hpp>                 // for operator!=
 
+#include "hostComputation.h"
+
 
 // Created by FINN during compilation
 // Use the default testing Driver type when none is specified.

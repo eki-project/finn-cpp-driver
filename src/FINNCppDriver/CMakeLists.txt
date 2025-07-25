@@ -8,7 +8,7 @@ add_custom_target(
  genHeader ALL
  COMMAND ${PYTHON_EXECUTABLE} ${FINN_BASE_DIR}/scripts/generateQuantHeader.py
  BYPRODUCTS hostParameters.h
- COMMENT "Generating enums"
+ COMMENT "Generating host Parameters header file"
 )
 
 add_dependencies(finnhpc genHeader)

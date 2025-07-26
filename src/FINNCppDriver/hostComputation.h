@@ -1,9 +1,12 @@
 #ifndef HOSTCOMPUTATION_H
 #define HOSTCOMPUTATION_H
 
-#include <vector>
-#include <functional>
+#include <immintrin.h>  // For AVX/AVX2 intrinsics
+
 #include <cstdint>
+#include <functional>
+#include <vector>
+
 #include "../../hostParameters.h"
 
 static constexpr float a = 254 / (thresholds[254] - thresholds[0]);
@@ -65,5 +68,50 @@ std::vector<int8_t> multithresholdLinearPerTensor(const std::vector<float> &inp)
 
   return ret;
 }
+
+std::vector<float> multiplyAdd(const std::vector<int8_t> &inp) {
+    static constexpr size_t N = addVec.size();
+    // inp.size() is guaranteed to be a multiple of N
+    std::vector<float> ret(inp.size());
+
+    // Use raw pointers with __restrict to help compiler optimize
+    const int8_t* __restrict inpPtr = inp.data();
+    float* __restrict retPtr = ret.data();
+
+    const size_t totalElements = inp.size();
+
+// Since N is small, fully unroll the inner loop
+#pragma omp simd
+    for (size_t i = 0; i < totalElements; i += N) {
+        // Manual unrolling for common small N values
+        if constexpr (N >= 1)
+            retPtr[i] = inpPtr[i] * scalingValue + addVec[0];
+        if constexpr (N >= 2)
+            retPtr[i + 1] = inpPtr[i + 1] * scalingValue + addVec[1];
+        if constexpr (N >= 3)
+            retPtr[i + 2] = inpPtr[i + 2] * scalingValue + addVec[2];
+        if constexpr (N >= 4)
+            retPtr[i + 3] = inpPtr[i + 3] * scalingValue + addVec[3];
+        if constexpr (N >= 5)
+            retPtr[i + 4] = inpPtr[i + 4] * scalingValue + addVec[4];
+        if constexpr (N >= 6)
+            retPtr[i + 5] = inpPtr[i + 5] * scalingValue + addVec[5];
+        if constexpr (N >= 7)
+            retPtr[i + 6] = inpPtr[i + 6] * scalingValue + addVec[6];
+        if constexpr (N >= 8)
+            retPtr[i + 7] = inpPtr[i + 7] * scalingValue + addVec[7];
+
+        // For N > 8, handle remaining elements
+        if constexpr (N > 8) {
+            for (size_t j = 8; j < N; ++j) {
+                retPtr[i + j] = inpPtr[i + j] * scalingValue + addVec[j];
+            }
+        }
+    }
+
+    return ret;
+}
+
+
 
 #endif /* HOSTCOMPUTATION_H */

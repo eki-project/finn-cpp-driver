@@ -12,7 +12,7 @@ intermediateModelsFolder = None
 
 for folder in cppDriverRoot.parents:
     for dirs in folder.iterdir():
-        if dirs.is_dir() == False:
+        if not dirs.is_dir():
             continue
         if dirs.name == "intermediate_models":
             intermediateModelsFolder = dirs
@@ -76,7 +76,7 @@ cppHeader = f"""
 
 constexpr std::array<float, 255> thresholds = {{{thresholdString}}};
 
-constexpr std::array<float, 5> addVec = {{{addVecString}}};
+constexpr std::array<float, {len(add_vec)}> addVec = {{{addVecString}}};
 
 constexpr float scalingValue = {scaling_val}f;
 

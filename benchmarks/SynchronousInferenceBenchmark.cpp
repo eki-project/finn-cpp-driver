@@ -69,14 +69,21 @@ static void BM_SynchronousInferenceSingleThread(benchmark::State& state) {
             benchmark::DoNotOptimize(results);
             ++processedCount;
         }
+        const auto end = std::chrono::high_resolution_clock::now();
+
         std::size_t infered = processedCount * batchSize;
 
-        // Report items processed in this iteration
+        auto elapsed_seconds =
+        std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
+
+        state.SetIterationTime(elapsed_seconds.count());
         state.SetItemsProcessed(static_cast<int64_t>(infered));
     }
+
+    std::cout << state.iterations() << "\n";
 }
 
 // Register the function as a benchmark
-BENCHMARK(BM_SynchronousInferenceSingleThread)->RangeMultiplier(2)->Range(1, 4096)->Repetitions(5);
+BENCHMARK(BM_SynchronousInferenceSingleThread)->RangeMultiplier(2)->Range(1, 4096)->Repetitions(5)->UseManualTime();
 
 BENCHMARK_MAIN();

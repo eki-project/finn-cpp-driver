@@ -18,6 +18,9 @@
 #include <cstdint>
 #include <random>
 #include <vector>
+#include <Profiler.h>
+#include <stdlib.h>
+#include <FINNCppDriver/hostComputation.h>
 
 template<typename O>
 using destribution_t = typename std::conditional_t<std::is_same_v<O, float>, std::uniform_real_distribution<O>, std::uniform_int_distribution<O>>;
@@ -35,12 +38,14 @@ Finn::Driver<SynchronousInference> createDriverFromConfig(const std::filesystem:
     return Finn::Driver<SynchronousInference>(configFilePath, batchSize);
 }
 
+using namespace pybind11::literals; // to bring in the `_a` literal
+
 static void BM_SynchronousInferenceSingleThread(benchmark::State& state) {
     const std::string exampleNetworkConfig = "jetConfig.json";
     const uint batchSize = static_cast<uint>(state.range(0));
     std::cout << "Running single-threaded benchmark with batch size: " << batchSize << std::endl;
     auto driver = createDriverFromConfig<true>(exampleNetworkConfig, batchSize);
-    using dtype = int8_t;
+    using dtype = float;
 
     // Create buffers for pipelining
     std::vector<dtype> inputBuffer(24 * batchSize);
@@ -52,38 +57,49 @@ static void BM_SynchronousInferenceSingleThread(benchmark::State& state) {
     // Fill all buffers with random data
     std::generate(inputBuffer.begin(), inputBuffer.end(), [&dist, &mersenneEngine]() { return dist(mersenneEngine); });
 
+    auto intbuffer = multithresholdLinearPerTensor(inputBuffer);
+
     // Warmup
-    auto warmup = driver.inferSynchronous(inputBuffer.begin(), inputBuffer.end());
+    auto warmup = driver.inferSynchronous(intbuffer.begin(), intbuffer.end());
     benchmark::DoNotOptimize(warmup);
+
+
+    Profiler profiler("../../external/NNenergyprofiler/configs/HACCConfig.py", "./out", "packed_"+std::to_string(batchSize));
 
     std::chrono::duration<float> runtime = std::chrono::seconds(90);  // Fixed runtime for the benchmark
 
+    size_t i = 0;
     for (auto _ : state) {
         std::size_t processedCount = 0;
+        profiler.start();
 
         // Set a fixed time for the benchmark
         const auto start = std::chrono::high_resolution_clock::now();
 
         while (std::chrono::high_resolution_clock::now() - start < std::chrono::duration<float>(runtime)) {
-            auto results = driver.inferSynchronous(inputBuffer.begin(), inputBuffer.end());
-            benchmark::DoNotOptimize(results);
+            auto intbuffer = multithresholdLinearPerTensor(inputBuffer);
+            auto results = driver.inferSynchronous(intbuffer.begin(), intbuffer.end());
+            auto output = multiplyAdd(results);
+            benchmark::DoNotOptimize(output);
             ++processedCount;
         }
         const auto end = std::chrono::high_resolution_clock::now();
 
-        std::size_t infered = processedCount * batchSize;
+        std::size_t inferred = processedCount * batchSize;
 
         auto elapsed_seconds =
         std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
 
-        state.SetIterationTime(elapsed_seconds.count());
-        state.SetItemsProcessed(static_cast<int64_t>(infered));
-    }
+        double throughput = static_cast<double>(inferred) / (static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed_seconds).count()) * 1e-9);
 
-    std::cout << state.iterations() << "\n";
+        profiler.stop("runtime-"+std::to_string(i++), throughput, inferred);
+
+        state.SetIterationTime(elapsed_seconds.count());
+        state.SetItemsProcessed(static_cast<int64_t>(inferred));
+    }
 }
 
 // Register the function as a benchmark
-BENCHMARK(BM_SynchronousInferenceSingleThread)->RangeMultiplier(2)->Range(1, 4096)->Repetitions(5)->UseManualTime();
+BENCHMARK(BM_SynchronousInferenceSingleThread)->RangeMultiplier(2)->Range(1, 4096)->Iterations(30)->UseManualTime();
 
 BENCHMARK_MAIN();

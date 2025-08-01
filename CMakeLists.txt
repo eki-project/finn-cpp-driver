@@ -101,11 +101,6 @@ include_directories(SYSTEM external/xtl/include)
 add_subdirectory(external/xtensor)
 include_directories(SYSTEM external/xtensor/include)
 
-#NNenergyprofiler
-find_package(pybind11 REQUIRED)
-add_subdirectory(external/NNenergyprofiler/cpp)
-include_directories(SYSTEM external/NNenergyprofiler/cpp)
-
 #Nlohmann json
 
 set(JSON_BuildTests OFF CACHE INTERNAL "")
@@ -194,6 +189,13 @@ else()
     message(WARNING "No active Conda environment detected!")
     find_package(Python 3.10 REQUIRED COMPONENTS Interpreter Development)
 endif()
+
+#NNenergyprofiler
+set(PATH "$ENV{CONDA_PREFIX}")
+message(STATUS "Using custom path for pybind: ${PATH}")
+find_package(pybind11 3.0 CONFIG REQUIRED PATHS ${PATH} NO_DEFAULT_PATH NO_SYSTEM_ENVIRONMENT_PATH)
+#add_subdirectory(external/NNenergyprofiler/cpp)
+include_directories(SYSTEM external/NNenergyprofiler/cpp)
 
 # Custom paths for the unittest configuration and the header for in-use compilation
 if(DEFINED FINN_CUSTOM_UNITTEST_CONFIG)

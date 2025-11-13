@@ -16,7 +16,7 @@ workflow:
 
 .load-modules:
   before_script:
-    - ml vis/Graphviz/8.1.0-GCCcore-12.3.0 fpga xilinx/xrt/2.16 devel/Doxygen/1.9.8-GCCcore-13.2.0 compiler/GCC/13.3.0 devel/CMake/3.29.3-GCCcore-13.3.0
+    - ml fpga xilinx/xrt/2.16 devel/Doxygen/1.14.0-GCCcore-14.3.0 compiler/GCC/13.3.0 devel/CMake/4.0.3-GCCcore-14.3.0
 init-repo:
   id_tokens:
     CI_JOB_JWT:
@@ -24,7 +24,7 @@ init-repo:
   stage: prepare
   variables:
     #SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 2:00:00 -N 1 -n 1 --cpus-per-task=128"
-    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p hacc -t 0:05:00"
+    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p fpga --nodelist=fpga1610 -N 1 -n 1 --cpus-per-task=128 -t 0:05:00"
   extends: .load-modules
   script:
     - git submodule update --init --recursive
@@ -42,7 +42,7 @@ build-unittests:
     - init-repo
   variables:
     #SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 2:00:00 -N 1 -n 1 --cpus-per-task=128"
-    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p hacc -t 2:00:00"
+    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p fpga --nodelist=fpga1610 -N 1 -n 1 --cpus-per-task=128 -t 2:00:00"
   extends: .load-modules
   script:
     - mkdir build && cd build
@@ -62,7 +62,7 @@ build-integrationtests:
     - init-repo
   variables:
     #SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 2:00:00 -N 1 -n 1 --cpus-per-task=128"
-    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p hacc -t 2:00:00"
+    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p fpga --nodelist=fpga1610 -N 1 -n 1 --cpus-per-task=128 -t 2:00:00"
   extends: .load-modules
   script:
     - mkdir build-host-mem && cd build-host-mem
@@ -87,7 +87,7 @@ build-regressiontests:
     - init-repo
   variables:
     #SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 2:00:00 -N 1 -n 1 --cpus-per-task=128"
-    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p hacc -t 2:00:00"
+    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p fpga --nodelist=fpga1610 -N 1 -n 1 --cpus-per-task=128 -t 2:00:00"
   extends: .load-modules
   script:
     - mkdir build && cd build
@@ -105,10 +105,9 @@ lint:
   stage: prepare
   variables:
     #SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 0:30:00 -N 1 -n 1 --cpus-per-task=2 --mem-per-cpu=2G"
-    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p hacc -t 2:00:00"
+    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p fpga --nodelist=fpga1610 -N 1 -n 1 --cpus-per-task=128 -t 2:00:00"
   script:
-    - ml lang
-    - ml Python/3.10.4-GCCcore-11.3.0
+    - ml lang/Python/3.13.5-GCCcore-14.3.0
     - command -v clang-format >/dev/null 2>&1 || pip3 install --user clang-format
     - find ./src \( -name \*.cpp -o -name \*.h -o -name \*.hpp \) -print0 | xargs -0 -n 1 /pc2/users/e/ekiappci/.local/bin/clang-format -style=file --Werror -n --verbose
     - find ./unittests \( -name \*.cpp -o -name \*.h -o -name \*.hpp \) -print0 | xargs -0 -n 1 /pc2/users/e/ekiappci/.local/bin/clang-format -style=file --Werror -n --verbose
@@ -124,7 +123,7 @@ run-unittests:
     - init-repo
   variables:
     #SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 0:30:00 -N 1 -n 1 --cpus-per-task=2 --mem-per-cpu=2G"
-    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p hacc -t 2:00:00"
+    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p fpga --nodelist=fpga1610 -N 1 -n 1 --cpus-per-task=128 -t 2:00:00"
   extends: .load-modules
   script:
     - export LD_LIBRARY_PATH="$(pwd)/build/libs:$LD_LIBRARY_PATH"
@@ -147,19 +146,21 @@ run-integrationtests:
     - build-integrationtests
     - init-repo
   variables:
-    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p hacc  -t 0:30:00"
+    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p fpga --nodelist=fpga1610 -N 1 -n 1 --cpus-per-task=128 -t 2:00:00"
   extends: .load-modules
   script:
     - export LD_LIBRARY_PATH="$(pwd)/build/libs:$LD_LIBRARY_PATH"
     # Reset FPGAs and setup Host Memory Access
-    - ml xilinx/u55c/u55c_gen3x16_xdma_3_202210_1
-    - xbutil reset -d 0000:c1:00.1
-    - xbutil reset -d 0000:81:00.1
-    - sudo /opt/software/FPGA/scripts/u280/host_memory/enable_hostmem_single_fpga.sh 0000:c1:00.1
-    - /opt/software/FPGA/scripts/u280/host_memory/verify_single_fpga.sh 0000:c1:00.1
-    - sudo /opt/software/FPGA/scripts/u280/host_memory/enable_hostmem_single_fpga.sh 0000:81:00.1
-    - /opt/software/FPGA/scripts/u280/host_memory/verify_single_fpga.sh 0000:81:00.1
-
+    - xbutil reset -d 0000:61:00.1
+    - xbutil reset -d 0000:71:00.1
+    - xbutil reset -d 0000:91:00.1
+    - sudo /opt/software/FPGA/scripts/u280/host_memory/enable_hostmem_single_fpga.sh 0000:61:00.1
+    - /opt/software/FPGA/scripts/u280/host_memory/verify_single_fpga.sh 0000:61:00.1
+    - sudo /opt/software/FPGA/scripts/u280/host_memory/enable_hostmem_single_fpga.sh 0000:71:00.1
+    - /opt/software/FPGA/scripts/u280/host_memory/verify_single_fpga.sh 0000:71:00.1
+    - sudo /opt/software/FPGA/scripts/u280/host_memory/enable_hostmem_single_fpga.sh 0000:91:00.1
+    - /opt/software/FPGA/scripts/u280/host_memory/verify_single_fpga.sh 0000:91:00.1
+    
     - cd build-host-mem/integrationtest
     # Test Synchronous Inference with Host memory
     - cp ../../example_networks/jet-structure-classification-with-host-mem/* .
@@ -167,8 +168,9 @@ run-integrationtests:
     - ./AsyncInference
 
     # Reset FPGAs again
-    - xbutil reset -d 0000:c1:00.1
-    - xbutil reset -d 0000:81:00.1
+    - xbutil reset -d 0000:61:00.1
+    - xbutil reset -d 0000:71:00.1
+    - xbutil reset -d 0000:91:00.1
 
     # Test Synchronous Inference without Host memory
     - cd ../../build-no-host-mem/integrationtest
@@ -186,18 +188,21 @@ run-regressiontests:
     - init-repo
   variables:
     #SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 0:30:00 -N 1 -n 1 --cpus-per-task=2 --mem-per-cpu=2G"
-    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p hacc -t 10:00:00"
+    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p fpga --nodelist=fpga1610 -N 1 -n 1 --cpus-per-task=128 -t 10:00:00"
   extends: .load-modules
   script:
     - export LD_LIBRARY_PATH="$(pwd)/build/libs:$LD_LIBRARY_PATH"
+    
     # Reset FPGAs and setup Host Memory Access
-    - ml xilinx/u55c/u55c_gen3x16_xdma_3_202210_1
-    - xbutil reset -d 0000:c1:00.1
-    - xbutil reset -d 0000:81:00.1
-    - sudo /opt/software/FPGA/scripts/u280/host_memory/enable_hostmem_single_fpga.sh 0000:c1:00.1
-    - /opt/software/FPGA/scripts/u280/host_memory/verify_single_fpga.sh 0000:c1:00.1
-    - sudo /opt/software/FPGA/scripts/u280/host_memory/enable_hostmem_single_fpga.sh 0000:81:00.1
-    - /opt/software/FPGA/scripts/u280/host_memory/verify_single_fpga.sh 0000:81:00.1
+    - xbutil reset -d 0000:61:00.1
+    - xbutil reset -d 0000:71:00.1
+    - xbutil reset -d 0000:91:00.1
+    - sudo /opt/software/FPGA/scripts/u280/host_memory/enable_hostmem_single_fpga.sh 0000:61:00.1
+    - /opt/software/FPGA/scripts/u280/host_memory/verify_single_fpga.sh 0000:61:00.1
+    - sudo /opt/software/FPGA/scripts/u280/host_memory/enable_hostmem_single_fpga.sh 0000:71:00.1
+    - /opt/software/FPGA/scripts/u280/host_memory/verify_single_fpga.sh 0000:71:00.1
+    - sudo /opt/software/FPGA/scripts/u280/host_memory/enable_hostmem_single_fpga.sh 0000:91:00.1
+    - /opt/software/FPGA/scripts/u280/host_memory/verify_single_fpga.sh 0000:91:00.1
 
     - cd build/benchmarks
     - cp ../../example_networks/jet-structure-classification-with-host-mem/* .

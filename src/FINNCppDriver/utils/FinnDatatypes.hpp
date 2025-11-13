@@ -337,7 +337,7 @@ namespace Finn {
          *
          */
         // NOLINTNEXTLINE
-        constexpr ~DatatypeFloat() override{};  //{} instead of default because compiler bug
+        constexpr ~DatatypeFloat() override {};  //{} instead of default because compiler bug
         /**
          * @brief Default move constructor
          *
@@ -430,7 +430,7 @@ namespace Finn {
          *
          */
         // NOLINTNEXTLINE
-        constexpr ~DatatypeInt() override{};  //{} instead of default because compiler bug
+        constexpr ~DatatypeInt() override {};  //{} instead of default because compiler bug
         /**
          * @brief Default move constructor
          *
@@ -523,7 +523,7 @@ namespace Finn {
          *
          */
         // NOLINTNEXTLINE
-        constexpr ~DatatypeFixed() override{};  //{} instead of default because compiler bug
+        constexpr ~DatatypeFixed() override {};  //{} instead of default because compiler bug
         /**
          * @brief Default move constructor
          *
@@ -629,7 +629,7 @@ namespace Finn {
          * @brief Default destructor
          *
          */
-        constexpr ~DatatypeUInt() override{};  //{} instead of default because compiler bug
+        constexpr ~DatatypeUInt() override {};  //{} instead of default because compiler bug
         /**
          * @brief Default move constructor
          *
@@ -726,7 +726,7 @@ namespace Finn {
          *
          */
         // NOLINTNEXTLINE
-        constexpr ~DatatypeBipolar() override{};  //{} instead of default because compiler bug
+        constexpr ~DatatypeBipolar() override {};  //{} instead of default because compiler bug
         /**
          * @brief Default move constructor
          *
@@ -820,7 +820,7 @@ namespace Finn {
          *
          */
         // NOLINTNEXTLINE
-        constexpr ~DatatypeTernary() override{};  //{} instead of default because compiler bug
+        constexpr ~DatatypeTernary() override {};  //{} instead of default because compiler bug
         /**
          * @brief Default move constructor
          *

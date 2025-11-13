@@ -76,7 +76,7 @@ namespace xrt {
          *  Data to write
          *
          */
-        void write_register(uint32_t offset, uint32_t data){};
+        void write_register(uint32_t offset, uint32_t data) {};
 
         /**
          * read_register() - Read data from ip address range

@@ -276,7 +276,7 @@ namespace Finn {
         AsyncDeviceOutputBuffer(const std::string& pCUName, xrt::device& device, xrt::uuid& pDevUUID, const shapePacked_t& pShapePacked, unsigned int batchSize)
             : DeviceOutputBuffer<T>(pCUName, device, pDevUUID, pShapePacked, batchSize),
               detail::AsyncBufferWrapper<T>(2 * batchSize * FinnUtils::shapeToElements(pShapePacked)),  // Make output buffer map twice as large to circumvent a very rare deadlock in the case where one thread handles IO alone.
-              workerThread(std::jthread(std::bind_front(&AsyncDeviceOutputBuffer::readInternal, this))){};
+              workerThread(std::jthread(std::bind_front(&AsyncDeviceOutputBuffer::readInternal, this))) {};
 
         /**
          * @brief Construct a new Async Device Output Buffer object (Move constructor)

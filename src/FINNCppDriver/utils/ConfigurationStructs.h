@@ -104,7 +104,7 @@ namespace Finn {
          * @param pKernelName Name of kernel
          * @param pPackedShape Input shape of kernel
          */
-        BufferDescriptor(const std::string& pKernelName, const shape_t& pPackedShape) : kernelName(pKernelName), packedShape(pPackedShape){};
+        BufferDescriptor(const std::string& pKernelName, const shape_t& pPackedShape) : kernelName(pKernelName), packedShape(pPackedShape) {};
         /**
          * @brief Construct a new Buffer Descriptor object (Move constructor)
          *
@@ -154,7 +154,7 @@ namespace Finn {
          * @param pFoldedShape Internal reshaped form
          */
         ExtendedBufferDescriptor(const std::string& pKernelName, const shape_t& pPackedShape, const shape_t& pNormalShape, const shape_t& pFoldedShape)
-            : BufferDescriptor(pKernelName, pPackedShape), normalShape(pNormalShape), foldedShape(pFoldedShape){};
+            : BufferDescriptor(pKernelName, pPackedShape), normalShape(pNormalShape), foldedShape(pFoldedShape) {};
 
         /**
          * @brief Input shape of neural network
@@ -203,7 +203,7 @@ namespace Finn {
          * @param pOdmas List of odma descriptions for this device
          */
         DeviceWrapper(const std::filesystem::path& pXclbin, const unsigned int pXrtDeviceIndex, const std::vector<std::shared_ptr<BufferDescriptor>>& pIdmas, const std::vector<std::shared_ptr<BufferDescriptor>>& pOdmas)
-            : xclbin(pXclbin), xrtDeviceIndex(pXrtDeviceIndex), idmas(pIdmas), odmas(pOdmas){};
+            : xclbin(pXclbin), xrtDeviceIndex(pXrtDeviceIndex), idmas(pIdmas), odmas(pOdmas) {};
 
         /**
          * @brief Construct a new Device Wrapper object

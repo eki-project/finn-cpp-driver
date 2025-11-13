@@ -203,6 +203,7 @@ run-regressiontests:
     - /opt/software/FPGA/scripts/u55c/host_memory/verify_single_fpga.sh 0000:71:00.1
     - sudo /opt/software/FPGA/scripts/u55c/host_memory/enable_hostmem_single_fpga.sh 0000:91:00.1
     - /opt/software/FPGA/scripts/u55c/host_memory/verify_single_fpga.sh 0000:91:00.1
+    - ml lang/SciPy-bundle/2025.06-gfbf-2025a
 
     - cd build/benchmarks
     - cp ../../example_networks/jet-structure-classification-with-host-mem/* .

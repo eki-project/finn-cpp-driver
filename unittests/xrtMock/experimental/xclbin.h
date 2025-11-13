@@ -13,7 +13,7 @@ namespace xrt {
         xclbin() = default;
         xclbin(xclbin&&) = default;
         xclbin(const xclbin&) = default;
-        explicit xclbin(const std::string& filename){};
+        explicit xclbin(const std::string& filename) {};
         xclbin& operator=(xclbin&&) = default;
         xclbin& operator=(const xclbin&) = default;
         ~xclbin() = default;

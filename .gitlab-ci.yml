@@ -154,12 +154,12 @@ run-integrationtests:
     - xbutil reset -d 0000:61:00.1
     - xbutil reset -d 0000:71:00.1
     - xbutil reset -d 0000:91:00.1
-    - sudo /opt/software/FPGA/scripts/u280/host_memory/enable_hostmem_single_fpga.sh 0000:61:00.1
-    - /opt/software/FPGA/scripts/u280/host_memory/verify_single_fpga.sh 0000:61:00.1
-    - sudo /opt/software/FPGA/scripts/u280/host_memory/enable_hostmem_single_fpga.sh 0000:71:00.1
-    - /opt/software/FPGA/scripts/u280/host_memory/verify_single_fpga.sh 0000:71:00.1
-    - sudo /opt/software/FPGA/scripts/u280/host_memory/enable_hostmem_single_fpga.sh 0000:91:00.1
-    - /opt/software/FPGA/scripts/u280/host_memory/verify_single_fpga.sh 0000:91:00.1
+    - sudo /opt/software/FPGA/scripts/u55c/host_memory/enable_hostmem_single_fpga.sh 0000:61:00.1
+    - /opt/software/FPGA/scripts/u55c/host_memory/verify_single_fpga.sh 0000:61:00.1
+    - sudo /opt/software/FPGA/scripts/u55c/host_memory/enable_hostmem_single_fpga.sh 0000:71:00.1
+    - /opt/software/FPGA/scripts/u55c/host_memory/verify_single_fpga.sh 0000:71:00.1
+    - sudo /opt/software/FPGA/scripts/u55c/host_memory/enable_hostmem_single_fpga.sh 0000:91:00.1
+    - /opt/software/FPGA/scripts/u55c/host_memory/verify_single_fpga.sh 0000:91:00.1
     
     - cd build-host-mem/integrationtest
     # Test Synchronous Inference with Host memory
@@ -197,12 +197,12 @@ run-regressiontests:
     - xbutil reset -d 0000:61:00.1
     - xbutil reset -d 0000:71:00.1
     - xbutil reset -d 0000:91:00.1
-    - sudo /opt/software/FPGA/scripts/u280/host_memory/enable_hostmem_single_fpga.sh 0000:61:00.1
-    - /opt/software/FPGA/scripts/u280/host_memory/verify_single_fpga.sh 0000:61:00.1
-    - sudo /opt/software/FPGA/scripts/u280/host_memory/enable_hostmem_single_fpga.sh 0000:71:00.1
-    - /opt/software/FPGA/scripts/u280/host_memory/verify_single_fpga.sh 0000:71:00.1
-    - sudo /opt/software/FPGA/scripts/u280/host_memory/enable_hostmem_single_fpga.sh 0000:91:00.1
-    - /opt/software/FPGA/scripts/u280/host_memory/verify_single_fpga.sh 0000:91:00.1
+    - sudo /opt/software/FPGA/scripts/u55c/host_memory/enable_hostmem_single_fpga.sh 0000:61:00.1
+    - /opt/software/FPGA/scripts/u55c/host_memory/verify_single_fpga.sh 0000:61:00.1
+    - sudo /opt/software/FPGA/scripts/u55c/host_memory/enable_hostmem_single_fpga.sh 0000:71:00.1
+    - /opt/software/FPGA/scripts/u55c/host_memory/verify_single_fpga.sh 0000:71:00.1
+    - sudo /opt/software/FPGA/scripts/u55c/host_memory/enable_hostmem_single_fpga.sh 0000:91:00.1
+    - /opt/software/FPGA/scripts/u55c/host_memory/verify_single_fpga.sh 0000:91:00.1
 
     - cd build/benchmarks
     - cp ../../example_networks/jet-structure-classification-with-host-mem/* .

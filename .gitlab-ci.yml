@@ -16,7 +16,7 @@ workflow:
 
 .load-modules:
   before_script:
-    - ml fpga xilinx/xrt/2.16 devel/Doxygen/1.14.0-GCCcore-14.3.0 compiler/GCC/13.3.0 devel/CMake/4.0.3-GCCcore-14.3.0
+    - ml fpga xilinx/xrt/2.16 devel/Doxygen/1.14.0-GCCcore-14.3.0 compiler/GCC/14.3.0 devel/CMake/4.0.3-GCCcore-14.3.0
 init-repo:
   id_tokens:
     CI_JOB_JWT:

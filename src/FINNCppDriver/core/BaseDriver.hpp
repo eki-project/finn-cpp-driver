@@ -76,10 +76,19 @@ namespace Finn {
          */
         void initializeBaseDriver(uint batchSize) {
             accelerator = Accelerator(configuration.deviceWrappers, SynchronousInference, batchSize);
-            defaultInputDeviceIndex = configuration.deviceWrappers[0].xrtDeviceIndex;
-            defaultInputKernelName = configuration.deviceWrappers[0].idmas[0]->kernelName;
-            defaultOutputDeviceIndex = configuration.deviceWrappers[0].xrtDeviceIndex;
-            defaultOutputKernelName = configuration.deviceWrappers[0].odmas[0]->kernelName;
+
+            // Search for the first device containing IDMA and ODMA each
+            // TODO (all): This has to be changed for multi-IO cases
+            for (DeviceWrapper& deviceWrapper : configuration.deviceWrappers) {
+                if (deviceWrapper.idmas.size() > 0) {
+                    defaultInputDeviceIndex = deviceWrapper.xrtDeviceIndex;
+                    defaultInputKernelName = deviceWrapper.idmas[0]->kernelName;
+                }
+                if (deviceWrapper.odmas.size() > 0) {
+                    defaultOutputDeviceIndex = deviceWrapper.xrtDeviceIndex;
+                    defaultOutputKernelName = deviceWrapper.odmas[0]->kernelName;
+                }
+            }
             batchElements = batchSize;
 #ifdef UNITTEST
             logDriver();
@@ -172,6 +181,20 @@ namespace Finn {
          * @param index
          */
         void setDefaultOutputDeviceIndex(uint index) { defaultOutputDeviceIndex = index; }
+
+        /**
+         * @brief Get the default input device index
+         *
+         * @return uint
+         */
+        uint getDefaultInputDeviceIndex() const { return defaultInputDeviceIndex; }
+
+        /**
+         * @brief Get the default output device index
+         *
+         * @return uint
+         */
+        uint getDefaultOutputDeviceIndex() const { return defaultOutputDeviceIndex; }
 
         /**
          * @brief Set the Default Input Kernel Name
@@ -370,9 +393,9 @@ namespace Finn {
 
             auto result = infer(packed.begin(), packed.end(), inputDeviceIndex, inputBufferKernelName, outputDeviceIndex, outputBufferKernelName, batchElements);
 
-            static auto packedOutput = configuration.deviceWrappers[inputDeviceIndex].odmas[0]->packedShape;
+            static auto packedOutput = configuration.deviceWrappers[outputDeviceIndex].odmas[0]->packedShape;
             packedOutput[0] = batchElements;
-            static auto foldedOutput = static_cast<Finn::ExtendedBufferDescriptor*>(configuration.deviceWrappers[inputDeviceIndex].odmas[0].get())->foldedShape;
+            static auto foldedOutput = static_cast<Finn::ExtendedBufferDescriptor*>(configuration.deviceWrappers[outputDeviceIndex].odmas[0].get())->foldedShape;
             foldedOutput[0] = batchElements;
             const Finn::DynamicMdSpan reshapedOutput(result.begin(), result.end(), packedOutput);
             auto unpacked = Finn::unpackMultiDimensionalOutputs<S, Finn::vector<uint8_t>::iterator, false, V>(result.begin(), result.end(), reshapedOutput, foldedOutput);

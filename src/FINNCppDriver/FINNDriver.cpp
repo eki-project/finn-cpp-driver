@@ -139,7 +139,7 @@ using destribution_t = typename std::conditional_t<std::is_same_v<O, float>, std
  * @param batchSize Batch size for inference
  */
 template<typename T>
-void runThroughputTestImpl(Finn::Driver<true>& baseDriver, std::size_t elementCount, uint batchSize) {
+void runThroughputTestImpl(Finn::Driver<true>& baseDriver, std::size_t elementCount, uint batchSize, uint numTestruns) {
     using dtype = T;
     Finn::vector<dtype> testInputs(elementCount * batchSize);
 
@@ -150,15 +150,17 @@ void runThroughputTestImpl(Finn::Driver<true>& baseDriver, std::size_t elementCo
 
     auto gen = [&dist, &mersenneEngine]() { return dist(mersenneEngine); };
 
-    constexpr size_t nTestruns = 5000;
+    uint nTestruns = numTestruns;
     std::chrono::duration<double> sumRuntimeEnd2End{};
 
     // Warmup
+    std::cout << "Warmup..." << std::endl;
     std::fill(testInputs.begin(), testInputs.end(), 1);
     auto warmup = baseDriver.inferSynchronous(testInputs.begin(), testInputs.end());
     Finn::DoNotOptimize(warmup);
 
     for (size_t i = 0; i < nTestruns; ++i) {
+        std::cout << "Sychronous inference (end2end measurement) " << i << " / " << nTestruns << std::endl;
         std::generate(testInputs.begin(), testInputs.end(), gen);
         const auto start = std::chrono::high_resolution_clock::now();
         auto ret = baseDriver.inferSynchronous(testInputs.begin(), testInputs.end());
@@ -173,9 +175,10 @@ void runThroughputTestImpl(Finn::Driver<true>& baseDriver, std::size_t elementCo
     std::chrono::duration<double> sumRuntimeReshaping{};
 
     for (size_t i = 0; i < nTestruns; ++i) {
+        std::cout << "Reshaping and packing measurements " << i << " / " << nTestruns << std::endl;
         std::generate(testInputs.begin(), testInputs.end(), gen);
         const auto start = std::chrono::high_resolution_clock::now();
-        static auto foldedShape = static_cast<Finn::ExtendedBufferDescriptor*>(baseDriver.getConfig().deviceWrappers[0].idmas[0].get())->foldedShape;
+        static auto foldedShape = static_cast<Finn::ExtendedBufferDescriptor*>(baseDriver.getConfig().deviceWrappers[baseDriver.getDefaultInputDeviceIndex()].idmas[0].get())->foldedShape;
         foldedShape[0] = batchSize;
         const Finn::DynamicMdSpan reshapedInput(testInputs.begin(), testInputs.end(), foldedShape);
         const auto reshape = std::chrono::high_resolution_clock::now();
@@ -187,12 +190,15 @@ void runThroughputTestImpl(Finn::Driver<true>& baseDriver, std::size_t elementCo
         sumRuntimePacking += (end - reshape);
     }
 
-    auto packedOutput = baseDriver.getConfig().deviceWrappers[0].odmas[0]->packedShape;
+    // TODO (all): This has to be updated for multi-IO cases (or if we don't specifically want ODMA #0)
+    shape_t packedOutput = baseDriver.getConfig().deviceWrappers[baseDriver.getDefaultOutputDeviceIndex()].odmas[0]->packedShape;
     packedOutput[0] = batchSize;
     std::vector<uint8_t> unpackingInputs(FinnUtils::shapeToElements(packedOutput));
     for (size_t i = 0; i < nTestruns; ++i) {
+        std::cout << "Unpacking " << i << " / " << nTestruns << std::endl;
         const auto start = std::chrono::high_resolution_clock::now();
-        auto foldedOutput = static_cast<Finn::ExtendedBufferDescriptor*>(baseDriver.getConfig().deviceWrappers[0].odmas[0].get())->foldedShape;
+        // TODO (all): This has to be updated for multi-IO cases (or if we don't specifically want ODMA #0)
+        auto foldedOutput = static_cast<Finn::ExtendedBufferDescriptor*>(baseDriver.getConfig().deviceWrappers[baseDriver.getDefaultOutputDeviceIndex()].odmas[0].get())->foldedShape;
         foldedOutput[0] = batchSize;
         const Finn::DynamicMdSpan reshapedOutput(unpackingInputs.begin(), unpackingInputs.end(), packedOutput);
         auto unpacked = Finn::unpackMultiDimensionalOutputs<OutputFinnType>(unpackingInputs.begin(), unpackingInputs.end(), reshapedOutput, foldedOutput);
@@ -220,11 +226,13 @@ void runThroughputTestImpl(Finn::Driver<true>& baseDriver, std::size_t elementCo
  * @param baseDriver
  * @param logger
  */
-void runThroughputTest(Finn::Driver<true>& baseDriver) {
+void runThroughputTest(Finn::Driver<true>& baseDriver, uint numTestruns) {
     FINN_LOG(loglevel::info) << finnMainLogPrefix() << "Device Information: ";
-    logDeviceInformation(baseDriver.getDeviceHandler(0).getDevice(), baseDriver.getConfig().deviceWrappers[0].xclbin);
+    // TODO (all): replace common call baseDriver.getConfig().deviceWrappers[baseDriver.getDefault...]... with a
+    // function in the base driver
+    logDeviceInformation(baseDriver.getDeviceHandler(baseDriver.getDefaultInputDeviceIndex()).getDevice(), baseDriver.getConfig().deviceWrappers[baseDriver.getDefaultInputDeviceIndex()].xclbin);
 
-    size_t elementcount = FinnUtils::shapeToElements((std::static_pointer_cast<Finn::ExtendedBufferDescriptor>(baseDriver.getConfig().deviceWrappers[0].idmas[0]))->normalShape);
+    size_t elementcount = FinnUtils::shapeToElements((std::static_pointer_cast<Finn::ExtendedBufferDescriptor>(baseDriver.getConfig().deviceWrappers[baseDriver.getDefaultInputDeviceIndex()].idmas[0]))->normalShape);
     uint batchSize = baseDriver.getBatchSize();
     FINN_LOG(loglevel::info) << finnMainLogPrefix() << "Input element count " << std::to_string(elementcount);
     FINN_LOG(loglevel::info) << finnMainLogPrefix() << "Batch size: " << batchSize;
@@ -232,10 +240,10 @@ void runThroughputTest(Finn::Driver<true>& baseDriver) {
     constexpr bool isInteger = InputFinnType().isInteger();
     if constexpr (isInteger) {
         using dtype = Finn::UnpackingAutoRetType::IntegralType<InputFinnType>;
-        runThroughputTestImpl<dtype>(baseDriver, elementcount, batchSize);
+        runThroughputTestImpl<dtype>(baseDriver, elementcount, batchSize, numTestruns);
         // benchmark each step in call chain for int
     } else {
-        runThroughputTestImpl<float>(baseDriver, elementcount, batchSize);
+        runThroughputTestImpl<float>(baseDriver, elementcount, batchSize, numTestruns);
     }
 }
 
@@ -252,7 +260,7 @@ void loadInferDump(Finn::Driver<true>& baseDriver, xt::detail::npy_file& loadedN
     auto xtensorArray = std::move(loadedNpyFile).cast<T, xt::layout_type::dynamic>();
     Finn::vector<T> vec(xtensorArray.begin(), xtensorArray.end());
     auto ret = baseDriver.inferSynchronous(vec.begin(), vec.end());
-    auto xarr = xt::adapt(ret, (std::static_pointer_cast<Finn::ExtendedBufferDescriptor>(baseDriver.getConfig().deviceWrappers[0].odmas[0]))->normalShape);
+    auto xarr = xt::adapt(ret, (std::static_pointer_cast<Finn::ExtendedBufferDescriptor>(baseDriver.getConfig().deviceWrappers[baseDriver.getDefaultOutputDeviceIndex()].odmas[0]))->normalShape);
     xt::dump_npy(outputFile, xarr);
 }
 
@@ -349,7 +357,7 @@ void inferUnsignedInteger(Finn::Driver<true>& baseDriver, xt::detail::npy_file& 
  */
 void runWithInputFile(Finn::Driver<true>& baseDriver, const std::vector<std::string>& inputFiles, const std::vector<std::string>& outputFiles) {
     FINN_LOG(loglevel::info) << finnMainLogPrefix() << "Running driver on input files";
-    logDeviceInformation(baseDriver.getDeviceHandler(0).getDevice(), baseDriver.getConfig().deviceWrappers[0].xclbin);
+    logDeviceInformation(baseDriver.getDeviceHandler(baseDriver.getDefaultInputDeviceIndex()).getDevice(), baseDriver.getConfig().deviceWrappers[baseDriver.getDefaultInputDeviceIndex()].xclbin);
 
     for (auto&& [inp, out] = std::tuple{inputFiles.begin(), outputFiles.begin()}; inp != inputFiles.end(); ++inp, ++out) {
         // load npy file and process it
@@ -377,7 +385,7 @@ void runWithInputFile(Finn::Driver<true>& baseDriver, const std::vector<std::str
                     auto xtensorArray = std::move(loadedFile).cast<bool, xt::layout_type::dynamic>();
                     Finn::vector<uint8_t> vec(xtensorArray.begin(), xtensorArray.end());
                     auto ret = baseDriver.inferSynchronous(vec.begin(), vec.end());
-                    auto xarr = xt::adapt(ret, (std::static_pointer_cast<Finn::ExtendedBufferDescriptor>(baseDriver.getConfig().deviceWrappers[0].odmas[0]))->normalShape);
+                    auto xarr = xt::adapt(ret, (std::static_pointer_cast<Finn::ExtendedBufferDescriptor>(baseDriver.getConfig().deviceWrappers[baseDriver.getDefaultOutputDeviceIndex()].odmas[0]))->normalShape);
                     xt::dump_npy(*out, xarr);
                     break;
                 }
@@ -419,6 +427,7 @@ int main(int argc, char* argv[]) {
         auto input_option = options.add<popl::Value<std::string>>("i", "input", "Path to one or more input files (npy format). Only required if mode is set to \"file\"");
         auto output_option = options.add<popl::Value<std::string>>("o", "output", "Path to one or more output files (npy format). Only required if mode is set to \"file\"");
         auto batch_option = options.add<popl::Value<unsigned>>("b", "batchsize", "Number of samples for inference", 1);
+        auto testruns_option = options.add<popl::Value<unsigned>>("t", "testruns", "Number of tests to run for throughput testing", 5000);
         auto check_option = options.add<popl::Switch>("", "check", "Outputs the compile time configuration");
 
         options.parse(argc, argv);
@@ -501,8 +510,10 @@ int main(int argc, char* argv[]) {
             auto driver = createDriverFromConfig<true>(config_option->value(), batch_option->value());
             runWithInputFile(driver, inputVec, outputVec);
         } else if (mode_option->value() == "throughput") {
+            std::cout << "Creating driver..." << std::endl;
             auto driver = createDriverFromConfig<true>(config_option->value(), batch_option->value());
-            runThroughputTest(driver);
+            std::cout << "Running throughput test. Batch size: " << batch_option->value() << ", Testruns: " << testruns_option->value() << "." << std::endl;
+            runThroughputTest(driver, testruns_option->value());
         } else {
             Finn::logAndError<std::invalid_argument>("Unknown driver mode: " + mode_option->value());
         }

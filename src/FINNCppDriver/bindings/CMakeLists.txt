@@ -20,13 +20,15 @@ if(pybind11_FOUND)
     # Optionally generate typing stubs
     find_program(PYBIND11_STUBGEN pybind11-stubgen)
     if(PYBIND11_STUBGEN)
-        message(STATUS "Found pybind11-stubgen. Creating Python package in ${BINDINGS_DIR}")
+        message(STATUS "Found pybind11-stubgen: ${PYBIND11_STUBGEN}. Creating Python package in ${BINDINGS_DIR}")
+        configure_file(generate_stubs.sh "${BINDINGS_DIR}/../generate_stubs.configured.sh" USE_SOURCE_PERMISSIONS)
         # Generate the stubs
         add_custom_command(
             TARGET finnhpcpy
             POST_BUILD
-            COMMAND "${PYBIND11_STUBGEN}" "-o" "." "finnhpcpy.finnhpcpy"
+            COMMAND "./generate_stubs.configured.sh"
             WORKING_DIRECTORY "${BINDINGS_DIR}/.."
+            COMMENT "Generating stubs..."
         )
     else()
         message(WARNING "Did not find pybind11-stubgen")

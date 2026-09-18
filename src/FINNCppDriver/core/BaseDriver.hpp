@@ -196,6 +196,20 @@ namespace Finn {
         void setDefaultOutputKernelName(const std::string& kernelName) { defaultInputKernelName = kernelName; }
 
         /**
+         * @brief Get the default input device index
+         *
+         * @return uint
+         */
+        uint getDefaultInputDeviceIndex() const { return defaultInputDeviceIndex; }
+
+        /**
+         * @brief Get the default output device index
+         *
+         * @return uint
+         */
+        uint getDefaultOutputDeviceIndex() const { return defaultOutputDeviceIndex; }
+
+        /**
          * @brief Set the Batch Size
          *
          * @param elements

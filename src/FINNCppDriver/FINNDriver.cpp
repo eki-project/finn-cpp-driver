@@ -239,6 +239,19 @@ void runThroughputTest(Finn::Driver<true>& baseDriver) {
 }
 
 /**
+ * @brief Return a shared_ptr to the default ODMA (default device, ODMA kernel index 0).
+ * 
+ * TODO(bwintermann): default ODMA kernel index should be configurable
+ * TODO(bwintermann): This should be an instance method of the driver itself
+ * 
+ * @param driver Reference to the FINN driver.
+ */
+template<bool SynchronousInference>
+std::shared_ptr<Finn::ExtendedBufferDescriptor> getDefaultODMA(Finn::Driver<SynchronousInference>& driver) {
+    return std::static_pointer_cast<Finn::ExtendedBufferDescriptor>(driver.getConfig().deviceWrappers[driver.getDefaultOutputDeviceIndex()].odmas[0]);
+}
+
+/**
  * @brief Load data from numpy file, run inference, and dump results
  *
  * @tparam T Data type for the loaded data

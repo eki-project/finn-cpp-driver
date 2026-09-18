@@ -139,7 +139,7 @@ using destribution_t = typename std::conditional_t<std::is_same_v<O, float>, std
  * @param batchSize Batch size for inference
  */
 template<typename T>
-void runThroughputTestImpl(Finn::Driver<true>& baseDriver, std::size_t elementCount, uint batchSize) {
+void runThroughputTestImpl(Finn::Driver<true>& baseDriver, std::size_t elementCount, uint batchSize, std::size_t nTestruns = 5000) {
     using dtype = T;
     Finn::vector<dtype> testInputs(elementCount * batchSize);
 
@@ -150,7 +150,6 @@ void runThroughputTestImpl(Finn::Driver<true>& baseDriver, std::size_t elementCo
 
     auto gen = [&dist, &mersenneEngine]() { return dist(mersenneEngine); };
 
-    constexpr size_t nTestruns = 5000;
     std::chrono::duration<double> sumRuntimeEnd2End{};
 
     // Warmup
@@ -237,6 +236,19 @@ void runThroughputTest(Finn::Driver<true>& baseDriver) {
     } else {
         runThroughputTestImpl<float>(baseDriver, elementcount, batchSize);
     }
+}
+
+/**
+ * @brief Return a shared_ptr to the default ODMA (default device, ODMA kernel index 0).
+ * 
+ * TODO(bwintermann): default ODMA kernel index should be configurable
+ * TODO(bwintermann): This should be an instance method of the driver itself
+ * 
+ * @param driver Reference to the FINN driver.
+ */
+template<bool SynchronousInference>
+std::shared_ptr<Finn::ExtendedBufferDescriptor> getDefaultODMA(Finn::Driver<SynchronousInference>& driver) {
+    return std::static_pointer_cast<Finn::ExtendedBufferDescriptor>(driver.getConfig().deviceWrappers[driver.getDefaultOutputDeviceIndex()].odmas[0]);
 }
 
 /**

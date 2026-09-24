@@ -252,6 +252,20 @@ std::shared_ptr<Finn::ExtendedBufferDescriptor> getDefaultODMA(Finn::Driver<Sync
 }
 
 /**
+ * @brief Return a shared_ptr to the default IDMA (default device, IDMA kernel index 0).
+ * 
+ * TODO(bwintermann): default IDMA kernel index should be configurable
+ * TODO(bwintermann): This should be an instance method of the driver itself
+ * 
+ * @param driver Reference to the FINN driver.
+ */
+template<bool SynchronousInference>
+std::shared_ptr<Finn::ExtendedBufferDescriptor> getDefaultIDMA(Finn::Driver<SynchronousInference>& driver) {
+    return std::static_pointer_cast<Finn::ExtendedBufferDescriptor>(driver.getConfig().deviceWrappers[driver.getDefaultInputDeviceIndex()].idmas[0]);
+}
+
+
+/**
  * @brief Load data from numpy file, run inference, and dump results
  *
  * @tparam T Data type for the loaded data

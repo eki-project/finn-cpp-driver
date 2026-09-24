@@ -12,6 +12,8 @@
 // into its own file/base class so that we can reuse it here and have a nicer structure.
 #include <FINNCppDriver/FINNDriver.cpp>
 
+namespace py = pybind11;
+
 using SyncDriver = Finn::Driver<true>;
 using AsyncDriver = Finn::Driver<false>;
 
@@ -19,6 +21,9 @@ using AsyncDriver = Finn::Driver<false>;
 // TODO(bwintermann): This should be moved to a common base class to avoid std::variant usage.
 using DriverVariant = std::variant<std::reference_wrapper<SyncDriver>, std::reference_wrapper<AsyncDriver>>;
 using ConstDriverVariant = std::variant<std::reference_wrapper<const SyncDriver>, std::reference_wrapper<const AsyncDriver>>;
+
+// Input datatype for inference
+using InputDtype = Finn::UnpackingAutoRetType::IntegralType<InputFinnType>;
 
 /**
  * @brief Print a warning if no user-defined datatype header was found.
@@ -91,4 +96,68 @@ void print_config(ConstDriverVariant driver) {
         std::cout << "\n";
     }
 }
+
+
+/**
+ * @brief Format the given shape into a string for display in errors, etc.
+ */
+template<typename T>
+std::string formatShape(std::span<const T> shape) {
+    std::string s = "(";
+    for (std::size_t i = 0; i < shape.size(); ++i) {
+        s += std::to_string(shape[i]);
+        if (i != shape.size() - 1) {
+            s += ", ";
+        }
+    }
+    s += ")";
+    return s;
+}
+
+/**
+ * @brief Check that the passed shapes match in length and content. Otherwise throw an std::runtime_error.
+ */
+template<typename T, typename S>
+void checkMatchingShapes(std::span<T> expected, std::span<S> received) {
+    std::string error = std::format(
+        "Shape mismatch: Expected shape {} but got shape {}.",
+        formatShape<T>(expected),
+        formatShape<S>(received)
+    );
+    if (expected.size() != received.size()) {
+        throw std::runtime_error(error);
+    }
+    for(std::size_t i = 0; i < expected.size(); ++i) {
+        if (expected[i] != received[i]) {
+            throw std::runtime_error(error);
+        }
+    }
+}
+
+
+/**
+ * @brief Infer a single numpy array synchronously.
+ */
+py::array_t<SyncDriver::AutoDeducedRetType> inferNumpyArraySynchronous(SyncDriver& driver, py::array_t<InputDtype, py::array::c_style> array) {
+    // Read expected shape from driver config 
+    auto expectedShape = getDefaultIDMA(driver)->normalShape;
+
+    // Request buffer info on the incoming array to read its shape
+    py::buffer_info binfo = array.request();
+
+    // Make sure shapes match
+    // TODO(bwinterman): Remove to allow batched inference as well
+    checkMatchingShapes<unsigned int, pybind11::ssize_t>(expectedShape, binfo.shape);
+
+    // ALTERNATIVE: std::span<InputDtype> data(array.mutable_data(), array.size());
+    auto mut_data = array.mutable_data();
+    Finn::vector<SyncDriver::AutoDeducedRetType> results = driver.inferSynchronous(mut_data, mut_data + array.size());
+    static auto outputShape = getDefaultODMA(driver)->normalShape;
+
+    // TODO(bwintermann): The resulting numpy array does NOT own the result data. To fix this run a std::memcpy between the vector data
+    // and the py::array_t. Inspect performance
+    // FIXME(bwintermann): Currently this returns all zeroes.
+    return py::array_t<SyncDriver::AutoDeducedRetType>(outputShape, results.data());
+}
+
 #endif

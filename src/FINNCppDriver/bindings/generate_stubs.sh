@@ -1,6 +1,7 @@
 #!/bin/bash
 # Try to generate stubs and silently handle the output. Logs are only kept if generation failed.
 LOGNAME="stubgenlog.txt"
+export PYTHONPATH="${BINDINGS_DIR}/..:$PYTHONPATH"
 cd ${BINDINGS_DIR}
 ${PYBIND11_STUBGEN} -o . finnhpcpy.finnhpcpy > "$LOGNAME" 2>&1
 if [ $? -ne 0 ]; then

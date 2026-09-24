@@ -40,6 +40,19 @@ PYBIND11_MODULE(finnhpcpy, m) {
             py::doc("Run a throughput test on the driver with the given number of iterations (total: batchsize x n).")
         )
 
+        // Getter and setter for batch sizes
+        .def(
+            "get_batch_size",
+            [](SyncDriver& driver) { return driver.getBatchSize(); },
+            py::doc("Get the currently set batch size. Update with set_batch_size.")
+        )
+        .def(
+            "set_batch_size",
+            [](SyncDriver& driver, unsigned int batch_size) { driver.setBatchSize(batch_size); },
+            py::arg("batch_size"),
+            py::doc("Set internal batch size of the driver. Inference NumPy arrays must have shape (batch_size, ...).")
+        )
+
         // Inference of a single numpy array
         .def(
             "infer_numpy",

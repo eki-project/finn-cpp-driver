@@ -127,6 +127,17 @@ void checkMatchingShapes(std::span<T> expected, std::span<S> received) {
     if (expected.size() != received.size()) {
         throw std::runtime_error(error);
     }
+    if (expected[0] != received[0]) {
+        throw std::runtime_error(
+            std::format(
+                "Mismatch in batch sizes. Driver expected a batch size of {} (shape: {}) but received batch size of {} (shape: {}). Use the method 'set_batch_size(...)' to update the batch size.",
+                expected[0],
+                formatShape<T>(expected),
+                received[0],
+                formatShape<S>(received)
+            )
+        );
+    }
     for(std::size_t i = 0; i < expected.size(); ++i) {
         if (expected[i] != received[i]) {
             throw std::runtime_error(error);
@@ -136,11 +147,12 @@ void checkMatchingShapes(std::span<T> expected, std::span<S> received) {
 
 
 /**
- * @brief Infer a single numpy array synchronously.
+ * @brief Infer a single numpy array synchronously. Expects the first dimension to be the batch size.
  */
 py::array_t<SyncDriver::AutoDeducedRetType> inferNumpyArraySynchronous(SyncDriver& driver, py::array_t<InputDtype, py::array::c_style> array) {
-    // Read expected shape from driver config 
+    // Read expected shape from driver config. The first element is the batch size.  
     auto expectedShape = getDefaultIDMA(driver)->normalShape;
+    expectedShape[0] = driver.getBatchSize();
 
     // Request buffer info on the incoming array to read its shape
     py::buffer_info binfo = array.request();

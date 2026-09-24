@@ -89,7 +89,7 @@ namespace Finn {
     bool Accelerator::wait() {
         bool ret = true;
         for (auto&& dev : devices) {
-            // Each of these calls can potentielly block
+            // Each of these calls can potentially block
             ret &= dev.wait();
         }
         return ret;

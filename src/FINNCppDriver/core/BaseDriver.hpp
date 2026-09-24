@@ -465,7 +465,7 @@ namespace Finn {
          */
         template<typename IteratorType, bool Sync = SynchronousInference, typename = std::enable_if_t<Sync>>
         [[nodiscard]] Finn::vector<uint8_t> infer(IteratorType first, IteratorType last, uint inputDeviceIndex, const std::string& inputBufferKernelName, uint outputDeviceIndex, const std::string& outputBufferKernelName, uint batchSize) {
-            FINN_LOG_DEBUG(loglevel::info) << loggerPrefix() << "Starting inference (raw data)";
+            FINN_LOG_DEBUG(loglevel::info) << loggerPrefix() << "Starting inference (raw data). Input length: " << std::abs(std::distance(first, last));
             auto storeFunc = accelerator.storeFactory(inputDeviceIndex, inputBufferKernelName);
 
             if (std::abs(std::distance(first, last)) != getTotalDataSize(inputDeviceIndex, inputBufferKernelName)) {

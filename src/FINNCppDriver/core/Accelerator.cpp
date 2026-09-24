@@ -78,7 +78,9 @@ namespace Finn {
 
     bool Accelerator::run() {
         bool ret = true;
+        FINN_LOG_DEBUG(loglevel::info) << "Running " << devices.size() << " devices.";
         for (auto&& dev : devices) {
+            FINN_LOG_DEBUG(loglevel::info) << "Running device index " << dev.getDeviceIndex();
             ret &= dev.run();
         }
         return ret;

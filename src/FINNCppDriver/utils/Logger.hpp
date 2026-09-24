@@ -63,7 +63,7 @@ class Logger {
      *
      * @param console Enable console output in addition to file logging
      */
-    void static initLogger(bool console = false) { static Logger log(console); }
+    void static initLogger(bool console = false);
 
     /**
      * @brief Construct a new Logger object (Deleted)
@@ -94,15 +94,7 @@ class Logger {
     Logger(Logger&&) = default;
 
      private:
-    Logger(bool console = false) {
-        static plog::RollingFileAppender<plog::TxtFormatter> fileAppender("finnLog.log", 10 * 1024 * 1024, 3);
-        static plog::ColorConsoleAppender<plog::TxtFormatter> consoleAppender;
-        if (console) {
-            plog::init(plog::debug, &fileAppender).addAppender(&consoleAppender);
-        } else {
-            plog::init(plog::debug, &fileAppender);
-        }
-    }
+    Logger(bool console = false);
     const std::string logFormat = "[%TimeStamp%] (%LineID%) [%Severity%]: %Message%";
 };
 

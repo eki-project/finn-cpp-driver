@@ -15,12 +15,17 @@ PYBIND11_MODULE(finnhpcpy, m) {
         // Contructor (can receive both pathlib.Path and str)
         .def(
             py::init(
-                [](py::object config_file, unsigned int batch_size) {
+                [](py::object config_file, unsigned int batch_size, bool enable_logger) {
+                    if (enable_logger) {
+                        Logger::initLogger(true);
+                    }
                     return SyncDriver(py::str(config_file), batch_size); 
                 }
             ),
             py::arg("config_file"),
-            py::arg("batch_size")
+            py::arg("batch_size"),
+            py::arg("enable_logger") = false,
+            py::doc("Construct a sync driver. This resets the FPGAs and prepares for inference.")
         )
 
         // Config overview

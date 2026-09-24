@@ -1,6 +1,10 @@
 if(pybind11_FOUND)
     # TODO(bwintermann): For now the module is built into lib/, but it should maybe be exported somwhere else?
     set(BINDINGS_DIR "${CMAKE_BINARY_DIR}/lib/finnhpcpy")
+    if(FINN_BINDINGS_OUTPUT_DIR)
+        set(BINDINGS_DIR "${FINN_BINDINGS_OUTPUT_DIR}/finnhpcpy")
+        message(STATUS "Custom bindings output directory specified!")
+    endif()
     message(STATUS "Found pybind11 - generating Python bindings to: ${BINDINGS_DIR}")
     
     # Compile the pybind module

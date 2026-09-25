@@ -16,6 +16,7 @@ PYBIND11_MODULE(finnhpcpy, m) {
         .def(
             py::init(
                 [](py::object config_file, unsigned int batch_size, bool enable_logger) {
+                    warn_undefined_header();
                     if (enable_logger) {
                         Logger::initLogger(true);
                     }
@@ -26,6 +27,13 @@ PYBIND11_MODULE(finnhpcpy, m) {
             py::arg("batch_size"),
             py::arg("enable_logger") = false,
             py::doc("Construct a sync driver. This resets the FPGAs and prepares for inference.")
+        )
+
+        // Example numpy array so that the Python side knows what dtype and shape to use.
+        .def(
+            "example_input_numpy",
+            &generateExampleInputNumpy,
+            py::doc("Return a numpy array with the correct shape and datatype for inference. This takes batch size into account as the first element of the shape.")
         )
 
         // Config overview
@@ -63,6 +71,30 @@ PYBIND11_MODULE(finnhpcpy, m) {
             },
             py::arg("input_data"),
             py::doc("Run inference of a single numpy array. The shape must match the normal input shape expected by the accelerator.")
+        )
+        
+        // Default device indices
+        .def(
+            "set_default_input_device_index",
+            &SyncDriver::setDefaultInputDeviceIndex,
+            py::arg("index"),
+            py::doc("Set the device index for the default input device.")
+        )
+        .def(
+            "set_default_output_device_index",
+            &SyncDriver::setDefaultOutputDeviceIndex,
+            py::arg("index"),
+            py::doc("Set the device index for the default output device.")
+        )
+        .def(
+            "get_default_input_device_index",
+            &SyncDriver::getDefaultInputDeviceIndex,
+            py::doc("Get the default input device index.")
+        )
+        .def(
+            "get_default_output_device_index",
+            &SyncDriver::getDefaultOutputDeviceIndex,
+            py::doc("Get the default output device index.")
         );
 
 }

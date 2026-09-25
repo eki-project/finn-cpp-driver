@@ -38,6 +38,16 @@ void warn_undefined_header() {
 }
 
 /**
+ * @brief Generate and return a numpy array object with the correct shape and
+ * datatype for inference. Can be used from the python side to create correctly defined inputs.
+ */
+py::array_t<InputDtype> generateExampleInputNumpy(SyncDriver& driver) {
+    shape_t inputShape = getDefaultIDMA(driver)->normalShape;
+    inputShape[0] = driver.getBatchSize();
+    return py::array_t<InputDtype>(inputShape);
+}
+
+/**
  * @brief Run the throughput test. Originally taken from FINNDriver.cpp and modified for wrapper use.
  *
  * @param driver Driver object.

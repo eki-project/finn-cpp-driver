@@ -1,3 +1,14 @@
+/**
+ * @file StandaloneExecutableDriver.cpp
+ * @author Linus Jungemann (linus.jungemann@uni-paderborn.de), Bjarne Wintermann (bjarne.wintermann@uni-paderborn.de) and others
+ * @brief Driver class for use in the standalone executable.
+ * @date 2026-09-25
+ *
+ * @copyright Copyright (c) 2026
+ * @license All rights reserved. This program and the accompanying materials are made available under the terms of the MIT license.
+ *
+ */
+
 #ifndef STANDALONE_EXECUTABLE_DRIVER_HPP
 #define STANDALONE_EXECUTABLE_DRIVER_HPP
 #include <FINNCppDriver/core/DeviceHandler.h>          // for DeviceHandler
@@ -18,8 +29,6 @@
 #include <xtensor/core/xlayout.hpp>               // for layout_type
 #include <xtensor/io/xnpy.hpp>                    // for dump_npy, ...
 #include <xtl/xiterator_base.hpp>                 // for operator!=
-
-#include <FINNCppDriver/core/BaseDriver.hpp>
 
 // Created by FINN during compilation
 // Use the default testing Driver type when none is specified.
@@ -52,7 +61,7 @@ namespace Finn {
      * @param device
      * @param filename
      */
-    void logDeviceInformation(xrt::device& device, const std::string& filename) {
+    inline void logDeviceInformation(xrt::device& device, const std::string& filename) {
         auto bdfInfo = device.get_info<xrt::info::device::bdf>();
         FINN_LOG(loglevel::info) << "BDF: " << bdfInfo;
         auto xclbin = xrt::xclbin(filename);
@@ -85,8 +94,7 @@ namespace Finn {
     class StandaloneExecutableDriver : public BaseDriver<SynchronousInference, F, S, T> {
         using BaseDriver<SynchronousInference, F, S, T>::BaseDriver;
 
-        private:
-
+         private:
         /**
          * @brief A short prefix usable with the logger to determine the source of the log write
          *
@@ -95,11 +103,12 @@ namespace Finn {
         std::string finnMainLogPrefix() { return "[FINNDriver] "; }
 
         /**
-        * @brief Index position in string that contains the byte size of the datatype stored in the numpy input file
-        *
-        */
+         * @brief Index position in string that contains the byte size of the datatype stored in the numpy input file
+         *
+         */
         static constexpr size_t typeStringByteSizePos = 2;
 
+         public:
         /**
          * @brief Implementation function for running throughput tests
          *
@@ -142,7 +151,7 @@ namespace Finn {
             for (size_t i = 0; i < nTestruns; ++i) {
                 std::generate(testInputs.begin(), testInputs.end(), gen);
                 const auto start = std::chrono::high_resolution_clock::now();
-                static auto foldedShape = static_cast<Finn::ExtendedBufferDescriptor*>(this->getConfig().deviceWrappers[0].idmas[0].get())->foldedShape;
+                static auto foldedShape = this->getInputFoldedShape();
                 foldedShape[0] = batchSize;
                 const Finn::DynamicMdSpan reshapedInput(testInputs.begin(), testInputs.end(), foldedShape);
                 const auto reshape = std::chrono::high_resolution_clock::now();
@@ -154,12 +163,12 @@ namespace Finn {
                 sumRuntimePacking += (end - reshape);
             }
 
-            auto packedOutput = this->getConfig().deviceWrappers[0].odmas[0]->packedShape;
+            auto packedOutput = this->getOutputPackedShape();
             packedOutput[0] = batchSize;
             std::vector<uint8_t> unpackingInputs(FinnUtils::shapeToElements(packedOutput));
             for (size_t i = 0; i < nTestruns; ++i) {
                 const auto start = std::chrono::high_resolution_clock::now();
-                auto foldedOutput = static_cast<Finn::ExtendedBufferDescriptor*>(this->getConfig().deviceWrappers[0].odmas[0].get())->foldedShape;
+                auto foldedOutput = this->getOutputFoldedShape();
                 foldedOutput[0] = batchSize;
                 const Finn::DynamicMdSpan reshapedOutput(unpackingInputs.begin(), unpackingInputs.end(), packedOutput);
                 auto unpacked = Finn::unpackMultiDimensionalOutputs<OutputFinnType>(unpackingInputs.begin(), unpackingInputs.end(), reshapedOutput, foldedOutput);
@@ -174,24 +183,23 @@ namespace Finn {
             std::cout << "Avg. folding latency: " << (static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(sumRuntimeReshaping).count()) / nTestruns) << "ns\n";
             std::cout << "Avg. unpacking latency: " << (static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(sumRuntimeUnpacking).count()) / nTestruns) << "ns\n";
             std::cout << "Avg. raw inference latency:"
-                    << (static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(sumRuntimeEnd2End).count()) / nTestruns) -
-                            (static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(sumRuntimePacking).count()) / nTestruns) -
-                            (static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(sumRuntimeReshaping).count()) / nTestruns) -
-                            (static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(sumRuntimeUnpacking).count()) / nTestruns)
-                    << "ns\n";
+                      << (static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(sumRuntimeEnd2End).count()) / nTestruns) -
+                             (static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(sumRuntimePacking).count()) / nTestruns) -
+                             (static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(sumRuntimeReshaping).count()) / nTestruns) -
+                             (static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(sumRuntimeUnpacking).count()) / nTestruns)
+                      << "ns\n";
         }
 
-        public:
         /**
-        * @brief Run a throughput test to test the performance of the driver
-        *
-        * @param logger
-        */
+         * @brief Run a throughput test to test the performance of the driver
+         *
+         * @param logger
+         */
         void runThroughputTest() {
             FINN_LOG(loglevel::info) << finnMainLogPrefix() << "Device Information: ";
             logDeviceInformation(this->getDeviceHandler(0).getDevice(), this->getConfig().deviceWrappers[0].xclbin);
 
-            size_t elementcount = FinnUtils::shapeToElements((std::static_pointer_cast<Finn::ExtendedBufferDescriptor>(this->getConfig().deviceWrappers[0].idmas[0]))->normalShape);
+            size_t elementcount = FinnUtils::shapeToElements(this->getInputNormalShape());
             uint batchSize = this->getBatchSize();
             FINN_LOG(loglevel::info) << finnMainLogPrefix() << "Input element count " << std::to_string(elementcount);
             FINN_LOG(loglevel::info) << finnMainLogPrefix() << "Batch size: " << batchSize;
@@ -207,49 +215,28 @@ namespace Finn {
         }
 
         /**
-        * @brief Return a shared_ptr to the default ODMA (default device, ODMA kernel index 0).
-        * 
-        * TODO(bwintermann): default ODMA kernel index should be configurable
-        * 
-        */
-        std::shared_ptr<Finn::ExtendedBufferDescriptor> getDefaultODMA() {
-            return std::static_pointer_cast<Finn::ExtendedBufferDescriptor>(this->getConfig().deviceWrappers[this->getDefaultOutputDeviceIndex()].odmas[0]);
-        }
-
-        /**
-        * @brief Return a shared_ptr to the default IDMA (default device, IDMA kernel index 0).
-        * 
-        * TODO(bwintermann): default IDMA kernel index should be configurable
-        * 
-        */
-        std::shared_ptr<Finn::ExtendedBufferDescriptor> getDefaultIDMA() {
-            return std::static_pointer_cast<Finn::ExtendedBufferDescriptor>(this->getConfig().deviceWrappers[this->getDefaultInputDeviceIndex()].idmas[0]);
-        }
-
-
-        /**
-        * @brief Load data from numpy file, run inference, and dump results
-        *
-        * @tparam T Data type for the loaded data
-        * @param loadedNpyFile Loaded numpy file containing input data
-        * @param outputFile Path to output file for results
-        */
+         * @brief Load data from numpy file, run inference, and dump results
+         *
+         * @tparam T Data type for the loaded data
+         * @param loadedNpyFile Loaded numpy file containing input data
+         * @param outputFile Path to output file for results
+         */
         template<typename DT>
         void loadInferDump(xt::detail::npy_file& loadedNpyFile, const std::string& outputFile) {
             auto xtensorArray = std::move(loadedNpyFile).cast<DT, xt::layout_type::dynamic>();
             Finn::vector<DT> vec(xtensorArray.begin(), xtensorArray.end());
             auto ret = this->inferSynchronous(vec.begin(), vec.end());
-            auto xarr = xt::adapt(ret, (std::static_pointer_cast<Finn::ExtendedBufferDescriptor>(this->getConfig().deviceWrappers[0].odmas[0]))->normalShape);
+            auto xarr = xt::adapt(ret, this->getOutputNormalShape());
             xt::dump_npy(outputFile, xarr);
         }
 
         /**
-        * @brief Executes inference on the input file if input type is a floating point type
-        * @attention This function does no checking of the datatype contained in the loadedNpyFile! Passing a npy file containing a non floating point type is UB.
-        *
-        * @param loadedNpyFile Input file
-        * @param outputFile Name of output file
-        */
+         * @brief Executes inference on the input file if input type is a floating point type
+         * @attention This function does no checking of the datatype contained in the loadedNpyFile! Passing a npy file containing a non floating point type is UB.
+         *
+         * @param loadedNpyFile Input file
+         * @param outputFile Name of output file
+         */
         void inferFloatingPoint(xt::detail::npy_file& loadedNpyFile, const std::string& outputFile) {
             size_t sizePos = typeStringByteSizePos;
             int size = std::stoi(loadedNpyFile.m_typestring, &sizePos);
@@ -265,12 +252,12 @@ namespace Finn {
         }
 
         /**
-        * @brief Executes inference on the input file if input type is a signed integer type
-        * @attention This function does no checking of the datatype contained in the loadedNpyFile! Passing a npy file containing a non signed integer type is UB.
-        *
-        * @param loadedNpyFile
-        * @param outputFile
-        */
+         * @brief Executes inference on the input file if input type is a signed integer type
+         * @attention This function does no checking of the datatype contained in the loadedNpyFile! Passing a npy file containing a non signed integer type is UB.
+         *
+         * @param loadedNpyFile
+         * @param outputFile
+         */
         void inferSignedInteger(xt::detail::npy_file& loadedNpyFile, const std::string& outputFile) {
             size_t sizePos = typeStringByteSizePos;
             int size = std::stoi(loadedNpyFile.m_typestring, &sizePos);
@@ -292,12 +279,12 @@ namespace Finn {
         }
 
         /**
-        * @brief Executes inference on the input file if input type is a unsigned integer type
-        * @attention This function does no checking of the datatype contained in the loadedNpyFile! Passing a npy file containing a non unsigned integer type is UB.
-        *
-        * @param loadedNpyFile
-        * @param outputFile
-        */
+         * @brief Executes inference on the input file if input type is a unsigned integer type
+         * @attention This function does no checking of the datatype contained in the loadedNpyFile! Passing a npy file containing a non unsigned integer type is UB.
+         *
+         * @param loadedNpyFile
+         * @param outputFile
+         */
         void inferUnsignedInteger(xt::detail::npy_file& loadedNpyFile, const std::string& outputFile) {
             size_t sizePos = typeStringByteSizePos;
             int size = std::stoi(loadedNpyFile.m_typestring, &sizePos);
@@ -319,15 +306,17 @@ namespace Finn {
         }
 
         /**
-        * @brief Run inference on an input file
-        *
-        * @param logger Logger to be used
-        * @param inputFiles Files used for inference input
-        * @param outputFiles Filenames used for output files
-        */
+         * @brief Run inference on an input file
+         *
+         * @param logger Logger to be used
+         * @param inputFiles Files used for inference input
+         * @param outputFiles Filenames used for output files
+         */
         void runWithInputFile(const std::vector<std::string>& inputFiles, const std::vector<std::string>& outputFiles) {
             FINN_LOG(loglevel::info) << finnMainLogPrefix() << "Running driver on input files";
-            logDeviceInformation(this->getDeviceHandler(0).getDevice(), this->getConfig().deviceWrappers[0].xclbin);
+
+            // TODO(bwintermann): This 0 may need to be swapped with this->getDefaultInputDeviceIndex() too
+            logDeviceInformation(this->getDeviceHandler(0).getDevice(), this->getConfig().deviceWrappers[this->getDefaultInputDeviceIndex()].xclbin);
 
             for (auto&& [inp, out] = std::tuple{inputFiles.begin(), outputFiles.begin()}; inp != inputFiles.end(); ++inp, ++out) {
                 // load npy file and process it
@@ -355,7 +344,7 @@ namespace Finn {
                             auto xtensorArray = std::move(loadedFile).cast<bool, xt::layout_type::dynamic>();
                             Finn::vector<uint8_t> vec(xtensorArray.begin(), xtensorArray.end());
                             auto ret = this->inferSynchronous(vec.begin(), vec.end());
-                            auto xarr = xt::adapt(ret, (std::static_pointer_cast<Finn::ExtendedBufferDescriptor>(this->getConfig().deviceWrappers[0].odmas[0]))->normalShape);
+                            auto xarr = xt::adapt(ret, this->getOutputNormalShape());
                             xt::dump_npy(*out, xarr);
                             break;
                         }
@@ -376,5 +365,5 @@ namespace Finn {
             }
         }
     };
-};
+}  // namespace Finn
 #endif

@@ -10,7 +10,7 @@ if(pybind11_FOUND)
     # Compile the pybind module
     pybind11_add_module(finnhpcpy WITHOUT_SOABI PythonBindings.cpp)
     target_include_directories(finnhpcpy PRIVATE ${FINN_SRC_DIR})
-    target_link_libraries(finnhpcpy PRIVATE finnc_core finnc_options finn_config finnc_options finnc_log) 
+    target_link_libraries(finnhpcpy PRIVATE finnc_core finnc_options finn_config finnc_options finnc_log Threads::Threads xrt_coreutil uuid finn_config nlohmann_json::nlohmann_json OpenMP::OpenMP_CXX) 
 
     # Write into the specified directory
     set_target_properties(finnhpcpy PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${BINDINGS_DIR}")

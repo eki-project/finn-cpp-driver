@@ -54,6 +54,8 @@ PYBIND11_MODULE(finnhpcpy, m) {
         )
 
         // Inference of a single numpy array
+        // TODO(bwintermann): Have a single `infer` function that receives a variant of all possible data types and
+        // decides which one to use automatically.
         .def(
             "infer_numpy",
             [](SyncDriver& driver, py::array_t<InputDtype, py::array::c_style>& array) {

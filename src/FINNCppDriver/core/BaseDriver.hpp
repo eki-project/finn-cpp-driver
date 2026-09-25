@@ -22,16 +22,13 @@
 #include <FINNCppDriver/utils/FinnDatatypes.hpp>
 #include <FINNCppDriver/utils/Logger.hpp>  // for FINN_LOG, loglevel, ...
 #include <FINNCppDriver/utils/join.hpp>
-#include <bitset>
-#include <cinttypes>  // for uint8_t
 #include <filesystem>
-#include <fstream>
-#include <iostream>
 #include <iterator>
 #include <memory>
+#include <optional>
+#include <stdexcept>
 
 #include "Accelerator.h"
-#include "ert.h"
 #include "omp.h"
 
 
@@ -50,10 +47,13 @@ namespace Finn {
         Config configuration;
 
         uint defaultInputDeviceIndex = 0;
-        std::string defaultInputKernelName;
         uint defaultOutputDeviceIndex = 0;
-        std::string defaultOutputKernelName;
+
+        uint defaultInputKernelIndex = 0;
+        uint defaultOutputKernelIndex = 0;
+
         uint batchElements = 1;
+
 
         /**
          * @brief A logger prefix to determine the source of a log write
@@ -69,17 +69,209 @@ namespace Finn {
          */
         using AutoDeducedRetType = Finn::UnpackingAutoRetType::AutoRetType<S>;
 
+
+        /**
+         * @brief Return whether any device wrapper has a matching xrtDeviceIndex.
+         */
+        bool hasXrtDeviceIndex(uint idx) {
+            return std::any_of(configuration.deviceWrappers.begin(), configuration.deviceWrappers.end(), [idx](const DeviceWrapper& dev) { return dev.xrtDeviceIndex == idx; });
+        }
+
+        /**
+         * @brief Set the Default Input Device Index
+         *
+         * @param index
+         * @throws std::runtime_error if no deviceWrapper has a matching xrtDeviceIndex
+         */
+        void setDefaultInputDeviceIndex(uint index) {
+            if (!hasXrtDeviceIndex(index)) {
+                throw std::runtime_error(std::format("Specified {} as the default INPUT device index, but no device wrapper has a matching xrtDeviceIndex!", index));
+            }
+            defaultInputDeviceIndex = index;
+        }
+
+        /**
+         * @brief Set the Default Output Device Index
+         *
+         * @param index
+         * @throws std::runtime_error if no deviceWrapper has a matching xrtDeviceIndex
+         */
+        void setDefaultOutputDeviceIndex(uint index) {
+            if (!hasXrtDeviceIndex(index)) {
+                throw std::runtime_error(std::format("Specified {} as the default OUTPUT device index, but no device wrapper has a matching xrtDeviceIndex!", index));
+            }
+            defaultOutputDeviceIndex = index;
+        }
+
+        /**
+         * @brief Get the default input device index
+         *
+         * @return uint
+         */
+        uint getDefaultInputDeviceIndex() const { return defaultInputDeviceIndex; }
+
+        /**
+         * @brief Get the default output device index
+         *
+         * @return uint
+         */
+        uint getDefaultOutputDeviceIndex() const { return defaultOutputDeviceIndex; }
+
+
+        /**
+         * @brief Return whether the default input device has an IDMA of the given index.
+         */
+        bool hasInputKernelIndex(uint idx) { return !(configuration.deviceWrappers[defaultInputDeviceIndex].idmas.size() <= idx); }
+
+        /**
+         * @brief Return whether the default output device has an ODMA of the given index.
+         */
+        bool hasOutputKernelIndex(uint idx) { return !(configuration.deviceWrappers[defaultOutputDeviceIndex].odmas.size() <= idx); }
+
+        /**
+         * @brief Set the default input kernel index (on the default input device).
+         * @throws std::runtime_error if the default input device has no such IDMA.
+         */
+        void setDefaultInputKernelIndex(uint index) {
+            if (!hasInputKernelIndex(index)) {
+                throw std::runtime_error(std::format("Default input device {} has no IDMA of index {}.", defaultInputDeviceIndex, index));
+            }
+            defaultInputKernelIndex = index;
+        }
+
+        /**
+         * @brief Set the default input kernel index (on the default input device).
+         * @throws std::runtime_error if the default input device has no such IDMA.
+         */
+        void setDefaultOutputKernelIndex(uint index) {
+            if (!hasOutputKernelIndex(index)) {
+                throw std::runtime_error(std::format("Default output device {} has no ODMA of index {}.", defaultOutputDeviceIndex, index));
+            }
+            defaultOutputKernelIndex = index;
+        }
+
+        /**
+         * @brief Retrieve the kernel index from the kernel name on the default input device.
+         * @throws std::runtime_error if no such kernel exists.
+         */
+        uint getInputKernelIndexFromName(const std::string& name) {
+            std::vector<std::shared_ptr<BufferDescriptor>>& idmas = configuration.deviceWrappers[defaultInputDeviceIndex].idmas;
+            for (uint i = 0; i < idmas.size(); ++i) {
+                if (idmas[i]->kernelName == name) {
+                    return i;
+                }
+            }
+            throw std::runtime_error(std::format("No IDMA of name {} was found in default input device {}.", name, defaultInputDeviceIndex));
+        }
+
+        /**
+         * @brief Retrieve the kernel index from the kernel name on the default output device.
+         * @throws std::runtime_error if no such kernel exists.
+         */
+        uint getOutputKernelIndexFromName(const std::string& name) {
+            std::vector<std::shared_ptr<BufferDescriptor>>& odmas = configuration.deviceWrappers[defaultOutputDeviceIndex].odmas;
+            for (uint i = 0; i < odmas.size(); ++i) {
+                if (odmas[i]->kernelName == name) {
+                    return i;
+                }
+            }
+            throw std::runtime_error(std::format("No ODMA of name {} was found in default output device {}", name, defaultOutputDeviceIndex));
+        }
+
+
+        /**
+         * @brief Return the default IDMA buffer descriptor.
+         * @param deviceIndex Optional device index. Otherwise the default device for this IO direction is used.
+         * @param kernelIndex Optional device index. Otherwise the default IO kernel index is used.
+         */
+        std::shared_ptr<ExtendedBufferDescriptor> getDefaultIDMABufferDescriptor(std::optional<uint> deviceIndex = std::nullopt, std::optional<uint> kernelIndex = std::nullopt) {
+            return std::static_pointer_cast<ExtendedBufferDescriptor>(configuration.deviceWrappers[deviceIndex.value_or(defaultInputDeviceIndex)].idmas[kernelIndex.value_or(defaultInputKernelIndex)]);
+        }
+
+        /**
+         * @brief Return the default ODMA buffer descriptor.
+         * @param deviceIndex Optional device index. Otherwise the default device for this IO direction is used.
+         * @param kernelIndex Optional device index. Otherwise the default IO kernel index is used.
+         */
+        std::shared_ptr<ExtendedBufferDescriptor> getDefaultODMABufferDescriptor(std::optional<uint> deviceIndex = std::nullopt, std::optional<uint> kernelIndex = std::nullopt) {
+            return std::static_pointer_cast<ExtendedBufferDescriptor>(configuration.deviceWrappers[deviceIndex.value_or(defaultOutputDeviceIndex)].odmas[kernelIndex.value_or(defaultOutputKernelIndex)]);
+        }
+
+        /**
+         * @brief Return the name of the default input kernel.
+         */
+        std::string getDefaultInputKernelName() { return getDefaultIDMABufferDescriptor()->kernelName; }
+
+        /**
+         * @brief Return the name of the default output kernel.
+         */
+        std::string getDefaultOutputKernelName() { return getDefaultODMABufferDescriptor()->kernelName; }
+
+        shape_t getInputNormalShape(bool withBatchSize = false, std::optional<uint> deviceIndex = std::nullopt, std::optional<uint> kernelIndex = std::nullopt) {
+            auto shape = getDefaultIDMABufferDescriptor(deviceIndex, kernelIndex)->normalShape;
+            if (withBatchSize) {
+                shape[0] = getBatchSize();
+            }
+            return shape;
+        }
+        shape_t getInputFoldedShape(bool withBatchSize = false, std::optional<uint> deviceIndex = std::nullopt, std::optional<uint> kernelIndex = std::nullopt) {
+            auto shape = getDefaultIDMABufferDescriptor(deviceIndex, kernelIndex)->foldedShape;
+            if (withBatchSize) {
+                shape[0] = getBatchSize();
+            }
+            return shape;
+        }
+        shape_t getInputPackedShape(bool withBatchSize = false, std::optional<uint> deviceIndex = std::nullopt, std::optional<uint> kernelIndex = std::nullopt) {
+            auto shape = getDefaultIDMABufferDescriptor(deviceIndex, kernelIndex)->packedShape;
+            if (withBatchSize) {
+                shape[0] = getBatchSize();
+            }
+            return shape;
+        }
+        shape_t getOutputNormalShape(bool withBatchSize = false, std::optional<uint> deviceIndex = std::nullopt, std::optional<uint> kernelIndex = std::nullopt) {
+            auto shape = getDefaultODMABufferDescriptor(deviceIndex, kernelIndex)->normalShape;
+            if (withBatchSize) {
+                shape[0] = getBatchSize();
+            }
+            return shape;
+        }
+        shape_t getOutputFoldedShape(bool withBatchSize = false, std::optional<uint> deviceIndex = std::nullopt, std::optional<uint> kernelIndex = std::nullopt) {
+            auto shape = getDefaultODMABufferDescriptor(deviceIndex, kernelIndex)->foldedShape;
+            if (withBatchSize) {
+                shape[0] = getBatchSize();
+            }
+            return shape;
+        }
+        shape_t getOutputPackedShape(bool withBatchSize = false, std::optional<uint> deviceIndex = std::nullopt, std::optional<uint> kernelIndex = std::nullopt) {
+            auto shape = getDefaultODMABufferDescriptor(deviceIndex, kernelIndex)->packedShape;
+            if (withBatchSize) {
+                shape[0] = getBatchSize();
+            }
+            return shape;
+        }
+
         /**
          * @brief Initializes the base driver to all default settings
          *
          * @param batchSize
          */
-        void initializeBaseDriver(uint batchSize) {
+        void initializeBaseDriver(uint batchSize, uint defDevInIdx = 0, uint defDevOutIdx = 0, uint defIDMAIdx = 0, uint defODMAIdx = 0) {
             accelerator = Accelerator(configuration.deviceWrappers, SynchronousInference, batchSize);
-            defaultInputDeviceIndex = configuration.deviceWrappers[0].xrtDeviceIndex;
-            defaultInputKernelName = configuration.deviceWrappers[0].idmas[0]->kernelName;
-            defaultOutputDeviceIndex = configuration.deviceWrappers[0].xrtDeviceIndex;
-            defaultOutputKernelName = configuration.deviceWrappers[0].odmas[0]->kernelName;
+
+            // TODO(all): In this method, the defaultInputDeviceIndex means the xrtDeviceIndex, in other methods however
+            // it refers to the list index of the deviceWrapper in its std::vector. For now we just manually check, but this should
+            // really be a map where the xrtDeviceIndex is the key and the matching device wrapper is the value.
+            for (uint i = 0; i < configuration.deviceWrappers.size(); ++i) {
+                if (configuration.deviceWrappers[i].xrtDeviceIndex != i) {
+                    throw std::runtime_error("INTERNAL ERROR: Mismatch between xrtDeviceIndex and configuration.deviceWrappers index. Check the BaseDriver::initializeBaseDriver method for details.");
+                }
+            }
+
+            // Assign the default device index used. This must match the xrtDeviceIndex, NOT the index of the device wrapper in the list of wrappers
+            setDefaultInputDeviceIndex(defDevInIdx);
+            setDefaultOutputDeviceIndex(defDevOutIdx);
+            setDefaultInputKernelIndex(defIDMAIdx);
+            setDefaultOutputKernelIndex(defODMAIdx);
             batchElements = batchSize;
 #ifdef UNITTEST
             logDriver();
@@ -93,6 +285,14 @@ namespace Finn {
          * @param batchSize
          */
         BaseDriver(const std::filesystem::path& configPath, uint batchSize) : configuration(createConfigFromPath(configPath)) { initializeBaseDriver(batchSize); };
+
+        /**
+         * @brief Create a BaseDriver from a config file. This needs to be templated by the FINN-datatypes. The corresponding header file is generated by the FINN compiler
+         *
+         * @param configPath
+         * @param batchSize
+         */
+        BaseDriver(const std::string& configPath, uint batchSize) : configuration(createConfigFromPath(configPath)) { initializeBaseDriver(batchSize); };
 
         /**
          * @brief Create a new base driver based on an existing configuration
@@ -115,7 +315,7 @@ namespace Finn {
          */
         BaseDriver(const std::filesystem::path& configPath, uint inputDeviceIndex, const std::string& inputKernelName, uint outputDeviceIndex, const std::string& outputKernelName, uint batchSize)
             : configuration(createConfigFromPath(configPath)) {
-            initializeBaseDriver(batchSize);
+            initializeBaseDriver(batchSize, inputDeviceIndex, outputDeviceIndex, getInputKernelIndexFromName(inputKernelName), getOutputKernelIndexFromName(outputKernelName));
         }
 
         /**
@@ -129,7 +329,9 @@ namespace Finn {
          * @param outputKernelName
          * @param batchSize
          */
-        BaseDriver(const Config& pConfig, uint inputDeviceIndex, const std::string& inputKernelName, uint outputDeviceIndex, const std::string& outputKernelName, uint batchSize) : configuration(pConfig) { initializeBaseDriver(batchSize); }
+        BaseDriver(const Config& pConfig, uint inputDeviceIndex, const std::string& inputKernelName, uint outputDeviceIndex, const std::string& outputKernelName, uint batchSize) : configuration(pConfig) {
+            initializeBaseDriver(batchSize, inputDeviceIndex, outputDeviceIndex, getInputKernelIndexFromName(inputKernelName), getOutputKernelIndexFromName(outputKernelName));
+        }
 
         /**
          * @brief Construct a new Base Driver object
@@ -159,33 +361,6 @@ namespace Finn {
          */
         virtual ~BaseDriver() = default;
 
-        /**
-         * @brief Set the Default Input Device Index
-         *
-         * @param index
-         */
-        void setDefaultInputDeviceIndex(uint index) { defaultInputDeviceIndex = index; }
-
-        /**
-         * @brief Set the Default Output Device Index
-         *
-         * @param index
-         */
-        void setDefaultOutputDeviceIndex(uint index) { defaultOutputDeviceIndex = index; }
-
-        /**
-         * @brief Set the Default Input Kernel Name
-         *
-         * @param kernelName
-         */
-        void setDefaultInputKernelName(const std::string& kernelName) { defaultInputKernelName = kernelName; }
-
-        /**
-         * @brief Set the Default Output Kernel Name
-         *
-         * @param kernelName
-         */
-        void setDefaultOutputKernelName(const std::string& kernelName) { defaultInputKernelName = kernelName; }
 
         /**
          * @brief Set the Batch Size
@@ -279,7 +454,7 @@ namespace Finn {
          */
         template<typename IteratorType, bool Sync = SynchronousInference, typename = std::enable_if_t<!Sync>>
         void input(IteratorType first, IteratorType last) {
-            input(first, last, defaultInputDeviceIndex, defaultInputKernelName, batchElements);
+            input(first, last, defaultInputDeviceIndex, getDefaultInputKernelName(), batchElements);
         }
 
         /**
@@ -294,14 +469,10 @@ namespace Finn {
         [[nodiscard]] Finn::vector<V> getResults(uint outputDeviceIndex, const std::string& outputBufferKernelName) {
             // TODO(linusjun): maybe this method should block until data is available?
             auto result = accelerator.getOutputData(outputDeviceIndex, outputBufferKernelName);
-
-            static auto packedOutput = configuration.deviceWrappers[outputDeviceIndex].odmas[0]->packedShape;
-            packedOutput[0] = batchElements;
-            static auto foldedOutput = static_cast<Finn::ExtendedBufferDescriptor*>(configuration.deviceWrappers[outputDeviceIndex].odmas[0].get())->foldedShape;
-            foldedOutput[0] = batchElements;
+            static auto packedOutput = getOutputPackedShape(true, outputDeviceIndex, getOutputKernelIndexFromName(outputBufferKernelName));
+            static auto foldedOutput = getOutputFoldedShape(true, outputDeviceIndex, getOutputKernelIndexFromName(outputBufferKernelName));
             const Finn::DynamicMdSpan reshapedOutput(result.begin(), result.end(), packedOutput);
             auto unpacked = Finn::unpackMultiDimensionalOutputs<S, Finn::vector<uint8_t>::iterator, false, V>(result.begin(), result.end(), reshapedOutput, foldedOutput);
-
             return unpacked;
         }
 
@@ -315,12 +486,9 @@ namespace Finn {
         template<typename V = Finn::UnpackingAutoRetType::AutoRetType<S>, bool Sync = SynchronousInference, typename = std::enable_if_t<!Sync>>
         [[nodiscard]] Finn::vector<V> getResults() {
             // TODO(linusjun): maybe this method should block until data is available?
-            auto result = accelerator.getOutputData(defaultOutputDeviceIndex, defaultOutputKernelName);
-
-            static auto packedOutput = configuration.deviceWrappers[defaultOutputDeviceIndex].odmas[0]->packedShape;
-            packedOutput[0] = batchElements;
-            static auto foldedOutput = static_cast<Finn::ExtendedBufferDescriptor*>(configuration.deviceWrappers[defaultOutputDeviceIndex].odmas[0].get())->foldedShape;
-            foldedOutput[0] = batchElements;
+            auto result = accelerator.getOutputData(defaultOutputDeviceIndex, getDefaultOutputKernelName());
+            static auto packedOutput = getOutputPackedShape(true);
+            static auto foldedOutput = getOutputFoldedShape(true);
             const Finn::DynamicMdSpan reshapedOutput(result.begin(), result.end(), packedOutput);
             auto unpacked = Finn::unpackMultiDimensionalOutputs<S, Finn::vector<uint8_t>::iterator, false, V>(result.begin(), result.end(), reshapedOutput, foldedOutput);
 
@@ -342,7 +510,7 @@ namespace Finn {
          */
         template<bool Sync = SynchronousInference, typename = std::enable_if_t<!Sync>>
         void drain() {
-            accelerator.drain(defaultOutputDeviceIndex, defaultOutputKernelName);
+            accelerator.drain(defaultOutputDeviceIndex, getDefaultOutputKernelName());
         }
 
         /**
@@ -361,22 +529,17 @@ namespace Finn {
          */
         template<typename IteratorType, typename V = Finn::UnpackingAutoRetType::AutoRetType<S>, bool Sync = SynchronousInference, typename = std::enable_if_t<Sync>>
         [[nodiscard]] Finn::vector<V> inferSynchronous(IteratorType first, IteratorType last, uint inputDeviceIndex, const std::string& inputBufferKernelName, uint outputDeviceIndex, const std::string& outputBufferKernelName) {
-            using IterValueType = typename std::iterator_traits<IteratorType>::value_type;
-            static auto foldedShape = static_cast<Finn::ExtendedBufferDescriptor*>(configuration.deviceWrappers[inputDeviceIndex].idmas[0].get())->foldedShape;
-            foldedShape[0] = batchElements;
+            static auto foldedShape = getInputFoldedShape(true, inputDeviceIndex, getInputKernelIndexFromName(inputBufferKernelName));
             const Finn::DynamicMdSpan reshapedInput(first, last, foldedShape);
 
             auto packed = Finn::packMultiDimensionalInputs<F, IteratorType>(first, last, reshapedInput, foldedShape.back());
 
             auto result = infer(packed.begin(), packed.end(), inputDeviceIndex, inputBufferKernelName, outputDeviceIndex, outputBufferKernelName, batchElements);
 
-            static auto packedOutput = configuration.deviceWrappers[inputDeviceIndex].odmas[0]->packedShape;
-            packedOutput[0] = batchElements;
-            static auto foldedOutput = static_cast<Finn::ExtendedBufferDescriptor*>(configuration.deviceWrappers[inputDeviceIndex].odmas[0].get())->foldedShape;
-            foldedOutput[0] = batchElements;
+            static auto packedOutput = getOutputPackedShape(true, outputDeviceIndex, getOutputKernelIndexFromName(outputBufferKernelName));
+            static auto foldedOutput = getOutputFoldedShape(true, outputDeviceIndex, getOutputKernelIndexFromName(outputBufferKernelName));
             const Finn::DynamicMdSpan reshapedOutput(result.begin(), result.end(), packedOutput);
             auto unpacked = Finn::unpackMultiDimensionalOutputs<S, Finn::vector<uint8_t>::iterator, false, V>(result.begin(), result.end(), reshapedOutput, foldedOutput);
-
             return unpacked;
         }
 
@@ -392,7 +555,7 @@ namespace Finn {
          */
         template<typename IteratorType, typename V = Finn::UnpackingAutoRetType::AutoRetType<S>, bool Sync = SynchronousInference, typename = std::enable_if_t<Sync>>
         [[nodiscard]] Finn::vector<V> inferSynchronous(IteratorType first, IteratorType last) {
-            return inferSynchronous(first, last, defaultInputDeviceIndex, defaultInputKernelName, defaultOutputDeviceIndex, defaultOutputKernelName);
+            return inferSynchronous(first, last, defaultInputDeviceIndex, getDefaultInputKernelName(), defaultOutputDeviceIndex, getDefaultOutputKernelName());
         }
 
         /**
@@ -424,7 +587,7 @@ namespace Finn {
          */
         template<typename U, typename V = Finn::UnpackingAutoRetType::AutoRetType<S>, bool Sync = SynchronousInference, typename = std::enable_if_t<Sync>>
         [[nodiscard]] Finn::vector<V> inferSynchronous(const Finn::vector<U>& data) {
-            return inferSynchronous(data, defaultInputDeviceIndex, defaultInputKernelName, defaultOutputDeviceIndex, defaultOutputKernelName, batchElements);
+            return inferSynchronous(data, defaultInputDeviceIndex, getDefaultInputKernelName(), defaultOutputDeviceIndex, getDefaultOutputKernelName(), batchElements);
         }
 
          protected:
@@ -443,7 +606,7 @@ namespace Finn {
          */
         template<typename IteratorType, bool Sync = SynchronousInference, typename = std::enable_if_t<Sync>>
         [[nodiscard]] Finn::vector<uint8_t> infer(IteratorType first, IteratorType last, uint inputDeviceIndex, const std::string& inputBufferKernelName, uint outputDeviceIndex, const std::string& outputBufferKernelName, uint batchSize) {
-            FINN_LOG_DEBUG(loglevel::info) << loggerPrefix() << "Starting inference (raw data)";
+            FINN_LOG_DEBUG(loglevel::info) << loggerPrefix() << "Starting inference (raw data). Input length: " << std::abs(std::distance(first, last));
             auto storeFunc = accelerator.storeFactory(inputDeviceIndex, inputBufferKernelName);
 
             if (std::abs(std::distance(first, last)) != getTotalDataSize(inputDeviceIndex, inputBufferKernelName)) {
@@ -452,6 +615,7 @@ namespace Finn {
                                                       std::to_string(getTotalDataSize(inputDeviceIndex, inputBufferKernelName)) + ")");
             }
 
+            // TODO(all): This is unused?
             bool stored = storeFunc(first, last);
 
             accelerator.run();

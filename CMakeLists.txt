@@ -71,6 +71,10 @@ endif()
 
 #INCLUDES
 
+# pybind
+set(PYBIND11_FINDPYTHON ON)
+find_package(pybind11 CONFIG)
+
 #Threads
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)

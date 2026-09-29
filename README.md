@@ -18,19 +18,20 @@ FINN will then generate all config files for you. For FINN it is then necessary 
 FINN+ on the other hand will configure and build the driver for you completely automatically. We would therefore recommend using FINN+ instead of standard FINN.
 
 ### Using the driver
+The driver can be used in a few ways:
+- As a standalone executable
+- As a library
+- As a Python module
 
-You can either use the driver as a standalone executable or as a library. For the use of the C++ driver as a library, please have a look at the section for [library use](#using-the-driver-as-a-library).
+#### Standalone Executable
 If you just want to use the C++ driver for FINN as an alternative for the default PYNQ driver, it is now possible to directly generate the C++ driver and all of its configutation files from [FINN](https://github.com/Xilinx/finn) and [FINN+](https://github.com/eki-project/finn-plus)!
 
 Just select `build_cfg.DataflowOutputType.CPP_DRIVER` instead of `build_cfg.DataflowOutputType.PYNQ_DRIVER` in your build script in `generate_outputs`.
+This will cause all config files to be generated for you automatically. 
 
-FINN will then generate all config files for you. For FINN it is then necessary to build the driver yourself. See section [Building the Driver](#building-the-driver).
+For standard FINN it is then necessary to build the driver yourself. See section [Building the Driver](#building-the-driver).
 
 FINN+ on the other hand will configure and build the driver for you completely automatically. We would therefore recommend using FINN+ instead of standard FINN.
-
-### Using the driver
-
-You can either use the driver as a standalone executable or as a library. For the use of the C++ driver as a library, please have a look at the section for [library use](#using-the-driver-as-a-library).
 
 If you ever need help on which arguments the driver requires, simply use the ```--help``` flag on the driver. The executable for the driver is, by default, located in the `build/bin` folder after compiling the driver.
 
@@ -53,6 +54,14 @@ If the execution of the C++ driver fails due to missing libraries such as `libfi
 ```bash
 export LD_LIBRARY_PATH="$(pwd)/build/libs:$LD_LIBRARY_PATH"
 ```
+
+#### Library
+For the use of the C++ driver as a library, please have a look at the section for [library use](#using-the-driver-as-a-library).
+
+#### Python Module
+Thanks to `pybind11` the core functionality of the driver can be used directly from Python. This can be useful for further integrating the driver into other projects.
+For details check out the section for [Python module use](#using-the-driver-as-a-python-module).
+
 
 ### Building the Driver
 
@@ -161,6 +170,46 @@ target_include_directories(example SYSTEM PRIVATE ${XRT_INCLUDE_DIRS} ${FINN_SRC
 target_link_directories(example PRIVATE ${XRT_LIB_CORE_LOCATION} ${XRT_LIB_OCL_LOCATION})
 target_link_libraries(example PRIVATE finnc_core finnc_options Threads::Threads OpenCL xrt_coreutil uuid finnc_utils finn_config nlohmann_json::nlohmann_json OpenMP::OpenMP_CXX)
 ```
+
+### Using the driver as a Python module
+To build the Python module make sure to have `pybind11` available in your environment. During configuration, CMake will pick up the necessary files and add the module as a target.
+
+By default the results are placed in `finn-cpp-driver/build/lib/finnhpcpy`. To change this add `-DFINN_BINDINGS_OUTPUT_DIR=<my path>` to your CMake command. The build will generate
+```
+finnhpcpy.so
+__init__.py
+(optional) finnhpcpy.pyi
+```
+
+> [!NOTE]
+> It is highly recommended to also install `pybind11-stubgen`. This tool can generate type-hints (`finnhpcpy.pyi`) for the built module. This is quite useful, since LSPs usually aren't able to extract function signatures
+> and datatypes directly from the `.so` file. Make sure that the Python interpreter used is the same as was used to build the module.
+
+> [!IMPORTANT]
+> Keep in mind that just as the standalone executable and the library target, the produced Python module is specific to the neural network which the driver was configured with. To target a different network regenerate the configuration and rebuild the module.
+> To keep performance optimized, use `Release` as the build type!
+
+If the build was successful, you will be able to simply instantiate the driver in your application:
+
+```Python
+# Almost all functions are methods of the driver class
+from finnhpcpy import FINNSyncDriver
+
+# Just as in the library, this will reset the FPGAs and prepare inference
+# Which logs are shown when enable_logger=True depends on your build type. If you built
+# the module with "Debug", the debug logs will be printed as well.
+driver = FINNSyncDriver("acceleratorconfig.json", batch_size=32, enable_logger=False)
+
+data = np.array(...)
+results = driver.infer_numpy(data)
+
+driver.set_batch_size(1024)
+results = driver.infer_numpy(...)
+```
+
+> [!WARNING]
+> The Python side `FINN(A)SyncDriver` is not a 1-to-1 mapping of the `BaseDriver` C++ class and its interface may still change. For an
+> overview of all bindings, check out `src/FINNCppDriver/bindings/PythonBindings.cpp`.
 
 ### Known Issues
 

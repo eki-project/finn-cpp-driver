@@ -20,6 +20,7 @@
 #include <cinttypes>                       // for uint8_t
 #include <cstddef>                         // for size_t
 #include <functional>                      // for function
+#include <map>                             // for map
 #include <string>                          // for string
 #include <vector>                          // for vector, vector<>::iter...
 
@@ -53,11 +54,11 @@ namespace Finn {
         /**
          * @brief Construct a new Accelerator object using a list of DeviceWrappers
          *
-         * @param deviceDefinitions Vector of @ref DeviceWrapper
+         * @param deviceDefinitions Map of @ref DeviceWrapper, keyed by their xrtDeviceIndex
          * @param synchronousInference Decides if synchronous or asynchronous inference should be used
          * @param hostBufferSize Size of ringbuffer to initialize
          */
-        explicit Accelerator(const std::vector<DeviceWrapper>& deviceDefinitions, bool synchronousInference, unsigned int hostBufferSize);
+        explicit Accelerator(const std::map<unsigned int, DeviceWrapper>& deviceDefinitions, bool synchronousInference, unsigned int hostBufferSize);
         /**
          * @brief Construct a new Accelerator object
          *

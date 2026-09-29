@@ -167,10 +167,12 @@ namespace Finn {
         bool ret = true;
         // cppcheck-suppress unusedVariable
         for (auto&& [key, value] : outputBufferMap) {
+            FINN_LOG_DEBUG(loglevel::info) << "Running kernel: " << key;
             ret &= value->run();
         }
         // cppcheck-suppress unusedVariable
         for (auto&& [key, value] : inputBufferMap) {
+            FINN_LOG_DEBUG(loglevel::info) << "Running kernel: " << key;
             ret &= value->run();
         }
         return ret;

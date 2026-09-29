@@ -19,21 +19,23 @@
 #include <FINNCppDriver/utils/Logger.hpp>  // for operator<<, DevNull
 #include <algorithm>                       // for count_if, find_if, tra...
 #include <cstddef>                         // for size_t
-#include <iterator>                        // for back_insert_iterator
+#include <format>                          // for format
 #include <stdexcept>                       // for runtime_error
 
 namespace Finn {
 
-    Accelerator::Accelerator(const std::vector<DeviceWrapper>& deviceDefinitions, bool synchronousInference, unsigned int hostBufferSize) {
+    Accelerator::Accelerator(const std::map<unsigned int, DeviceWrapper>& deviceDefinitions, bool synchronousInference, unsigned int hostBufferSize) {
         FINN_LOG(loglevel::info) << "Constructing Accelerator\n";
-        std::transform(deviceDefinitions.begin(), deviceDefinitions.end(), std::back_inserter(devices), [hostBufferSize, synchronousInference](const DeviceWrapper& dew) { return DeviceHandler(dew, synchronousInference, hostBufferSize); });
+        for (const auto& [xrtDeviceIndex, deviceWrapper] : deviceDefinitions) {
+            devices.emplace_back(deviceWrapper, synchronousInference, hostBufferSize);
+        }
     }
 
 
     /****** GETTER / SETTER ******/
     DeviceHandler& Accelerator::getDeviceHandler(unsigned int deviceIndex) {
         if (!containsDevice(deviceIndex)) {
-            Finn::logAndError<std::runtime_error>("Tried retrieving a deviceHandler with an unknown index " + std::to_string(deviceIndex));
+            Finn::logAndError<std::runtime_error>(std::format("Tried retrieving a deviceHandler with an unknown xrtDeviceIndex {}!", deviceIndex));
         }
         auto isCorrectHandler = [deviceIndex](const DeviceHandler& dhh) { return dhh.getDeviceIndex() == deviceIndex; };
         if (auto dhIt = std::find_if(devices.begin(), devices.end(), isCorrectHandler); dhIt != devices.end()) {
@@ -105,18 +107,9 @@ namespace Finn {
 
     // cppcheck-suppress unusedFunction
     [[maybe_unused]] Finn::vector<uint8_t> Accelerator::getOutputData(const unsigned int deviceIndex, const std::string& outputBufferKernelName, const std::size_t& numItems) {
-        if (containsDevice(deviceIndex)) {
-            FINN_LOG_DEBUG(loglevel::info) << "Retrieving results from the specified device index!";
-            return getDeviceHandler(deviceIndex).retrieveResults(outputBufferKernelName, numItems);
-        } else {
-            if (containsDevice(0)) {
-                FINN_LOG_DEBUG(loglevel::info) << "Retrieving results from 0  device index!";
-                return getDeviceHandler(0).retrieveResults(outputBufferKernelName, numItems);
-            } else {
-                // cppcheck-suppress missingReturn
-                Finn::logAndError<std::runtime_error>("Tried receiving data in a devicehandler with an invalid deviceIndex!");
-            }
-        }
+        // getDeviceHandler throws if no device with this xrtDeviceIndex exists. There is deliberately no fallback to another device.
+        FINN_LOG_DEBUG(loglevel::info) << "Retrieving results from device index " << deviceIndex;
+        return getDeviceHandler(deviceIndex).retrieveResults(outputBufferKernelName, numItems);
     }
 
     Finn::vector<uint8_t> Accelerator::getOutputData(const unsigned int deviceIndex, const std::string& outputBufferKernelName) {

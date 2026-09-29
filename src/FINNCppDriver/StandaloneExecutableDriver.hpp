@@ -197,7 +197,7 @@ namespace Finn {
          */
         void runThroughputTest() {
             FINN_LOG(loglevel::info) << finnMainLogPrefix() << "Device Information: ";
-            logDeviceInformation(this->getDeviceHandler(0).getDevice(), this->getConfig().deviceWrappers[0].xclbin);
+            logDeviceInformation(this->getDeviceHandler(0).getDevice(), this->getConfig().getDeviceWrapper(0).xclbin);
 
             size_t elementcount = FinnUtils::shapeToElements(this->getInputNormalShape());
             uint batchSize = this->getBatchSize();
@@ -316,7 +316,7 @@ namespace Finn {
             FINN_LOG(loglevel::info) << finnMainLogPrefix() << "Running driver on input files";
 
             // TODO(bwintermann): This 0 may need to be swapped with this->getDefaultInputDeviceIndex() too
-            logDeviceInformation(this->getDeviceHandler(0).getDevice(), this->getConfig().deviceWrappers[this->getDefaultInputDeviceIndex()].xclbin);
+            logDeviceInformation(this->getDeviceHandler(0).getDevice(), this->getConfig().getDeviceWrapper(this->getDefaultInputDeviceIndex()).xclbin);
 
             for (auto&& [inp, out] = std::tuple{inputFiles.begin(), outputFiles.begin()}; inp != inputFiles.end(); ++inp, ++out) {
                 // load npy file and process it

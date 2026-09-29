@@ -83,8 +83,8 @@ void printConfig(ConstDriverVariant driver) {
     std::cout << "Input Bitwidth: " << InputFinnType().bitwidth() << std::endl;
     std::cout << "Output Bitwidth: " << OutputFinnType().bitwidth() << std::endl;
     std::cout << "------------------" << std::endl;
-    for (Finn::DeviceWrapper& wrapper : config.deviceWrappers) {
-        std::cout << "DEVICE " << wrapper.xrtDeviceIndex << std::endl;
+    for (const auto& [xrtDeviceIndex, wrapper] : config.deviceWrappers) {
+        std::cout << "DEVICE " << xrtDeviceIndex << std::endl;
         std::cout << "\tXCLBIN: " << wrapper.xclbin << std::endl;
         for (const std::shared_ptr<Finn::BufferDescriptor>& idma : wrapper.idmas) {
             std::cout << "\tIDMA: " << idma->kernelName << std::endl;

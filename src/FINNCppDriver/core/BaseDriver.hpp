@@ -73,9 +73,7 @@ namespace Finn {
         /**
          * @brief Return whether any device wrapper has a matching xrtDeviceIndex.
          */
-        bool hasXrtDeviceIndex(uint idx) {
-            return std::any_of(configuration.deviceWrappers.begin(), configuration.deviceWrappers.end(), [idx](const DeviceWrapper& dev) { return dev.xrtDeviceIndex == idx; });
-        }
+        bool hasXrtDeviceIndex(uint idx) const { return configuration.deviceWrappers.contains(idx); }
 
         /**
          * @brief Set the Default Input Device Index
@@ -121,12 +119,12 @@ namespace Finn {
         /**
          * @brief Return whether the default input device has an IDMA of the given index.
          */
-        bool hasInputKernelIndex(uint idx) { return !(configuration.deviceWrappers[defaultInputDeviceIndex].idmas.size() <= idx); }
+        bool hasInputKernelIndex(uint idx) const { return idx < configuration.getDeviceWrapper(defaultInputDeviceIndex).idmas.size(); }
 
         /**
          * @brief Return whether the default output device has an ODMA of the given index.
          */
-        bool hasOutputKernelIndex(uint idx) { return !(configuration.deviceWrappers[defaultOutputDeviceIndex].odmas.size() <= idx); }
+        bool hasOutputKernelIndex(uint idx) const { return idx < configuration.getDeviceWrapper(defaultOutputDeviceIndex).odmas.size(); }
 
         /**
          * @brief Set the default input kernel index (on the default input device).
@@ -151,32 +149,48 @@ namespace Finn {
         }
 
         /**
-         * @brief Retrieve the kernel index from the kernel name on the default input device.
-         * @throws std::runtime_error if no such kernel exists.
+         * @brief Retrieve the kernel index from the kernel name on the device with the given xrtDeviceIndex.
+         * @param deviceIndex xrtDeviceIndex of the device to search
+         * @param name Name of the IDMA kernel
+         * @throws std::runtime_error if no such device or kernel exists.
          */
-        uint getInputKernelIndexFromName(const std::string& name) {
-            std::vector<std::shared_ptr<BufferDescriptor>>& idmas = configuration.deviceWrappers[defaultInputDeviceIndex].idmas;
+        uint getInputKernelIndexFromName(uint deviceIndex, const std::string& name) {
+            const std::vector<std::shared_ptr<BufferDescriptor>>& idmas = configuration.getDeviceWrapper(deviceIndex).idmas;
             for (uint i = 0; i < idmas.size(); ++i) {
                 if (idmas[i]->kernelName == name) {
                     return i;
                 }
             }
-            throw std::runtime_error(std::format("No IDMA of name {} was found in default input device {}.", name, defaultInputDeviceIndex));
+            throw std::runtime_error(std::format("No IDMA of name {} was found in device {}.", name, deviceIndex));
+        }
+
+        /**
+         * @brief Retrieve the kernel index from the kernel name on the default input device.
+         * @throws std::runtime_error if no such kernel exists.
+         */
+        uint getInputKernelIndexFromName(const std::string& name) { return getInputKernelIndexFromName(defaultInputDeviceIndex, name); }
+
+        /**
+         * @brief Retrieve the kernel index from the kernel name on the device with the given xrtDeviceIndex.
+         * @param deviceIndex xrtDeviceIndex of the device to search
+         * @param name Name of the ODMA kernel
+         * @throws std::runtime_error if no such device or kernel exists.
+         */
+        uint getOutputKernelIndexFromName(uint deviceIndex, const std::string& name) {
+            const std::vector<std::shared_ptr<BufferDescriptor>>& odmas = configuration.getDeviceWrapper(deviceIndex).odmas;
+            for (uint i = 0; i < odmas.size(); ++i) {
+                if (odmas[i]->kernelName == name) {
+                    return i;
+                }
+            }
+            throw std::runtime_error(std::format("No ODMA of name {} was found in device {}.", name, deviceIndex));
         }
 
         /**
          * @brief Retrieve the kernel index from the kernel name on the default output device.
          * @throws std::runtime_error if no such kernel exists.
          */
-        uint getOutputKernelIndexFromName(const std::string& name) {
-            std::vector<std::shared_ptr<BufferDescriptor>>& odmas = configuration.deviceWrappers[defaultOutputDeviceIndex].odmas;
-            for (uint i = 0; i < odmas.size(); ++i) {
-                if (odmas[i]->kernelName == name) {
-                    return i;
-                }
-            }
-            throw std::runtime_error(std::format("No ODMA of name {} was found in default output device {}", name, defaultOutputDeviceIndex));
-        }
+        uint getOutputKernelIndexFromName(const std::string& name) { return getOutputKernelIndexFromName(defaultOutputDeviceIndex, name); }
 
 
         /**
@@ -185,7 +199,7 @@ namespace Finn {
          * @param kernelIndex Optional device index. Otherwise the default IO kernel index is used.
          */
         std::shared_ptr<ExtendedBufferDescriptor> getDefaultIDMABufferDescriptor(std::optional<uint> deviceIndex = std::nullopt, std::optional<uint> kernelIndex = std::nullopt) {
-            return std::static_pointer_cast<ExtendedBufferDescriptor>(configuration.deviceWrappers[deviceIndex.value_or(defaultInputDeviceIndex)].idmas[kernelIndex.value_or(defaultInputKernelIndex)]);
+            return std::static_pointer_cast<ExtendedBufferDescriptor>(configuration.getDeviceWrapper(deviceIndex.value_or(defaultInputDeviceIndex)).idmas.at(kernelIndex.value_or(defaultInputKernelIndex)));
         }
 
         /**
@@ -194,7 +208,7 @@ namespace Finn {
          * @param kernelIndex Optional device index. Otherwise the default IO kernel index is used.
          */
         std::shared_ptr<ExtendedBufferDescriptor> getDefaultODMABufferDescriptor(std::optional<uint> deviceIndex = std::nullopt, std::optional<uint> kernelIndex = std::nullopt) {
-            return std::static_pointer_cast<ExtendedBufferDescriptor>(configuration.deviceWrappers[deviceIndex.value_or(defaultOutputDeviceIndex)].odmas[kernelIndex.value_or(defaultOutputKernelIndex)]);
+            return std::static_pointer_cast<ExtendedBufferDescriptor>(configuration.getDeviceWrapper(deviceIndex.value_or(defaultOutputDeviceIndex)).odmas.at(kernelIndex.value_or(defaultOutputKernelIndex)));
         }
 
         /**
@@ -258,16 +272,7 @@ namespace Finn {
         void initializeBaseDriver(uint batchSize, uint defDevInIdx = 0, uint defDevOutIdx = 0, uint defIDMAIdx = 0, uint defODMAIdx = 0) {
             accelerator = Accelerator(configuration.deviceWrappers, SynchronousInference, batchSize);
 
-            // TODO(all): In this method, the defaultInputDeviceIndex means the xrtDeviceIndex, in other methods however
-            // it refers to the list index of the deviceWrapper in its std::vector. For now we just manually check, but this should
-            // really be a map where the xrtDeviceIndex is the key and the matching device wrapper is the value.
-            for (uint i = 0; i < configuration.deviceWrappers.size(); ++i) {
-                if (configuration.deviceWrappers[i].xrtDeviceIndex != i) {
-                    throw std::runtime_error("INTERNAL ERROR: Mismatch between xrtDeviceIndex and configuration.deviceWrappers index. Check the BaseDriver::initializeBaseDriver method for details.");
-                }
-            }
-
-            // Assign the default device index used. This must match the xrtDeviceIndex, NOT the index of the device wrapper in the list of wrappers
+            // All device indices in this class are xrtDeviceIndex values, i.e. the keys of configuration.deviceWrappers.
             setDefaultInputDeviceIndex(defDevInIdx);
             setDefaultOutputDeviceIndex(defDevOutIdx);
             setDefaultInputKernelIndex(defIDMAIdx);
@@ -315,7 +320,7 @@ namespace Finn {
          */
         BaseDriver(const std::filesystem::path& configPath, uint inputDeviceIndex, const std::string& inputKernelName, uint outputDeviceIndex, const std::string& outputKernelName, uint batchSize)
             : configuration(createConfigFromPath(configPath)) {
-            initializeBaseDriver(batchSize, inputDeviceIndex, outputDeviceIndex, getInputKernelIndexFromName(inputKernelName), getOutputKernelIndexFromName(outputKernelName));
+            initializeBaseDriver(batchSize, inputDeviceIndex, outputDeviceIndex, getInputKernelIndexFromName(inputDeviceIndex, inputKernelName), getOutputKernelIndexFromName(outputDeviceIndex, outputKernelName));
         }
 
         /**
@@ -330,7 +335,7 @@ namespace Finn {
          * @param batchSize
          */
         BaseDriver(const Config& pConfig, uint inputDeviceIndex, const std::string& inputKernelName, uint outputDeviceIndex, const std::string& outputKernelName, uint batchSize) : configuration(pConfig) {
-            initializeBaseDriver(batchSize, inputDeviceIndex, outputDeviceIndex, getInputKernelIndexFromName(inputKernelName), getOutputKernelIndexFromName(outputKernelName));
+            initializeBaseDriver(batchSize, inputDeviceIndex, outputDeviceIndex, getInputKernelIndexFromName(inputDeviceIndex, inputKernelName), getOutputKernelIndexFromName(outputDeviceIndex, outputKernelName));
         }
 
         /**
@@ -469,8 +474,11 @@ namespace Finn {
         [[nodiscard]] Finn::vector<V> getResults(uint outputDeviceIndex, const std::string& outputBufferKernelName) {
             // TODO(linusjun): maybe this method should block until data is available?
             auto result = accelerator.getOutputData(outputDeviceIndex, outputBufferKernelName);
-            static auto packedOutput = getOutputPackedShape(true, outputDeviceIndex, getOutputKernelIndexFromName(outputBufferKernelName));
-            static auto foldedOutput = getOutputFoldedShape(true, outputDeviceIndex, getOutputKernelIndexFromName(outputBufferKernelName));
+            // NOTE: These shapes used to be `static`, i.e. computed once per template instantiation and then reused. That silently returned stale shapes after a different device/kernel was passed, after setBatchSize(),
+            // or when another driver object of the same type was used. They are now recomputed on every call (kernel name lookup + shape copies), which may have performance implications in benchmarks.
+            // If that shows up, cache them per driver object and invalidate the cache in setBatchSize() and when the defaults change.
+            auto packedOutput = getOutputPackedShape(true, outputDeviceIndex, getOutputKernelIndexFromName(outputDeviceIndex, outputBufferKernelName));
+            auto foldedOutput = getOutputFoldedShape(true, outputDeviceIndex, getOutputKernelIndexFromName(outputDeviceIndex, outputBufferKernelName));
             const Finn::DynamicMdSpan reshapedOutput(result.begin(), result.end(), packedOutput);
             auto unpacked = Finn::unpackMultiDimensionalOutputs<S, Finn::vector<uint8_t>::iterator, false, V>(result.begin(), result.end(), reshapedOutput, foldedOutput);
             return unpacked;
@@ -487,8 +495,11 @@ namespace Finn {
         [[nodiscard]] Finn::vector<V> getResults() {
             // TODO(linusjun): maybe this method should block until data is available?
             auto result = accelerator.getOutputData(defaultOutputDeviceIndex, getDefaultOutputKernelName());
-            static auto packedOutput = getOutputPackedShape(true);
-            static auto foldedOutput = getOutputFoldedShape(true);
+            // NOTE: These shapes used to be `static`, i.e. computed once per template instantiation and then reused. That silently returned stale shapes after the default device/kernel changed, after setBatchSize(),
+            // or when another driver object of the same type was used. They are now recomputed on every call (shape copies), which may have performance implications in benchmarks.
+            // If that shows up, cache them per driver object and invalidate the cache in setBatchSize() and when the defaults change.
+            auto packedOutput = getOutputPackedShape(true);
+            auto foldedOutput = getOutputFoldedShape(true);
             const Finn::DynamicMdSpan reshapedOutput(result.begin(), result.end(), packedOutput);
             auto unpacked = Finn::unpackMultiDimensionalOutputs<S, Finn::vector<uint8_t>::iterator, false, V>(result.begin(), result.end(), reshapedOutput, foldedOutput);
 
@@ -529,15 +540,19 @@ namespace Finn {
          */
         template<typename IteratorType, typename V = Finn::UnpackingAutoRetType::AutoRetType<S>, bool Sync = SynchronousInference, typename = std::enable_if_t<Sync>>
         [[nodiscard]] Finn::vector<V> inferSynchronous(IteratorType first, IteratorType last, uint inputDeviceIndex, const std::string& inputBufferKernelName, uint outputDeviceIndex, const std::string& outputBufferKernelName) {
-            static auto foldedShape = getInputFoldedShape(true, inputDeviceIndex, getInputKernelIndexFromName(inputBufferKernelName));
+            // NOTE: The shapes in this method used to be `static`, i.e. computed once per template instantiation and then reused. That silently returned stale shapes after a different device/kernel was passed,
+            // after setBatchSize(), or when another driver object of the same type was used. They are now recomputed on every call (kernel name lookup + shape copies), which may have performance implications in
+            // benchmarks. If that shows up, cache them per driver object and invalidate the cache in setBatchSize() and when the defaults change.
+            auto foldedShape = getInputFoldedShape(true, inputDeviceIndex, getInputKernelIndexFromName(inputDeviceIndex, inputBufferKernelName));
             const Finn::DynamicMdSpan reshapedInput(first, last, foldedShape);
 
             auto packed = Finn::packMultiDimensionalInputs<F, IteratorType>(first, last, reshapedInput, foldedShape.back());
 
             auto result = infer(packed.begin(), packed.end(), inputDeviceIndex, inputBufferKernelName, outputDeviceIndex, outputBufferKernelName, batchElements);
 
-            static auto packedOutput = getOutputPackedShape(true, outputDeviceIndex, getOutputKernelIndexFromName(outputBufferKernelName));
-            static auto foldedOutput = getOutputFoldedShape(true, outputDeviceIndex, getOutputKernelIndexFromName(outputBufferKernelName));
+            // NOTE: No longer static, see the note for foldedShape above.
+            auto packedOutput = getOutputPackedShape(true, outputDeviceIndex, getOutputKernelIndexFromName(outputDeviceIndex, outputBufferKernelName));
+            auto foldedOutput = getOutputFoldedShape(true, outputDeviceIndex, getOutputKernelIndexFromName(outputDeviceIndex, outputBufferKernelName));
             const Finn::DynamicMdSpan reshapedOutput(result.begin(), result.end(), packedOutput);
             auto unpacked = Finn::unpackMultiDimensionalOutputs<S, Finn::vector<uint8_t>::iterator, false, V>(result.begin(), result.end(), reshapedOutput, foldedOutput);
             return unpacked;

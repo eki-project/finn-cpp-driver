@@ -45,7 +45,7 @@ namespace Finn {
              *
              * @param expectedMaxQueueSize Expected maximum size of the queue
              */
-            AsyncBufferWrapper(std::size_t expectedMaxQueueSize) : queue(expectedMaxQueueSize * featureMapCount) { FINN_LOG(loglevel::info) << "[AsyncDeviceBuffer] Max buffer size:" << queue.size() << "\n"; }
+            AsyncBufferWrapper(std::size_t expectedMaxQueueSize) : queue(expectedMaxQueueSize * featureMapCount) { FINN_LOG(loglevel::info) << "[AsyncDeviceBuffer] Max buffer size:" << queue.capacity() << "\n"; }
 
             /**
              * @brief Destroy the Async Buffer Wrapper object
@@ -259,7 +259,8 @@ namespace Finn {
                 }
                 this->sync(this->totalDataSize);
                 saveMap();
-                callback(this->queue.size() - (this->queue.size() % this->totalDataSize));  // Notify that data is available in the queue
+                const std::size_t queued = this->queue.size();
+                callback(queued - (queued % this->totalDataSize));  // Notify that data is available in the queue
             }
         }
 
@@ -372,9 +373,8 @@ namespace Finn {
         }
 
         void drain() override {
-            // Drain the queue by reading all available items
-            T item;
-            while (this->queue.try_dequeue(item)) {}
+            // Discard all queued items
+            this->queue.clear();
             FINN_LOG_DEBUG(loglevel::info) << "Drained the AsyncDeviceOutputBuffer queue.";
         }
 

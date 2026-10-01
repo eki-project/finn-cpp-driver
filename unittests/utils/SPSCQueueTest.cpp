@@ -1,6 +1,15 @@
 #include <FINNCppDriver/utils/SPSCQueue.hpp>
 #include <atomic>
 #include <chrono>
+#include <cstdint>
+#include <deque>
+#include <iterator>
+#include <list>
+#include <memory>
+#include <numeric>
+#include <random>
+#include <stdexcept>
+#include <stop_token>
 #include <string>
 #include <thread>
 #include <vector>
@@ -391,8 +400,8 @@ TEST(SPSCQueueTest, ConcurrentThroughput) {
                             break;
                         }
                         expected++;
-                    } else if (producer_done.load(std::memory_order_acquire)) {
-                        // If producer is done and no more items, we're missing items
+                    } else if (producer_done.load(std::memory_order_acquire) && queue.is_empty()) {
+                        // Producer is done and the queue is drained, so any item not seen yet is missing
                         if (expected < ITEM_COUNT) {
                             error = true;
                         }
@@ -827,8 +836,8 @@ TEST(DynamicSPSCQueueTest, ConcurrentThroughput) {
                             break;
                         }
                         expected++;
-                    } else if (producer_done.load(std::memory_order_acquire)) {
-                        // If producer is done and no more items, we're missing items
+                    } else if (producer_done.load(std::memory_order_acquire) && queue.is_empty()) {
+                        // Producer is done and the queue is drained, so any item not seen yet is missing
                         if (expected < ITEM_COUNT) {
                             error = true;
                         }
@@ -855,6 +864,352 @@ TEST(DynamicSPSCQueueTest, ConcurrentThroughput) {
         EXPECT_TRUE(joined) << "Test timed out - likely deadlock";
         EXPECT_FALSE(error) << "Data corruption or missing items detected";
     }
+}
+
+// REGRESSION TESTS
+// Each of these covers a defect of the previous queue implementation
+
+namespace {
+    using namespace std::chrono_literals;
+
+    // Not default-constructible, owns heap memory (so ASAN sees leaks) and counts live objects (double destruction)
+    struct Tracked {
+        static inline int live = 0;
+        static inline int copies_until_throw = -1;  // < 0: never throw
+
+        std::string payload;
+
+        explicit Tracked(int value) : payload("tracked-value-with-heap-storage-" + std::to_string(value)) { ++live; }
+        Tracked(const Tracked& other) : payload(other.payload) {
+            if (copies_until_throw == 0) {
+                throw std::runtime_error("copy failed");
+            }
+            if (copies_until_throw > 0) {
+                --copies_until_throw;
+            }
+            ++live;
+        }
+        Tracked(Tracked&& other) noexcept : payload(std::move(other.payload)) { ++live; }
+        Tracked& operator=(const Tracked&) = default;
+        Tracked& operator=(Tracked&&) noexcept = default;
+        ~Tracked() { --live; }
+    };
+
+    template<typename Queue, typename... QueueArgs>
+    void checkElementLifetimes(QueueArgs... queueArgs) {
+        const int before = Tracked::live;
+        {
+            auto queue = std::make_unique<Queue>(queueArgs...);  // capacity 15
+            Tracked out(-1);
+            // 50 enqueues through 16 slots: wraps around several times
+            for (int round = 0; round < 10; ++round) {
+                for (int i = 0; i < 5; ++i) {
+                    EXPECT_TRUE(queue->try_emplace(round * 5 + i));
+                }
+                for (int i = 0; i < 4; ++i) {
+                    EXPECT_TRUE(queue->try_dequeue(out));
+                }
+            }
+            EXPECT_EQ(queue->size(), 10u);
+            EXPECT_EQ(Tracked::live, before + 1 + 10);
+
+            std::vector<Tracked> src;
+            for (int i = 0; i < 5; ++i) {
+                src.emplace_back(100 + i);
+            }
+            EXPECT_EQ(queue->try_enqueue_bulk(src.begin(), src.size()), 5u);
+            EXPECT_TRUE(queue->is_full());
+
+            std::vector<Tracked> dst(6, Tracked(0));
+            EXPECT_EQ(queue->try_dequeue_bulk(dst.begin(), dst.size()), 6u);
+            EXPECT_EQ(queue->clear(), 9u);
+            EXPECT_TRUE(queue->is_empty());
+            EXPECT_EQ(Tracked::live, before + 1 + 5 + 6);
+
+            // Left in the queue for the destructor
+            EXPECT_TRUE(queue->try_emplace(7));
+            EXPECT_TRUE(queue->try_emplace(8));
+        }
+        EXPECT_EQ(Tracked::live, before);
+    }
+
+    // Lets the other side repeatedly go from spinning to sleeping, to exercise the sleep/wake handshake
+    void randomPause(std::mt19937& rng) {
+        if (rng() % 32 == 0) {
+            const auto until = std::chrono::steady_clock::now() + std::chrono::microseconds(rng() % 100);
+            while (std::chrono::steady_clock::now() < until) {}
+        }
+    }
+
+    // Runs body; if it does not finish within the deadline, shuts the queue down so the test fails instead of hanging
+    template<typename Queue, typename Body>
+    void withWatchdog(Queue& queue, Body body) {
+        std::atomic<bool> done{false};
+        std::thread watchdog([&] {
+            const auto deadline = std::chrono::steady_clock::now() + 60s;
+            while (!done.load() && std::chrono::steady_clock::now() < deadline) {
+                std::this_thread::sleep_for(10ms);
+            }
+            if (!done.load()) {
+                ADD_FAILURE() << "Blocking hand-off hung (lost wake-up)";
+                queue.shutdown();
+            }
+        });
+        body();
+        done = true;
+        watchdog.join();
+    }
+
+    template<typename Queue>
+    void checkBlockingHandOff(Queue& queue) {
+        constexpr int kItems = 200000;
+        withWatchdog(queue, [&] {
+            std::thread producer([&] {
+                std::mt19937 rng(1);
+                for (int i = 0; i < kItems; ++i) {
+                    if (!queue.enqueue(i)) {
+                        return;
+                    }
+                    randomPause(rng);
+                }
+            });
+            std::mt19937 rng(2);
+            int item = -1;
+            int received = 0;
+            for (; received < kItems; ++received) {
+                if (!queue.dequeue(item) || item != received) {
+                    break;
+                }
+                randomPause(rng);
+            }
+            producer.join();
+            EXPECT_EQ(received, kItems);
+        });
+    }
+
+    template<typename Queue>
+    void checkBlockingBulkHandOff(Queue& queue) {
+        constexpr int kItems = 300000;
+        std::vector<int> produced(kItems);
+        std::iota(produced.begin(), produced.end(), 0);
+        std::vector<int> consumed(kItems, -1);
+        withWatchdog(queue, [&] {
+            std::thread producer([&] {
+                std::mt19937 rng(3);
+                for (std::size_t pos = 0, chunk = 1; pos < produced.size(); pos += chunk, chunk = chunk % 37 + 1) {
+                    chunk = std::min(chunk, produced.size() - pos);
+                    if (queue.enqueue_bulk(produced.data() + pos, chunk) != chunk) {
+                        return;
+                    }
+                    randomPause(rng);
+                }
+            });
+            std::mt19937 rng(4);
+            for (std::size_t pos = 0, chunk = 1; pos < consumed.size(); pos += chunk, chunk = chunk % 23 + 1) {
+                chunk = std::min(chunk, consumed.size() - pos);
+                if (queue.dequeue_bulk(consumed.begin() + static_cast<std::ptrdiff_t>(pos), chunk) != chunk) {
+                    break;
+                }
+                randomPause(rng);
+            }
+            producer.join();
+        });
+        EXPECT_EQ(consumed, produced);
+    }
+}  // namespace
+
+// The static queue used to construct elements on top of live std::array elements and leak or double-destroy them;
+// try_dequeue skipped the destructor of moved-from std::string, std::vector<bool>, pointers and containers
+TEST(SPSCQueueRegression, ElementLifetimesStatic) { checkElementLifetimes<SPSCQueue<Tracked, 16>>(); }
+
+TEST(SPSCQueueRegression, ElementLifetimesDynamic) { checkElementLifetimes<DynamicSPSCQueue<Tracked>>(16); }
+
+// A throwing copy in the middle of a wrapped bulk enqueue must not leak the elements already constructed
+TEST(SPSCQueueRegression, BulkEnqueueIsExceptionSafe) {
+    const int before = Tracked::live;
+    {
+        SPSCQueue<Tracked, 8> queue;  // capacity 7, 8 slots
+        Tracked out(0);
+        for (int i = 0; i < 6; ++i) {
+            ASSERT_TRUE(queue.try_emplace(i));
+            ASSERT_TRUE(queue.try_dequeue(out));
+        }
+        std::vector<Tracked> src;
+        for (int i = 0; i < 5; ++i) {
+            src.emplace_back(i);
+        }
+        Tracked::copies_until_throw = 3;  // fails in the second chunk, after wrapping around
+        EXPECT_THROW(queue.try_enqueue_bulk(src.begin(), src.size()), std::runtime_error);
+        Tracked::copies_until_throw = -1;
+        EXPECT_TRUE(queue.is_empty());
+        EXPECT_EQ(Tracked::live, before + 1 + 5);
+        EXPECT_EQ(queue.try_enqueue_bulk(src.begin(), src.size()), 5u);
+    }
+    EXPECT_EQ(Tracked::live, before);
+}
+
+// dequeue_bulk returned 0 on stop although it had already moved elements out of the queue
+TEST(SPSCQueueRegression, BulkDequeueReportsItemsTakenBeforeStop) {
+    DynamicSPSCQueue<int> queue(64);
+    for (int i = 0; i < 5; ++i) {
+        ASSERT_TRUE(queue.try_enqueue(i));
+    }
+    std::stop_source stop;
+    std::thread stopper([&] {
+        std::this_thread::sleep_for(50ms);
+        stop.request_stop();
+    });
+    std::vector<int> out(10, -1);
+    const auto start = std::chrono::steady_clock::now();
+    EXPECT_EQ(queue.dequeue_bulk(out.data(), out.size(), stop.get_token()), 5u);
+    EXPECT_LT(std::chrono::steady_clock::now() - start, 1s);  // woken by the stop request, not by polling
+    stopper.join();
+    for (int i = 0; i < 5; ++i) {
+        EXPECT_EQ(out[static_cast<std::size_t>(i)], i);
+    }
+    EXPECT_TRUE(queue.is_empty());
+}
+
+// Shutdown must wake a blocked bulk dequeue and report the partial count
+TEST(SPSCQueueRegression, ShutdownWakesBlockedBulkDequeue) {
+    DynamicSPSCQueue<int> queue(64);
+    ASSERT_TRUE(queue.try_enqueue(1));
+    std::thread closer([&] {
+        std::this_thread::sleep_for(50ms);
+        queue.shutdown();
+    });
+    std::vector<int> out(4, -1);
+    EXPECT_EQ(queue.dequeue_bulk(out.begin(), out.size()), 1u);
+    closer.join();
+    EXPECT_EQ(out[0], 1);
+}
+
+// The stop-token overloads waited on a temporary condition variable that was never notified, so they only returned
+// on stop; the timed variant did not compile and reported failure after taking the last element
+TEST(SPSCQueueRegression, StopTokenOverloadsWakeOnData) {
+    SPSCQueue<int, 16> queue;
+    std::stop_source stop;  // never triggered
+
+    std::thread producer([&] {
+        std::this_thread::sleep_for(50ms);
+        queue.try_enqueue(7);
+    });
+    int item = 0;
+    const auto start = std::chrono::steady_clock::now();
+    EXPECT_TRUE(queue.dequeue(item, stop.get_token()));
+    EXPECT_LT(std::chrono::steady_clock::now() - start, 1s);
+    EXPECT_EQ(item, 7);
+    producer.join();
+
+    std::thread producer2([&] {
+        std::this_thread::sleep_for(20ms);
+        queue.try_enqueue(8);
+    });
+    EXPECT_TRUE(queue.dequeue_for(item, 1s, stop.get_token()));
+    EXPECT_EQ(item, 8);
+    EXPECT_TRUE(queue.is_empty());
+    producer2.join();
+}
+
+// enqueue(T&&, stop_token) ignored the stop token
+TEST(SPSCQueueRegression, BlockingEnqueueHonoursStopToken) {
+    SPSCQueue<int, 4> queue;  // capacity 3
+    for (int i = 0; i < 3; ++i) {
+        ASSERT_TRUE(queue.try_enqueue(i));
+    }
+    std::stop_source stop;
+    std::thread stopper([&] {
+        std::this_thread::sleep_for(50ms);
+        stop.request_stop();
+    });
+    const auto start = std::chrono::steady_clock::now();
+    EXPECT_FALSE(queue.enqueue(3, stop.get_token()));
+    EXPECT_LT(std::chrono::steady_clock::now() - start, 1s);
+    stopper.join();
+    EXPECT_EQ(queue.size(), 3u);
+
+    std::thread consumer([&] {
+        std::this_thread::sleep_for(20ms);
+        int item = 0;
+        queue.try_dequeue(item);
+    });
+    EXPECT_TRUE(queue.enqueue(3));  // woken by the consumer freeing a slot
+    consumer.join();
+}
+
+// dequeue_for only compiled for millisecond durations
+TEST(SPSCQueueRegression, TimedOperationsAcceptAnyDuration) {
+    DynamicSPSCQueue<int> queue(8);
+    int item = 0;
+    EXPECT_FALSE(queue.dequeue_for(item, std::chrono::microseconds(500)));
+    EXPECT_FALSE(queue.dequeue_for(item, std::chrono::duration<double>(0.001)));
+    EXPECT_FALSE(queue.dequeue_for(item, std::chrono::nanoseconds(0)));
+    ASSERT_TRUE(queue.try_enqueue(5));
+    EXPECT_TRUE(queue.dequeue_for(item, std::chrono::hours(1)));
+    EXPECT_EQ(item, 5);
+}
+
+// Notifications without the mutex could be lost, leaving blocking operations asleep with work available
+TEST(SPSCQueueRegression, BlockingHandOffNeverLosesWakeups) {
+    SPSCQueue<int, 4> queue;
+    checkBlockingHandOff(queue);
+}
+
+TEST(SPSCQueueRegression, BlockingHandOffNeverLosesWakeupsDynamic) {
+    DynamicSPSCQueue<int> queue(4);
+    checkBlockingHandOff(queue);
+}
+
+TEST(SPSCQueueRegression, BlockingBulkHandOff) {
+    DynamicSPSCQueue<int> queue(16);
+    checkBlockingBulkHandOff(queue);
+}
+
+// The driver's paths: const pointer in (store), vector iterator out (getData) and raw pointer out (loadMap)
+TEST(SPSCQueueRegression, BulkCopyPathsAcrossWrapAround) {
+    DynamicSPSCQueue<std::uint8_t> queue(16);  // capacity 15
+    std::uint8_t next = 0;
+    for (std::size_t round = 0; round < 100; ++round) {
+        const std::size_t n = 1 + round % 15;
+        std::vector<std::uint8_t> chunk(n);
+        for (auto& value : chunk) {
+            value = next++;
+        }
+        const std::uint8_t* src = chunk.data();
+        ASSERT_EQ(queue.try_enqueue_bulk(src, n), n);
+        std::vector<std::uint8_t> out(n);
+        if (round % 2 == 0) {
+            ASSERT_EQ(queue.try_dequeue_bulk(out.begin(), n), n);
+        } else {
+            ASSERT_EQ(queue.try_dequeue_bulk(out.data(), n), n);
+        }
+        EXPECT_EQ(out, chunk);
+    }
+
+    // Non-contiguous iterators take the element-wise path
+    DynamicSPSCQueue<int> intQueue(8);
+    std::deque<int> source = {1, 2, 3, 4, 5, 6, 7, 8, 9};
+    EXPECT_EQ(intQueue.try_enqueue_bulk(source.begin(), source.size()), 7u);
+    std::list<int> sink;
+    EXPECT_EQ(intQueue.try_dequeue_bulk(std::back_inserter(sink), 10), 7u);
+    EXPECT_EQ(sink, (std::list<int>{1, 2, 3, 4, 5, 6, 7}));
+}
+
+// After shutdown, blocking calls stop waiting but queued elements can still be drained
+TEST(SPSCQueueRegression, ShutdownStillDrainsRemainingItems) {
+    SPSCQueue<int, 8> queue;
+    ASSERT_TRUE(queue.try_enqueue(1));
+    ASSERT_TRUE(queue.try_enqueue(2));
+    queue.shutdown();
+    EXPECT_FALSE(queue.is_active());
+
+    int item = 0;
+    EXPECT_TRUE(queue.dequeue(item));
+    EXPECT_EQ(item, 1);
+    std::vector<int> out(4, -1);
+    EXPECT_EQ(queue.dequeue_bulk(out.begin(), out.size()), 1u);
+    EXPECT_EQ(out[0], 2);
+    EXPECT_FALSE(queue.dequeue(item));
 }
 
 int main(int argc, char** argv) {

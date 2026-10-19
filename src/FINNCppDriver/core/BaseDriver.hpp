@@ -437,16 +437,21 @@ namespace Finn {
         template<typename IteratorType, bool Sync = SynchronousInference, typename = std::enable_if_t<!Sync>>
         void input(IteratorType first, IteratorType last, uint inputDeviceIndex, const std::string& inputBufferKernelName, uint batchSize) {
             FINN_LOG_DEBUG(loglevel::info) << loggerPrefix() << "Store data for asynchronous inference.";
-            auto packed = Finn::pack<F>(first, last);
+            // Pack per innermost dimension exactly like the synchronous path, so sub-byte types with inner rows that are not byte aligned get the padding the accelerator expects
+            auto foldedShape = getInputFoldedShape(false, inputDeviceIndex, getInputKernelIndexFromName(inputDeviceIndex, inputBufferKernelName));
+            foldedShape[0] = batchSize;
+            const Finn::DynamicMdSpan reshapedInput(first, last, foldedShape);
+            auto packed = Finn::packMultiDimensionalInputs<F, IteratorType>(first, last, reshapedInput, foldedShape.back());
             auto storeFunc = accelerator.storeFactory(inputDeviceIndex, inputBufferKernelName);
 
-            if (std::abs(std::distance(packed.begin(), packed.end())) != getFeatureMapSize(inputDeviceIndex, inputBufferKernelName) * batchSize) {
-                Finn::logAndError<std::runtime_error>("Input length (" + std::to_string(std::abs(std::distance(packed.begin(), packed.end()))) + ") does not match up with batches*inputsize_per_batch (" +
-                                                      std::to_string(getFeatureMapSize(inputDeviceIndex, inputBufferKernelName)) + "*" + std::to_string(batchSize) + "=" +
-                                                      std::to_string(getFeatureMapSize(inputDeviceIndex, inputBufferKernelName) * batchSize) + ")");
+            if (packed.size() != getFeatureMapSize(inputDeviceIndex, inputBufferKernelName) * batchSize) {
+                Finn::logAndError<std::runtime_error>("Input length (" + std::to_string(packed.size()) + ") does not match up with batches*inputsize_per_batch (" + std::to_string(getFeatureMapSize(inputDeviceIndex, inputBufferKernelName)) +
+                                                      "*" + std::to_string(batchSize) + "=" + std::to_string(getFeatureMapSize(inputDeviceIndex, inputBufferKernelName) * batchSize) + ")");
             }
 
-            storeFunc(packed.begin(), packed.end());
+            if (!storeFunc(packed.begin(), packed.end())) {
+                Finn::logAndError<std::runtime_error>(loggerPrefix() + "Input could not be stored: the device buffer is shutting down");
+            }
         }
 
         /**
@@ -588,7 +593,7 @@ namespace Finn {
          */
         template<typename U, typename V = Finn::UnpackingAutoRetType::AutoRetType<S>, bool Sync = SynchronousInference, typename = std::enable_if_t<Sync>>
         [[nodiscard]] Finn::vector<V> inferSynchronous(const Finn::vector<U>& data, uint inputDeviceIndex, const std::string& inputBufferKernelName, uint outputDeviceIndex, const std::string& outputBufferKernelName) {
-            return inferSynchronous(data.begin(), data.end(), inputDeviceIndex, inputBufferKernelName, outputDeviceIndex, outputBufferKernelName, batchElements);
+            return inferSynchronous<typename Finn::vector<U>::const_iterator, V>(data.begin(), data.end(), inputDeviceIndex, inputBufferKernelName, outputDeviceIndex, outputBufferKernelName);
         }
 
         /**
@@ -602,7 +607,7 @@ namespace Finn {
          */
         template<typename U, typename V = Finn::UnpackingAutoRetType::AutoRetType<S>, bool Sync = SynchronousInference, typename = std::enable_if_t<Sync>>
         [[nodiscard]] Finn::vector<V> inferSynchronous(const Finn::vector<U>& data) {
-            return inferSynchronous(data, defaultInputDeviceIndex, getDefaultInputKernelName(), defaultOutputDeviceIndex, getDefaultOutputKernelName(), batchElements);
+            return inferSynchronous<U, V>(data, defaultInputDeviceIndex, getDefaultInputKernelName(), defaultOutputDeviceIndex, getDefaultOutputKernelName());
         }
 
          protected:
@@ -630,8 +635,9 @@ namespace Finn {
                                                       std::to_string(getTotalDataSize(inputDeviceIndex, inputBufferKernelName)) + ")");
             }
 
-            // TODO(all): This is unused?
-            bool stored = storeFunc(first, last);
+            if (!storeFunc(first, last)) {
+                Finn::logAndError<std::runtime_error>(loggerPrefix() + "Input could not be stored in the device buffer");
+            }
 
             accelerator.run();
 
@@ -639,7 +645,9 @@ namespace Finn {
             Finn::vector<uint8_t> data(first, last);
             FINN_LOG(loglevel::info) << "Readback from device buffer confirming data was written to board successfully: " << isSyncedDataEquivalent(inputDeviceIndex, inputBufferKernelName, data);
 #endif
-            accelerator.wait();
+            if (!accelerator.wait()) {
+                Finn::logAndError<std::runtime_error>(loggerPrefix() + "Waiting for the accelerator was interrupted");
+            }
 
             FINN_LOG_DEBUG(loglevel::info) << "Reading out buffers";
             accelerator.read();

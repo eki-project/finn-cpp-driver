@@ -39,7 +39,7 @@ using namespace std::chrono_literals;
 
 namespace Finn {
     DeviceHandler::DeviceHandler(const DeviceWrapper& devWrap, bool pSynchronousInference, unsigned int hostBufferSize)
-        : synchronousInference(pSynchronousInference), devInformation(devWrap), xrtDeviceIndex(devWrap.xrtDeviceIndex), xclbinPath(devWrap.xclbin) {
+        : synchronousInference(pSynchronousInference), devInformation(devWrap), batchsize(hostBufferSize), xrtDeviceIndex(devWrap.xrtDeviceIndex), xclbinPath(devWrap.xclbin) {
         checkDeviceWrapper(devWrap);
         initializeDevice();
         loadXclbinSetUUID();
@@ -101,20 +101,23 @@ namespace Finn {
     void DeviceHandler::initializeBufferObjects(const DeviceWrapper& devWrap, unsigned int hostBufferSize, bool pSynchronousInference) {
         FINN_LOG(loglevel::info) << "(" << xrtDeviceIndex << ") "
                                  << "Initializing buffer objects with buffer size " << hostBufferSize << "\n";
-        for (auto&& ebdptr : devWrap.idmas) {
-            if (pSynchronousInference) {
-                inputBufferMap.emplace(std::make_pair(ebdptr->kernelName, std::make_shared<Finn::SyncDeviceInputBuffer<uint8_t>>(ebdptr->kernelName, device, uuid, ebdptr->packedShape, hostBufferSize)));
-            } else {
-                inputBufferMap.emplace(std::make_pair(ebdptr->kernelName, std::make_shared<Finn::AsyncDeviceInputBuffer<uint8_t>>(ebdptr->kernelName, device, uuid, ebdptr->packedShape, hostBufferSize)));
-            }
-        }
+        // Orders asynchronous batch starts after the previous batch's completion; outputs are created first so that every
+        // output is registered before the first input worker consults the gate
+        auto gate = pSynchronousInference ? nullptr : std::make_shared<Finn::detail::BatchGate>(devWrap.idmas.size(), devWrap.odmas.size());
         for (auto&& ebdptr : devWrap.odmas) {
             if (pSynchronousInference) {
                 auto ptr = std::make_shared<Finn::SyncDeviceOutputBuffer<uint8_t>>(ebdptr->kernelName, device, uuid, ebdptr->packedShape, hostBufferSize);
                 outputBufferMap.emplace(std::make_pair(ebdptr->kernelName, ptr));
             } else {
-                auto ptr = std::make_shared<Finn::AsyncDeviceOutputBuffer<uint8_t>>(ebdptr->kernelName, device, uuid, ebdptr->packedShape, hostBufferSize);
+                auto ptr = std::make_shared<Finn::AsyncDeviceOutputBuffer<uint8_t>>(ebdptr->kernelName, device, uuid, ebdptr->packedShape, hostBufferSize, gate);
                 outputBufferMap.emplace(std::make_pair(ebdptr->kernelName, ptr));
+            }
+        }
+        for (auto&& ebdptr : devWrap.idmas) {
+            if (pSynchronousInference) {
+                inputBufferMap.emplace(std::make_pair(ebdptr->kernelName, std::make_shared<Finn::SyncDeviceInputBuffer<uint8_t>>(ebdptr->kernelName, device, uuid, ebdptr->packedShape, hostBufferSize)));
+            } else {
+                inputBufferMap.emplace(std::make_pair(ebdptr->kernelName, std::make_shared<Finn::AsyncDeviceInputBuffer<uint8_t>>(ebdptr->kernelName, device, uuid, ebdptr->packedShape, hostBufferSize, gate)));
             }
         }
         FINN_LOG(loglevel::info) << "Finished initializing buffer objects on device " << xrtDeviceIndex;
@@ -129,16 +132,30 @@ namespace Finn {
     void DeviceHandler::setBatchSize(uint pBatchsize) {
         if (this->batchsize == pBatchsize) {
             return;
-        } else {
-            FINN_LOG(loglevel::info) << "(" << xrtDeviceIndex << ") "
-                                     << "Change batch size to " << pBatchsize << "\n";
-            this->batchsize = pBatchsize;
-            inputBufferMap.clear();
-            outputBufferMap.clear();
-
-            std::this_thread::sleep_for(2000ms);
-            initializeBufferObjects(this->devInformation, pBatchsize, this->synchronousInference);
         }
+        FINN_LOG(loglevel::info) << "(" << xrtDeviceIndex << ") "
+                                 << "Change batch size to " << pBatchsize << "\n";
+        this->batchsize = pBatchsize;
+        shutdownBuffers();
+        // XRT 2.16 quirk: once the last xrt::ip of a device handle is destroyed, every further buffer allocation on that
+        // handle fails with "failed to allocate userptr bo: Operation not permitted", and reloading the xclbin on the
+        // same handle does not help. Re-opening the handle (no FPGA reset) and reloading the already programmed xclbin
+        // restores a working state; verified on U55C / XRT 2.16.13.
+        device = xrt::device(xrtDeviceIndex);
+        loadXclbinSetUUID();
+        initializeBufferObjects(this->devInformation, pBatchsize, this->synchronousInference);
+    }
+
+    void DeviceHandler::shutdownBuffers() {
+        // Stop worker threads first so no buffer is destroyed while its thread still uses it
+        for (auto& [name, buffer] : inputBufferMap) {
+            buffer->prepareForShutdown();
+        }
+        for (auto& [name, buffer] : outputBufferMap) {
+            buffer->prepareForShutdown();
+        }
+        inputBufferMap.clear();
+        outputBufferMap.clear();
     }
 
     [[maybe_unused]] xrt::device& DeviceHandler::getDevice() { return device; }
@@ -201,9 +218,8 @@ namespace Finn {
 
     [[maybe_unused]] Finn::vector<uint8_t> DeviceHandler::retrieveResults(const std::string& outputBufferKernelName, const std::size_t& numItems) {
         if (!outputBufferMap.contains(outputBufferKernelName)) {
-            auto newlineFold = [](std::string a, const auto& b) { return std::move(a) + '\n' + std::move(b.first); };
-            std::string existingNames = "Existing buffer names:";
-            std::accumulate(inputBufferMap.begin(), inputBufferMap.end(), existingNames, newlineFold);
+            auto newlineFold = [](std::string a, const auto& b) { return std::move(a) + '\n' + b.first; };
+            const std::string existingNames = std::accumulate(outputBufferMap.begin(), outputBufferMap.end(), std::string("Existing output buffer names:"), newlineFold);
             Finn::logAndError<std::runtime_error>("Tried accessing kernel/buffer with name " + outputBufferKernelName + " but this kernel / buffer does not exist! " + existingNames);
         }
         return outputBufferMap.at(outputBufferKernelName)->getData(numItems);

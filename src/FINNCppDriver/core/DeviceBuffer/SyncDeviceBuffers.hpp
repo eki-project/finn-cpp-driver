@@ -90,6 +90,9 @@ namespace Finn {
          * @return false
          */
         bool store(std::span<const T> data) override {
+            if (data.size() > this->mapSize) {
+                Finn::logAndError<std::length_error>("Tried to store " + std::to_string(data.size()) + " elements into a device buffer of " + std::to_string(this->mapSize) + " elements");
+            }
             std::copy(data.begin(), data.end(), this->map);
             return true;
         }
@@ -102,7 +105,7 @@ namespace Finn {
          */
         bool run() override {
             FINN_LOG_DEBUG(loglevel::info) << this->loggerPrefix() << "DeviceBuffer (" << this->name << ") executing...";
-            this->sync(FinnUtils::shapeToElements(this->shapePacked));
+            this->sync(this->totalDataSize);
             this->execute(this->shapePacked[0]);
             return true;
         }
@@ -167,6 +170,9 @@ namespace Finn {
          * @return Finn::vector<T>
          */
         Finn::vector<T> getData(const std::size_t& numItems) override {
+            if (numItems > this->mapSize) {
+                Finn::logAndError<std::length_error>("Tried to read " + std::to_string(numItems) + " elements from a device buffer of " + std::to_string(this->mapSize) + " elements");
+            }
             Finn::vector<T> tmp(this->map, this->map + numItems);
             return tmp;
         }
@@ -189,7 +195,7 @@ namespace Finn {
          * @return bool
          */
         bool read() override {
-            FINN_LOG_DEBUG(loglevel::info) << this->loggerPrefix() << "Synching  " << this->totalDataSize << " bytes from the device";
+            FINN_LOG_DEBUG(loglevel::info) << this->loggerPrefix() << "Synching  " << this->totalDataSize << " elements from the device";
             this->sync(this->totalDataSize);
             return true;
         }

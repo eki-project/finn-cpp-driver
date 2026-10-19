@@ -25,17 +25,18 @@ include(FetchContent)
 set(FETCHCONTENT_UPDATES_DISCONNECTED ON)
 
 
+# Pinned so that builds are reproducible and the performance baseline stays comparable
 FetchContent_Declare(
   googletest
   GIT_REPOSITORY https://github.com/google/googletest.git
-  GIT_TAG        main
+  GIT_TAG        v1.15.2
   GIT_SHALLOW     TRUE
 )
 
 FetchContent_Declare(
   googlebenchmark
   GIT_REPOSITORY  https://github.com/google/benchmark.git
-  GIT_TAG         main
+  GIT_TAG         v1.9.1
   GIT_SHALLOW     TRUE
 
 )
@@ -140,16 +141,16 @@ endif()
 # Build Unit tests
 # Include before clang-tidy inclusion to exclude folder from clang-tidy
 
-set(FINN_ENABLE_TESTING "Build all tests (default is ON)" ON)
-FetchContent_MakeAvailable(googletest googlebenchmark)
-include(cmake/AddUnittest.cmake)
-include(cmake/AddBenchmark.cmake)
-include(cmake/AddIntegrationtest.cmake)
-
-enable_testing()
-set(ENV{GTEST_OUTPUT} "json")
+option(FINN_ENABLE_TESTING "Build all tests" ON)
 
 if (FINN_ENABLE_TESTING)
+  FetchContent_MakeAvailable(googletest googlebenchmark)
+  include(cmake/AddUnittest.cmake)
+  include(cmake/AddBenchmark.cmake)
+  include(cmake/AddIntegrationtest.cmake)
+
+  enable_testing()
+
   message(STATUS "Finn C++ unittests:")
   add_subdirectory(unittests)
   message(STATUS "Finn C++ benchmarks:")
@@ -163,11 +164,18 @@ add_library(finnc_options INTERFACE)
 add_library(finnc::finnc_options ALIAS finnc_options)
 
 OPTION(FINN_ENABLE_ALLOPT "Enable all optimizations" ON)
+OPTION(FINN_MARCH_NATIVE "Tune the binaries for the build host (disable for binaries that run on other machines)" ON)
 if(${FINN_ENABLE_ALLOPT})
   message(STATUS "All optimizations are enabled")
+  # -O3 instead of -Ofast: -Ofast implies -fallow-store-data-races (unsafe with the worker threads and lock-free
+  # queue) and -ffinite-math-only (breaks NaN/Inf handling in the datatype conversions). -fno-math-errno keeps the
+  # vectorization benefit of -ffast-math without changing results.
   target_compile_options(
     finnc_options
-    INTERFACE -Ofast -ffast-math -march=native -mtune=native -fstack-protector-strong -fopenmp -ffunction-sections -fdata-sections -pipe -funroll-loops)
+    INTERFACE -O3 -fno-math-errno -fno-trapping-math -fstack-protector-strong -fopenmp -ffunction-sections -fdata-sections -pipe -funroll-loops)
+  if(FINN_MARCH_NATIVE)
+    target_compile_options(finnc_options INTERFACE -march=native -mtune=native)
+  endif()
 endif()
 
 ### Enable compiler warnings
@@ -211,16 +219,14 @@ endmacro()
 
 include(cmake/Sanitizers.cmake)
 
-#Disable sanitizers by default in release mode
-if (CMAKE_BUILD_TYPE STREQUAL "Release")
-  OPTION(FINN_ENABLE_SANITIZERS "Enable default analyzers" OFF)
-  OPTION(FINN_ENABLE_THREAD_SANITIZERS "Enable thread analyzer" OFF)
-  OPTION(FINN_ENABLE_MEMORY_SANITIZERS "Enable memory analyzer" OFF)
-else()
+#Sanitizers are only on by default in Debug builds: they slow the driver down a lot and an instrumented Python module cannot be imported without LD_PRELOAD
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
   OPTION(FINN_ENABLE_SANITIZERS "Enable default analyzers" ON)
-  OPTION(FINN_ENABLE_THREAD_SANITIZERS "Enable thread analyzer" OFF)
-  OPTION(FINN_ENABLE_MEMORY_SANITIZERS "Enable memory analyzer" OFF)
+else()
+  OPTION(FINN_ENABLE_SANITIZERS "Enable default analyzers" OFF)
 endif()
+OPTION(FINN_ENABLE_THREAD_SANITIZERS "Enable thread analyzer" OFF)
+OPTION(FINN_ENABLE_MEMORY_SANITIZERS "Enable memory analyzer" OFF)
 
 if (FINN_ENABLE_SANITIZERS)
 finncpp_enable_sanitizers(finnc_options

@@ -129,18 +129,7 @@ namespace Finn {
          */
         ~DeviceHandler() {
             FINN_LOG(loglevel::info) << "Tearing down DeviceHandler" << std::endl;
-
-            // First call prepareForShutdown on all buffers
-            for (auto& [_, buffer] : inputBufferMap) {
-                buffer->prepareForShutdown();
-            }
-            for (auto& [_, buffer] : outputBufferMap) {
-                buffer->prepareForShutdown();
-            }
-
-            // Now safe to destroy buffers
-            inputBufferMap.clear();
-            outputBufferMap.clear();
+            shutdownBuffers();
             FINN_LOG(loglevel::info) << "Destructed Buffers" << std::endl;
         };
 
@@ -332,6 +321,12 @@ namespace Finn {
          * @param synchronousInference
          */
         void initializeBufferObjects(const DeviceWrapper& devWrap, unsigned int hostBufferSize, bool pSynchronousInference);
+
+        /**
+         * @brief Stop the worker threads of all buffers and destroy the buffers
+         *
+         */
+        void shutdownBuffers();
 
          private:
         /**

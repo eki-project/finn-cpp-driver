@@ -19,7 +19,8 @@ PYBIND11_MODULE(finnhpcpy, m) {
                  if (enableLogger) {
                      Logger::initLogger(true);
                  }
-                 return SyncDriver(py::str(configFile), batchSize);
+                 // Constructed in place: the driver owns worker threads and device handles and must not be moved
+                 return std::make_unique<SyncDriver>(std::string(py::str(configFile)), batchSize);
              }),
              py::arg("config_file"), py::arg("batch_size"), py::arg("enable_logger") = false, py::doc("Construct a sync driver. This resets the FPGAs and prepares for inference."))
 
@@ -46,7 +47,7 @@ PYBIND11_MODULE(finnhpcpy, m) {
         // TODO(bwintermann): Have a single `infer` function that receives a variant of all possible data types and
         // decides which one to use automatically.
         .def(
-            "infer_numpy", [](SyncDriver& driver, py::array_t<InputDtype, py::array::c_style>& array) { return inferNumpyArraySynchronous(driver, array); }, py::arg("input_data"),
+            "infer_numpy", [](SyncDriver& driver, const py::array_t<InputDtype, py::array::c_style | py::array::forcecast>& array) { return inferNumpyArraySynchronous(driver, array); }, py::arg("input_data"),
             py::doc("Run inference of a single numpy array. The shape must match the normal input shape expected by the accelerator."))
 
         // Default device indices

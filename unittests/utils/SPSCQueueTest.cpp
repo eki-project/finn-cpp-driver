@@ -1171,9 +1171,10 @@ TEST(SPSCQueueRegression, BulkCopyPathsAcrossWrapAround) {
     std::uint8_t next = 0;
     for (std::size_t round = 0; round < 100; ++round) {
         const std::size_t n = 1 + round % 15;
-        std::vector<std::uint8_t> chunk(n);
-        for (auto& value : chunk) {
-            value = next++;
+        std::vector<std::uint8_t> chunk;
+        chunk.reserve(n);
+        for (std::size_t i = 0; i < n; ++i) {
+            chunk.push_back(next++);
         }
         const std::uint8_t* src = chunk.data();
         ASSERT_EQ(queue.try_enqueue_bulk(src, n), n);

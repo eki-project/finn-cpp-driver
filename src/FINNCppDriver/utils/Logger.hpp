@@ -30,19 +30,16 @@ namespace loglevel = plog;
 // NOLINTBEGIN
 #define FINN_LOG(SEV) PLOG(SEV)
 #ifdef NDEBUG
-class [[maybe_unused]] DevNull {};
-
-static DevNull dev_null;
-
-template<typename T>
-DevNull& operator<<(DevNull& dest, [[maybe_unused]] T) {
-    return dest;
-}
     /**
      * @brief Defines debug logging macro that is removed when building in Release mode
      *
+     * The dead else-branch keeps the streamed operands type-checked but never evaluated, so string
+     * construction in hot paths costs nothing (same technique as plog's PLOG_DISABLE_LOGGING).
      */
-    #define FINN_LOG_DEBUG(SEV) dev_null
+    #define FINN_LOG_DEBUG(SEV) \
+        if (true) {             \
+        } else                  \
+            PLOG(SEV)
 #else
     /**
      * @brief Defines debug logging macro that is removed when building in Release mode

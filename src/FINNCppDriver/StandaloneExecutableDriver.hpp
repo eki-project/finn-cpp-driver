@@ -21,14 +21,17 @@
 #include <FINNCppDriver/utils/DataPacking.hpp>    // for AutoReturnType
 #include <FINNCppDriver/utils/DynamicMdSpan.hpp>  // for DynamicMdSpan
 #include <FINNCppDriver/utils/Logger.hpp>         // for FINN_LOG, ...
-#include <ext/alloc_traits.h>                     // for __alloc_tr...
-#include <popl.hpp>                               // for program options
-#include <xtensor/containers/xadapt.hpp>          // for adapt
-#include <xtensor/containers/xarray.hpp>          // for xarray_ada...
-#include <xtensor/core/xiterator.hpp>             // for operator==
-#include <xtensor/core/xlayout.hpp>               // for layout_type
-#include <xtensor/io/xnpy.hpp>                    // for dump_npy, ...
-#include <xtl/xiterator_base.hpp>                 // for operator!=
+#include <chrono>
+#include <ext/alloc_traits.h>  // for __alloc_tr...
+#include <fstream>
+#include <popl.hpp>                       // for program options
+#include <random>
+#include <xtensor/containers/xadapt.hpp>  // for adapt
+#include <xtensor/containers/xarray.hpp>  // for xarray_ada...
+#include <xtensor/core/xiterator.hpp>     // for operator==
+#include <xtensor/core/xlayout.hpp>       // for layout_type
+#include <xtensor/io/xnpy.hpp>            // for dump_npy, ...
+#include <xtl/xiterator_base.hpp>         // for operator!=
 
 // Created by FINN during compilation
 // Use the default testing Driver type when none is specified.
@@ -57,7 +60,6 @@ namespace Finn {
     /**
      * @brief Log some initial information about the device and the kernels used
      *
-     * @param logger
      * @param device
      * @param filename
      */
@@ -83,6 +85,22 @@ namespace Finn {
     using distribution_t = typename std::conditional_t<std::is_same_v<O, float>, std::uniform_real_distribution<O>, std::uniform_int_distribution<O>>;
 
     /**
+     * @brief Random value distribution over the representable range of the input datatype
+     *
+     * uniform_real_distribution requires max - min to fit into the type, so float inputs are drawn from [-1e3, 1e3] at most.
+     */
+    template<typename DT>
+    distribution_t<DT> makeInputDistribution() {
+        if constexpr (std::is_same_v<DT, float>) {
+            const auto lo = static_cast<float>(std::max(InputFinnType().min(), -1e3));
+            const auto hi = static_cast<float>(std::min(InputFinnType().max(), 1e3));
+            return std::uniform_real_distribution<float>{lo, hi};
+        } else {
+            return std::uniform_int_distribution<DT>{static_cast<DT>(InputFinnType().min()), static_cast<DT>(InputFinnType().max())};
+        }
+    }
+
+    /**
      * @brief A class to represent a full FINN-Driver
      *
      * @tparam bool SynchronousInference mode switch
@@ -93,6 +111,7 @@ namespace Finn {
     template<bool SynchronousInference, IsDatatype F, IsDatatype S, typename T = uint8_t>
     class StandaloneExecutableDriver : public BaseDriver<SynchronousInference, F, S, T> {
         using BaseDriver<SynchronousInference, F, S, T>::BaseDriver;
+        using Clock = std::chrono::steady_clock;
 
          private:
         /**
@@ -102,17 +121,11 @@ namespace Finn {
          */
         std::string finnMainLogPrefix() { return "[FINNDriver] "; }
 
-        /**
-         * @brief Index position in string that contains the byte size of the datatype stored in the numpy input file
-         *
-         */
-        static constexpr size_t typeStringByteSizePos = 2;
-
          public:
         /**
          * @brief Implementation function for running throughput tests
          *
-         * @tparam T Data type for the test inputs
+         * @tparam DT Data type for the test inputs
          * @param elementCount Number of elements in test data
          * @param batchSize Batch size for inference
          */
@@ -123,7 +136,7 @@ namespace Finn {
             std::random_device rndDevice;
             std::mt19937 mersenneEngine{rndDevice()};  // Generates random integers
 
-            distribution_t<DT> dist{static_cast<DT>(InputFinnType().min()), static_cast<DT>(InputFinnType().max())};
+            distribution_t<DT> dist = makeInputDistribution<DT>();
 
             auto gen = [&dist, &mersenneEngine]() { return dist(mersenneEngine); };
 
@@ -136,10 +149,10 @@ namespace Finn {
 
             for (size_t i = 0; i < nTestruns; ++i) {
                 std::generate(testInputs.begin(), testInputs.end(), gen);
-                const auto start = std::chrono::high_resolution_clock::now();
+                const auto start = Clock::now();
                 auto ret = this->inferSynchronous(testInputs.begin(), testInputs.end());
                 Finn::DoNotOptimize(ret);
-                const auto end = std::chrono::high_resolution_clock::now();
+                const auto end = Clock::now();
 
                 sumRuntimeEnd2End += (end - start);
             }
@@ -148,16 +161,16 @@ namespace Finn {
             std::chrono::duration<double> sumRuntimeUnpacking{};
             std::chrono::duration<double> sumRuntimeReshaping{};
 
+            auto foldedShape = this->getInputFoldedShape();
+            foldedShape[0] = batchSize;
             for (size_t i = 0; i < nTestruns; ++i) {
                 std::generate(testInputs.begin(), testInputs.end(), gen);
-                const auto start = std::chrono::high_resolution_clock::now();
-                static auto foldedShape = this->getInputFoldedShape();
-                foldedShape[0] = batchSize;
+                const auto start = Clock::now();
                 const Finn::DynamicMdSpan reshapedInput(testInputs.begin(), testInputs.end(), foldedShape);
-                const auto reshape = std::chrono::high_resolution_clock::now();
+                const auto reshape = Clock::now();
                 auto packed = Finn::packMultiDimensionalInputs<InputFinnType>(testInputs.begin(), testInputs.end(), reshapedInput, foldedShape.back());
                 Finn::DoNotOptimize(packed);
-                const auto end = std::chrono::high_resolution_clock::now();
+                const auto end = Clock::now();
 
                 sumRuntimeReshaping += (reshape - start);
                 sumRuntimePacking += (end - reshape);
@@ -167,37 +180,32 @@ namespace Finn {
             packedOutput[0] = batchSize;
             std::vector<uint8_t> unpackingInputs(FinnUtils::shapeToElements(packedOutput));
             for (size_t i = 0; i < nTestruns; ++i) {
-                const auto start = std::chrono::high_resolution_clock::now();
+                const auto start = Clock::now();
                 auto foldedOutput = this->getOutputFoldedShape();
                 foldedOutput[0] = batchSize;
                 const Finn::DynamicMdSpan reshapedOutput(unpackingInputs.begin(), unpackingInputs.end(), packedOutput);
                 auto unpacked = Finn::unpackMultiDimensionalOutputs<OutputFinnType>(unpackingInputs.begin(), unpackingInputs.end(), reshapedOutput, foldedOutput);
                 Finn::DoNotOptimize(unpacked);
-                const auto end = std::chrono::high_resolution_clock::now();
+                const auto end = Clock::now();
                 sumRuntimeUnpacking += (end - start);
             }
 
-            std::cout << "Avg. end2end latency: " << (static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(sumRuntimeEnd2End).count()) / nTestruns / 1000) << "us\n";
-            std::cout << "Avg. end2end throughput: " << 1 / (static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(sumRuntimeEnd2End).count()) / nTestruns / batchSize / 1000 / 1000 / 1000) << " inferences/s\n";
-            std::cout << "Avg. packing latency: " << (static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(sumRuntimePacking).count()) / nTestruns) << "ns\n";
-            std::cout << "Avg. folding latency: " << (static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(sumRuntimeReshaping).count()) / nTestruns) << "ns\n";
-            std::cout << "Avg. unpacking latency: " << (static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(sumRuntimeUnpacking).count()) / nTestruns) << "ns\n";
-            std::cout << "Avg. raw inference latency:"
-                      << (static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(sumRuntimeEnd2End).count()) / nTestruns) -
-                             (static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(sumRuntimePacking).count()) / nTestruns) -
-                             (static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(sumRuntimeReshaping).count()) / nTestruns) -
-                             (static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(sumRuntimeUnpacking).count()) / nTestruns)
-                      << "ns\n";
+            const auto avgNs = [nTestruns](const std::chrono::duration<double>& sum) { return static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(sum).count()) / static_cast<double>(nTestruns); };
+            std::cout << "Avg. end2end latency: " << avgNs(sumRuntimeEnd2End) / 1000 << "us\n";
+            std::cout << "Avg. end2end throughput: " << 1e9 * batchSize / avgNs(sumRuntimeEnd2End) << " inferences/s\n";
+            std::cout << "Avg. packing latency: " << avgNs(sumRuntimePacking) << "ns\n";
+            std::cout << "Avg. folding latency: " << avgNs(sumRuntimeReshaping) << "ns\n";
+            std::cout << "Avg. unpacking latency: " << avgNs(sumRuntimeUnpacking) << "ns\n";
+            std::cout << "Avg. raw inference latency:" << avgNs(sumRuntimeEnd2End) - avgNs(sumRuntimePacking) - avgNs(sumRuntimeReshaping) - avgNs(sumRuntimeUnpacking) << "ns\n";
         }
 
         /**
          * @brief Run a throughput test to test the performance of the driver
-         *
-         * @param logger
          */
         void runThroughputTest() {
             FINN_LOG(loglevel::info) << finnMainLogPrefix() << "Device Information: ";
-            logDeviceInformation(this->getDeviceHandler(0).getDevice(), this->getConfig().getDeviceWrapper(0).xclbin);
+            const uint deviceIndex = this->getDefaultInputDeviceIndex();
+            logDeviceInformation(this->getDeviceHandler(deviceIndex).getDevice(), this->getConfig().getDeviceWrapper(deviceIndex).xclbin);
 
             size_t elementcount = FinnUtils::shapeToElements(this->getInputNormalShape());
             uint batchSize = this->getBatchSize();
@@ -208,7 +216,6 @@ namespace Finn {
             if constexpr (isInteger) {
                 using dtype = Finn::UnpackingAutoRetType::IntegralType<InputFinnType>;
                 runThroughputTestImpl<dtype>(elementcount, batchSize);
-                // benchmark each step in call chain for int
             } else {
                 runThroughputTestImpl<float>(elementcount, batchSize);
             }
@@ -217,106 +224,97 @@ namespace Finn {
         /**
          * @brief Load data from numpy file, run inference, and dump results
          *
-         * @tparam T Data type for the loaded data
+         * @tparam DT Data type for the loaded data
          * @param loadedNpyFile Loaded numpy file containing input data
          * @param outputFile Path to output file for results
          */
         template<typename DT>
         void loadInferDump(xt::detail::npy_file& loadedNpyFile, const std::string& outputFile) {
             auto xtensorArray = std::move(loadedNpyFile).cast<DT, xt::layout_type::dynamic>();
+            const std::size_t expectedElements = FinnUtils::shapeToElements(this->getInputNormalShape(true));
+            if (xtensorArray.size() != expectedElements) {
+                Finn::logAndError<std::runtime_error>("Input file holds " + std::to_string(xtensorArray.size()) + " elements, but the driver expects " + std::to_string(expectedElements) + " (normal input shape " +
+                                                      FinnUtils::shapeToString(this->getInputNormalShape(true)) + " with batch size " + std::to_string(this->getBatchSize()) + ")");
+            }
             Finn::vector<DT> vec(xtensorArray.begin(), xtensorArray.end());
             auto ret = this->inferSynchronous(vec.begin(), vec.end());
-            auto xarr = xt::adapt(ret, this->getOutputNormalShape());
+            auto xarr = xt::adapt(ret, this->getOutputNormalShape(true));
             xt::dump_npy(outputFile, xarr);
         }
 
         /**
-         * @brief Executes inference on the input file if input type is a floating point type
-         * @attention This function does no checking of the datatype contained in the loadedNpyFile! Passing a npy file containing a non floating point type is UB.
+         * @brief Executes inference on the input file, dispatching on the numpy dtype
          *
          * @param loadedNpyFile Input file
          * @param outputFile Name of output file
          */
-        void inferFloatingPoint(xt::detail::npy_file& loadedNpyFile, const std::string& outputFile) {
-            size_t sizePos = typeStringByteSizePos;
-            int size = std::stoi(loadedNpyFile.m_typestring, &sizePos);
-            if (size == 4) {
-                // float
-                loadInferDump<float>(loadedNpyFile, outputFile);
-            } else if (size == 8) {
-                // double
-                loadInferDump<double>(loadedNpyFile, outputFile);
-            } else {
-                Finn::logAndError<std::runtime_error>("Unsupported floating point type detected when loading input npy file!");
+        void inferNpyFile(xt::detail::npy_file& loadedNpyFile, const std::string& outputFile) {
+            // numpy type strings look like "<f4", "<i2" or, for single-byte types, "|u1" / "|b1"
+            const std::string& typestring = loadedNpyFile.m_typestring;
+            if (typestring.size() < 2) {
+                Finn::logAndError<std::runtime_error>("Unexpected numpy type string '" + typestring + "'");
             }
-        }
-
-        /**
-         * @brief Executes inference on the input file if input type is a signed integer type
-         * @attention This function does no checking of the datatype contained in the loadedNpyFile! Passing a npy file containing a non signed integer type is UB.
-         *
-         * @param loadedNpyFile
-         * @param outputFile
-         */
-        void inferSignedInteger(xt::detail::npy_file& loadedNpyFile, const std::string& outputFile) {
-            size_t sizePos = typeStringByteSizePos;
-            int size = std::stoi(loadedNpyFile.m_typestring, &sizePos);
-            if (size == 1) {
-                // int8_t
-                loadInferDump<int8_t>(loadedNpyFile, outputFile);
-            } else if (size == 2) {
-                // int16_t
-                loadInferDump<int16_t>(loadedNpyFile, outputFile);
-            } else if (size == 4) {
-                // int32_t
-                loadInferDump<int32_t>(loadedNpyFile, outputFile);
-            } else if (size == 8) {
-                // int64_t
-                loadInferDump<int64_t>(loadedNpyFile, outputFile);
-            } else {
-                Finn::logAndError<std::runtime_error>("Unsupported signed integer type detected when loading input npy file!");
+            const char byteOrder = typestring[0];
+            const char kind = typestring[1];
+            const std::size_t wordSize = loadedNpyFile.m_word_size;
+            if (byteOrder == '>' || (byteOrder == '=' && std::endian::native != std::endian::little)) {
+                Finn::logAndError<std::runtime_error>("At the moment only files created on little endian systems are supported!");
             }
-        }
+            if (byteOrder != '<' && byteOrder != '|' && byteOrder != '=') {
+                Finn::logAndError<std::runtime_error>("Unexpected numpy type string '" + typestring + "'");
+            }
 
-        /**
-         * @brief Executes inference on the input file if input type is a unsigned integer type
-         * @attention This function does no checking of the datatype contained in the loadedNpyFile! Passing a npy file containing a non unsigned integer type is UB.
-         *
-         * @param loadedNpyFile
-         * @param outputFile
-         */
-        void inferUnsignedInteger(xt::detail::npy_file& loadedNpyFile, const std::string& outputFile) {
-            size_t sizePos = typeStringByteSizePos;
-            int size = std::stoi(loadedNpyFile.m_typestring, &sizePos);
-            if (size == 1) {
-                // uint8_t
-                loadInferDump<uint8_t>(loadedNpyFile, outputFile);
-            } else if (size == 2) {
-                // uint16_t
-                loadInferDump<uint16_t>(loadedNpyFile, outputFile);
-            } else if (size == 4) {
-                // uint32_t
-                loadInferDump<uint32_t>(loadedNpyFile, outputFile);
-            } else if (size == 8) {
-                // uint64_t
-                loadInferDump<uint64_t>(loadedNpyFile, outputFile);
-            } else {
-                Finn::logAndError<std::runtime_error>("Unsupported floating point type detected when loading input npy file!");
+            switch (kind) {
+                case 'f':
+                    if (wordSize == 4) {
+                        loadInferDump<float>(loadedNpyFile, outputFile);
+                    } else if (wordSize == 8) {
+                        loadInferDump<double>(loadedNpyFile, outputFile);
+                    } else {
+                        Finn::logAndError<std::runtime_error>("Unsupported floating point type '" + typestring + "' in input npy file!");
+                    }
+                    break;
+                case 'i':
+                    switch (wordSize) {
+                        case 1: loadInferDump<int8_t>(loadedNpyFile, outputFile); break;
+                        case 2: loadInferDump<int16_t>(loadedNpyFile, outputFile); break;
+                        case 4: loadInferDump<int32_t>(loadedNpyFile, outputFile); break;
+                        case 8: loadInferDump<int64_t>(loadedNpyFile, outputFile); break;
+                        default: Finn::logAndError<std::runtime_error>("Unsupported signed integer type '" + typestring + "' in input npy file!");
+                    }
+                    break;
+                case 'u':
+                    switch (wordSize) {
+                        case 1: loadInferDump<uint8_t>(loadedNpyFile, outputFile); break;
+                        case 2: loadInferDump<uint16_t>(loadedNpyFile, outputFile); break;
+                        case 4: loadInferDump<uint32_t>(loadedNpyFile, outputFile); break;
+                        case 8: loadInferDump<uint64_t>(loadedNpyFile, outputFile); break;
+                        default: Finn::logAndError<std::runtime_error>("Unsupported unsigned integer type '" + typestring + "' in input npy file!");
+                    }
+                    break;
+                case 'b': {
+                    auto xtensorArray = std::move(loadedNpyFile).cast<bool, xt::layout_type::dynamic>();
+                    Finn::vector<uint8_t> vec(xtensorArray.begin(), xtensorArray.end());
+                    auto ret = this->inferSynchronous(vec.begin(), vec.end());
+                    auto xarr = xt::adapt(ret, this->getOutputNormalShape(true));
+                    xt::dump_npy(outputFile, xarr);
+                    break;
+                }
+                default: Finn::logAndError<std::runtime_error>("Loading a numpy array with type identifier string '" + typestring + "' is currently not supported.");
             }
         }
 
         /**
          * @brief Run inference on an input file
          *
-         * @param logger Logger to be used
          * @param inputFiles Files used for inference input
          * @param outputFiles Filenames used for output files
          */
         void runWithInputFile(const std::vector<std::string>& inputFiles, const std::vector<std::string>& outputFiles) {
             FINN_LOG(loglevel::info) << finnMainLogPrefix() << "Running driver on input files";
 
-            // TODO(bwintermann): This 0 may need to be swapped with this->getDefaultInputDeviceIndex() too
-            logDeviceInformation(this->getDeviceHandler(0).getDevice(), this->getConfig().getDeviceWrapper(this->getDefaultInputDeviceIndex()).xclbin);
+            const uint deviceIndex = this->getDefaultInputDeviceIndex();
+            logDeviceInformation(this->getDeviceHandler(deviceIndex).getDevice(), this->getConfig().getDeviceWrapper(deviceIndex).xclbin);
 
             for (auto&& [inp, out] = std::tuple{inputFiles.begin(), outputFiles.begin()}; inp != inputFiles.end(); ++inp, ++out) {
                 // load npy file and process it
@@ -324,44 +322,11 @@ namespace Finn {
                 // instead use xnpy::detail::load_npy_file und then concert by hand based on m_typestring of xnpy::detail::npy_file
                 std::ifstream stream(*inp, std::ifstream::binary);
                 if (!stream) {
-                    Finn::logAndError<std::runtime_error>("io error: failed to open a file.");
+                    Finn::logAndError<std::runtime_error>("io error: failed to open input file " + *inp);
                 }
 
                 auto loadedFile = xt::detail::load_npy_file(stream);
-
-                if (loadedFile.m_typestring[0] == '<') {
-                    // little endian
-                    switch (loadedFile.m_typestring[1]) {
-                        case 'f': {
-                            inferFloatingPoint(loadedFile, *out);
-                            break;
-                        }
-                        case 'i': {
-                            inferSignedInteger(loadedFile, *out);
-                            break;
-                        }
-                        case 'b': {
-                            auto xtensorArray = std::move(loadedFile).cast<bool, xt::layout_type::dynamic>();
-                            Finn::vector<uint8_t> vec(xtensorArray.begin(), xtensorArray.end());
-                            auto ret = this->inferSynchronous(vec.begin(), vec.end());
-                            auto xarr = xt::adapt(ret, this->getOutputNormalShape());
-                            xt::dump_npy(*out, xarr);
-                            break;
-                        }
-                        case 'u': {
-                            inferUnsignedInteger(loadedFile, *out);
-                            break;
-                        }
-                        default:
-                            std::string errorString = "Loading a numpy array with type identifier string ";
-                            errorString += loadedFile.m_typestring[1];
-                            errorString += " is currently not supported.";
-                            Finn::logAndError<std::runtime_error>(errorString);
-                    }
-                } else {
-                    // all other endians
-                    Finn::logAndError<std::runtime_error>("At the moment only files created on little endian systems are supported!\n");
-                }
+                inferNpyFile(loadedFile, *out);
             }
         }
     };

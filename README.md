@@ -52,8 +52,10 @@ Options:
 If the execution of the C++ driver fails due to missing libraries such as `libfinn_core.so`, it might be necessary to set the `LD_LIBRARY_PATH` environment variable:
 
 ```bash
-export LD_LIBRARY_PATH="$(pwd)/build/libs:$LD_LIBRARY_PATH"
+export LD_LIBRARY_PATH="$(pwd)/build/lib:$LD_LIBRARY_PATH"
 ```
+
+Every driver construction resets the FPGA (`xbutil reset --force`) before loading the bitstream, which takes a few seconds. Set `FINN_SKIP_FPGA_RESET=1` in the environment to skip the reset, e.g. when constructing drivers repeatedly from Python; a previous run that left data in the accelerator is then not cleaned up.
 
 #### Library
 For the use of the C++ driver as a library, please have a look at the section for [library use](#using-the-driver-as-a-library).

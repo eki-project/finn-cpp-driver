@@ -77,6 +77,16 @@ int main(int argc, char* argv[]) {
             return 0;
         }
 
+        if (!options.unknown_options().empty()) {
+            throw std::runtime_error("Command Line Argument Error: unknown option '" + options.unknown_options().front() + "'");
+        }
+        if (!options.non_option_args().empty()) {
+            throw std::runtime_error("Command Line Argument Error: unexpected argument '" + options.non_option_args().front() + "'");
+        }
+        if (batch_option->value() == 0) {
+            throw std::runtime_error("Command Line Argument Error: batchsize must be at least 1");
+        }
+
         if (check_option->is_set()) {
             std::cout << "input_t: " << Finn::type_name<InputFinnType>() << "\n";
             std::cout << "output_t: " << Finn::type_name<OutputFinnType>() << "\n";
@@ -125,9 +135,8 @@ int main(int argc, char* argv[]) {
 
         FINN_LOG(loglevel::info) << mainLogPrefix() << "Parsed command line params";
 
-        // Switch on modes
-        auto driver = Finn::StandaloneExecutableDriver<true, InputFinnType, OutputFinnType>(config_option->value(), batch_option->value());
-        if (mode_option->value() == "execute") {
+        // Validate the execute-mode arguments before the (slow) driver construction resets and programs the FPGA
+        if (mode == "execute") {
             if (!input_option->is_set()) {
                 Finn::logAndError<std::invalid_argument>("No input file(s) specified for file execution mode!");
             }
@@ -137,7 +146,11 @@ int main(int argc, char* argv[]) {
             if (input_option->count() != output_option->count()) {
                 Finn::logAndError<std::invalid_argument>("Same amount of input and output files required!");
             }
+        }
 
+        // Switch on modes
+        auto driver = Finn::StandaloneExecutableDriver<true, InputFinnType, OutputFinnType>(config_option->value(), batch_option->value());
+        if (mode == "execute") {
             std::vector<std::string> inputVec;
             for (size_t i = 0; i < input_option->count(); ++i) {
                 inputVec.emplace_back(input_option->value(i));
@@ -148,20 +161,20 @@ int main(int argc, char* argv[]) {
             }
 
             driver.runWithInputFile(inputVec, outputVec);
-        } else if (mode_option->value() == "throughput") {
+        } else if (mode == "throughput") {
             driver.runThroughputTest();
         } else {
-            Finn::logAndError<std::invalid_argument>("Unknown driver mode: " + mode_option->value());
+            Finn::logAndError<std::invalid_argument>("Unknown driver mode: " + mode);
         }
 
-        return 1;
+        return EXIT_SUCCESS;
     } catch (std::exception& e) {
         std::cerr << "Error: " << e.what() << "\n";
-        return 0;
+        return EXIT_FAILURE;
     } catch (...)  // Catch everything that is not an exception class
     {
         std::cerr << "Unknown error!"
                   << "\n";
-        return 0;
+        return EXIT_FAILURE;
     }
 }

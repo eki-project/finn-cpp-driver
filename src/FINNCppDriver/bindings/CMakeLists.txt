@@ -15,9 +15,9 @@ if(pybind11_FOUND)
     # Write into the specified directory
     set_target_properties(finnhpcpy PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${BINDINGS_DIR}")
     
-    # Make it a python package
+    # Make it a python package that re-exports the extension module, so `from finnhpcpy import FINNSyncDriver` works
     file(MAKE_DIRECTORY "${BINDINGS_DIR}")
-    file(TOUCH "${BINDINGS_DIR}/__init__.py")
+    file(WRITE "${BINDINGS_DIR}/__init__.py" "from .finnhpcpy import *  # noqa: F401,F403\n")
 
     # Optionally generate typing stubs
     find_program(PYBIND11_STUBGEN pybind11-stubgen)

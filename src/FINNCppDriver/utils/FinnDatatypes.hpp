@@ -568,16 +568,16 @@ namespace Finn {
         /**
          * @brief @see Datatype
          */
-        constexpr double scaleFactor() const { return 1.0 / (1U << fracBits()); }
+        constexpr double scaleFactor() const { return 1.0 / static_cast<double>(1ULL << fracBits()); }
 
         /**
          * @brief @see Datatype
          */
-        constexpr double min() const override { return -static_cast<double>(1U << (B - 1)) * scaleFactor(); }
+        constexpr double min() const override { return -static_cast<double>(1ULL << (B - 1)) * scaleFactor(); }
         /**
          * @brief @see Datatype
          */
-        constexpr double max() const override { return ((1U << (B - 1)) - 1) * scaleFactor(); }
+        constexpr double max() const override { return static_cast<double>((1ULL << (B - 1)) - 1) * scaleFactor(); }
 
         /**
          * @brief @see Datatype
@@ -599,8 +599,8 @@ namespace Finn {
          */
         template<typename T>
         [[maybe_unused]] bool allowedImpl(const T& val) const {
-            T intEquivalent = val * (1U << I);
-            return (intEquivalent >= min()) && (intEquivalent <= max());
+            // min()/max() are already expressed in the real-valued domain
+            return (static_cast<double>(val) >= min()) && (static_cast<double>(val) <= max());
         }
     };
 

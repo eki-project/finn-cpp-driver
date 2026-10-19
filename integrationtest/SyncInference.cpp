@@ -19,7 +19,7 @@
 
 namespace Finn {
     template<bool SynchronousInference>
-    using Driver = BaseDriver<SynchronousInference, DatatypeInt<8>, DatatypeUInt<16>>;
+    using Driver = BaseDriver<SynchronousInference, DatatypeInt<8>, DatatypeInt<16>>;
 }
 
 TEST(SyncInference, syncInferenceTest) {
@@ -35,7 +35,7 @@ TEST(SyncInference, syncInferenceTest) {
     // Run inference
     auto results = driver.inferSynchronous(data.begin(), data.end());
 
-    Finn::vector<uint16_t> expectedResults = {98, 50, 65476, 65493, 27};
+    Finn::vector<int16_t> expectedResults = {98, 50, -60, -43, 27};
 
     EXPECT_EQ(results, expectedResults);
 }
@@ -57,8 +57,8 @@ TEST(SyncInference, syncBatchInferenceTest) {
     // Run inference
     auto results = driver.inferSynchronous(data.begin(), data.end());
 
-    Finn::vector<uint16_t> expectedResults = {98, 50, 65476, 65493, 27, 98, 50, 65476, 65493, 27, 98, 50, 65476, 65493, 27, 98, 50, 65476, 65493, 27, 98, 50, 65476, 65493, 27,
-                                              95, 61, 65483, 65491, 12, 98, 50, 65476, 65493, 27, 92, 53, 65483, 65498, 15, 92, 53, 65483, 65498, 15, 86, 53, 65489, 65498, 9};
+    Finn::vector<int16_t> expectedResults = {98, 50, -60, -43, 27, 98, 50, -60, -43, 27, 98, 50, -60, -43, 27, 98, 50, -60, -43, 27, 98, 50, -60, -43, 27,
+                                             95, 61, -53, -45, 12, 98, 50, -60, -43, 27, 92, 53, -53, -38, 15, 92, 53, -53, -38, 15, 86, 53, -47, -38, 9};
 
     EXPECT_EQ(results, expectedResults);
 }

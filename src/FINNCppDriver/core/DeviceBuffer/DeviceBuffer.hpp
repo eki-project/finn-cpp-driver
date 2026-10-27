@@ -14,12 +14,14 @@
 #define DEVICEBUFFER
 
 #include <FINNCppDriver/config/CompilationOptions.h>
+#include <FINNCppDriver/utils/ConfigurationStructs.h>
 #include <FINNCppDriver/utils/Types.h>
 
 #include <FINNCppDriver/utils/FinnDatatypes.hpp>
 #include <FINNCppDriver/utils/Logger.hpp>
 #include <chrono>
 #include <future>
+#include <optional>
 #include <span>
 #include <thread>
 
@@ -138,10 +140,49 @@ namespace Finn {
          * @return true if the kernel is idle, false if the wait was stopped via the token
          */
         bool busyWait(std::stop_token stopToken = {}) {
+            return waitFor([this] { return (assocIPCore.read_register(CSR_OFFSET) & IP_IDLE) == IP_IDLE; }, stopToken);
+        }
+
+        /**
+         * @brief Wait until the ring DMA has completed descriptor count `posted`
+         *
+         * @param posted Descriptor count to wait for
+         * @param stopToken Token to request stopping the wait
+         * @return true if reached, false if the wait was stopped via the token
+         */
+        bool ringWait(uint32_t posted, std::stop_token stopToken = {}) {
+            return waitFor([this, posted] { return ringReached(posted); }, stopToken);
+        }
+
+        /**
+         * @brief Whether this buffer drives a free-running ring DMA
+         *
+         */
+        bool isRingDma() const { return ring.has_value(); }
+
+        /**
+         * @brief Ring DMA: wait until every descriptor but the most recent one has completed
+         *
+         * Lets a double-buffered input fill one buffer while the kernel still reads the other.
+         *
+         * @param stopToken Token to request stopping the wait
+         * @return true if reached, false if the wait was stopped via the token
+         */
+        bool ringWaitAllButLast(std::stop_token stopToken = {}) { return ringWait(ringPosted - 1, stopToken); }
+
+        /**
+         * @brief Poll until `done` returns true, spinning first and then backing off (see busyWait)
+         *
+         * @param done Condition, one register read per call
+         * @param stopToken Token to request stopping the wait
+         * @return true if the condition was met, false if the wait was stopped via the token
+         */
+        template<typename Done>
+        bool waitFor(Done done, std::stop_token stopToken) {
             using namespace std::chrono_literals;
             std::size_t polls = 0;
             while (!stopToken.stop_requested()) {
-                if ((assocIPCore.read_register(CSR_OFFSET) & IP_IDLE) == IP_IDLE) {
+                if (done()) {
                     return true;
                 }
                 if (++polls > spinPolls) {
@@ -158,23 +199,42 @@ namespace Finn {
 
          private:
         /**
-         * @brief Get the group ID for a compute unit
-         *
-         * @param device XRT device
-         * @param uuid Device UUID
-         * @param computeUnit Name of the compute unit
-         * @return unsigned int Group ID
-         */
-        unsigned int getGroupId(const xrt::device& device, const xrt::uuid& uuid, const std::string& computeUnit) { return xrt::kernel(device, uuid, computeUnit).group_id(0); }
-
-        /**
          * @brief Kernel register contents written by the last execute, so unchanged registers are not rewritten (one PCIe write each)
          *
          */
         uint32_t lastRepetitions = 0;
         uint64_t lastAddress = ~uint64_t{0};
 
+        /**
+         * @brief Register map of a free-running ring DMA; empty for register DMAs
+         *
+         */
+        std::optional<RingControl> ring;
+        /**
+         * @brief Descriptors posted to the ring DMA so far (the value last written to its prod register)
+         *
+         */
+        uint32_t ringPosted = 0;
+
+        /**
+         * @brief Number of descriptors the ring DMA has completed
+         *
+         */
+        uint32_t ringCompleted() { return assocIPCore.read_register(ring->cons); }
+
          protected:
+        /**
+         * @brief Whether the ring DMA has completed descriptor count `posted` (wrap-around safe)
+         *
+         */
+        bool ringReached(uint32_t posted) { return static_cast<int32_t>(ringCompleted() - posted) >= 0; }
+
+        /**
+         * @brief Descriptors posted to the ring DMA so far
+         *
+         */
+        uint32_t ringDescriptorsPosted() const { return ringPosted; }
+
         /**
          * @brief Get flags for buffer object creation based on host memory access
          *
@@ -196,17 +256,29 @@ namespace Finn {
          * @param device XRT device
          * @param pAssociatedKernel XRT kernel
          * @param pShapePacked packed shape of input
+         * @param pMemGroup memory group (bank) the compute unit's memory port reaches; the buffer is allocated there
          */
-        DeviceBuffer(const std::string& pCUName, xrt::device& device, xrt::uuid& pDevUUID, const shapePacked_t& pShapePacked, unsigned int batchSize = 1)
+        DeviceBuffer(const std::string& pCUName, xrt::device& device, xrt::uuid& pDevUUID, const shapePacked_t& pShapePacked, unsigned int batchSize = 1, const std::optional<RingControl>& pRing = std::nullopt, unsigned int pMemGroup = 0)
             : name(pCUName),
               shapePacked(pShapePacked),
               mapSize(FinnUtils::getActualBufferSize(FinnUtils::shapeToElements(pShapePacked) * batchSize)),
-              assocIPCore(xrt::ip(device, pDevUUID, pCUName)),  // Using xrt::kernel/getGroupId after this point leads to a total bricking of the FPGA card!!
-              internalBo(xrt::bo(device, mapSize * sizeof(T), DeviceBuffer::getFlags(Finn::Options::hostMemoryAccess), 0)),
+              assocIPCore(xrt::ip(device, pDevUUID, pCUName)),  // Using xrt::kernel after this point leads to a total bricking of the FPGA card!!
+              internalBo(xrt::bo(device, mapSize * sizeof(T), DeviceBuffer::getFlags(Finn::Options::hostMemoryAccess), pMemGroup)),
               map(internalBo.template map<T*>()),
-              bufAdr(internalBo.address()) {
+              bufAdr(internalBo.address()),
+              ring(pRing) {
             shapePacked[0] = batchSize;
-            FINN_LOG(loglevel::info) << "New Device Buffer of size " << mapSize * sizeof(T) << "bytes with group id " << 0 << "\n";
+            if (ring) {
+                // Continue from the kernel's count: it never restarts, so its counters survive the previous process
+                ringPosted = ringCompleted();
+                const uint32_t prod = assocIPCore.read_register(ring->prod);
+                if (prod != ringPosted) {
+                    FINN_LOG(loglevel::warning) << "Ring DMA " << name << " still has " << (prod - ringPosted) << " descriptors of a previous process pending; reset the card if its outputs were not collected";
+                    ringPosted = prod;
+                }
+                FINN_LOG(loglevel::info) << "Ring DMA " << name << ": " << ring->slots << " descriptor slots, " << ringPosted << " descriptors completed so far";
+            }
+            FINN_LOG(loglevel::info) << "New Device Buffer of size " << mapSize * sizeof(T) << "bytes with group id " << pMemGroup << "\n";
             FINN_LOG(loglevel::info) << "Host Memory Access enabled: " << Finn::Options::hostMemoryAccess << "\n";
             FINN_LOG(loglevel::info) << "Initializing DeviceBuffer " << name << " (SHAPE PACKED: " << FinnUtils::shapeToString(pShapePacked) << " inputs of the given shape, MAP SIZE: " << mapSize << ")\n";
             std::fill(map, map + mapSize, 0);
@@ -269,6 +341,20 @@ namespace Finn {
          */
         virtual size_t getSizeInBytes() { return totalDataSize * sizeof(T); }
 
+#ifdef UNITTEST
+        /**
+         * @brief Device address of the internal buffer (unit tests)
+         *
+         */
+        long long testGetAddress() const { return bufAdr; }
+
+        /**
+         * @brief Memory group the internal buffer was allocated in (unit tests)
+         *
+         */
+        unsigned int testGetMemoryGroup() const { return internalBo.get_memory_group(); }
+#endif
+
         /**
          * @brief Get the feature map size
          *
@@ -319,7 +405,7 @@ namespace Finn {
          * @return true The kernel finished
          * @return false The wait was stopped via the token before the kernel finished
          */
-        virtual bool wait(std::stop_token stopToken = {}) { return busyWait(stopToken); };
+        virtual bool wait(std::stop_token stopToken = {}) { return ring ? ringWait(ringPosted, stopToken) : busyWait(stopToken); };
 
          protected:
         /**
@@ -352,6 +438,10 @@ namespace Finn {
          * @param repetitions Number of repetitions to execute
          */
         void executeAt(const uint64_t address, const uint32_t repetitions) {
+            if (ring) {
+                postDescriptor(address, repetitions);
+                return;
+            }
             constexpr uint32_t offset_buf = 0x10;
             constexpr uint32_t offset_rep = 0x1C;
 
@@ -367,6 +457,25 @@ namespace Finn {
 
             // Start inference
             assocIPCore.write_register(CSR_OFFSET, IP_START);
+        }
+
+        /**
+         * @brief Post one descriptor to the ring DMA: move `frames` samples to or from `address`
+         *
+         * Waits for a free slot first (at most `slots` descriptors are outstanding). The kernel starts on it as soon as
+         * prod is written; completion is observed through ringWait()/wait().
+         *
+         * @param address Device address of the buffer
+         * @param frames Number of samples
+         */
+        void postDescriptor(const uint64_t address, const uint32_t frames) {
+            ringWait(ringPosted - ring->slots + 1);
+            const uint32_t slot = 4 * (ringPosted % ring->slots);
+            assocIPCore.write_register(ring->addrLo + slot, static_cast<uint32_t>(address));
+            assocIPCore.write_register(ring->addrHi + slot, static_cast<uint32_t>(address >> 32));
+            assocIPCore.write_register(ring->frames + slot, frames);
+            ++ringPosted;
+            assocIPCore.write_register(ring->prod, ringPosted);
         }
     };
 
@@ -408,7 +517,9 @@ namespace Finn {
          * @param pAssociatedKernel XRT kernel
          * @param pShapePacked packed shape of input
          */
-        DeviceInputBuffer(const std::string& pCUName, xrt::device& device, xrt::uuid& pDevUUID, const shapePacked_t& pShapePacked, unsigned int batchSize = 1) : DeviceBuffer<T>(pCUName, device, pDevUUID, pShapePacked, batchSize) {};
+        DeviceInputBuffer(const std::string& pCUName, xrt::device& device, xrt::uuid& pDevUUID, const shapePacked_t& pShapePacked, unsigned int batchSize = 1, const std::optional<RingControl>& pRing = std::nullopt,
+                          unsigned int pMemGroup = 0)
+            : DeviceBuffer<T>(pCUName, device, pDevUUID, pShapePacked, batchSize, pRing, pMemGroup){};
 
         /**
          * @brief Store the given vector of data in the FPGA mem map
@@ -471,7 +582,9 @@ namespace Finn {
          * @param pAssociatedKernel XRT kernel
          * @param pShapePacked packed shape of input
          */
-        DeviceOutputBuffer(const std::string& pCUName, xrt::device& device, xrt::uuid& pDevUUID, const shapePacked_t& pShapePacked, unsigned int batchSize = 1) : DeviceBuffer<T>(pCUName, device, pDevUUID, pShapePacked, batchSize) {};
+        DeviceOutputBuffer(const std::string& pCUName, xrt::device& device, xrt::uuid& pDevUUID, const shapePacked_t& pShapePacked, unsigned int batchSize = 1, const std::optional<RingControl>& pRing = std::nullopt,
+                           unsigned int pMemGroup = 0)
+            : DeviceBuffer<T>(pCUName, device, pDevUUID, pShapePacked, batchSize, pRing, pMemGroup){};
 
         /**
          * @brief Get the data from the buffer and return it as a vector

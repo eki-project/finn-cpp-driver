@@ -21,6 +21,7 @@
 #include <map>
 #include <memory>
 #include <nlohmann/json.hpp>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -75,6 +76,23 @@ namespace nlohmann {
 
 namespace Finn {
     /**
+     * @brief Register map of a free-running ring DMA (FINN IODMA_hls with ctrlMode "ring")
+     *
+     * The kernel never stops. The host writes descriptor d (address, frames) into slot d % slots and then writes d + 1
+     * to prod; the kernel counts the descriptors it has completed in cons (input DMA: data read from memory, output
+     * DMA: data written and acknowledged). All offsets are AXI-lite byte offsets; slot s of a register file is at
+     * offset + 4 * s.
+     */
+    struct RingControl {
+        unsigned int slots = 0;  ///< number of descriptor slots
+        uint32_t addrLo = 0;     ///< buffer address, bits 31..0
+        uint32_t addrHi = 0;     ///< buffer address, bits 63..32
+        uint32_t frames = 0;     ///< number of frames (samples) to move
+        uint32_t prod = 0;       ///< descriptors posted by the host
+        uint32_t cons = 0;       ///< descriptors completed by the kernel
+    };
+
+    /**
      * @brief A small storage struct to manage the description of Buffers
      *
      */
@@ -89,6 +107,11 @@ namespace Finn {
          *
          */
         shape_t packedShape;
+        /**
+         * @brief Set for ring DMAs; register DMAs (ap_ctrl_hs, address at 0x10, repetitions at 0x1C) have none
+         *
+         */
+        std::optional<RingControl> ring;
 
         // TODO(bwintermann): Currently unused, reserved for multi-fpga usage
         /**
@@ -244,16 +267,50 @@ namespace Finn {
 
     /***** JSON CONVERSION FUNCTIONS ******/
     /**
-     * @brief JSON -> ExtendedBufferDescriptor
+     * @brief RingControl -> JSON
+     *
+     * @param j
+     * @param ring
+     */
+    // NOLINTNEXTLINE
+    void inline to_json(json& j, const RingControl& ring) { j = json{{"slots", ring.slots}, {"registers", {{"addr_lo", ring.addrLo}, {"addr_hi", ring.addrHi}, {"frames", ring.frames}, {"prod", ring.prod}, {"cons", ring.cons}}}}; }
+
+    /**
+     * @brief JSON -> RingControl (the "ring" entry FINN writes for ring DMAs)
+     *
+     * @param j
+     * @param ring
+     */
+    // NOLINTNEXTLINE
+    void inline from_json(const json& j, RingControl& ring) {
+        j.at("slots").get_to(ring.slots);
+        const json& regs = j.at("registers");
+        regs.at("addr_lo").get_to(ring.addrLo);
+        regs.at("addr_hi").get_to(ring.addrHi);
+        regs.at("frames").get_to(ring.frames);
+        regs.at("prod").get_to(ring.prod);
+        regs.at("cons").get_to(ring.cons);
+        if (ring.slots == 0) {
+            throw std::runtime_error("A ring DMA needs at least one descriptor slot");
+        }
+    }
+
+    /**
+     * @brief ExtendedBufferDescriptor -> JSON
      *
      * @param j
      * @param ebd
      */
     // NOLINTNEXTLINE
-    void inline to_json(json& j, const ExtendedBufferDescriptor& ebd) { j = json{{"kernelName", ebd.kernelName}, {"packedShape", ebd.packedShape}, {"normalShape", ebd.normalShape}, {"foldedShape", ebd.foldedShape}}; }
+    void inline to_json(json& j, const ExtendedBufferDescriptor& ebd) {
+        j = json{{"kernelName", ebd.kernelName}, {"packedShape", ebd.packedShape}, {"normalShape", ebd.normalShape}, {"foldedShape", ebd.foldedShape}};
+        if (ebd.ring) {
+            j["ring"] = *ebd.ring;
+        }
+    }
 
     /**
-     * @brief ExtendedBufferDescriptor -> JSON
+     * @brief JSON -> ExtendedBufferDescriptor
      *
      * @param j
      * @param ebd
@@ -264,6 +321,9 @@ namespace Finn {
         j.at("packedShape").get_to(ebd.packedShape);
         j.at("normalShape").get_to(ebd.normalShape);
         j.at("foldedShape").get_to(ebd.foldedShape);
+        if (j.contains("ring")) {
+            ebd.ring = j.at("ring").get<RingControl>();
+        }
     }
 
     /**

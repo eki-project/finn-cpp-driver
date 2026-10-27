@@ -30,6 +30,7 @@
 #include <utility>  // for move
 #include <vector>   // for vector
 
+#include "experimental/xrt_xclbin.h"
 #include "xrt/xrt_device.h"
 #include "xrt/xrt_uuid.h"  // for uuid
 
@@ -98,26 +99,61 @@ namespace Finn {
         uuid = device.load_xclbin(xclbinPath);
     }
 
+    namespace {
+        /**
+         * @brief Memory group (bank) that the memory port of a DMA compute unit reaches, from the xclbin metadata
+         *
+         * The build may place each DMA in a bank of its own, and a DMA only reaches the bank of its port. The metadata is read
+         * from the file because an xrt::kernel destroyed before the buffers are allocated breaks every later allocation.
+         *
+         * @param xclbin Loaded xclbin
+         * @param kernelName Compute unit as the configuration names it ("kernel:{cu}")
+         * @return unsigned int Memory group to allocate the DMA's buffer in
+         */
+        unsigned int memoryGroup(const xrt::xclbin& xclbin, const std::string& kernelName) {
+            std::string cuName = kernelName;  // the xclbin names it "kernel:cu"
+            std::erase(cuName, '{');
+            std::erase(cuName, '}');
+            for (const auto& ip : xclbin.get_ips()) {
+                if (ip.get_name() != cuName) {
+                    continue;
+                }
+                for (const auto& arg : ip.get_args()) {
+                    for (const auto& mem : arg.get_mems()) {
+                        if (mem.get_type() != xrt::xclbin::mem::memory_type::streaming_connection) {
+                            return static_cast<unsigned int>(mem.get_index());
+                        }
+                    }
+                }
+                throw std::runtime_error("Compute unit " + kernelName + " has no memory port");
+            }
+            throw std::runtime_error("Compute unit " + kernelName + " is not in the xclbin");
+        }
+    }  // namespace
+
     void DeviceHandler::initializeBufferObjects(const DeviceWrapper& devWrap, unsigned int hostBufferSize, bool pSynchronousInference) {
         FINN_LOG(loglevel::info) << "(" << xrtDeviceIndex << ") "
                                  << "Initializing buffer objects with buffer size " << hostBufferSize << "\n";
         // Orders asynchronous batch starts after the previous batch's completion; outputs are created first so that every
         // output is registered before the first input worker consults the gate
         auto gate = pSynchronousInference ? nullptr : std::make_shared<Finn::detail::BatchGate>(devWrap.idmas.size(), devWrap.odmas.size());
+        const xrt::xclbin xclbin(xclbinPath);
         for (auto&& ebdptr : devWrap.odmas) {
             if (pSynchronousInference) {
-                auto ptr = std::make_shared<Finn::SyncDeviceOutputBuffer<uint8_t>>(ebdptr->kernelName, device, uuid, ebdptr->packedShape, hostBufferSize);
+                auto ptr = std::make_shared<Finn::SyncDeviceOutputBuffer<uint8_t>>(ebdptr->kernelName, device, uuid, ebdptr->packedShape, hostBufferSize, ebdptr->ring, memoryGroup(xclbin, ebdptr->kernelName));
                 outputBufferMap.emplace(std::make_pair(ebdptr->kernelName, ptr));
             } else {
-                auto ptr = std::make_shared<Finn::AsyncDeviceOutputBuffer<uint8_t>>(ebdptr->kernelName, device, uuid, ebdptr->packedShape, hostBufferSize, gate);
+                auto ptr = std::make_shared<Finn::AsyncDeviceOutputBuffer<uint8_t>>(ebdptr->kernelName, device, uuid, ebdptr->packedShape, hostBufferSize, gate, ebdptr->ring, memoryGroup(xclbin, ebdptr->kernelName));
                 outputBufferMap.emplace(std::make_pair(ebdptr->kernelName, ptr));
             }
         }
         for (auto&& ebdptr : devWrap.idmas) {
             if (pSynchronousInference) {
-                inputBufferMap.emplace(std::make_pair(ebdptr->kernelName, std::make_shared<Finn::SyncDeviceInputBuffer<uint8_t>>(ebdptr->kernelName, device, uuid, ebdptr->packedShape, hostBufferSize)));
+                inputBufferMap.emplace(
+                    std::make_pair(ebdptr->kernelName, std::make_shared<Finn::SyncDeviceInputBuffer<uint8_t>>(ebdptr->kernelName, device, uuid, ebdptr->packedShape, hostBufferSize, ebdptr->ring, memoryGroup(xclbin, ebdptr->kernelName))));
             } else {
-                inputBufferMap.emplace(std::make_pair(ebdptr->kernelName, std::make_shared<Finn::AsyncDeviceInputBuffer<uint8_t>>(ebdptr->kernelName, device, uuid, ebdptr->packedShape, hostBufferSize, gate)));
+                inputBufferMap.emplace(std::make_pair(
+                    ebdptr->kernelName, std::make_shared<Finn::AsyncDeviceInputBuffer<uint8_t>>(ebdptr->kernelName, device, uuid, ebdptr->packedShape, hostBufferSize, gate, ebdptr->ring, memoryGroup(xclbin, ebdptr->kernelName))));
             }
         }
         FINN_LOG(loglevel::info) << "Finished initializing buffer objects on device " << xrtDeviceIndex;

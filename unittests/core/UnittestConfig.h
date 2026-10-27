@@ -21,6 +21,8 @@
 #include <memory>
 #include <vector>
 
+#include "experimental/xrt_xclbin.h"
+
 #define MSTR(x)    #x
 #define STRNGFY(x) MSTR(x)
 
@@ -32,6 +34,18 @@ namespace FinnUnittest {
 #endif
 
     Finn::Config unittestConfig = Finn::createConfigFromPath(std::filesystem::path(configFilePath));
+
+    // The mock xclbin reports every DMA of the configuration, with its memory port in group 0
+    const bool computeUnitsMocked = [] {
+        for (const auto& [index, wrapper] : unittestConfig.deviceWrappers) {
+            for (const auto& dmas : {wrapper.idmas, wrapper.odmas}) {
+                for (const auto& dma : dmas) {
+                    xrt::xclbin::mockComputeUnits({dma->kernelName});
+                }
+            }
+        }
+        return true;
+    }();
 
     const std::string inputDmaName = "StreamingDataflowPartition_0:{idma0}";
     const std::string outputDmaName = "StreamingDataflowPartition_2:{odma0}";

@@ -34,7 +34,9 @@ namespace Finn {
          * @param pShapePacked packed shape of input
          * @param batchSize batch size
          */
-        SyncDeviceInputBuffer(const std::string& pCUName, xrt::device& device, xrt::uuid& pDevUUID, const shapePacked_t& pShapePacked, unsigned int batchSize) : DeviceInputBuffer<T>(pCUName, device, pDevUUID, pShapePacked, batchSize) {
+        SyncDeviceInputBuffer(const std::string& pCUName, xrt::device& device, xrt::uuid& pDevUUID, const shapePacked_t& pShapePacked, unsigned int batchSize, const std::optional<RingControl>& pRing = std::nullopt,
+                              unsigned int pMemGroup = 0)
+            : DeviceInputBuffer<T>(pCUName, device, pDevUUID, pShapePacked, batchSize, pRing, pMemGroup) {
             FINN_LOG(loglevel::info) << "[SyncDeviceInputBuffer] "
                                      << "Initializing DeviceBuffer " << this->name << " (SHAPE PACKED: " << FinnUtils::shapeToString(pShapePacked) << " inputs of the given shape, MAP SIZE: " << this->mapSize << ")\n";
             this->shapePacked[0] = batchSize;
@@ -128,7 +130,9 @@ namespace Finn {
          * @param pShapePacked packed shape of input
          * @param ringBufferSizeFactor size of ringbuffer in input elements (batch elements)
          */
-        SyncDeviceOutputBuffer(const std::string& pCUName, xrt::device& device, xrt::uuid& pDevUUID, const shapePacked_t& pShapePacked, unsigned int batchSize) : DeviceOutputBuffer<T>(pCUName, device, pDevUUID, pShapePacked, batchSize) {
+        SyncDeviceOutputBuffer(const std::string& pCUName, xrt::device& device, xrt::uuid& pDevUUID, const shapePacked_t& pShapePacked, unsigned int batchSize, const std::optional<RingControl>& pRing = std::nullopt,
+                               unsigned int pMemGroup = 0)
+            : DeviceOutputBuffer<T>(pCUName, device, pDevUUID, pShapePacked, batchSize, pRing, pMemGroup) {
             this->shapePacked[0] = batchSize;
         };
 

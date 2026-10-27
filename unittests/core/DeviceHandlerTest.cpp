@@ -21,6 +21,7 @@
 #include <string>
 #include <vector>
 
+#include "experimental/xrt_xclbin.h"
 #include "gtest/gtest.h"
 #include "xrt/xrt_device.h"
 #include "xrt/xrt_kernel.h"
@@ -31,6 +32,8 @@ class DeviceHandlerSetup : public ::testing::Test {
      protected:
     std::string fn = "somefile.xclbin";
     void SetUp() override {
+        xrt::xclbin::mockIps.clear();
+        xrt::xclbin::mockComputeUnits({"a", "b", "c", "inpName", "outName"});
         std::fstream tmpfile(fn, std::fstream::out);
         tmpfile << "some stuff\n";
         tmpfile.close();
@@ -86,6 +89,24 @@ TEST_F(DeviceHandlerSetup, ArgumentTest) {
         DeviceWrapper("somefile.xclbin", 0, {std::make_shared<BufferDescriptor>("a", shape_t({1})), std::make_shared<BufferDescriptor>("c", shape_t({1}))}, {std::make_shared<BufferDescriptor>("b", shape_t({1, 2}))}), true, 1));
 }
 
+TEST_F(DeviceHandlerSetup, MemoryGroupTest) {
+    // the build may give every DMA a bank of its own: each buffer goes into the bank its DMA reaches
+    xrt::xclbin::mockIps.clear();
+    xrt::xclbin::mockComputeUnits({"Partition_0:{idma0}"}, 0);
+    xrt::xclbin::mockComputeUnits({"Partition_2:{odma0}"}, 1);
+    auto handler = DeviceHandler(DeviceWrapper("somefile.xclbin", 0, {std::make_shared<BufferDescriptor>("Partition_0:{idma0}", shape_t({1, 4}))}, {std::make_shared<BufferDescriptor>("Partition_2:{odma0}", shape_t({1, 4}))}), true, 10);
+    EXPECT_EQ(handler.getInputBuffer("Partition_0:{idma0}")->testGetMemoryGroup(), 0U);
+    EXPECT_EQ(handler.getOutputBuffer("Partition_2:{odma0}")->testGetMemoryGroup(), 1U);
+
+    // a compute unit the xclbin does not contain, or one without a memory port, is an error
+    xrt::xclbin::mockIps.clear();
+    xrt::xclbin::mockComputeUnits({"Partition_0:{idma0}"});
+    EXPECT_THROW(DeviceHandler(DeviceWrapper("somefile.xclbin", 0, {std::make_shared<BufferDescriptor>("Partition_0:{idma0}", shape_t({1, 4}))}, {std::make_shared<BufferDescriptor>("Partition_2:{odma0}", shape_t({1, 4}))}), true, 10),
+                 std::runtime_error);
+    xrt::xclbin::mockIps.emplace_back("Partition_2:odma0", std::vector<xrt::xclbin::arg>{xrt::xclbin::arg({xrt::xclbin::mem(40, xrt::xclbin::mem::memory_type::streaming_connection)})});
+    EXPECT_THROW(DeviceHandler(DeviceWrapper("somefile.xclbin", 0, {std::make_shared<BufferDescriptor>("Partition_0:{idma0}", shape_t({1, 4}))}, {std::make_shared<BufferDescriptor>("Partition_2:{odma0}", shape_t({1, 4}))}), true, 10),
+                 std::runtime_error);
+}
 
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);

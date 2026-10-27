@@ -23,6 +23,7 @@
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <stop_token>
 #include <thread>
 #include <vector>
@@ -155,6 +156,14 @@ namespace Finn {
              */
             bool waitForInputsAnnounced(uint64_t batches, const std::stop_token& stoken) {
                 return waitUntil(stoken, [&] { return allAtLeast(announcedPerInput, batches); });
+            }
+
+            /**
+             * @brief Whether every input buffer has announced at least `batches` batches (does not block)
+             */
+            bool inputsAnnounced(uint64_t batches) {
+                const std::lock_guard<std::mutex> lock(mutex);
+                return allAtLeast(announcedPerInput, batches);
             }
 
             /**
@@ -294,6 +303,19 @@ namespace Finn {
                     break;
                 }
                 bo.sync(XCL_BO_SYNC_BO_TO_DEVICE, loaded * sizeof(T), 0);
+                if (this->isRingDma()) {
+                    // Ring DMAs never restart and take data whenever it comes, so batches only follow each other: post
+                    // this one, then wait until the kernel has read the previous one, whose buffer is filled next
+                    gate->inputAnnounced(gateIndex);
+                    ++started;
+                    this->executeAt(useSpare ? spareAdr : static_cast<uint64_t>(this->bufAdr), this->shapePacked[0]);
+                    if (!this->ringWaitAllButLast(stoken)) {
+                        FINN_LOG_DEBUG(loglevel::info) << "Stopped waiting for the input kernel";
+                        break;
+                    }
+                    useSpare = !useSpare;
+                    continue;
+                }
                 // Batch k may only start once the outputs of batch k-1 are complete, and only after the output kernels
                 // started their run for batch k, see BatchGate
                 if (!gate->waitForCompleted(started, stoken)) {
@@ -324,10 +346,11 @@ namespace Finn {
          * @param pShapePacked packed shape of input
          * @param batchSize size of ringbuffer in input elements (batch elements)
          */
-        AsyncDeviceInputBuffer(const std::string& pCUName, xrt::device& device, xrt::uuid& pDevUUID, const shapePacked_t& pShapePacked, unsigned int batchSize, std::shared_ptr<detail::BatchGate> pGate)
-            : DeviceInputBuffer<T>(pCUName, device, pDevUUID, pShapePacked, batchSize),
+        AsyncDeviceInputBuffer(const std::string& pCUName, xrt::device& device, xrt::uuid& pDevUUID, const shapePacked_t& pShapePacked, unsigned int batchSize, std::shared_ptr<detail::BatchGate> pGate,
+                               const std::optional<RingControl>& pRing = std::nullopt, unsigned int pMemGroup = 0)
+            : DeviceInputBuffer<T>(pCUName, device, pDevUUID, pShapePacked, batchSize, pRing, pMemGroup),
               detail::AsyncBufferWrapper<T>(batchSize * FinnUtils::shapeToElements(pShapePacked)),
-              spareBo(device, this->mapSize * sizeof(T), DeviceBuffer<T>::getFlags(Finn::Options::hostMemoryAccess), 0),
+              spareBo(device, this->mapSize * sizeof(T), DeviceBuffer<T>::getFlags(Finn::Options::hostMemoryAccess), pMemGroup),
               spareMap(spareBo.template map<T*>()),
               spareAdr(spareBo.address()),
               gate(std::move(pGate)),
@@ -401,6 +424,9 @@ namespace Finn {
     class AsyncDeviceOutputBuffer : public DeviceOutputBuffer<T>, public detail::AsyncBufferWrapper<T> {
         std::shared_ptr<detail::BatchGate> gate;         ///< shared with the input buffers of the same device
         std::size_t gateIndex = 0;                       ///< this buffer's index in the gate
+        std::optional<xrt::bo> spareBo;                  ///< ring DMAs only: second buffer, written by the kernel while the host collects the other one
+        T* spareMap = nullptr;
+        uint64_t spareAdr = 0;
         std::jthread workerThread;
         std::mutex callbackMutex;                        ///< Guards callback against registerCallback() racing with the worker
         std::function<void(std::size_t)> callback = {};  ///< Callback that is called when data is available in the queue
@@ -414,6 +440,11 @@ namespace Finn {
          */
         void readInternal(std::stop_token stoken) {
             FINN_LOG_DEBUG(loglevel::info) << "Starting to read from the device";
+            if (this->isRingDma()) {
+                readRing(stoken);
+                FINN_LOG(loglevel::info) << "Asynchronous Output buffer runner terminated";
+                return;
+            }
             for (uint64_t batch = 1;; ++batch) {
                 // Only run the kernel for a batch the inputs committed to; this also serves announced batches after a
                 // stop request so that no run is left pending on the card, see BatchGate
@@ -432,6 +463,49 @@ namespace Finn {
                 notify(queued - (queued % this->totalDataSize));
             }
             FINN_LOG(loglevel::info) << "Asynchronous Output buffer runner terminated";
+        }
+
+        /**
+         * @brief readInternal for a ring DMA: double-buffered
+         *
+         * The descriptor of the next batch is posted while the host still syncs and copies the current one, so the kernel
+         * always has a buffer to write into. Single-buffered, it would hold back the whole pipeline during every sync and
+         * copy. As for register DMAs, a descriptor is only posted for a batch the inputs committed to, and a posted batch
+         * is always waited for, so no descriptor is left pending on the card.
+         */
+        void readRing(const std::stop_token& stoken) {
+            const uint32_t base = this->ringDescriptorsPosted();  // batch b completes with descriptor count base + b
+            uint64_t posted = 0;
+            const auto post = [&] {
+                ++posted;
+                this->executeAt(posted % 2 == 1 ? static_cast<uint64_t>(this->bufAdr) : spareAdr, this->shapePacked[0]);
+                gate->outputStarted(gateIndex);
+            };
+            for (uint64_t batch = 1;; ++batch) {
+                if (posted < batch) {
+                    if (!gate->waitForInputsAnnounced(batch, stoken)) {
+                        break;
+                    }
+                    post();
+                }
+                // No stop token: the batch is in flight and completes once it has passed through
+                this->waitFor(
+                    [&] {
+                        if (posted == batch && gate->inputsAnnounced(batch + 1)) {
+                            post();
+                        }
+                        return this->ringReached(base + static_cast<uint32_t>(batch));
+                    },
+                    {});
+                xrt::bo& bo = batch % 2 == 1 ? this->internalBo : *spareBo;
+                bo.sync(XCL_BO_SYNC_BO_FROM_DEVICE, this->totalDataSize * sizeof(T), 0);
+                gate->completed(gateIndex);
+                if (!saveMap(batch % 2 == 1 ? this->map : spareMap, stoken)) {
+                    continue;  // stopping with a full queue: the data is dropped, the device state is clean
+                }
+                const std::size_t queued = this->queue.size();
+                notify(queued - (queued % this->totalDataSize));
+            }
         }
 
         /**
@@ -460,11 +534,18 @@ namespace Finn {
          * @param pShapePacked packed shape of input
          * @param batchSize batch size of the output
          */
-        AsyncDeviceOutputBuffer(const std::string& pCUName, xrt::device& device, xrt::uuid& pDevUUID, const shapePacked_t& pShapePacked, unsigned int batchSize, std::shared_ptr<detail::BatchGate> pGate)
-            : DeviceOutputBuffer<T>(pCUName, device, pDevUUID, pShapePacked, batchSize),
+        AsyncDeviceOutputBuffer(const std::string& pCUName, xrt::device& device, xrt::uuid& pDevUUID, const shapePacked_t& pShapePacked, unsigned int batchSize, std::shared_ptr<detail::BatchGate> pGate,
+                                const std::optional<RingControl>& pRing = std::nullopt, unsigned int pMemGroup = 0)
+            : DeviceOutputBuffer<T>(pCUName, device, pDevUUID, pShapePacked, batchSize, pRing, pMemGroup),
               detail::AsyncBufferWrapper<T>(2 * batchSize * FinnUtils::shapeToElements(pShapePacked)),  // Make output buffer map twice as large to circumvent a very rare deadlock in the case where one thread handles IO alone.
               gate(std::move(pGate)),
               gateIndex(gate->registerOutput()) {
+            if (pRing) {
+                spareBo.emplace(device, this->mapSize * sizeof(T), DeviceBuffer<T>::getFlags(Finn::Options::hostMemoryAccess), pMemGroup);
+                spareMap = spareBo->template map<T*>();
+                spareAdr = spareBo->address();
+                std::fill(spareMap, spareMap + this->mapSize, 0);
+            }
             this->pollPause = std::chrono::microseconds{2};  // the input worker starts kernels while this buffer polls
             // Started last, once every member the worker touches (callback mutex, callback, gate) is constructed
             workerThread = std::jthread(std::bind_front(&AsyncDeviceOutputBuffer::readInternal, this));
@@ -544,9 +625,16 @@ namespace Finn {
          *
          * @return false if the buffer was shut down before the data could be stored
          */
-        bool saveMap(const std::stop_token& stoken) {
+        bool saveMap(const std::stop_token& stoken) { return saveMap(this->map, stoken); }
+
+        /**
+         * @brief Store the contents of the given buffer map into the ring buffer. Blocks while the ring buffer is full.
+         *
+         * @return false if the buffer was shut down before the data could be stored
+         */
+        bool saveMap(const T* source, const std::stop_token& stoken) {
             FINN_LOG_DEBUG(loglevel::info) << "Data transfer of output from FPGA!\n";
-            if (this->queue.enqueue_bulk(this->map, this->totalDataSize, stoken) == this->totalDataSize) {
+            if (this->queue.enqueue_bulk(source, this->totalDataSize, stoken) == this->totalDataSize) {
                 FINN_LOG_DEBUG(loglevel::info) << this->loggerPrefix() << "Stored " << this->totalDataSize << " elements in the FIFO";
                 return true;
             }

@@ -5,6 +5,11 @@
 // Copyright (C) 2022 Advanced Micro Devices, Inc. All rights reserved.
 
 #include <cstdint>
+#include <map>
+#include <mutex>
+#include <optional>
+#include <string>
+#include <utility>
 
 #include "xrt.h"
 #include "xrt/xrt_device.h"
@@ -39,6 +44,37 @@ namespace xrt {
         inline static std::vector<xrt::device> kernel_device;
         inline static std::vector<xrt::uuid> kernel_uuid;
         /**
+         * @brief Last value written to each register, per IP name and offset
+         */
+        inline static std::map<std::pair<std::string, uint32_t>, uint32_t> registers;
+        /**
+         * @brief (prod, cons) offsets of a ring DMA: reading cons returns the last value written to prod, i.e. every
+         * posted descriptor completes immediately
+         */
+        inline static std::optional<std::pair<uint32_t, uint32_t>> ringCompletesImmediately;
+        /**
+         * @brief Guards registers against the worker threads of the asynchronous buffers
+         */
+        inline static std::mutex registersMutex;
+
+        /**
+         * @brief Thread-safe read of a register from the test
+         */
+        static uint32_t peek(const std::string& name, uint32_t offset) {
+            const std::lock_guard<std::mutex> lock(registersMutex);
+            const auto it = registers.find({name, offset});
+            return it == registers.end() ? 0 : it->second;
+        }
+
+        /**
+         * @brief Thread-safe write of a register from the test, e.g. to complete ring descriptors
+         */
+        static void poke(const std::string& name, uint32_t offset, uint32_t value) {
+            const std::lock_guard<std::mutex> lock(registersMutex);
+            registers[{name, offset}] = value;
+        }
+        std::string ipName;
+        /**
          * ip() - Construct empty ip object
          */
         ip() {}
@@ -65,6 +101,7 @@ namespace xrt {
             kernel_device.emplace_back(device);
             kernel_uuid.emplace_back(xclbin_id);
             kernel_name.emplace_back(name);
+            ipName = name;
         };
 
         /**
@@ -76,7 +113,7 @@ namespace xrt {
          *  Data to write
          *
          */
-        void write_register(uint32_t offset, uint32_t data) {};
+        void write_register(uint32_t offset, uint32_t data) { poke(ipName, offset, data); };
 
         /**
          * read_register() - Read data from ip address range
@@ -91,7 +128,10 @@ namespace xrt {
             if (offset == 0x0) {
                 return 0x4;  // ap_idle: every invocation completes immediately
             }
-            return 0;
+            if (ringCompletesImmediately && offset == ringCompletesImmediately->second) {
+                offset = ringCompletesImmediately->first;
+            }
+            return peek(ipName, offset);
         };
     };
 

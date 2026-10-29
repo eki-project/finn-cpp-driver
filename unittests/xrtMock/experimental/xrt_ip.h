@@ -89,7 +89,7 @@ namespace xrt {
          */
         uint32_t read_register(uint32_t offset) const {
             if (offset == 0x0) {
-                return 0x4;
+                return 0x4;  // ap_idle: every invocation completes immediately
             }
             return 0;
         };

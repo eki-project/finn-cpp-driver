@@ -34,8 +34,12 @@
  */
 constexpr uint32_t IP_START = 0x1;
 /**
- * @brief Magic value used by XRT to see if a kernel is idling
+ * @brief ap_idle bit of the HLS control register
  *
+ * @attention For the FINN IODMA kernels with numReps > 1, ap_idle is observed shortly before the last repetition has fully drained into the accelerator.
+ * Starting the input kernel again right away corrupts the last sample of the previous batch (measured on U55C: 2-10% of 10-sample batches, even with a
+ * separate buffer for the next batch). The asynchronous buffers therefore only start a batch once the previous one has completed on the output kernels
+ * (see Finn::detail::BatchGate). ap_done (clear-on-read) is not an alternative: polling it lost completions and hung on the same hardware.
  */
 constexpr uint32_t IP_IDLE = 0x4;
 /**
@@ -72,15 +76,18 @@ namespace Finn {
          */
         size_t mapSize;
         /**
+         * @brief XRT IP core associated with this Buffer
+         *
+         * Declared (and therefore constructed) before the buffer object: opening the IP establishes the process' context
+         * on the loaded xclbin, which buffer allocation requires. Without it, re-creating buffers after the previous
+         * ones were destroyed fails with EPERM.
+         */
+        xrt::ip assocIPCore;
+        /**
          * @brief XRT buffer object; This is used to interact with FPGA memory
          *
          */
         xrt::bo internalBo;
-        /**
-         * @brief XRT IP core associated with this Buffer
-         *
-         */
-        xrt::ip assocIPCore;
         /**
          * @brief Mapped buffer; Part of the XRT buffer object
          *
@@ -104,16 +111,49 @@ namespace Finn {
         std::size_t featureMapSize;
 
         /**
-         * @brief Busy wait until the IP core is done executing
+         * @brief Number of status-register polls done back-to-back before the wait starts sleeping between polls
+         *
+         * Each poll is a PCIe register read of a few microseconds, so this covers short kernel runs with minimal latency.
+         */
+        static constexpr std::size_t spinPolls = 2000;
+        /**
+         * @brief Pause between two status-register polls while spinning
+         *
+         * Zero by default: a single polling thread (synchronous inference) gets the lowest latency from back-to-back
+         * reads. Buffers whose polling runs concurrently with kernel starts from another thread (the asynchronous
+         * workers) set a short pause, because back-to-back register reads starve other register accesses in the XRT
+         * driver (measured: a kernel start from another thread was delayed by up to 1 ms). Measured cost of a 2 us
+         * pause on the synchronous path: 1.2 to 1.9 us per inference, which is why it is not applied there.
+         */
+        std::chrono::nanoseconds pollPause{0};
+
+        /**
+         * @brief Wait until the IP core reports idle
+         *
+         * Polls the control register; after @ref spinPolls polls it backs off to sleeping between polls so that a
+         * thread waiting for a kernel that has nothing to do (e.g. the asynchronous output worker while no input is
+         * pending) does not occupy a CPU core. See @ref IP_IDLE for the caveat on reusing input buffers.
          *
          * @param stopToken Token to request stopping the wait
+         * @return true if the kernel is idle, false if the wait was stopped via the token
          */
-        void busyWait(std::stop_token stopToken = {}) {
-            // Wait until the IP is DONE
-            uint32_t axi_ctrl = 0;
-            while ((axi_ctrl & IP_IDLE) != IP_IDLE && !stopToken.stop_requested()) {
-                axi_ctrl = assocIPCore.read_register(CSR_OFFSET);
+        bool busyWait(std::stop_token stopToken = {}) {
+            using namespace std::chrono_literals;
+            std::size_t polls = 0;
+            while (!stopToken.stop_requested()) {
+                if ((assocIPCore.read_register(CSR_OFFSET) & IP_IDLE) == IP_IDLE) {
+                    return true;
+                }
+                if (++polls > spinPolls) {
+                    std::this_thread::sleep_for(polls > 2 * spinPolls ? 200us : 20us);
+                } else if (pollPause.count() > 0) {
+                    // Leaves gaps between the reads for register accesses of other threads, see pollPause
+                    const auto until = std::chrono::steady_clock::now() + pollPause;
+                    while (std::chrono::steady_clock::now() < until) {
+                    }
+                }
             }
+            return false;
         }
 
          private:
@@ -128,11 +168,13 @@ namespace Finn {
         unsigned int getGroupId(const xrt::device& device, const xrt::uuid& uuid, const std::string& computeUnit) { return xrt::kernel(device, uuid, computeUnit).group_id(0); }
 
         /**
-         * @brief Used for deciding if execute needs to write data registers or not
+         * @brief Kernel register contents written by the last execute, so unchanged registers are not rewritten (one PCIe write each)
          *
          */
-        uint32_t oldRepetitions = 0;
+        uint32_t lastRepetitions = 0;
+        uint64_t lastAddress = ~uint64_t{0};
 
+         protected:
         /**
          * @brief Get flags for buffer object creation based on host memory access
          *
@@ -159,9 +201,9 @@ namespace Finn {
             : name(pCUName),
               shapePacked(pShapePacked),
               mapSize(FinnUtils::getActualBufferSize(FinnUtils::shapeToElements(pShapePacked) * batchSize)),
+              assocIPCore(xrt::ip(device, pDevUUID, pCUName)),  // Using xrt::kernel/getGroupId after this point leads to a total bricking of the FPGA card!!
               internalBo(xrt::bo(device, mapSize * sizeof(T), DeviceBuffer::getFlags(Finn::Options::hostMemoryAccess), 0)),
               map(internalBo.template map<T*>()),
-              assocIPCore(xrt::ip(device, pDevUUID, pCUName)),  // Using xrt::kernel/getGroupId after this point leads to a total bricking of the FPGA card!!
               bufAdr(internalBo.address()) {
             shapePacked[0] = batchSize;
             FINN_LOG(loglevel::info) << "New Device Buffer of size " << mapSize * sizeof(T) << "bytes with group id " << 0 << "\n";
@@ -174,11 +216,10 @@ namespace Finn {
         }
 
         /**
-         * @brief Construct a new Device Buffer object (Move constructor)
-         * @param buf
+         * @brief Deleted move constructor. Buffers are only ever handled through std::shared_ptr; moving one would also
+         * have to carry totalDataSize, featureMapSize and the cached kernel registers.
          */
-        DeviceBuffer(DeviceBuffer&& buf) noexcept
-            : name(std::move(buf.name)), shapePacked(std::move(buf.shapePacked)), mapSize(buf.mapSize), internalBo(std::move(buf.internalBo)), assocIPCore(std::move(buf.assocIPCore)), map(std::move(buf.map)), bufAdr(internalBo.address()) {}
+        DeviceBuffer(DeviceBuffer&& buf) noexcept = delete;
 
         /**
          * @brief Construct a new Device Buffer object (Deleted copy constructor)
@@ -275,13 +316,10 @@ namespace Finn {
          * @brief Wait for the kernel to complete execution
          *
          * @param stopToken Token to request stopping the wait
-         * @return true Success
-         * @return false Failure
+         * @return true The kernel finished
+         * @return false The wait was stopped via the token before the kernel finished
          */
-        virtual bool wait(std::stop_token stopToken = {}) {
-            busyWait(stopToken);
-            return true;
-        };
+        virtual bool wait(std::stop_token stopToken = {}) { return busyWait(stopToken); };
 
          protected:
         /**
@@ -292,34 +330,40 @@ namespace Finn {
         virtual std::string loggerPrefix() { return "[" + std::string(Finn::type_name<decltype(*this)>()) + " - " + name + "] "; }
 
         /**
-         * @brief Synchronizes the Buffer data to the data on the FPGA
+         * @brief Synchronizes the first elements of the buffer with the FPGA memory
          *
-         * @param bytes
+         * @param elements Number of elements of type T to transfer (converted to bytes internally)
          */
-        virtual void sync(std::size_t bytes) = 0;
+        virtual void sync(std::size_t elements) = 0;
 
         /**
-         * @brief Execute the kernel with specified repetitions
+         * @brief Execute the kernel on this buffer with specified repetitions
          *
          * @param repetitions Number of repetitions to execute (default: 1)
          */
-        void execute(const uint32_t repetitions = 1) {
-            // writes the buffer adress
+        void execute(const uint32_t repetitions = 1) { executeAt(static_cast<uint64_t>(bufAdr), repetitions); }
+
+        /**
+         * @brief Execute the kernel on the device buffer at the given address with specified repetitions
+         *
+         * Only registers whose value changed since the last execute are written.
+         *
+         * @param address Device address of the buffer the kernel should use
+         * @param repetitions Number of repetitions to execute
+         */
+        void executeAt(const uint64_t address, const uint32_t repetitions) {
             constexpr uint32_t offset_buf = 0x10;
             constexpr uint32_t offset_rep = 0x1C;
 
-            // If repetition number is the same as for the last call, then nothing has to be written before starting the Kernel
-            if (repetitions == oldRepetitions) {
-                assocIPCore.write_register(CSR_OFFSET, IP_START);
-                return;
+            if (address != lastAddress) {
+                assocIPCore.write_register(offset_buf, static_cast<uint32_t>(address));
+                assocIPCore.write_register(offset_buf + 4, static_cast<uint32_t>(address >> 32));
+                lastAddress = address;
             }
-            oldRepetitions = repetitions;
-
-            assocIPCore.write_register(offset_buf, bufAdr);
-            assocIPCore.write_register(offset_buf + 4, bufAdr >> 32);
-
-            // writes the repetitions
-            assocIPCore.write_register(offset_rep, repetitions);
+            if (repetitions != lastRepetitions) {
+                assocIPCore.write_register(offset_rep, repetitions);
+                lastRepetitions = repetitions;
+            }
 
             // Start inference
             assocIPCore.write_register(CSR_OFFSET, IP_START);
@@ -381,7 +425,7 @@ namespace Finn {
          * @brief Sync data from the map to the device.
          *
          */
-        void sync(std::size_t bytes) override { this->internalBo.sync(XCL_BO_SYNC_BO_TO_DEVICE, bytes, 0); }
+        void sync(std::size_t elements) override { this->internalBo.sync(XCL_BO_SYNC_BO_TO_DEVICE, elements * sizeof(T), 0); }
 
          private:
         template<typename InputIt>
@@ -418,12 +462,6 @@ namespace Finn {
          *
          */
         const IO ioMode = IO::OUTPUT;
-        /**
-         * @brief Timeout for kernels
-         *
-         */
-        unsigned int msExecuteTimeout = 1000;
-
          public:
         /**
          * @brief Construct a new Device Output Buffer object
@@ -469,9 +507,8 @@ namespace Finn {
         /**
          * @brief Sync data from the FPGA into the memory map
          *
-         * @return * void
          */
-        void sync(std::size_t bytes) override { this->internalBo.sync(XCL_BO_SYNC_BO_FROM_DEVICE, bytes, 0); }
+        void sync(std::size_t elements) override { this->internalBo.sync(XCL_BO_SYNC_BO_FROM_DEVICE, elements * sizeof(T), 0); }
 
 #ifdef UNITTEST
          public:
@@ -497,7 +534,7 @@ namespace Finn {
 
         void testSetMap(const Finn::vector<T>& data) { testSetMap(data.begin(), data.end()); }
 
-        xrt::bo& testGetInternalBO() { return this->interalBo; }
+        xrt::bo& testGetInternalBO() { return this->internalBo; }
 #endif
     };
 }  // namespace Finn

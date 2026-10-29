@@ -30,19 +30,16 @@ namespace loglevel = plog;
 // NOLINTBEGIN
 #define FINN_LOG(SEV) PLOG(SEV)
 #ifdef NDEBUG
-class [[maybe_unused]] DevNull {};
-
-static DevNull dev_null;
-
-template<typename T>
-DevNull& operator<<(DevNull& dest, [[maybe_unused]] T) {
-    return dest;
-}
     /**
      * @brief Defines debug logging macro that is removed when building in Release mode
      *
+     * The dead else-branch keeps the streamed operands type-checked but never evaluated, so string
+     * construction in hot paths costs nothing (same technique as plog's PLOG_DISABLE_LOGGING).
      */
-    #define FINN_LOG_DEBUG(SEV) dev_null
+    #define FINN_LOG_DEBUG(SEV) \
+        if (true) {             \
+        } else                  \
+            PLOG(SEV)
 #else
     /**
      * @brief Defines debug logging macro that is removed when building in Release mode
@@ -63,7 +60,7 @@ class Logger {
      *
      * @param console Enable console output in addition to file logging
      */
-    void static initLogger(bool console = false) { static Logger log(console); }
+    void static initLogger(bool console = false);
 
     /**
      * @brief Construct a new Logger object (Deleted)
@@ -94,15 +91,7 @@ class Logger {
     Logger(Logger&&) = default;
 
      private:
-    Logger(bool console = false) {
-        static plog::RollingFileAppender<plog::TxtFormatter> fileAppender("finnLog.log", 10 * 1024 * 1024, 3);
-        static plog::ColorConsoleAppender<plog::TxtFormatter> consoleAppender;
-        if (console) {
-            plog::init(plog::debug, &fileAppender).addAppender(&consoleAppender);
-        } else {
-            plog::init(plog::debug, &fileAppender);
-        }
-    }
+    Logger(bool console = false);
     const std::string logFormat = "[%TimeStamp%] (%LineID%) [%Severity%]: %Message%";
 };
 

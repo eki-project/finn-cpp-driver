@@ -1,4 +1,4 @@
-#bin/bash
+#!/bin/bash
 
 if git submodule status | grep --quiet '^-'; then
     git submodule init

@@ -2,7 +2,7 @@
  * @file AsyncDeviceBuffers.hpp
  * @author Linus Jungemann (linus.jungemann@uni-paderborn.de) and others
  * @brief Implements asynchronous FPGA interfaces to transfer data to and from the FPGA.
- * @version 1.0
+ * @version 1.1
  * @date 2023-12-20
  *
  * @copyright Copyright (c) 2023
@@ -17,14 +17,178 @@
 
 #include <FINNCppDriver/core/DeviceBuffer/DeviceBuffer.hpp>
 #include <FINNCppDriver/utils/SPSCQueue.hpp>
+#include <chrono>
+#include <condition_variable>
+#include <cstdint>
 #include <functional>
+#include <memory>
+#include <mutex>
+#include <stop_token>
 #include <thread>
+#include <vector>
 
 #include "ert.h"
 
 namespace Finn {
 
     namespace detail {
+        /**
+         * @brief Orders the kernel starts of the asynchronous workers of one device
+         *
+         * Per batch N the order is: every output kernel completed batch N-1 and the host read it, then the input
+         * workers announce batch N, then every output kernel starts its run for batch N, then the input kernels start
+         * batch N. All three rules were measured on U55C with the jet network:
+         * - Starting input batch N+1 before output batch N completed corrupted the last sample of batch N (the input
+         *   kernels report idle shortly before their last repetition has drained). FINN's reference driver has the same
+         *   order.
+         * - Starting an output run after its input run, or racing the two starts, corrupts the last sample of the batch
+         *   with 3 percent (started after) down to 0.1 percent (racing) probability: the output kernel must already be
+         *   waiting on the stream when the first data arrives. The synchronous path always starts the output kernel
+         *   first and never showed the corruption.
+         * - An output run started ahead of any announced input batch is left pending on the card when the process
+         *   ends and swallows the first sample of the next process (every later output is shifted by one sample until
+         *   the card is reset). Output runs are therefore only started for announced batches, and shutdown drains them.
+         * Host work for the next batch (packing, queueing, DMA into the spare buffer) still overlaps with the FPGA.
+         */
+        class BatchGate {
+            std::mutex mutex;
+            std::condition_variable_any cv;
+            std::vector<uint64_t> completedPerOutput;  ///< batches completed per output buffer
+            std::vector<uint64_t> startedPerOutput;    ///< output kernel runs started per output buffer
+            std::vector<uint64_t> announcedPerInput;   ///< batches announced (about to start) per input buffer
+            std::size_t registeredOutputs = 0;
+            std::size_t registeredInputs = 0;
+            bool active = true;
+
+            template<typename Counters>
+            static bool allAtLeast(const Counters& counters, uint64_t value) {
+                for (const auto counter : counters) {
+                    if (counter < value) {
+                        return false;
+                    }
+                }
+                return true;
+            }
+
+            template<typename Pred>
+            bool waitUntil(const std::stop_token& stoken, Pred satisfied) {
+                std::unique_lock<std::mutex> lock(mutex);
+                cv.wait(lock, stoken, [&] { return !active || satisfied(); });
+                return satisfied();
+            }
+
+             public:
+            /**
+             * @brief Construct a gate for a fixed number of input and output buffers
+             *
+             * The counts are fixed up front because the buffers are constructed one after another and each one starts
+             * its worker immediately: a wait over an empty set of counters would be vacuously satisfied, and an output
+             * worker could run ahead of the inputs before they exist.
+             */
+            BatchGate(std::size_t inputs, std::size_t outputs) : completedPerOutput(outputs, 0), startedPerOutput(outputs, 0), announcedPerInput(inputs, 0) {}
+
+            /**
+             * @brief Registers an output buffer
+             *
+             * @return Index to pass to @ref outputStarted and @ref completed
+             */
+            std::size_t registerOutput() {
+                const std::lock_guard<std::mutex> lock(mutex);
+                if (registeredOutputs >= completedPerOutput.size()) {
+                    Finn::logAndError<std::runtime_error>("More output buffers registered at the batch gate than it was constructed for");
+                }
+                return registeredOutputs++;
+            }
+
+            /**
+             * @brief Registers an input buffer
+             *
+             * @return Index to pass to @ref inputAnnounced
+             */
+            std::size_t registerInput() {
+                const std::lock_guard<std::mutex> lock(mutex);
+                if (registeredInputs >= announcedPerInput.size()) {
+                    Finn::logAndError<std::runtime_error>("More input buffers registered at the batch gate than it was constructed for");
+                }
+                return registeredInputs++;
+            }
+
+            /**
+             * @brief Records that output buffer `index` finished one more batch
+             */
+            void completed(std::size_t index) {
+                {
+                    const std::lock_guard<std::mutex> lock(mutex);
+                    ++completedPerOutput[index];
+                }
+                cv.notify_all();
+            }
+
+            /**
+             * @brief Input buffer `index` commits to starting its next batch (it will start it even if stopped meanwhile)
+             */
+            void inputAnnounced(std::size_t index) {
+                {
+                    const std::lock_guard<std::mutex> lock(mutex);
+                    ++announcedPerInput[index];
+                }
+                cv.notify_all();
+            }
+
+            /**
+             * @brief Records that output buffer `index` started its kernel run for one more batch
+             */
+            void outputStarted(std::size_t index) {
+                {
+                    const std::lock_guard<std::mutex> lock(mutex);
+                    ++startedPerOutput[index];
+                }
+                cv.notify_all();
+            }
+
+            /**
+             * @brief Blocks until every input buffer has announced at least `batches` batches
+             *
+             * Returns true as soon as that holds, even after a stop request or shutdown, so that an output worker still
+             * serves a batch the inputs committed to. Returns false only if the condition does not hold when the gate is
+             * shut down or the token is stopped.
+             */
+            bool waitForInputsAnnounced(uint64_t batches, const std::stop_token& stoken) {
+                return waitUntil(stoken, [&] { return allAtLeast(announcedPerInput, batches); });
+            }
+
+            /**
+             * @brief Blocks until every output buffer has started its run for at least `batches` batches
+             *
+             * Not interruptible by a stop token: the caller has announced the batch and the output workers will start
+             * it. Returns false only if the gate was shut down first, which the shutdown order of DeviceHandler prevents.
+             */
+            bool waitForOutputsStarted(uint64_t batches) { return waitUntil(std::stop_token{}, [&] { return allAtLeast(startedPerOutput, batches); }); }
+
+            /**
+             * @brief Blocks until every output buffer has completed at least `batches` batches
+             *
+             * @return false if shut down or stopped before that happened
+             */
+            bool waitForCompleted(uint64_t batches, const std::stop_token& stoken) {
+                std::unique_lock<std::mutex> lock(mutex);
+                const auto ready = [&] { return !active || allAtLeast(completedPerOutput, batches); };
+                cv.wait(lock, stoken, ready);
+                return active && !stoken.stop_requested() && ready();
+            }
+
+            /**
+             * @brief Wakes all waiters and makes further waits return immediately
+             */
+            void shutdown() {
+                {
+                    const std::lock_guard<std::mutex> lock(mutex);
+                    active = false;
+                }
+                cv.notify_all();
+            }
+        };
+
         /**
          * @brief Wrapper that contains the ringbuffer used by Asynchronous Input & Output Buffers
          *
@@ -45,39 +209,36 @@ namespace Finn {
              *
              * @param expectedMaxQueueSize Expected maximum size of the queue
              */
-            AsyncBufferWrapper(std::size_t expectedMaxQueueSize) : queue(expectedMaxQueueSize * featureMapCount) { FINN_LOG(loglevel::info) << "[AsyncDeviceBuffer] Max buffer size:" << queue.size() << "\n"; }
+            explicit AsyncBufferWrapper(std::size_t expectedMaxQueueSize) : queue(expectedMaxQueueSize * featureMapCount) { FINN_LOG(loglevel::info) << "[AsyncDeviceBuffer] Max buffer size:" << queue.capacity() << "\n"; }
+
+            ~AsyncBufferWrapper() = default;
+
+            // The queue is used by a worker thread that captures `this`, so these objects must never move
+            AsyncBufferWrapper(AsyncBufferWrapper&&) = delete;
+            AsyncBufferWrapper(const AsyncBufferWrapper&) = delete;
+            AsyncBufferWrapper& operator=(AsyncBufferWrapper&&) = delete;
+            AsyncBufferWrapper& operator=(const AsyncBufferWrapper&) = delete;
 
             /**
-             * @brief Destroy the Async Buffer Wrapper object
+             * @brief Joins the worker thread of a buffer after requesting it to stop, logging if that takes unusually long
              *
+             * @param worker Thread to join
+             * @param name Buffer name for the log
              */
-            ~AsyncBufferWrapper() = default;
-            /**
-             * @brief Construct a new Async Buffer Wrapper object (Move construction)
-             *
-             * @param buf
-             */
-            AsyncBufferWrapper(AsyncBufferWrapper&& buf) noexcept {}
-            /**
-             * @brief Construct a new Async Buffer Wrapper object (Deleted Copy constructor)
-             *
-             * @param buf
-             */
-            AsyncBufferWrapper(const AsyncBufferWrapper& buf) noexcept = delete;
-            /**
-             * @brief Deleted move assignment operator
-             *
-             * @param buf
-             * @return AsyncBufferWrapper&
-             */
-            AsyncBufferWrapper& operator=(AsyncBufferWrapper&& buf) = delete;
-            /**
-             * @brief Deleted copy assignment operator
-             *
-             * @param buf
-             * @return AsyncBufferWrapper&
-             */
-            AsyncBufferWrapper& operator=(const AsyncBufferWrapper& buf) = delete;
+            static void stopWorker(std::jthread& worker, const std::string& name) {
+                if (!worker.joinable()) {
+                    return;
+                }
+                worker.request_stop();
+                const auto start = std::chrono::steady_clock::now();
+                worker.join();
+                const auto took = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start);
+                if (took > std::chrono::seconds(1)) {
+                    FINN_LOG(loglevel::warning) << "Worker thread for " << name << " needed " << took.count() << " ms to stop";
+                } else {
+                    FINN_LOG(loglevel::info) << "Worker thread for " << name << " exited cleanly";
+                }
+            }
 #ifdef UNITTEST
              public:
             DynamicSPSCQueue<T>& testGetQueue() { return this->queue; }
@@ -85,7 +246,7 @@ namespace Finn {
 
              public:
             /**
-             * @brief Return the size of the buffer as specified by the argument.
+             * @brief Return the number of elements currently held in the queue
              *
              * @return size_t
              */
@@ -102,20 +263,53 @@ namespace Finn {
     class AsyncDeviceInputBuffer : public DeviceInputBuffer<T>, public detail::AsyncBufferWrapper<T> {
          private:
         friend class DeviceInputBuffer<T>;
+        /**
+         * @brief Second device buffer: batches alternate between the two buffers so the worker never writes into the
+         * buffer the input kernel was last started on. The kernel can report idle slightly before its last repetition
+         * has finished reading (see @ref IP_IDLE); with two buffers that read is never disturbed.
+         */
+        xrt::bo spareBo;
+        T* spareMap;
+        uint64_t spareAdr;
+        std::shared_ptr<detail::BatchGate> gate;  ///< shared with the output buffers of the same device
+        std::size_t gateIndex = 0;                ///< this buffer's index in the gate
         std::jthread workerThread;
 
         /**
          * @brief Internal run method used by the runner thread
          *
+         * Moves one batch at a time from the queue into the inactive device buffer and runs the input kernel on it. A
+         * stop request (or a queue shutdown) can wake the dequeue with a partial batch; the kernel must then not be
+         * started, because it would stream stale buffer contents into the accelerator and leave data in flight.
          */
         void runInternal(std::stop_token stoken) {
+            bool useSpare = false;
+            uint64_t started = 0;
             while (!stoken.stop_requested()) {
-                this->sync(this->loadMap(stoken));
-                this->execute(this->shapePacked[0]);
-                bool success = this->wait(stoken);  // Wait until the kernel is done executing
-                if (!success) {
-                    FINN_LOG_DEBUG(loglevel::error) << "Kernel execution failed";
+                T* target = useSpare ? spareMap : this->map;
+                xrt::bo& bo = useSpare ? spareBo : this->internalBo;
+                FINN_LOG_DEBUG(loglevel::info) << "Data transfer of input data to FPGA!\n";
+                const std::size_t loaded = this->queue.dequeue_bulk(target, this->totalDataSize, stoken);
+                if (loaded != this->totalDataSize) {
+                    break;
                 }
+                bo.sync(XCL_BO_SYNC_BO_TO_DEVICE, loaded * sizeof(T), 0);
+                // Batch k may only start once the outputs of batch k-1 are complete, and only after the output kernels
+                // started their run for batch k, see BatchGate
+                if (!gate->waitForCompleted(started, stoken)) {
+                    break;
+                }
+                gate->inputAnnounced(gateIndex);  // commits to this batch: it is started even if a stop arrives meanwhile
+                if (!gate->waitForOutputsStarted(started + 1)) {
+                    break;
+                }
+                ++started;
+                this->executeAt(useSpare ? spareAdr : static_cast<uint64_t>(this->bufAdr), this->shapePacked[0]);
+                if (!this->wait(stoken)) {
+                    FINN_LOG_DEBUG(loglevel::info) << "Stopped waiting for the input kernel";
+                    break;
+                }
+                useSpare = !useSpare;
             }
             FINN_LOG(loglevel::info) << "Asynchronous Input buffer runner terminated";
         }
@@ -130,103 +324,64 @@ namespace Finn {
          * @param pShapePacked packed shape of input
          * @param batchSize size of ringbuffer in input elements (batch elements)
          */
-        AsyncDeviceInputBuffer(const std::string& pCUName, xrt::device& device, xrt::uuid& pDevUUID, const shapePacked_t& pShapePacked, unsigned int batchSize)
+        AsyncDeviceInputBuffer(const std::string& pCUName, xrt::device& device, xrt::uuid& pDevUUID, const shapePacked_t& pShapePacked, unsigned int batchSize, std::shared_ptr<detail::BatchGate> pGate)
             : DeviceInputBuffer<T>(pCUName, device, pDevUUID, pShapePacked, batchSize),
               detail::AsyncBufferWrapper<T>(batchSize * FinnUtils::shapeToElements(pShapePacked)),
-              workerThread(std::jthread(std::bind_front(&AsyncDeviceInputBuffer::runInternal, this))) {}
+              spareBo(device, this->mapSize * sizeof(T), DeviceBuffer<T>::getFlags(Finn::Options::hostMemoryAccess), 0),
+              spareMap(spareBo.template map<T*>()),
+              spareAdr(spareBo.address()),
+              gate(std::move(pGate)),
+              gateIndex(gate->registerInput()) {
+            std::fill(spareMap, spareMap + this->mapSize, 0);
+            this->pollPause = std::chrono::microseconds{2};  // the output worker starts kernels while this buffer polls
+            // Started last, once every member the worker touches is constructed
+            workerThread = std::jthread(std::bind_front(&AsyncDeviceInputBuffer::runInternal, this));
+        }
 
-        /**
-         * @brief Construct a new Async Device Input Buffer object
-         *
-         * @param buf
-         */
-        AsyncDeviceInputBuffer(AsyncDeviceInputBuffer&& buf) noexcept = default;
-        /**
-         * @brief Construct a new Async Device Input Buffer object (Deleted)
-         *
-         * @param buf
-         */
+        AsyncDeviceInputBuffer(AsyncDeviceInputBuffer&& buf) noexcept = delete;
         AsyncDeviceInputBuffer(const AsyncDeviceInputBuffer& buf) noexcept = delete;
+        AsyncDeviceInputBuffer& operator=(AsyncDeviceInputBuffer&& buf) = delete;
+        AsyncDeviceInputBuffer& operator=(const AsyncDeviceInputBuffer& buf) = delete;
+
         /**
          * @brief Destroy the Async Device Input Buffer object
          *
          */
-        ~AsyncDeviceInputBuffer() override { FINN_LOG(loglevel::info) << "Destructing Asynchronous input buffer" << std::endl; };
+        ~AsyncDeviceInputBuffer() override {
+            prepareForShutdown();
+            FINN_LOG(loglevel::info) << "Destructing Asynchronous input buffer" << std::endl;
+        };
 
         /**
-         * @brief Prepare the buffer for shutdown
-         *
-         * This method will signal the worker thread to stop and wait for it to finish.
+         * @brief Stop the worker thread and wait for it. Safe to call more than once.
          */
         void prepareForShutdown() override {
+            if (!workerThread.joinable()) {
+                return;
+            }
             FINN_LOG(loglevel::info) << "Stopping Asynchronous input buffer" << std::endl;
             DeviceInputBuffer<T>::prepareForShutdown();
-
-            // Signal worker thread to stop
-            this->queue.shutdown();
-            workerThread.request_stop();
-
-            // Attempt to join with timeout
-            auto joinFuture = std::async(std::launch::async, [this]() {
-                if (workerThread.joinable()) {
-                    workerThread.join();
-                }
-            });
-
-            if (joinFuture.wait_for(std::chrono::seconds(1)) == std::future_status::timeout) {
-                FINN_LOG(loglevel::warning) << "Worker thread for " << this->name << " did not exit cleanly" << std::endl;
-                // Thread will be detached automatically when jthread is destroyed
-                throw std::runtime_error("Worker thread did not exit cleanly within timeout period");
-            } else {
-                FINN_LOG(loglevel::info) << "Worker thread for " << this->name << " exited cleanly" << std::endl;
-            }
+            this->queue.shutdown();  // wakes a worker that is blocked waiting for input; a gate wait wakes on the stop token
+            this->stopWorker(workerThread, this->name);  // the gate stays active: the output workers still drain started batches
         }
 
         /**
-         * @brief Deleted move assignment
-         *
-         * @param buf
-         * @return AsyncDeviceInputBuffer&
-         */
-        AsyncDeviceInputBuffer& operator=(AsyncDeviceInputBuffer&& buf) = delete;
-        /**
-         * @brief Deleted copy assignment
-         *
-         * @param buf
-         * @return AsyncDeviceInputBuffer&
-         */
-        AsyncDeviceInputBuffer& operator=(const AsyncDeviceInputBuffer& buf) = delete;
-
-        /**
-         * @brief Store the given data in the ring buffer
+         * @brief Store the given data in the ring buffer. Blocks while the ring buffer is full.
          *
          * @param data
          * @return true Store was successful
-         * @return false Store failed
+         * @return false Store failed (the buffer is shutting down)
          */
         bool store(std::span<const T> data) override {
             if (this->queue.enqueue_bulk(data.data(), data.size()) == data.size()) {
                 FINN_LOG_DEBUG(loglevel::info) << this->loggerPrefix() << "Stored " << data.size() << " elements in the ring buffer";
                 return true;
-            } else {
-                FINN_LOG_DEBUG(loglevel::error) << this->loggerPrefix() << "Failed to store data in the ring buffer.";
-                return false;
             }
+            FINN_LOG_DEBUG(loglevel::error) << this->loggerPrefix() << "Failed to store data in the ring buffer.";
+            return false;
         }
 
          protected:
-        /**
-         * @brief  Load data from the ring buffer into the memory map of the device.
-         * @attention Invalidates the data that was moved to map
-         *
-         * @return Number of bytes loaded into the map
-         */
-        size_t loadMap(std::stop_token stoken) {
-            FINN_LOG_DEBUG(loglevel::info) << "Data transfer of input data to FPGA!\n";
-            FINN_LOG_DEBUG(loglevel::info) << "Queue size: " << this->queue.size() << "\n";
-            return this->queue.dequeue_bulk(this->map, this->totalDataSize, stoken);
-        }
-
         /**
          * @brief Not supported for AsyncInputBuffer
          *
@@ -244,22 +399,54 @@ namespace Finn {
      */
     template<typename T>
     class AsyncDeviceOutputBuffer : public DeviceOutputBuffer<T>, public detail::AsyncBufferWrapper<T> {
-        std::mutex ltsMutex;
+        std::shared_ptr<detail::BatchGate> gate;         ///< shared with the input buffers of the same device
+        std::size_t gateIndex = 0;                       ///< this buffer's index in the gate
         std::jthread workerThread;
-        std::function<void(std::size_t)> callback = [](std::size_t numItems) {};  ///< Callback that is called when data is available in the queue
+        std::mutex callbackMutex;                        ///< Guards callback against registerCallback() racing with the worker
+        std::function<void(std::size_t)> callback = {};  ///< Callback that is called when data is available in the queue
 
          private:
+        /**
+         * @brief Internal read method used by the runner thread
+         *
+         * Keeps the output kernel running so that results are collected as soon as the accelerator produces them. On a
+         * stop request the map does not hold a complete batch, so nothing is forwarded to the queue.
+         */
         void readInternal(std::stop_token stoken) {
             FINN_LOG_DEBUG(loglevel::info) << "Starting to read from the device";
-            while (!stoken.stop_requested()) {
-                this->execute(this->shapePacked[0]);
-                bool success = this->wait(stoken);  // Wait until the kernel is done executing
-                if (!success) {
-                    FINN_LOG_DEBUG(loglevel::error) << "Kernel execution failed";
+            for (uint64_t batch = 1;; ++batch) {
+                // Only run the kernel for a batch the inputs committed to; this also serves announced batches after a
+                // stop request so that no run is left pending on the card, see BatchGate
+                if (!gate->waitForInputsAnnounced(batch, stoken)) {
+                    break;
                 }
+                this->execute(this->shapePacked[0]);
+                gate->outputStarted(gateIndex);  // the input kernels may start now
+                this->wait();  // no stop token: the batch is in flight and the run completes once it has passed through
                 this->sync(this->totalDataSize);
-                saveMap();
-                callback(this->queue.size() - (this->queue.size() % this->totalDataSize));  // Notify that data is available in the queue
+                gate->completed(gateIndex);  // the batch is out and read by the host: the inputs may start the next one (same order as FINN's reference driver)
+                if (!saveMap(stoken)) {
+                    continue;  // stopping with a full queue: the data is dropped, the device state is clean
+                }
+                const std::size_t queued = this->queue.size();
+                notify(queued - (queued % this->totalDataSize));
+            }
+            FINN_LOG(loglevel::info) << "Asynchronous Output buffer runner terminated";
+        }
+
+        /**
+         * @brief Invokes the registered callback, if any
+         *
+         * @param numItems Number of complete batches worth of elements available in the queue
+         */
+        void notify(std::size_t numItems) {
+            std::function<void(std::size_t)> cb;
+            {
+                const std::lock_guard<std::mutex> lock(callbackMutex);
+                cb = callback;
+            }
+            if (cb) {
+                cb(numItems);
             }
         }
 
@@ -273,72 +460,42 @@ namespace Finn {
          * @param pShapePacked packed shape of input
          * @param batchSize batch size of the output
          */
-        AsyncDeviceOutputBuffer(const std::string& pCUName, xrt::device& device, xrt::uuid& pDevUUID, const shapePacked_t& pShapePacked, unsigned int batchSize)
+        AsyncDeviceOutputBuffer(const std::string& pCUName, xrt::device& device, xrt::uuid& pDevUUID, const shapePacked_t& pShapePacked, unsigned int batchSize, std::shared_ptr<detail::BatchGate> pGate)
             : DeviceOutputBuffer<T>(pCUName, device, pDevUUID, pShapePacked, batchSize),
               detail::AsyncBufferWrapper<T>(2 * batchSize * FinnUtils::shapeToElements(pShapePacked)),  // Make output buffer map twice as large to circumvent a very rare deadlock in the case where one thread handles IO alone.
-              workerThread(std::jthread(std::bind_front(&AsyncDeviceOutputBuffer::readInternal, this))) {};
+              gate(std::move(pGate)),
+              gateIndex(gate->registerOutput()) {
+            this->pollPause = std::chrono::microseconds{2};  // the input worker starts kernels while this buffer polls
+            // Started last, once every member the worker touches (callback mutex, callback, gate) is constructed
+            workerThread = std::jthread(std::bind_front(&AsyncDeviceOutputBuffer::readInternal, this));
+        };
 
-        /**
-         * @brief Construct a new Async Device Output Buffer object (Move constructor)
-         *
-         * @param buf
-         */
-        AsyncDeviceOutputBuffer(AsyncDeviceOutputBuffer&& buf) noexcept = default;
-        /**
-         * @brief Construct a new Async Device Output Buffer object (Deleted copy constructor)
-         *
-         * @param buf
-         */
+        AsyncDeviceOutputBuffer(AsyncDeviceOutputBuffer&& buf) noexcept = delete;
         AsyncDeviceOutputBuffer(const AsyncDeviceOutputBuffer& buf) noexcept = delete;
+        AsyncDeviceOutputBuffer& operator=(AsyncDeviceOutputBuffer&& buf) = delete;
+        AsyncDeviceOutputBuffer& operator=(const AsyncDeviceOutputBuffer& buf) = delete;
+
         /**
          * @brief Destroy the Async Device Output Buffer object
          *
          */
-        ~AsyncDeviceOutputBuffer() override { FINN_LOG(loglevel::info) << "Destruction Asynchronous output buffer" << std::endl; };
+        ~AsyncDeviceOutputBuffer() override {
+            prepareForShutdown();
+            FINN_LOG(loglevel::info) << "Destruction Asynchronous output buffer" << std::endl;
+        };
 
         /**
-         * @brief Prepare the buffer for shutdown
-         *
-         * This method will signal the worker thread to stop and wait for it to finish.
+         * @brief Stop the worker thread and wait for it. Safe to call more than once.
          */
         void prepareForShutdown() override {
-            DeviceOutputBuffer<T>::prepareForShutdown();
-
-            // Signal worker thread to stop
-            this->queue.shutdown();
-            workerThread.request_stop();
-
-            // Attempt to join with timeout
-            auto joinFuture = std::async(std::launch::async, [this]() {
-                if (workerThread.joinable()) {
-                    workerThread.join();
-                }
-            });
-
-            if (joinFuture.wait_for(std::chrono::seconds(1)) == std::future_status::timeout) {
-                FINN_LOG(loglevel::warning) << "Worker thread for " << this->name << " did not exit cleanly" << std::endl;
-                // Thread will be detached automatically when jthread is destroyed
-                throw std::runtime_error("Worker thread did not exit cleanly within timeout period");
-            } else {
-                FINN_LOG(loglevel::info) << "Worker thread for " << this->name << " exited cleanly" << std::endl;
+            if (!workerThread.joinable()) {
+                return;
             }
+            DeviceOutputBuffer<T>::prepareForShutdown();
+            this->queue.shutdown();  // wakes a worker that is blocked on a full queue
+            gate->shutdown();        // wakes a worker waiting for inputs that will not come; must run after the input buffers were stopped
+            this->stopWorker(workerThread, this->name);
         }
-
-        /**
-         * @brief Deleted move assignment operator
-         *
-         * @param buf
-         * @return AsyncDeviceOutputBuffer&
-         */
-        AsyncDeviceOutputBuffer& operator=(AsyncDeviceOutputBuffer&& buf) = delete;
-
-        /**
-         * @brief Deleted copy assignment operator
-         *
-         * @param buf
-         * @return AsyncDeviceOutputBuffer&
-         */
-        AsyncDeviceOutputBuffer& operator=(const AsyncDeviceOutputBuffer& buf) = delete;
 
         /**
          * @brief Not supported by the AsyncDeviceOutputBuffer.
@@ -356,42 +513,45 @@ namespace Finn {
         bool run() override { return false; }
 
         /**
-         *  @brief Return the data contained in the FPGA Buffer map.
+         *  @brief Return the next numItems elements, blocking until they are available.
          *
-         * @return Finn::vector<T>
+         * @return Finn::vector<T> The requested elements; shorter only if the buffer was shut down while waiting
          */
         Finn::vector<T> getData(const std::size_t& numItems) override {
             Finn::vector<T> tmp(numItems);
-            this->queue.dequeue_bulk(tmp.begin(), numItems);
+            const std::size_t received = this->queue.dequeue_bulk(tmp.begin(), numItems);
+            if (received != numItems) {
+                FINN_LOG(loglevel::warning) << this->loggerPrefix() << "Only " << received << " of " << numItems << " requested elements were available before shutdown";
+                tmp.resize(received);
+            }
             return tmp;
         }
 
-        void registerCallback(std::function<void(std::size_t)> callback) override {
-            // Register a callback that is called when data is available in the queue
-            this->callback = callback;
+        void registerCallback(std::function<void(std::size_t)> newCallback) override {
+            const std::lock_guard<std::mutex> lock(callbackMutex);
+            this->callback = std::move(newCallback);
         }
 
         void drain() override {
-            // Drain the queue by reading all available items
-            T item;
-            while (this->queue.try_dequeue(item)) {}
+            // Discard all queued items
+            this->queue.clear();
             FINN_LOG_DEBUG(loglevel::info) << "Drained the AsyncDeviceOutputBuffer queue.";
         }
 
          protected:
         /**
-         * @brief Store the contents of the memory map into the ring buffer.
+         * @brief Store the contents of the memory map into the ring buffer. Blocks while the ring buffer is full.
          *
+         * @return false if the buffer was shut down before the data could be stored
          */
-        bool saveMap() {
+        bool saveMap(const std::stop_token& stoken) {
             FINN_LOG_DEBUG(loglevel::info) << "Data transfer of output from FPGA!\n";
-            if (this->queue.enqueue_bulk(this->map, this->totalDataSize) == this->totalDataSize) {
+            if (this->queue.enqueue_bulk(this->map, this->totalDataSize, stoken) == this->totalDataSize) {
                 FINN_LOG_DEBUG(loglevel::info) << this->loggerPrefix() << "Stored " << this->totalDataSize << " elements in the FIFO";
                 return true;
-            } else {
-                FINN_LOG_DEBUG(loglevel::error) << this->loggerPrefix() << "Failed to store data in the FIFO.";
-                return false;
             }
+            FINN_LOG_DEBUG(loglevel::error) << this->loggerPrefix() << "Failed to store data in the FIFO.";
+            return false;
         }
     };
 }  // namespace Finn

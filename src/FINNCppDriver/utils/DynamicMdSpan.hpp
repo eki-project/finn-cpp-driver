@@ -60,10 +60,12 @@ namespace Finn {
          */
         std::vector<std::size_t> strides;
         /**
-         * @brief Spans of all inner most dimensions covered by the DynamicMDSpan
+         * @brief Spans of all inner most dimensions covered by the DynamicMDSpan, built on the first getMostInnerDims() call.
+         * The inference paths only need the strides; with an innermost dimension of one element this would be one span per
+         * element (8.4M spans, 134 MB, 9 ms per call for a batch of 4096 RadioML inputs)
          *
          */
-        std::vector<std::span<SpanElement>> mostInnerDims;
+        mutable std::vector<std::span<SpanElement>> mostInnerDims;
         /**
          * @brief Iterator to first element managed
          *
@@ -77,7 +79,7 @@ namespace Finn {
 
          public:
         /**
-         * @brief Computes all strides needed to access the container correctly and also computes all most inner dimension spans
+         * @brief Computes all strides needed to access the container correctly
          *
          * @param shape Shape that the input should be interpreted as
          */
@@ -99,12 +101,7 @@ namespace Finn {
                 (*ritStrides) = *(ritStrides - 1) * (*it);
             }
 
-            const std::size_t stridingInner = *(strides.rbegin() + 1);
             mostInnerDims.clear();
-            mostInnerDims.reserve(count / stridingInner);
-            for (auto firstElem = begin; end - firstElem > 0; firstElem += static_cast<std::iter_difference_t<IteratorType>>(stridingInner)) {
-                mostInnerDims.emplace_back(std::span<SpanElement>(firstElem, stridingInner));
-            }
         }
 
         /**
@@ -130,11 +127,20 @@ namespace Finn {
         std::vector<std::size_t> getStrides() const { return strides; }
 
         /**
-         * @brief Get the Most Inner Dims object
+         * @brief Get the Most Inner Dims object. Builds them on the first call, so concurrent first calls on one object race
          *
          * @return const std::vector<std::span<SpanElement>>&
          */
-        const std::vector<std::span<SpanElement>>& getMostInnerDims() const { return mostInnerDims; }
+        const std::vector<std::span<SpanElement>>& getMostInnerDims() const {
+            if (mostInnerDims.empty()) {
+                const std::size_t stridingInner = innerStride();
+                mostInnerDims.reserve(count / stridingInner);
+                for (auto firstElem = begin; end - firstElem > 0; firstElem += static_cast<std::iter_difference_t<IteratorType>>(stridingInner)) {
+                    mostInnerDims.emplace_back(std::span<SpanElement>(firstElem, stridingInner));
+                }
+            }
+            return mostInnerDims;
+        }
 
         /**
          * @brief Number of elements in one innermost row

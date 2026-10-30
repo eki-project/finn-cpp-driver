@@ -14,6 +14,7 @@
 #include <FINNCppDriver/core/DeviceBuffer/SyncDeviceBuffers.hpp>
 #include <FINNCppDriver/utils/FinnDatatypes.hpp>
 #include <FINNCppDriver/utils/Logger.hpp>
+#include <algorithm>
 #include <chrono>
 #include <memory>
 #include <random>
@@ -108,8 +109,8 @@ TEST_F(DBTest, RingContinuesKernelCount) {
 }
 
 TEST_F(DBTest, RingAsyncOutputKeepsNextDescriptorPosted) {
-    // the output worker posts the next announced batch while the kernel is still writing the current one, and collects
-    // the batches in order as the kernel completes them
+    // the output worker posts the next announced batches while the kernel is still writing the current ones, one
+    // descriptor for all batches announced since the last post, and collects them in order as the kernel completes them
     using namespace std::chrono_literals;
     const Finn::RingControl ring{4, 0x20, 0x30, 0x40, 0x50, 0x58};
     const std::string name = "RingAsyncOutput";
@@ -126,6 +127,7 @@ TEST_F(DBTest, RingAsyncOutputKeepsNextDescriptorPosted) {
     const std::size_t batch = buffer.getTotalDataSize();
 
     gate->inputAnnounced(input);
+    EXPECT_EQ(waitForPosted(1), 1u);
     gate->inputAnnounced(input);
     EXPECT_EQ(waitForPosted(2), 2u);  // nothing has completed yet
     EXPECT_EQ(xrt::ip::peek(name, ring.frames), FinnUnittest::parts);
@@ -136,10 +138,43 @@ TEST_F(DBTest, RingAsyncOutputKeepsNextDescriptorPosted) {
     std::this_thread::sleep_for(10ms);
     EXPECT_EQ(xrt::ip::peek(name, ring.prod), 2u);  // a batch the inputs did not announce is never posted
 
-    gate->inputAnnounced(input);
+    gate->inputAnnounced(input, 3);  // announced together: one descriptor
     EXPECT_EQ(waitForPosted(3), 3u);
+    EXPECT_EQ(xrt::ip::peek(name, ring.frames + 8), 3 * FinnUnittest::parts);
     xrt::ip::poke(name, ring.cons, 3);
-    EXPECT_EQ(buffer.getData(batch).size(), batch);
+    EXPECT_EQ(buffer.getData(3 * batch).size(), 3 * batch);
+}
+
+TEST_F(DBTest, RingAsyncInputGroupsQueuedBatches) {
+    // batches that are already queued go to the kernel in one descriptor; every stored batch is posted exactly once
+    using namespace std::chrono_literals;
+    const Finn::RingControl ring{4, 0x20, 0x30, 0x40, 0x50, 0x58};
+    const std::string name = "RingAsyncInput";
+    xrt::ip::ringCompletesImmediately = std::make_pair(ring.prod, ring.cons);
+    auto gate = std::make_shared<Finn::detail::BatchGate>(1, 0);
+    {
+        Finn::AsyncDeviceInputBuffer<uint8_t> buffer(name, device, uuid, FinnUnittest::myShapePacked, FinnUnittest::parts, gate, ring);
+        Finn::vector<uint8_t> data(buffer.getTotalDataSize());
+        constexpr uint32_t stored = 4;
+        for (uint32_t i = 0; i < stored; ++i) {
+            EXPECT_TRUE(buffer.store({data.begin(), data.end()}));
+        }
+        const auto framesPosted = [&] {
+            uint32_t frames = 0;
+            for (uint32_t d = 0; d < std::min(xrt::ip::peek(name, ring.prod), ring.slots); ++d) {
+                frames += xrt::ip::peek(name, ring.frames + 4 * d);
+            }
+            return frames;
+        };
+        const auto deadline = std::chrono::steady_clock::now() + 5s;
+        while (framesPosted() < stored * FinnUnittest::parts && std::chrono::steady_clock::now() < deadline) {
+            std::this_thread::sleep_for(1ms);
+        }
+        EXPECT_EQ(framesPosted(), stored * FinnUnittest::parts);
+        EXPECT_LE(xrt::ip::peek(name, ring.prod), stored);
+        EXPECT_EQ(gate->inputsAnnouncedCount(), stored);
+    }
+    xrt::ip::ringCompletesImmediately.reset();
 }
 
 int main(int argc, char** argv) {

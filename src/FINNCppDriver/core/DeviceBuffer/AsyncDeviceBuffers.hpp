@@ -17,9 +17,12 @@
 
 #include <FINNCppDriver/core/DeviceBuffer/DeviceBuffer.hpp>
 #include <FINNCppDriver/utils/SPSCQueue.hpp>
+#include <algorithm>
+#include <array>
 #include <chrono>
 #include <condition_variable>
 #include <cstdint>
+#include <deque>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -115,34 +118,35 @@ namespace Finn {
             }
 
             /**
-             * @brief Records that output buffer `index` finished one more batch
+             * @brief Records that output buffer `index` finished `batches` more batches
              */
-            void completed(std::size_t index) {
+            void completed(std::size_t index, uint64_t batches = 1) {
                 {
                     const std::lock_guard<std::mutex> lock(mutex);
-                    ++completedPerOutput[index];
+                    completedPerOutput[index] += batches;
                 }
                 cv.notify_all();
             }
 
             /**
-             * @brief Input buffer `index` commits to starting its next batch (it will start it even if stopped meanwhile)
+             * @brief Input buffer `index` commits to starting its next `batches` batches (it will start them even if
+             * stopped meanwhile)
              */
-            void inputAnnounced(std::size_t index) {
+            void inputAnnounced(std::size_t index, uint64_t batches = 1) {
                 {
                     const std::lock_guard<std::mutex> lock(mutex);
-                    ++announcedPerInput[index];
+                    announcedPerInput[index] += batches;
                 }
                 cv.notify_all();
             }
 
             /**
-             * @brief Records that output buffer `index` started its kernel run for one more batch
+             * @brief Records that output buffer `index` started its kernel run for `batches` more batches
              */
-            void outputStarted(std::size_t index) {
+            void outputStarted(std::size_t index, uint64_t batches = 1) {
                 {
                     const std::lock_guard<std::mutex> lock(mutex);
-                    ++startedPerOutput[index];
+                    startedPerOutput[index] += batches;
                 }
                 cv.notify_all();
             }
@@ -164,6 +168,18 @@ namespace Finn {
             bool inputsAnnounced(uint64_t batches) {
                 const std::lock_guard<std::mutex> lock(mutex);
                 return allAtLeast(announcedPerInput, batches);
+            }
+
+            /**
+             * @brief Number of batches every input buffer has announced (does not block)
+             */
+            uint64_t inputsAnnouncedCount() {
+                const std::lock_guard<std::mutex> lock(mutex);
+                uint64_t count = UINT64_MAX;
+                for (const auto announced : announcedPerInput) {
+                    count = std::min(count, announced);
+                }
+                return announcedPerInput.empty() ? 0 : count;
             }
 
             /**
@@ -207,6 +223,32 @@ namespace Finn {
         class AsyncBufferWrapper {
              protected:
             constexpr static size_t featureMapCount = 5;  //< Number of feature maps that can be buffered in the queue
+            /**
+             * @brief Ring DMAs: at most this many batches that are already queued move in one transfer and one descriptor
+             *
+             * Each transfer and each descriptor has a fixed cost on the host (measured on U55C: about 11 us per buffer
+             * sync and 2 us per register read, independent of the size), which dominates small batches. Grouping only
+             * takes what is queued and never waits for more, so it adds no latency when batches come one at a time.
+             */
+            constexpr static size_t maxGroupBatches = featureMapCount;
+
+            /**
+             * @brief Two device buffers of maxGroupBatches batches each, used alternately by a ring DMA worker
+             */
+            struct GroupBuffers {
+                std::array<std::optional<xrt::bo>, 2> bo;
+                std::array<T*, 2> map{};
+                std::array<uint64_t, 2> address{};
+
+                void allocate(xrt::device& device, std::size_t elements, xrt::bo::flags flags, unsigned int memGroup) {
+                    for (std::size_t i = 0; i < 2; ++i) {
+                        bo[i].emplace(device, elements * sizeof(T), flags, memGroup);
+                        map[i] = bo[i]->template map<T*>();
+                        address[i] = bo[i]->address();
+                        std::fill(map[i], map[i] + elements, 0);
+                    }
+                }
+            };
             /**
              * @brief Internal queue used by all asynchronous buffers
              *
@@ -275,11 +317,13 @@ namespace Finn {
         /**
          * @brief Second device buffer: batches alternate between the two buffers so the worker never writes into the
          * buffer the input kernel was last started on. The kernel can report idle slightly before its last repetition
-         * has finished reading (see @ref IP_IDLE); with two buffers that read is never disturbed.
+         * has finished reading (see @ref IP_IDLE); with two buffers that read is never disturbed. Register DMAs only.
          */
-        xrt::bo spareBo;
-        T* spareMap;
-        uint64_t spareAdr;
+        std::optional<xrt::bo> spareBo;
+        T* spareMap = nullptr;
+        uint64_t spareAdr = 0;
+        /// ring DMAs only: buffers for grouped batches
+        typename detail::AsyncBufferWrapper<T>::GroupBuffers groups;
         std::shared_ptr<detail::BatchGate> gate;  ///< shared with the output buffers of the same device
         std::size_t gateIndex = 0;                ///< this buffer's index in the gate
         std::jthread workerThread;
@@ -292,30 +336,22 @@ namespace Finn {
          * started, because it would stream stale buffer contents into the accelerator and leave data in flight.
          */
         void runInternal(std::stop_token stoken) {
+            if (this->isRingDma()) {
+                runRing(stoken);
+                FINN_LOG(loglevel::info) << "Asynchronous Input buffer runner terminated";
+                return;
+            }
             bool useSpare = false;
             uint64_t started = 0;
             while (!stoken.stop_requested()) {
                 T* target = useSpare ? spareMap : this->map;
-                xrt::bo& bo = useSpare ? spareBo : this->internalBo;
+                xrt::bo& bo = useSpare ? *spareBo : this->internalBo;
                 FINN_LOG_DEBUG(loglevel::info) << "Data transfer of input data to FPGA!\n";
                 const std::size_t loaded = this->queue.dequeue_bulk(target, this->totalDataSize, stoken);
                 if (loaded != this->totalDataSize) {
                     break;
                 }
                 bo.sync(XCL_BO_SYNC_BO_TO_DEVICE, loaded * sizeof(T), 0);
-                if (this->isRingDma()) {
-                    // Ring DMAs never restart and take data whenever it comes, so batches only follow each other: post
-                    // this one, then wait until the kernel has read the previous one, whose buffer is filled next
-                    gate->inputAnnounced(gateIndex);
-                    ++started;
-                    this->executeAt(useSpare ? spareAdr : static_cast<uint64_t>(this->bufAdr), this->shapePacked[0]);
-                    if (!this->ringWaitAllButLast(stoken)) {
-                        FINN_LOG_DEBUG(loglevel::info) << "Stopped waiting for the input kernel";
-                        break;
-                    }
-                    useSpare = !useSpare;
-                    continue;
-                }
                 // Batch k may only start once the outputs of batch k-1 are complete, and only after the output kernels
                 // started their run for batch k, see BatchGate
                 if (!gate->waitForCompleted(started, stoken)) {
@@ -336,6 +372,39 @@ namespace Finn {
             FINN_LOG(loglevel::info) << "Asynchronous Input buffer runner terminated";
         }
 
+        /**
+         * @brief runInternal for a ring DMA: one transfer and one descriptor per group of queued batches
+         *
+         * Ring DMAs never restart and take data whenever it comes, so batches only follow each other: the worker takes
+         * the next batch (waiting for it) plus every further complete batch already queued (up to maxGroupBatches),
+         * posts them as one descriptor, then waits until the kernel has read the previous group, whose buffer is
+         * filled next.
+         */
+        void runRing(const std::stop_token& stoken) {
+            const std::size_t batch = this->totalDataSize;
+            std::size_t next = 0;
+            while (!stoken.stop_requested()) {
+                T* target = groups.map[next];
+                if (this->queue.dequeue_bulk(target, batch, stoken) != batch) {
+                    break;
+                }
+                std::size_t batches = 1;
+                while (batches < this->maxGroupBatches && this->queue.size() >= batch) {
+                    // the only consumer: a batch counted in size() stays there until taken
+                    this->queue.try_dequeue_bulk(target + batches * batch, batch);
+                    ++batches;
+                }
+                groups.bo[next]->sync(XCL_BO_SYNC_BO_TO_DEVICE, batches * batch * sizeof(T), 0);
+                gate->inputAnnounced(gateIndex, batches);
+                this->executeAt(groups.address[next], static_cast<uint32_t>(batches * this->shapePacked[0]));
+                if (!this->ringWaitAllButLast(stoken)) {
+                    FINN_LOG_DEBUG(loglevel::info) << "Stopped waiting for the input kernel";
+                    break;
+                }
+                next ^= 1;
+            }
+        }
+
          public:
         /**
          * @brief Construct a new Async Device Input Buffer object
@@ -350,12 +419,16 @@ namespace Finn {
                                const std::optional<RingControl>& pRing = std::nullopt, unsigned int pMemGroup = 0)
             : DeviceInputBuffer<T>(pCUName, device, pDevUUID, pShapePacked, batchSize, pRing, pMemGroup),
               detail::AsyncBufferWrapper<T>(batchSize * FinnUtils::shapeToElements(pShapePacked)),
-              spareBo(device, this->mapSize * sizeof(T), DeviceBuffer<T>::getFlags(Finn::Options::hostMemoryAccess), pMemGroup),
-              spareMap(spareBo.template map<T*>()),
-              spareAdr(spareBo.address()),
               gate(std::move(pGate)),
               gateIndex(gate->registerInput()) {
-            std::fill(spareMap, spareMap + this->mapSize, 0);
+            if (pRing) {
+                groups.allocate(device, FinnUtils::getActualBufferSize(this->maxGroupBatches * this->totalDataSize), DeviceBuffer<T>::getFlags(Finn::Options::hostMemoryAccess), pMemGroup);
+            } else {
+                spareBo.emplace(device, this->mapSize * sizeof(T), DeviceBuffer<T>::getFlags(Finn::Options::hostMemoryAccess), pMemGroup);
+                spareMap = spareBo->template map<T*>();
+                spareAdr = spareBo->address();
+                std::fill(spareMap, spareMap + this->mapSize, 0);
+            }
             this->pollPause = std::chrono::microseconds{2};  // the output worker starts kernels while this buffer polls
             // Started last, once every member the worker touches is constructed
             workerThread = std::jthread(std::bind_front(&AsyncDeviceInputBuffer::runInternal, this));
@@ -424,9 +497,8 @@ namespace Finn {
     class AsyncDeviceOutputBuffer : public DeviceOutputBuffer<T>, public detail::AsyncBufferWrapper<T> {
         std::shared_ptr<detail::BatchGate> gate;         ///< shared with the input buffers of the same device
         std::size_t gateIndex = 0;                       ///< this buffer's index in the gate
-        std::optional<xrt::bo> spareBo;                  ///< ring DMAs only: second buffer, written by the kernel while the host collects the other one
-        T* spareMap = nullptr;
-        uint64_t spareAdr = 0;
+        /// ring DMAs only: one is written by the kernel while the host collects the other
+        typename detail::AsyncBufferWrapper<T>::GroupBuffers groups;
         std::jthread workerThread;
         std::mutex callbackMutex;                        ///< Guards callback against registerCallback() racing with the worker
         std::function<void(std::size_t)> callback = {};  ///< Callback that is called when data is available in the queue
@@ -466,45 +538,60 @@ namespace Finn {
         }
 
         /**
-         * @brief readInternal for a ring DMA: double-buffered
+         * @brief readInternal for a ring DMA: double-buffered, one descriptor per group of announced batches
          *
-         * The descriptor of the next batch is posted while the host still syncs and copies the current one, so the kernel
-         * always has a buffer to write into. Single-buffered, it would hold back the whole pipeline during every sync and
-         * copy. As for register DMAs, a descriptor is only posted for a batch the inputs committed to, and a posted batch
-         * is always waited for, so no descriptor is left pending on the card.
+         * The descriptor of the next group is posted while the host still syncs and copies the current one, so the
+         * kernel always has a buffer to write into. Single-buffered, it would hold back the whole pipeline during every
+         * sync and copy. A descriptor covers every batch the inputs announced and no descriptor covers yet (up to
+         * maxGroupBatches); output groups need not match the input groups, the kernel only counts samples. As for
+         * register DMAs, a descriptor is only posted for batches the inputs committed to, and a posted descriptor is
+         * always waited for, so none is left pending on the card.
          */
         void readRing(const std::stop_token& stoken) {
-            const uint32_t base = this->ringDescriptorsPosted();  // batch b completes with descriptor count base + b
-            uint64_t posted = 0;
-            const auto post = [&] {
-                ++posted;
-                this->executeAt(posted % 2 == 1 ? static_cast<uint64_t>(this->bufAdr) : spareAdr, this->shapePacked[0]);
-                gate->outputStarted(gateIndex);
+            const std::size_t batch = this->totalDataSize;
+            struct Posted {
+                uint32_t descriptors;  ///< descriptor count the ring reaches when this group is complete
+                std::size_t batches;
+                std::size_t buffer;
             };
-            for (uint64_t batch = 1;; ++batch) {
-                if (posted < batch) {
-                    if (!gate->waitForInputsAnnounced(batch, stoken)) {
+            std::deque<Posted> inFlight;  // at most one group per buffer
+            uint64_t postedBatches = 0;
+            std::size_t next = 0;
+            const auto postAnnounced = [&] {
+                const uint64_t announced = gate->inputsAnnouncedCount();
+                if (inFlight.size() == 2 || announced <= postedBatches) {
+                    return;
+                }
+                const std::size_t batches = static_cast<std::size_t>(std::min<uint64_t>(this->maxGroupBatches, announced - postedBatches));
+                this->executeAt(groups.address[next], static_cast<uint32_t>(batches * this->shapePacked[0]));
+                inFlight.push_back({this->ringDescriptorsPosted(), batches, next});
+                postedBatches += batches;
+                next ^= 1;
+                gate->outputStarted(gateIndex, batches);
+            };
+            while (true) {
+                if (inFlight.empty()) {
+                    if (!gate->waitForInputsAnnounced(postedBatches + 1, stoken)) {
                         break;
                     }
-                    post();
+                    postAnnounced();
                 }
-                // No stop token: the batch is in flight and completes once it has passed through
+                const Posted group = inFlight.front();
+                // No stop token: the group is in flight and completes once it has passed through
                 this->waitFor(
                     [&] {
-                        if (posted == batch && gate->inputsAnnounced(batch + 1)) {
-                            post();
-                        }
-                        return this->ringReached(base + static_cast<uint32_t>(batch));
+                        postAnnounced();
+                        return this->ringReached(group.descriptors);
                     },
                     {});
-                xrt::bo& bo = batch % 2 == 1 ? this->internalBo : *spareBo;
-                bo.sync(XCL_BO_SYNC_BO_FROM_DEVICE, this->totalDataSize * sizeof(T), 0);
-                gate->completed(gateIndex);
-                if (!saveMap(batch % 2 == 1 ? this->map : spareMap, stoken)) {
+                groups.bo[group.buffer]->sync(XCL_BO_SYNC_BO_FROM_DEVICE, group.batches * batch * sizeof(T), 0);
+                inFlight.pop_front();
+                gate->completed(gateIndex, group.batches);
+                if (!saveMap(groups.map[group.buffer], group.batches * batch, stoken)) {
                     continue;  // stopping with a full queue: the data is dropped, the device state is clean
                 }
                 const std::size_t queued = this->queue.size();
-                notify(queued - (queued % this->totalDataSize));
+                notify(queued - (queued % batch));
             }
         }
 
@@ -541,10 +628,7 @@ namespace Finn {
               gate(std::move(pGate)),
               gateIndex(gate->registerOutput()) {
             if (pRing) {
-                spareBo.emplace(device, this->mapSize * sizeof(T), DeviceBuffer<T>::getFlags(Finn::Options::hostMemoryAccess), pMemGroup);
-                spareMap = spareBo->template map<T*>();
-                spareAdr = spareBo->address();
-                std::fill(spareMap, spareMap + this->mapSize, 0);
+                groups.allocate(device, FinnUtils::getActualBufferSize(this->maxGroupBatches * this->totalDataSize), DeviceBuffer<T>::getFlags(Finn::Options::hostMemoryAccess), pMemGroup);
             }
             this->pollPause = std::chrono::microseconds{2};  // the input worker starts kernels while this buffer polls
             // Started last, once every member the worker touches (callback mutex, callback, gate) is constructed
@@ -625,17 +709,18 @@ namespace Finn {
          *
          * @return false if the buffer was shut down before the data could be stored
          */
-        bool saveMap(const std::stop_token& stoken) { return saveMap(this->map, stoken); }
+        bool saveMap(const std::stop_token& stoken) { return saveMap(this->map, this->totalDataSize, stoken); }
 
         /**
-         * @brief Store the contents of the given buffer map into the ring buffer. Blocks while the ring buffer is full.
+         * @brief Store the first `elements` elements of the given buffer map into the ring buffer. Blocks while the ring
+         * buffer is full.
          *
          * @return false if the buffer was shut down before the data could be stored
          */
-        bool saveMap(const T* source, const std::stop_token& stoken) {
+        bool saveMap(const T* source, std::size_t elements, const std::stop_token& stoken) {
             FINN_LOG_DEBUG(loglevel::info) << "Data transfer of output from FPGA!\n";
-            if (this->queue.enqueue_bulk(source, this->totalDataSize, stoken) == this->totalDataSize) {
-                FINN_LOG_DEBUG(loglevel::info) << this->loggerPrefix() << "Stored " << this->totalDataSize << " elements in the FIFO";
+            if (this->queue.enqueue_bulk(source, elements, stoken) == elements) {
+                FINN_LOG_DEBUG(loglevel::info) << this->loggerPrefix() << "Stored " << elements << " elements in the FIFO";
                 return true;
             }
             FINN_LOG_DEBUG(loglevel::error) << this->loggerPrefix() << "Failed to store data in the FIFO.";

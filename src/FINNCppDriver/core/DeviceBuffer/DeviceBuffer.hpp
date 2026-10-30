@@ -146,11 +146,17 @@ namespace Finn {
         /**
          * @brief Wait until the ring DMA has completed descriptor count `posted`
          *
+         * Reads no register if an earlier read already showed it (cons only grows), e.g. the free-slot check of a post
+         * right after the previous descriptor was waited for.
+         *
          * @param posted Descriptor count to wait for
          * @param stopToken Token to request stopping the wait
          * @return true if reached, false if the wait was stopped via the token
          */
         bool ringWait(uint32_t posted, std::stop_token stopToken = {}) {
+            if (static_cast<int32_t>(ringConsSeen - posted) >= 0) {
+                return true;
+            }
             return waitFor([this, posted] { return ringReached(posted); }, stopToken);
         }
 
@@ -215,12 +221,20 @@ namespace Finn {
          *
          */
         uint32_t ringPosted = 0;
-
         /**
-         * @brief Number of descriptors the ring DMA has completed
+         * @brief Value of cons at the last read: the ring DMA has completed at least this many descriptors
          *
          */
-        uint32_t ringCompleted() { return assocIPCore.read_register(ring->cons); }
+        uint32_t ringConsSeen = 0;
+
+        /**
+         * @brief Number of descriptors the ring DMA has completed (one PCIe read)
+         *
+         */
+        uint32_t ringCompleted() {
+            ringConsSeen = assocIPCore.read_register(ring->cons);
+            return ringConsSeen;
+        }
 
          protected:
         /**

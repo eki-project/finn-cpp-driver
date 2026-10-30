@@ -56,6 +56,7 @@ namespace xrt {
          * @brief Guards registers against the worker threads of the asynchronous buffers
          */
         inline static std::mutex registersMutex;
+        inline static std::map<std::pair<std::string, uint32_t>, unsigned> reads;  ///< read_register calls per register
 
         /**
          * @brief Thread-safe read of a register from the test
@@ -127,6 +128,10 @@ namespace xrt {
         uint32_t read_register(uint32_t offset) const {
             if (offset == 0x0) {
                 return 0x4;  // ap_idle: every invocation completes immediately
+            }
+            {
+                const std::lock_guard<std::mutex> lock(registersMutex);
+                ++reads[{ipName, offset}];
             }
             if (ringCompletesImmediately && offset == ringCompletesImmediately->second) {
                 offset = ringCompletesImmediately->first;

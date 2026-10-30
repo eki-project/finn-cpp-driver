@@ -73,6 +73,27 @@ TEST_F(DBTest, RingPostsDescriptors) {
     xrt::ip::ringCompletesImmediately.reset();
 }
 
+TEST_F(DBTest, RingPostReadsConsOnlyWhenNoSlotIsKnownFree) {
+    // cons only grows, so a post needs no free-slot read while the last cons value read already shows a free slot
+    const Finn::RingControl ring{4, 0x20, 0x30, 0x40, 0x50, 0x58};
+    const std::string name = "RingFreeSlot";
+    Finn::SyncDeviceInputBuffer<uint8_t> buffer(name, device, uuid, FinnUnittest::myShapePacked, FinnUnittest::parts, ring);
+    const auto consReads = [&] { return xrt::ip::reads[{name, ring.cons}]; };
+    const unsigned atStart = consReads();  // the constructor reads cons once
+    for (uint32_t posted = 1; posted <= ring.slots; ++posted) {
+        EXPECT_TRUE(buffer.run());  // the slots are known free from the count read at construction
+    }
+    EXPECT_EQ(consReads(), atStart);
+    xrt::ip::poke(name, ring.cons, 1);
+    EXPECT_TRUE(buffer.run());  // the ring is full as far as the buffer knows: one read finds slot 0 free again
+    EXPECT_EQ(consReads(), atStart + 1);
+    EXPECT_EQ(xrt::ip::peek(name, ring.prod), ring.slots + 1);
+    xrt::ip::poke(name, ring.cons, ring.slots + 1);
+    EXPECT_TRUE(buffer.wait());
+    EXPECT_TRUE(buffer.run());  // the wait has just read cons: no further read
+    EXPECT_EQ(consReads(), atStart + 2);
+}
+
 TEST_F(DBTest, RingContinuesKernelCount) {
     // the kernel never restarts: a new buffer continues from the count it finds
     const Finn::RingControl ring{4, 0x20, 0x30, 0x40, 0x50, 0x58};

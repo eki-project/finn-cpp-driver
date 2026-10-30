@@ -21,6 +21,8 @@
 #include <memory>
 #include <vector>
 
+#include "experimental/xrt_xclbin.h"
+
 #define MSTR(x)    #x
 #define STRNGFY(x) MSTR(x)
 
@@ -33,12 +35,24 @@ namespace FinnUnittest {
 
     Finn::Config unittestConfig = Finn::createConfigFromPath(std::filesystem::path(configFilePath));
 
+    // The mock xclbin reports every DMA of the configuration, with its memory port in group 0
+    const bool computeUnitsMocked = [] {
+        for (const auto& [index, wrapper] : unittestConfig.deviceWrappers) {
+            for (const auto& dmas : {wrapper.idmas, wrapper.odmas}) {
+                for (const auto& dma : dmas) {
+                    xrt::xclbin::mockComputeUnits({dma->kernelName});
+                }
+            }
+        }
+        return true;
+    }();
+
     const std::string inputDmaName = "StreamingDataflowPartition_0:{idma0}";
     const std::string outputDmaName = "StreamingDataflowPartition_2:{odma0}";
 
-    auto myShapeNormal = (*std::dynamic_pointer_cast<Finn::ExtendedBufferDescriptor>(unittestConfig.deviceWrappers[0].idmas[0])).normalShape;
-    auto myShapeFolded = (*std::dynamic_pointer_cast<Finn::ExtendedBufferDescriptor>(unittestConfig.deviceWrappers[0].idmas[0])).foldedShape;
-    auto myShapePacked = (*std::dynamic_pointer_cast<Finn::ExtendedBufferDescriptor>(unittestConfig.deviceWrappers[0].idmas[0])).packedShape;
+    auto myShapeNormal = (*std::dynamic_pointer_cast<Finn::ExtendedBufferDescriptor>(unittestConfig.getDeviceWrapper(0).idmas[0])).normalShape;
+    auto myShapeFolded = (*std::dynamic_pointer_cast<Finn::ExtendedBufferDescriptor>(unittestConfig.getDeviceWrapper(0).idmas[0])).foldedShape;
+    auto myShapePacked = (*std::dynamic_pointer_cast<Finn::ExtendedBufferDescriptor>(unittestConfig.getDeviceWrapper(0).idmas[0])).packedShape;
 
     const unsigned int hostBufferSize = 10;
     const size_t elementsPerPart = FinnUtils::shapeToElements(myShapePacked);

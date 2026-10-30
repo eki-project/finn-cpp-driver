@@ -84,6 +84,8 @@ namespace xrt {
         }
 
         uint64_t address() const { return 0; };
+
+        unsigned int get_memory_group() const { return group; }
     };
 }  // namespace xrt
 

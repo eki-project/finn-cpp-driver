@@ -653,6 +653,139 @@ TEST(DataPacking, UnpackingMultiDimensionalInputs) {
     EXPECT_EQ(unpackedMerged, expectedResult2);
 }
 
+// REGRESSION TESTS for defects of the previous packing implementation
+
+// unpack<Bipolar> returned {0, -1} instead of {-1, +1}
+TEST(DataPackingRegression, BipolarRoundTrip) {
+    Finn::vector<int8_t> values = {1, -1, 1, 1, -1, -1, 1, -1, -1};
+    auto packed = Finn::pack<Finn::DatatypeBipolar>(values);
+    Finn::vector<uint8_t> expectedPacked = {0x4D, 0x00};  // bit i = (value_i + 1) / 2
+    EXPECT_EQ(packed, expectedPacked);
+    auto unpacked = Finn::unpack<Finn::DatatypeBipolar>(packed, 7);
+    EXPECT_EQ(unpacked, values);
+}
+
+// pack() shifted/masked the caller's input in place
+TEST(DataPackingRegression, PackDoesNotModifyInput) {
+    Finn::vector<float> fixedInput = {1.5F, -2.25F, 0.5F, 3.0F};
+    const auto fixedCopy = fixedInput;
+    auto packedFixed = Finn::pack<Finn::DatatypeFixed<16, 10>>(fixedInput.begin(), fixedInput.end());
+    EXPECT_EQ(fixedInput, fixedCopy);
+    const auto packedAgain = Finn::pack<Finn::DatatypeFixed<16, 10>>(fixedInput.begin(), fixedInput.end());
+    EXPECT_EQ(packedFixed, packedAgain);
+
+    Finn::vector<uint8_t> unsignedInput = {0x1F, 0x0F, 0xF3};
+    const auto unsignedCopy = unsignedInput;
+    auto packedUnsigned = Finn::pack<Finn::DatatypeUInt<4>>(unsignedInput);
+    EXPECT_EQ(unsignedInput, unsignedCopy);
+    Finn::vector<uint8_t> expected = {0xFF, 0x03};
+    EXPECT_EQ(packedUnsigned, expected);
+
+    // const input must be accepted
+    const Finn::vector<int> constInput = {-9, -3, 2, 8};
+    EXPECT_EQ(Finn::pack<Finn::DatatypeInt<5>>(constInput.begin(), constInput.end()).size(), 3U);
+}
+
+// Negative fixed-point values round trip
+TEST(DataPackingRegression, FixedPointNegativeRoundTrip) {
+    Finn::vector<float> values = {-8.0F, -0.0625F, 0.0625F, 7.9375F, -3.5F};
+    auto packed = Finn::pack<Finn::DatatypeFixed<8, 4>>(values);
+    EXPECT_EQ(packed.size(), values.size());
+    auto unpacked = Finn::unpack<Finn::DatatypeFixed<8, 4>>(packed);
+    EXPECT_EQ(unpacked, values);
+}
+
+// Wider user-specified output types lost the sign extension
+TEST(DataPackingRegression, UnpackWiderSignedType) {
+    Finn::vector<uint8_t> packed = {0xF8, 0x71};  // Int<4>: -8, -1, 1, 7
+    Finn::vector<int32_t> expected32 = {-8, -1, 1, 7};
+    EXPECT_EQ((Finn::unpack<Finn::DatatypeInt<4>, false, int32_t>(packed)), expected32);
+    Finn::vector<int64_t> expected64 = {-8, -1, 1, 7};
+    EXPECT_EQ((Finn::unpack<Finn::DatatypeInt<4>, false, int64_t>(packed)), expected64);
+
+    Finn::vector<int> ten = {-1, -512, 511};
+    auto packed10 = Finn::pack<Finn::DatatypeInt<10>>(ten);
+    Finn::vector<int64_t> expected10 = {-1, -512, 511};
+    EXPECT_EQ((Finn::unpack<Finn::DatatypeInt<10>, false, int64_t>(packed10, packed10.size() * 8 - 30)), expected10);
+}
+
+// Signed storage narrower than the FINN bitwidth dropped the sign bits
+TEST(DataPackingRegression, PackSignedStorageNarrowerThanBitwidth) {
+    Finn::vector<int8_t> narrow = {-1, -2};
+    Finn::vector<int> wide = {-1, -2};
+    EXPECT_EQ(Finn::pack<Finn::DatatypeInt<9>>(narrow), Finn::pack<Finn::DatatypeInt<9>>(wide));
+    Finn::vector<uint8_t> expected = {0xFF, 0xFD, 0x03};
+    EXPECT_EQ(Finn::pack<Finn::DatatypeInt<9>>(narrow), expected);
+
+    Finn::vector<int8_t> one = {-1};
+    Finn::vector<uint8_t> expected16 = {0xFF, 0xFF};
+    EXPECT_EQ(Finn::pack<Finn::DatatypeInt<16>>(one), expected16);
+}
+
+// Whole-byte widths must be plain little-endian copies
+TEST(DataPackingRegression, WholeByteWidths) {
+    Finn::vector<int32_t> values = {-1, 0x12345678, 42};
+    auto packed = Finn::pack<Finn::DatatypeInt<32>>(values);
+    Finn::vector<uint8_t> expected = {0xFF, 0xFF, 0xFF, 0xFF, 0x78, 0x56, 0x34, 0x12, 42, 0, 0, 0};
+    EXPECT_EQ(packed, expected);
+    EXPECT_EQ(Finn::unpack<Finn::DatatypeInt<32>>(packed), values);
+
+    Finn::vector<float> floats = {1.5F, -2.0F, 0.0F};
+    auto packedFloats = Finn::pack<Finn::DatatypeFloat>(floats);
+    EXPECT_EQ(packedFloats.size(), 12U);
+    EXPECT_EQ(Finn::unpack<Finn::DatatypeFloat>(packedFloats), floats);
+
+    Finn::vector<int16_t> values24 = {-2, 300};
+    auto packed24 = Finn::pack<Finn::DatatypeInt<24>>(values24);
+    Finn::vector<uint8_t> expected24 = {0xFE, 0xFF, 0xFF, 0x2C, 0x01, 0x00};
+    EXPECT_EQ(packed24, expected24);
+    Finn::vector<int32_t> unpacked24 = Finn::unpack<Finn::DatatypeInt<24>>(packed24);
+    EXPECT_EQ(unpacked24, (Finn::vector<int32_t>{-2, 300}));
+}
+
+// Multi-dimensional packing with whole bytes, large inputs (parallel path) and the wider-T forwarding of unpackMultiDimensionalOutputs
+TEST(DataPackingRegression, MultiDimensionalLargeAndWideTypes) {
+    const std::size_t rows = 20000;
+    const std::size_t rowElements = 3;
+    Finn::vector<int> inp(rows * rowElements);
+    for (std::size_t i = 0; i < inp.size(); ++i) {
+        inp[i] = static_cast<int>(i % 32) - 16;  // Int<5> range
+    }
+    Finn::DynamicMdSpan shape(inp.begin(), inp.end(), {1, static_cast<unsigned int>(rows), static_cast<unsigned int>(rowElements)});
+    auto packed = Finn::packMultiDimensionalInputs<Finn::DatatypeInt<5>>(inp.begin(), inp.end(), shape, rowElements);
+    ASSERT_EQ(packed.size(), rows * 2);  // 15 bits per row -> 2 bytes
+
+    // Row-wise result must equal packing each row on its own
+    for (std::size_t row : {std::size_t{0}, std::size_t{7}, rows - 1}) {
+        auto single = Finn::pack<Finn::DatatypeInt<5>>(inp.begin() + static_cast<long>(row * rowElements), inp.begin() + static_cast<long>((row + 1) * rowElements));
+        EXPECT_EQ(single, (Finn::vector<uint8_t>{packed[row * 2], packed[row * 2 + 1]}));
+    }
+
+    Finn::DynamicMdSpan packedShape(packed.begin(), packed.end(), {1, static_cast<unsigned int>(rows), 2});
+    auto unpacked = Finn::unpackMultiDimensionalOutputs<Finn::DatatypeInt<5>>(packed.begin(), packed.end(), packedShape, {1, static_cast<unsigned int>(rows), static_cast<unsigned int>(rowElements)});
+    Finn::vector<int8_t> expected(inp.begin(), inp.end());
+    EXPECT_EQ(unpacked, expected);
+
+    auto unpackedWide = Finn::unpackMultiDimensionalOutputs<Finn::DatatypeInt<5>, decltype(packed.begin()), false, int32_t>(packed.begin(), packed.end(), packedShape, {1, static_cast<unsigned int>(rows), static_cast<unsigned int>(rowElements)});
+    EXPECT_EQ(unpackedWide, Finn::vector<int32_t>(inp.begin(), inp.end()));
+
+    // Whole-byte element type: no per-row padding, identical to flat packing
+    Finn::vector<uint8_t> bytes(rows * rowElements, 7);
+    Finn::DynamicMdSpan byteShape(bytes.begin(), bytes.end(), {1, static_cast<unsigned int>(rows), static_cast<unsigned int>(rowElements)});
+    EXPECT_EQ(Finn::packMultiDimensionalInputs<Finn::DatatypeUInt<8>>(bytes.begin(), bytes.end(), byteShape, rowElements), bytes);
+}
+
+// Packing must not change the process-wide OpenMP configuration
+TEST(DataPackingRegression, DoesNotChangeOpenMPThreadCount) {
+    const int before = omp_get_max_threads();
+    Finn::vector<int> inp(6, 1);
+    Finn::DynamicMdSpan shape(inp.begin(), inp.end(), {1, 3, 2});
+    auto packed = Finn::packMultiDimensionalInputs<Finn::DatatypeInt<5>>(inp.begin(), inp.end(), shape, 2);
+    Finn::DynamicMdSpan packedShape(packed.begin(), packed.end(), {1, 3, 2});
+    auto unpacked = Finn::unpackMultiDimensionalOutputs<Finn::DatatypeInt<5>>(packed.begin(), packed.end(), packedShape, {1, 3, 2});
+    EXPECT_EQ(omp_get_max_threads(), before);
+}
+
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();

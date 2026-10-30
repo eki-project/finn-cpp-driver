@@ -15,9 +15,14 @@
 
 #include <FINNCppDriver/utils/Types.h>
 
+#include <filesystem>
+#include <format>
 #include <fstream>
+#include <map>
 #include <memory>
 #include <nlohmann/json.hpp>
+#include <optional>
+#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
@@ -71,6 +76,23 @@ namespace nlohmann {
 
 namespace Finn {
     /**
+     * @brief Register map of a free-running ring DMA (FINN IODMA_hls with ctrlMode "ring")
+     *
+     * The kernel never stops. The host writes descriptor d (address, frames) into slot d % slots and then writes d + 1
+     * to prod; the kernel counts the descriptors it has completed in cons (input DMA: data read from memory, output
+     * DMA: data written and acknowledged). All offsets are AXI-lite byte offsets; slot s of a register file is at
+     * offset + 4 * s.
+     */
+    struct RingControl {
+        unsigned int slots = 0;  ///< number of descriptor slots
+        uint32_t addrLo = 0;     ///< buffer address, bits 31..0
+        uint32_t addrHi = 0;     ///< buffer address, bits 63..32
+        uint32_t frames = 0;     ///< number of frames (samples) to move
+        uint32_t prod = 0;       ///< descriptors posted by the host
+        uint32_t cons = 0;       ///< descriptors completed by the kernel
+    };
+
+    /**
      * @brief A small storage struct to manage the description of Buffers
      *
      */
@@ -85,6 +107,11 @@ namespace Finn {
          *
          */
         shape_t packedShape;
+        /**
+         * @brief Set for ring DMAs; register DMAs (ap_ctrl_hs, address at 0x10, repetitions at 0x1C) have none
+         *
+         */
+        std::optional<RingControl> ring;
 
         // TODO(bwintermann): Currently unused, reserved for multi-fpga usage
         /**
@@ -104,7 +131,7 @@ namespace Finn {
          * @param pKernelName Name of kernel
          * @param pPackedShape Input shape of kernel
          */
-        BufferDescriptor(const std::string& pKernelName, const shape_t& pPackedShape) : kernelName(pKernelName), packedShape(pPackedShape) {};
+        BufferDescriptor(const std::string& pKernelName, const shape_t& pPackedShape) : kernelName(pKernelName), packedShape(pPackedShape){};
         /**
          * @brief Construct a new Buffer Descriptor object (Move constructor)
          *
@@ -154,7 +181,7 @@ namespace Finn {
          * @param pFoldedShape Internal reshaped form
          */
         ExtendedBufferDescriptor(const std::string& pKernelName, const shape_t& pPackedShape, const shape_t& pNormalShape, const shape_t& pFoldedShape)
-            : BufferDescriptor(pKernelName, pPackedShape), normalShape(pNormalShape), foldedShape(pFoldedShape) {};
+            : BufferDescriptor(pKernelName, pPackedShape), normalShape(pNormalShape), foldedShape(pFoldedShape){};
 
         /**
          * @brief Input shape of neural network
@@ -203,7 +230,7 @@ namespace Finn {
          * @param pOdmas List of odma descriptions for this device
          */
         DeviceWrapper(const std::filesystem::path& pXclbin, const unsigned int pXrtDeviceIndex, const std::vector<std::shared_ptr<BufferDescriptor>>& pIdmas, const std::vector<std::shared_ptr<BufferDescriptor>>& pOdmas)
-            : xclbin(pXclbin), xrtDeviceIndex(pXrtDeviceIndex), idmas(pIdmas), odmas(pOdmas) {};
+            : xclbin(pXclbin), xrtDeviceIndex(pXrtDeviceIndex), idmas(pIdmas), odmas(pOdmas){};
 
         /**
          * @brief Construct a new Device Wrapper object
@@ -218,25 +245,72 @@ namespace Finn {
      */
     struct Config {
         /**
-         * @brief List of device descriptions
+         * @brief Device descriptions, keyed by their xrtDeviceIndex
          *
          */
-        std::vector<DeviceWrapper> deviceWrappers;
+        std::map<unsigned int, DeviceWrapper> deviceWrappers;
+
+        /**
+         * @brief Get the device description with the given xrtDeviceIndex
+         *
+         * @param xrtDeviceIndex
+         * @return const DeviceWrapper&
+         * @throws std::runtime_error if no device wrapper has this xrtDeviceIndex
+         */
+        const DeviceWrapper& getDeviceWrapper(unsigned int xrtDeviceIndex) const {
+            try {
+                return deviceWrappers.at(xrtDeviceIndex);
+            } catch (const std::out_of_range&) { throw std::runtime_error(std::format("No device wrapper with xrtDeviceIndex {} exists in the configuration!", xrtDeviceIndex)); }
+        }
     };
 
 
     /***** JSON CONVERSION FUNCTIONS ******/
     /**
-     * @brief JSON -> ExtendedBufferDescriptor
+     * @brief RingControl -> JSON
+     *
+     * @param j
+     * @param ring
+     */
+    // NOLINTNEXTLINE
+    void inline to_json(json& j, const RingControl& ring) { j = json{{"slots", ring.slots}, {"registers", {{"addr_lo", ring.addrLo}, {"addr_hi", ring.addrHi}, {"frames", ring.frames}, {"prod", ring.prod}, {"cons", ring.cons}}}}; }
+
+    /**
+     * @brief JSON -> RingControl (the "ring" entry FINN writes for ring DMAs)
+     *
+     * @param j
+     * @param ring
+     */
+    // NOLINTNEXTLINE
+    void inline from_json(const json& j, RingControl& ring) {
+        j.at("slots").get_to(ring.slots);
+        const json& regs = j.at("registers");
+        regs.at("addr_lo").get_to(ring.addrLo);
+        regs.at("addr_hi").get_to(ring.addrHi);
+        regs.at("frames").get_to(ring.frames);
+        regs.at("prod").get_to(ring.prod);
+        regs.at("cons").get_to(ring.cons);
+        if (ring.slots == 0) {
+            throw std::runtime_error("A ring DMA needs at least one descriptor slot");
+        }
+    }
+
+    /**
+     * @brief ExtendedBufferDescriptor -> JSON
      *
      * @param j
      * @param ebd
      */
     // NOLINTNEXTLINE
-    void inline to_json(json& j, const ExtendedBufferDescriptor& ebd) { j = json{{"kernelName", ebd.kernelName}, {"packedShape", ebd.packedShape}, {"normalShape", ebd.normalShape}, {"foldedShape", ebd.foldedShape}}; }
+    void inline to_json(json& j, const ExtendedBufferDescriptor& ebd) {
+        j = json{{"kernelName", ebd.kernelName}, {"packedShape", ebd.packedShape}, {"normalShape", ebd.normalShape}, {"foldedShape", ebd.foldedShape}};
+        if (ebd.ring) {
+            j["ring"] = *ebd.ring;
+        }
+    }
 
     /**
-     * @brief ExtendedBufferDescriptor -> JSON
+     * @brief JSON -> ExtendedBufferDescriptor
      *
      * @param j
      * @param ebd
@@ -247,6 +321,9 @@ namespace Finn {
         j.at("packedShape").get_to(ebd.packedShape);
         j.at("normalShape").get_to(ebd.normalShape);
         j.at("foldedShape").get_to(ebd.foldedShape);
+        if (j.contains("ring")) {
+            ebd.ring = j.at("ring").get<RingControl>();
+        }
     }
 
     /**
@@ -281,7 +358,10 @@ namespace Finn {
         for (auto& fpgaDevice : dataJson) {
             DeviceWrapper devWrap;
             from_json(fpgaDevice, devWrap);
-            config.deviceWrappers.emplace_back(devWrap);
+            const unsigned int xrtIdx = devWrap.xrtDeviceIndex;
+            if (!config.deviceWrappers.emplace(xrtIdx, std::move(devWrap)).second) {
+                throw std::runtime_error(std::format("Duplicate xrtDeviceIndex {} in config file {}!", xrtIdx, configPath.string()));
+            }
         }
         return config;
     }
@@ -290,14 +370,15 @@ namespace Finn {
      * @brief Get the normal, folded and packed shapes for a specific device and dma
      *
      * @param conf Config from which the shapes should be read
-     * @param device device index
+     * @param xrtDeviceIndex xrt device index of the device
      * @param dma dma index
      * @return std::tuple<shape_t, shape_t, shape_t>
      */
-    inline std::tuple<shape_t, shape_t, shape_t> getConfigShapes(const Config& conf, uint device = 0, uint dma = 0) {
-        auto myShapeNormal = (*std::dynamic_pointer_cast<Finn::ExtendedBufferDescriptor>(conf.deviceWrappers.at(device).idmas.at(dma))).normalShape;
-        auto myShapeFolded = (*std::dynamic_pointer_cast<Finn::ExtendedBufferDescriptor>(conf.deviceWrappers[device].idmas[dma])).foldedShape;
-        auto myShapePacked = (*std::dynamic_pointer_cast<Finn::ExtendedBufferDescriptor>(conf.deviceWrappers[device].idmas[dma])).packedShape;
+    inline std::tuple<shape_t, shape_t, shape_t> getConfigShapes(const Config& conf, uint xrtDeviceIndex = 0, uint dma = 0) {
+        const auto& idma = conf.getDeviceWrapper(xrtDeviceIndex).idmas.at(dma);
+        auto myShapeNormal = (*std::dynamic_pointer_cast<Finn::ExtendedBufferDescriptor>(idma)).normalShape;
+        auto myShapeFolded = (*std::dynamic_pointer_cast<Finn::ExtendedBufferDescriptor>(idma)).foldedShape;
+        auto myShapePacked = (*std::dynamic_pointer_cast<Finn::ExtendedBufferDescriptor>(idma)).packedShape;
         return {myShapeNormal, myShapeFolded, myShapePacked};
     }
 

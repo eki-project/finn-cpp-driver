@@ -14,9 +14,13 @@
 #include <FINNCppDriver/core/DeviceBuffer/SyncDeviceBuffers.hpp>
 #include <FINNCppDriver/utils/FinnDatatypes.hpp>
 #include <FINNCppDriver/utils/Logger.hpp>
+#include <algorithm>
+#include <chrono>
 #include <memory>
 #include <random>
 #include <span>
+#include <string>
+#include <thread>
 
 #include "gtest/gtest.h"
 #include "xrt/xrt_device.h"
@@ -53,6 +57,125 @@ TEST_F(DBTest, DBOutputTest) {
     EXPECT_EQ(data, vec);
 }
 
+TEST_F(DBTest, RingPostsDescriptors) {
+    // ring DMA with 4 slots; the mock completes every posted descriptor immediately
+    const Finn::RingControl ring{4, 0x20, 0x30, 0x40, 0x50, 0x58};
+    xrt::ip::ringCompletesImmediately = std::make_pair(ring.prod, ring.cons);
+    Finn::SyncDeviceInputBuffer<uint8_t> buffer("RingInput", device, uuid, FinnUnittest::myShapePacked, FinnUnittest::parts, ring);
+    auto reg = [](uint32_t offset) { return xrt::ip::registers[{"RingInput", offset}]; };
+    for (uint32_t posted = 1; posted <= 10; ++posted) {  // more descriptors than slots
+        EXPECT_TRUE(buffer.run());
+        EXPECT_TRUE(buffer.wait());
+        EXPECT_EQ(reg(ring.prod), posted);
+        const uint32_t slot = 4 * ((posted - 1) % ring.slots);
+        EXPECT_EQ(reg(ring.frames + slot), FinnUnittest::parts);
+        EXPECT_EQ(reg(ring.addrLo + slot) | (static_cast<uint64_t>(reg(ring.addrHi + slot)) << 32), static_cast<uint64_t>(buffer.testGetAddress()));
+    }
+    xrt::ip::ringCompletesImmediately.reset();
+}
+
+TEST_F(DBTest, RingPostReadsConsOnlyWhenNoSlotIsKnownFree) {
+    // cons only grows, so a post needs no free-slot read while the last cons value read already shows a free slot
+    const Finn::RingControl ring{4, 0x20, 0x30, 0x40, 0x50, 0x58};
+    const std::string name = "RingFreeSlot";
+    Finn::SyncDeviceInputBuffer<uint8_t> buffer(name, device, uuid, FinnUnittest::myShapePacked, FinnUnittest::parts, ring);
+    const auto consReads = [&] { return xrt::ip::reads[{name, ring.cons}]; };
+    const unsigned atStart = consReads();  // the constructor reads cons once
+    for (uint32_t posted = 1; posted <= ring.slots; ++posted) {
+        EXPECT_TRUE(buffer.run());  // the slots are known free from the count read at construction
+    }
+    EXPECT_EQ(consReads(), atStart);
+    xrt::ip::poke(name, ring.cons, 1);
+    EXPECT_TRUE(buffer.run());  // the ring is full as far as the buffer knows: one read finds slot 0 free again
+    EXPECT_EQ(consReads(), atStart + 1);
+    EXPECT_EQ(xrt::ip::peek(name, ring.prod), ring.slots + 1);
+    xrt::ip::poke(name, ring.cons, ring.slots + 1);
+    EXPECT_TRUE(buffer.wait());
+    EXPECT_TRUE(buffer.run());  // the wait has just read cons: no further read
+    EXPECT_EQ(consReads(), atStart + 2);
+}
+
+TEST_F(DBTest, RingContinuesKernelCount) {
+    // the kernel never restarts: a new buffer continues from the count it finds
+    const Finn::RingControl ring{4, 0x20, 0x30, 0x40, 0x50, 0x58};
+    xrt::ip::ringCompletesImmediately = std::make_pair(ring.prod, ring.cons);
+    xrt::ip::registers[{"RingOutput", ring.prod}] = 7;
+    Finn::SyncDeviceOutputBuffer<uint8_t> buffer("RingOutput", device, uuid, FinnUnittest::myShapePacked, FinnUnittest::parts, ring);
+    EXPECT_TRUE(buffer.run());
+    EXPECT_TRUE(buffer.wait());
+    EXPECT_EQ((xrt::ip::registers[{"RingOutput", ring.prod}]), 8u);
+    EXPECT_EQ((xrt::ip::registers[{"RingOutput", ring.frames + 4 * (7 % ring.slots)}]), FinnUnittest::parts);
+    xrt::ip::ringCompletesImmediately.reset();
+}
+
+TEST_F(DBTest, RingAsyncOutputKeepsNextDescriptorPosted) {
+    // the output worker posts the next announced batches while the kernel is still writing the current ones, one
+    // descriptor for all batches announced since the last post, and collects them in order as the kernel completes them
+    using namespace std::chrono_literals;
+    const Finn::RingControl ring{4, 0x20, 0x30, 0x40, 0x50, 0x58};
+    const std::string name = "RingAsyncOutput";
+    auto gate = std::make_shared<Finn::detail::BatchGate>(1, 1);
+    const std::size_t input = gate->registerInput();
+    Finn::AsyncDeviceOutputBuffer<uint8_t> buffer(name, device, uuid, FinnUnittest::myShapePacked, FinnUnittest::parts, gate, ring);
+    const auto waitForPosted = [&](uint32_t posted) {
+        const auto deadline = std::chrono::steady_clock::now() + 5s;
+        while (xrt::ip::peek(name, ring.prod) < posted && std::chrono::steady_clock::now() < deadline) {
+            std::this_thread::sleep_for(1ms);
+        }
+        return xrt::ip::peek(name, ring.prod);
+    };
+    const std::size_t batch = buffer.getTotalDataSize();
+
+    gate->inputAnnounced(input);
+    EXPECT_EQ(waitForPosted(1), 1u);
+    gate->inputAnnounced(input);
+    EXPECT_EQ(waitForPosted(2), 2u);  // nothing has completed yet
+    EXPECT_EQ(xrt::ip::peek(name, ring.frames), FinnUnittest::parts);
+    EXPECT_EQ(xrt::ip::peek(name, ring.frames + 4), FinnUnittest::parts);
+
+    xrt::ip::poke(name, ring.cons, 2);
+    EXPECT_EQ(buffer.getData(2 * batch).size(), 2 * batch);
+    std::this_thread::sleep_for(10ms);
+    EXPECT_EQ(xrt::ip::peek(name, ring.prod), 2u);  // a batch the inputs did not announce is never posted
+
+    gate->inputAnnounced(input, 3);  // announced together: one descriptor
+    EXPECT_EQ(waitForPosted(3), 3u);
+    EXPECT_EQ(xrt::ip::peek(name, ring.frames + 8), 3 * FinnUnittest::parts);
+    xrt::ip::poke(name, ring.cons, 3);
+    EXPECT_EQ(buffer.getData(3 * batch).size(), 3 * batch);
+}
+
+TEST_F(DBTest, RingAsyncInputGroupsQueuedBatches) {
+    // batches that are already queued go to the kernel in one descriptor; every stored batch is posted exactly once
+    using namespace std::chrono_literals;
+    const Finn::RingControl ring{4, 0x20, 0x30, 0x40, 0x50, 0x58};
+    const std::string name = "RingAsyncInput";
+    xrt::ip::ringCompletesImmediately = std::make_pair(ring.prod, ring.cons);
+    auto gate = std::make_shared<Finn::detail::BatchGate>(1, 0);
+    {
+        Finn::AsyncDeviceInputBuffer<uint8_t> buffer(name, device, uuid, FinnUnittest::myShapePacked, FinnUnittest::parts, gate, ring);
+        Finn::vector<uint8_t> data(buffer.getTotalDataSize());
+        constexpr uint32_t stored = 4;
+        for (uint32_t i = 0; i < stored; ++i) {
+            EXPECT_TRUE(buffer.store({data.begin(), data.end()}));
+        }
+        const auto framesPosted = [&] {
+            uint32_t frames = 0;
+            for (uint32_t d = 0; d < std::min(xrt::ip::peek(name, ring.prod), ring.slots); ++d) {
+                frames += xrt::ip::peek(name, ring.frames + 4 * d);
+            }
+            return frames;
+        };
+        const auto deadline = std::chrono::steady_clock::now() + 5s;
+        while (framesPosted() < stored * FinnUnittest::parts && std::chrono::steady_clock::now() < deadline) {
+            std::this_thread::sleep_for(1ms);
+        }
+        EXPECT_EQ(framesPosted(), stored * FinnUnittest::parts);
+        EXPECT_LE(xrt::ip::peek(name, ring.prod), stored);
+        EXPECT_EQ(gate->inputsAnnouncedCount(), stored);
+    }
+    xrt::ip::ringCompletesImmediately.reset();
+}
 
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);

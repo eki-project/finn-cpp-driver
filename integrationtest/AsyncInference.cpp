@@ -27,7 +27,7 @@ namespace Finn {
     // The jet example network is INT8 -> INT16 (see example_networks/*/FinnDatatypesJet.h)
     template<bool SynchronousInference>
     using Driver = BaseDriver<SynchronousInference, DatatypeInt<8>, DatatypeInt<16>>;
-}
+}  // namespace Finn
 
 using namespace std::literals::chrono_literals;
 
@@ -49,9 +49,9 @@ TEST(AsyncInference, asyncInferenceTest) {
     std::string exampleNetworkConfig = "jetConfig.json";
     Finn::Config conf = Finn::createConfigFromPath(exampleNetworkConfig);
 
-    auto driver = Finn::Driver<false>(conf, 0, conf.deviceWrappers[0].idmas[0]->kernelName, 0, conf.deviceWrappers[0].odmas[0]->kernelName, 1);
+    auto driver = Finn::Driver<false>(conf, 1);
 
-    Finn::vector<int8_t> data(driver.getFeatureMapSize(0, conf.deviceWrappers[0].idmas[0]->kernelName), 1);
+    Finn::vector<int8_t> data(driver.getFeatureMapSize(driver.getInputDeviceIndex(), driver.getInputKernelName()), 1);
 
     std::iota(data.begin(), data.end(), -127);
 
@@ -70,9 +70,9 @@ TEST(AsyncInference, asyncBatchInferenceTest) {
     std::condition_variable cv;
     std::mutex m;
 
-    auto driver = Finn::Driver<false>(conf, 0, conf.deviceWrappers[0].idmas[0]->kernelName, 0, conf.deviceWrappers[0].odmas[0]->kernelName, static_cast<uint>(batchLength));
+    auto driver = Finn::Driver<false>(conf, static_cast<uint>(batchLength));
 
-    const std::size_t featureMapSize = driver.getFeatureMapSize(0, conf.deviceWrappers[0].idmas[0]->kernelName);
+    const std::size_t featureMapSize = driver.getFeatureMapSize(driver.getInputDeviceIndex(), driver.getInputKernelName());
     auto data = makeBatchInput(featureMapSize, batchLength);
 
     // Run inference
@@ -83,7 +83,7 @@ TEST(AsyncInference, asyncBatchInferenceTest) {
     EXPECT_EQ(results, expectedBatch);
 
     // Second batch, this time waiting for the callback before fetching the results
-    driver.registerCallback(0, conf.deviceWrappers[0].odmas[0]->kernelName, [&availableData, &cv, &m](std::size_t numItems) {
+    driver.registerCallback(driver.getOutputDeviceIndex(), driver.getOutputKernelName(), [&availableData, &cv, &m](std::size_t numItems) {
         {
             // The callback reports how many complete batches worth of elements are queued
             const std::lock_guard<std::mutex> lock(m);  // notify under the mutex so the waiter cannot miss it
@@ -97,7 +97,7 @@ TEST(AsyncInference, asyncBatchInferenceTest) {
 
     {
         std::unique_lock lk(m);
-        const bool notified = cv.wait_for(lk, 30s, [&availableData, &driver, &conf] { return availableData >= driver.getTotalDataSize(0, conf.deviceWrappers[0].odmas[0]->kernelName); });
+        const bool notified = cv.wait_for(lk, 30s, [&availableData, &driver] { return availableData >= driver.getTotalDataSize(driver.getOutputDeviceIndex(), driver.getOutputKernelName()); });
         ASSERT_TRUE(notified) << "Output callback was not called within 30 s";
     }
 
@@ -114,8 +114,8 @@ TEST(AsyncInference, asyncPipelinedInferenceTest) {
     const std::size_t batchLength = 10;
     const int batches = 50;
 
-    auto driver = Finn::Driver<false>(conf, 0, conf.deviceWrappers[0].idmas[0]->kernelName, 0, conf.deviceWrappers[0].odmas[0]->kernelName, static_cast<uint>(batchLength));
-    const std::size_t featureMapSize = driver.getFeatureMapSize(0, conf.deviceWrappers[0].idmas[0]->kernelName);
+    auto driver = Finn::Driver<false>(conf, static_cast<uint>(batchLength));
+    const std::size_t featureMapSize = driver.getFeatureMapSize(driver.getInputDeviceIndex(), driver.getInputKernelName());
     auto data = makeBatchInput(featureMapSize, batchLength);
 
     std::thread producer([&] {
@@ -146,8 +146,8 @@ TEST(AsyncInference, shutdownWithPendingInput) {
     Finn::Config conf = Finn::createConfigFromPath(exampleNetworkConfig);
     const auto start = std::chrono::steady_clock::now();
     {
-        auto driver = Finn::Driver<false>(conf, 0, conf.deviceWrappers[0].idmas[0]->kernelName, 0, conf.deviceWrappers[0].odmas[0]->kernelName, 10);
-        auto data = makeBatchInput(driver.getFeatureMapSize(0, conf.deviceWrappers[0].idmas[0]->kernelName), 10);
+        auto driver = Finn::Driver<false>(conf, 10);
+        auto data = makeBatchInput(driver.getFeatureMapSize(driver.getInputDeviceIndex(), driver.getInputKernelName()), 10);
         driver.input(data.begin(), data.end());
         std::this_thread::sleep_for(100ms);
     }

@@ -85,7 +85,7 @@ TEST_F(BaseDriverTest, BasicBaseDriverTest) {
 }
 
 TEST_F(BaseDriverTest, syncInferenceTest) {
-    auto driver = Finn::Driver<true>(unittestConfig, 0, inputDmaName, 0, outputDmaName, 1);
+    auto driver = Finn::Driver<true>(unittestConfig, 1);
 
     // The input has to be 4 times longer than the expected size of the FPGA, because uint8->int2 packing reduces size by factor 4
     std::cout << driver.getFeatureMapSize(0, inputDmaName) << "\n";

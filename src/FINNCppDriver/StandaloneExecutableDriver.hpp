@@ -24,7 +24,7 @@
 #include <chrono>
 #include <ext/alloc_traits.h>  // for __alloc_tr...
 #include <fstream>
-#include <popl.hpp>                       // for program options
+#include <popl.hpp>  // for program options
 #include <random>
 #include <xtensor/containers/xadapt.hpp>  // for adapt
 #include <xtensor/containers/xarray.hpp>  // for xarray_ada...
@@ -204,7 +204,7 @@ namespace Finn {
          */
         void runThroughputTest() {
             FINN_LOG(loglevel::info) << finnMainLogPrefix() << "Device Information: ";
-            const uint deviceIndex = this->getDefaultInputDeviceIndex();
+            const uint deviceIndex = this->getInputDeviceIndex();
             logDeviceInformation(this->getDeviceHandler(deviceIndex).getDevice(), this->getConfig().getDeviceWrapper(deviceIndex).xclbin);
 
             size_t elementcount = FinnUtils::shapeToElements(this->getInputNormalShape());
@@ -276,20 +276,38 @@ namespace Finn {
                     break;
                 case 'i':
                     switch (wordSize) {
-                        case 1: loadInferDump<int8_t>(loadedNpyFile, outputFile); break;
-                        case 2: loadInferDump<int16_t>(loadedNpyFile, outputFile); break;
-                        case 4: loadInferDump<int32_t>(loadedNpyFile, outputFile); break;
-                        case 8: loadInferDump<int64_t>(loadedNpyFile, outputFile); break;
-                        default: Finn::logAndError<std::runtime_error>("Unsupported signed integer type '" + typestring + "' in input npy file!");
+                        case 1:
+                            loadInferDump<int8_t>(loadedNpyFile, outputFile);
+                            break;
+                        case 2:
+                            loadInferDump<int16_t>(loadedNpyFile, outputFile);
+                            break;
+                        case 4:
+                            loadInferDump<int32_t>(loadedNpyFile, outputFile);
+                            break;
+                        case 8:
+                            loadInferDump<int64_t>(loadedNpyFile, outputFile);
+                            break;
+                        default:
+                            Finn::logAndError<std::runtime_error>("Unsupported signed integer type '" + typestring + "' in input npy file!");
                     }
                     break;
                 case 'u':
                     switch (wordSize) {
-                        case 1: loadInferDump<uint8_t>(loadedNpyFile, outputFile); break;
-                        case 2: loadInferDump<uint16_t>(loadedNpyFile, outputFile); break;
-                        case 4: loadInferDump<uint32_t>(loadedNpyFile, outputFile); break;
-                        case 8: loadInferDump<uint64_t>(loadedNpyFile, outputFile); break;
-                        default: Finn::logAndError<std::runtime_error>("Unsupported unsigned integer type '" + typestring + "' in input npy file!");
+                        case 1:
+                            loadInferDump<uint8_t>(loadedNpyFile, outputFile);
+                            break;
+                        case 2:
+                            loadInferDump<uint16_t>(loadedNpyFile, outputFile);
+                            break;
+                        case 4:
+                            loadInferDump<uint32_t>(loadedNpyFile, outputFile);
+                            break;
+                        case 8:
+                            loadInferDump<uint64_t>(loadedNpyFile, outputFile);
+                            break;
+                        default:
+                            Finn::logAndError<std::runtime_error>("Unsupported unsigned integer type '" + typestring + "' in input npy file!");
                     }
                     break;
                 case 'b': {
@@ -300,7 +318,8 @@ namespace Finn {
                     xt::dump_npy(outputFile, xarr);
                     break;
                 }
-                default: Finn::logAndError<std::runtime_error>("Loading a numpy array with type identifier string '" + typestring + "' is currently not supported.");
+                default:
+                    Finn::logAndError<std::runtime_error>("Loading a numpy array with type identifier string '" + typestring + "' is currently not supported.");
             }
         }
 
@@ -313,7 +332,7 @@ namespace Finn {
         void runWithInputFile(const std::vector<std::string>& inputFiles, const std::vector<std::string>& outputFiles) {
             FINN_LOG(loglevel::info) << finnMainLogPrefix() << "Running driver on input files";
 
-            const uint deviceIndex = this->getDefaultInputDeviceIndex();
+            const uint deviceIndex = this->getInputDeviceIndex();
             logDeviceInformation(this->getDeviceHandler(deviceIndex).getDevice(), this->getConfig().getDeviceWrapper(deviceIndex).xclbin);
 
             for (auto&& [inp, out] = std::tuple{inputFiles.begin(), outputFiles.begin()}; inp != inputFiles.end(); ++inp, ++out) {

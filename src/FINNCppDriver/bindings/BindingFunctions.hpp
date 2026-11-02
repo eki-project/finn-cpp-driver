@@ -88,6 +88,8 @@ inline void printConfig(ConstDriverVariant driver) {
     std::cout << "CONFIGURATION" << std::endl << "------------------" << std::endl;
     std::cout << "Input Bitwidth: " << InputFinnType().bitwidth() << std::endl;
     std::cout << "Output Bitwidth: " << OutputFinnType().bitwidth() << std::endl;
+    std::cout << "Input: device " << config.inputDeviceIndex << ", IDMA " << config.inputKernelIndex << std::endl;
+    std::cout << "Output: device " << config.outputDeviceIndex << ", ODMA " << config.outputKernelIndex << std::endl;
     std::cout << "------------------" << std::endl;
     for (const auto& [xrtDeviceIndex, wrapper] : config.deviceWrappers) {
         std::cout << "DEVICE " << xrtDeviceIndex << std::endl;

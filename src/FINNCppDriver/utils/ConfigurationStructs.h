@@ -226,6 +226,26 @@ namespace Finn {
          *
          */
         std::map<unsigned int, DeviceWrapper> deviceWrappers;
+        /**
+         * @brief xrtDeviceIndex of the device that receives the input
+         *
+         */
+        unsigned int inputDeviceIndex;
+        /**
+         * @brief xrtDeviceIndex of the device that produces the output
+         *
+         */
+        unsigned int outputDeviceIndex;
+        /**
+         * @brief Position of the input kernel in the idmas of the input device
+         *
+         */
+        unsigned int inputKernelIndex;
+        /**
+         * @brief Position of the output kernel in the odmas of the output device
+         *
+         */
+        unsigned int outputKernelIndex;
 
         /**
          * @brief Get the device description with the given xrtDeviceIndex
@@ -238,6 +258,26 @@ namespace Finn {
             try {
                 return deviceWrappers.at(xrtDeviceIndex);
             } catch (const std::out_of_range&) { throw std::runtime_error(std::format("No device wrapper with xrtDeviceIndex {} exists in the configuration!", xrtDeviceIndex)); }
+        }
+
+        /**
+         * @brief Check that the input/output device and kernel indices refer to existing devices and DMAs
+         *
+         * @throws std::runtime_error if a device or kernel index does not exist
+         */
+        void validate() const {
+            if (!deviceWrappers.contains(inputDeviceIndex)) {
+                throw std::runtime_error(std::format("The input device index {} does not match the xrtDeviceIndex of any device in the configuration!", inputDeviceIndex));
+            }
+            if (!deviceWrappers.contains(outputDeviceIndex)) {
+                throw std::runtime_error(std::format("The output device index {} does not match the xrtDeviceIndex of any device in the configuration!", outputDeviceIndex));
+            }
+            if (inputKernelIndex >= getDeviceWrapper(inputDeviceIndex).idmas.size()) {
+                throw std::runtime_error(std::format("The input device {} has no IDMA of index {}!", inputDeviceIndex, inputKernelIndex));
+            }
+            if (outputKernelIndex >= getDeviceWrapper(outputDeviceIndex).odmas.size()) {
+                throw std::runtime_error(std::format("The output device {} has no ODMA of index {}!", outputDeviceIndex, outputKernelIndex));
+            }
         }
     };
 
@@ -283,19 +323,89 @@ namespace Finn {
     }
 
     /**
+     * @brief Determine the input or output device (xrtDeviceIndex) of a config file.
+     *
+     * Uses the top-level entry `key` if the file has one. Otherwise the config must contain exactly one device, which is then both the input and the output device.
+     *
+     * @param configJson Parsed config file. In the legacy format this is the bare list of devices, which never contains `key`.
+     * @param configPath Path of the config file, for error messages
+     * @param key "inputDeviceIndex" or "outputDeviceIndex"
+     * @param config Config with all deviceWrappers already parsed
+     * @return unsigned int xrtDeviceIndex of the selected device
+     * @throws std::runtime_error if the given index matches no device, or the index is missing although there are multiple devices
+     */
+    inline unsigned int resolveDeviceIndex(const json& configJson, const std::filesystem::path& configPath, const std::string& key, const Config& config) {
+        if (configJson.contains(key)) {
+            const auto xrtDeviceIndex = configJson.at(key).get<unsigned int>();
+            if (!config.deviceWrappers.contains(xrtDeviceIndex)) {
+                throw std::runtime_error(std::format("\"{}\" in config file {} is {}, but no device has this xrtDeviceIndex!", key, configPath.string(), xrtDeviceIndex));
+            }
+            return xrtDeviceIndex;
+        }
+        if (config.deviceWrappers.size() != 1) {
+            throw std::runtime_error(std::format("Config file {} has {} devices, so \"{}\" must be given at the top level (next to the \"devices\" list)!", configPath.string(), config.deviceWrappers.size(), key));
+        }
+        // Single device: it is the only possible input/output device
+        return config.deviceWrappers.begin()->first;
+    }
+
+    /**
+     * @brief Determine the input or output kernel (position in idmas/odmas) on the selected device.
+     *
+     * Uses the top-level entry `key` if the file has one. Otherwise the device must have exactly one DMA of this kind, which is then selected.
+     *
+     * @param configJson Parsed config file. In the legacy format this is the bare list of devices, which never contains `key`.
+     * @param configPath Path of the config file, for error messages
+     * @param key "inputKernelIndex" or "outputKernelIndex"
+     * @param device The selected input/output device
+     * @param dmas The idmas (input) or odmas (output) of that device
+     * @param dmaKind "IDMA" or "ODMA", for error messages
+     * @return unsigned int Position of the selected kernel in dmas
+     * @throws std::runtime_error if the device has no such DMA, the given index is out of range, or the index is missing although there are multiple DMAs
+     */
+    inline unsigned int resolveKernelIndex(const json& configJson, const std::filesystem::path& configPath, const std::string& key, const DeviceWrapper& device, const std::vector<std::shared_ptr<BufferDescriptor>>& dmas,
+                                           const std::string& dmaKind) {
+        if (dmas.empty()) {
+            throw std::runtime_error(std::format("Device {} in config file {} has no {}!", device.xrtDeviceIndex, configPath.string(), dmaKind));
+        }
+        if (configJson.contains(key)) {
+            const auto kernelIndex = configJson.at(key).get<unsigned int>();
+            if (kernelIndex >= dmas.size()) {
+                throw std::runtime_error(std::format("\"{}\" in config file {} is {}, but device {} only has {} {}(s)!", key, configPath.string(), kernelIndex, device.xrtDeviceIndex, dmas.size(), dmaKind));
+            }
+            return kernelIndex;
+        }
+        if (dmas.size() != 1) {
+            throw std::runtime_error(std::format("Device {} in config file {} has {} {}s, so \"{}\" must be given at the top level (next to the \"devices\" list)!", device.xrtDeviceIndex, configPath.string(), dmas.size(), dmaKind, key));
+        }
+        // Single DMA: it is the only possible input/output kernel
+        return 0;
+    }
+
+    /**
      * @brief Create a Config from a filepath by parsing it's JSON.
+     *
+     * The file is an object {"devices": [...], "inputDeviceIndex": ..., "outputDeviceIndex": ..., "inputKernelIndex": ..., "outputKernelIndex": ...}, or in the legacy format only the list of devices.
+     * Device indices are xrtDeviceIndex values, kernel indices are positions in the idmas/odmas of the input/output device. An index may only be left out if there is exactly one candidate for it,
+     * so the legacy format only works for a single device with a single IDMA and ODMA.
      *
      * @param configPath
      * @return Config
+     * @throws std::runtime_error if the file is malformed, or an input/output index is ambiguous or does not exist
      */
     inline Config createConfigFromPath(const std::filesystem::path& configPath) {
         if (!std::filesystem::exists(configPath) || !std::filesystem::is_regular_file(configPath)) {
             throw std::filesystem::filesystem_error("File " + configPath.string() + " not found. Abort.", std::error_code());
         }
         std::ifstream file(configPath);
-        json dataJson = json::parse(file);
+        const json dataJson = json::parse(file);
+        const bool legacyFormat = dataJson.is_array();
+        if (!legacyFormat && !(dataJson.is_object() && dataJson.contains("devices"))) {
+            throw std::runtime_error(std::format("Config file {} must be either a list of devices or an object with a \"devices\" list!", configPath.string()));
+        }
+
         Config config;
-        for (auto& fpgaDevice : dataJson) {
+        for (const auto& fpgaDevice : legacyFormat ? dataJson : dataJson.at("devices")) {
             DeviceWrapper devWrap;
             from_json(fpgaDevice, devWrap);
             const unsigned int xrtIdx = devWrap.xrtDeviceIndex;
@@ -303,6 +413,18 @@ namespace Finn {
                 throw std::runtime_error(std::format("Duplicate xrtDeviceIndex {} in config file {}!", xrtIdx, configPath.string()));
             }
         }
+        if (config.deviceWrappers.empty()) {
+            throw std::runtime_error(std::format("Config file {} contains no devices!", configPath.string()));
+        }
+
+        // Select the input/output devices and kernels: given explicitly at the top level, or derived when there is exactly one candidate (see resolveDeviceIndex/resolveKernelIndex)
+        config.inputDeviceIndex = resolveDeviceIndex(dataJson, configPath, "inputDeviceIndex", config);
+        config.outputDeviceIndex = resolveDeviceIndex(dataJson, configPath, "outputDeviceIndex", config);
+
+        const DeviceWrapper& inputDevice = config.getDeviceWrapper(config.inputDeviceIndex);
+        const DeviceWrapper& outputDevice = config.getDeviceWrapper(config.outputDeviceIndex);
+        config.inputKernelIndex = resolveKernelIndex(dataJson, configPath, "inputKernelIndex", inputDevice, inputDevice.idmas, "IDMA");
+        config.outputKernelIndex = resolveKernelIndex(dataJson, configPath, "outputKernelIndex", outputDevice, outputDevice.odmas, "ODMA");
         return config;
     }
 
@@ -314,7 +436,7 @@ namespace Finn {
      * @param dma dma index
      * @return std::tuple<shape_t, shape_t, shape_t>
      */
-    inline std::tuple<shape_t, shape_t, shape_t> getConfigShapes(const Config& conf, uint xrtDeviceIndex = 0, uint dma = 0) {
+    inline std::tuple<shape_t, shape_t, shape_t> getConfigShapes(const Config& conf, uint xrtDeviceIndex, uint dma) {
         const auto& idma = conf.getDeviceWrapper(xrtDeviceIndex).idmas.at(dma);
         auto myShapeNormal = (*std::dynamic_pointer_cast<Finn::ExtendedBufferDescriptor>(idma)).normalShape;
         auto myShapeFolded = (*std::dynamic_pointer_cast<Finn::ExtendedBufferDescriptor>(idma)).foldedShape;

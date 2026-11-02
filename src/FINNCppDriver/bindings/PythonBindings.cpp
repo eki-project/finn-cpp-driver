@@ -50,9 +50,7 @@ PYBIND11_MODULE(finnhpcpy, m) {
             "infer_numpy", [](SyncDriver& driver, const py::array_t<InputDtype, py::array::c_style | py::array::forcecast>& array) { return inferNumpyArraySynchronous(driver, array); }, py::arg("input_data"),
             py::doc("Run inference of a single numpy array. The shape must match the normal input shape expected by the accelerator."))
 
-        // Default device indices
-        .def("set_default_input_device_index", &SyncDriver::setDefaultInputDeviceIndex, py::arg("index"), py::doc("Set the device index for the default input device."))
-        .def("set_default_output_device_index", &SyncDriver::setDefaultOutputDeviceIndex, py::arg("index"), py::doc("Set the device index for the default output device."))
-        .def("get_default_input_device_index", &SyncDriver::getDefaultInputDeviceIndex, py::doc("Get the default input device index."))
-        .def("get_default_output_device_index", &SyncDriver::getDefaultOutputDeviceIndex, py::doc("Get the default output device index."));
+        // Device indices (selected in the config file)
+        .def("get_input_device_index", &SyncDriver::getInputDeviceIndex, py::doc("Get the xrtDeviceIndex of the input device."))
+        .def("get_output_device_index", &SyncDriver::getOutputDeviceIndex, py::doc("Get the xrtDeviceIndex of the output device."));
 }

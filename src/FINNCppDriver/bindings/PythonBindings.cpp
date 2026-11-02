@@ -25,7 +25,8 @@ PYBIND11_MODULE(finnhpcpy, m) {
              py::arg("config_file"), py::arg("batch_size"), py::arg("enable_logger") = false, py::doc("Construct a sync driver. This resets the FPGAs and prepares for inference."))
 
         // Example numpy array so that the Python side knows what dtype and shape to use.
-        .def("example_input_numpy", &generateExampleInputNumpy, py::doc("Return a numpy array with the correct shape and datatype for inference. This takes batch size into account as the first element of the shape."))
+        .def("example_input_numpy", &generateExampleInputNumpy, py::doc("Return an input numpy array with the correct shape and datatype for inference. This takes batch size into account as the first element of the shape."))
+        .def("example_output_numpy", &generateExampleOutputNumpy, py::doc("Return an output numpy array with the correct shape and datatype for inference. This takes batch size into account as the first element of the shape."))
 
         // Config overview
         .def(

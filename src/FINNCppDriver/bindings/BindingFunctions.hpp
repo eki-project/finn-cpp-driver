@@ -6,6 +6,7 @@
  * TODO(bwintermann): Doxygen and license header.
  */
 
+#include <FINNCppDriver/config/FinnDriverUsedDatatypes.h>
 #include <FINNCppDriver/utils/ConfigurationStructs.h>
 #include <FINNCppDriver/utils/FinnUtils.h>
 #include <pybind11/numpy.h>
@@ -18,6 +19,7 @@
 // It must not be included here directly: the generated header shares the include guard of the default one, so
 // whichever is included first wins.
 #include <FINNCppDriver/StandaloneExecutableDriver.hpp>
+#include <FINNCppDriver/utils/DataPacking.hpp>
 #include <format>
 
 namespace py = pybind11;
@@ -52,6 +54,12 @@ inline void warnUndefinedHeader() {
 inline py::array_t<InputDtype> generateExampleInputNumpy(SyncDriver& driver) {
     py::array_t<InputDtype> array(driver.getInputNormalShape(true));
     std::fill(array.mutable_data(), array.mutable_data() + array.size(), InputDtype{});
+    return array;
+}
+
+inline py::array_t<SyncDriver::AutoDeducedRetType> generateExampleOutputNumpy(SyncDriver& driver) {
+    py::array_t<SyncDriver::AutoDeducedRetType> array(driver.getOutputNormalShape(true));
+    std::fill(array.mutable_data(), array.mutable_data() + array.size(), SyncDriver::AutoDeducedRetType{});
     return array;
 }
 

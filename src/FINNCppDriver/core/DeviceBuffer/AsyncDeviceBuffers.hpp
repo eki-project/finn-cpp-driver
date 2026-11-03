@@ -163,7 +163,9 @@ namespace Finn {
              * Not interruptible by a stop token: the caller has announced the batch and the output workers will start
              * it. Returns false only if the gate was shut down first, which the shutdown order of DeviceHandler prevents.
              */
-            bool waitForOutputsStarted(uint64_t batches) { return waitUntil(std::stop_token{}, [&] { return allAtLeast(startedPerOutput, batches); }); }
+            bool waitForOutputsStarted(uint64_t batches) {
+                return waitUntil(std::stop_token{}, [&] { return allAtLeast(startedPerOutput, batches); });
+            }
 
             /**
              * @brief Blocks until every output buffer has completed at least `batches` batches
@@ -322,12 +324,13 @@ namespace Finn {
          * @param device XRT device
          * @param pAssociatedKernel XRT kernel
          * @param pShapePacked packed shape of input
+         * @param pMemoryGroup memory group the IP's memory-mapped argument is connected to (also used for the spare buffer)
          * @param batchSize size of ringbuffer in input elements (batch elements)
          */
-        AsyncDeviceInputBuffer(const std::string& pCUName, xrt::device& device, xrt::uuid& pDevUUID, const shapePacked_t& pShapePacked, unsigned int batchSize, std::shared_ptr<detail::BatchGate> pGate)
-            : DeviceInputBuffer<T>(pCUName, device, pDevUUID, pShapePacked, batchSize),
+        AsyncDeviceInputBuffer(const std::string& pCUName, xrt::device& device, xrt::uuid& pDevUUID, const shapePacked_t& pShapePacked, unsigned int pMemoryGroup, unsigned int batchSize, std::shared_ptr<detail::BatchGate> pGate)
+            : DeviceInputBuffer<T>(pCUName, device, pDevUUID, pShapePacked, pMemoryGroup, batchSize),
               detail::AsyncBufferWrapper<T>(batchSize * FinnUtils::shapeToElements(pShapePacked)),
-              spareBo(device, this->mapSize * sizeof(T), DeviceBuffer<T>::getFlags(Finn::Options::hostMemoryAccess), 0),
+              spareBo(device, this->mapSize * sizeof(T), DeviceBuffer<T>::getFlags(Finn::Options::hostMemoryAccess), this->memoryGroup),
               spareMap(spareBo.template map<T*>()),
               spareAdr(spareBo.address()),
               gate(std::move(pGate)),
@@ -361,7 +364,7 @@ namespace Finn {
             }
             FINN_LOG(loglevel::info) << "Stopping Asynchronous input buffer" << std::endl;
             DeviceInputBuffer<T>::prepareForShutdown();
-            this->queue.shutdown();  // wakes a worker that is blocked waiting for input; a gate wait wakes on the stop token
+            this->queue.shutdown();                      // wakes a worker that is blocked waiting for input; a gate wait wakes on the stop token
             this->stopWorker(workerThread, this->name);  // the gate stays active: the output workers still drain started batches
         }
 
@@ -399,8 +402,8 @@ namespace Finn {
      */
     template<typename T>
     class AsyncDeviceOutputBuffer : public DeviceOutputBuffer<T>, public detail::AsyncBufferWrapper<T> {
-        std::shared_ptr<detail::BatchGate> gate;         ///< shared with the input buffers of the same device
-        std::size_t gateIndex = 0;                       ///< this buffer's index in the gate
+        std::shared_ptr<detail::BatchGate> gate;  ///< shared with the input buffers of the same device
+        std::size_t gateIndex = 0;                ///< this buffer's index in the gate
         std::jthread workerThread;
         std::mutex callbackMutex;                        ///< Guards callback against registerCallback() racing with the worker
         std::function<void(std::size_t)> callback = {};  ///< Callback that is called when data is available in the queue
@@ -422,7 +425,7 @@ namespace Finn {
                 }
                 this->execute(this->shapePacked[0]);
                 gate->outputStarted(gateIndex);  // the input kernels may start now
-                this->wait();  // no stop token: the batch is in flight and the run completes once it has passed through
+                this->wait();                    // no stop token: the batch is in flight and the run completes once it has passed through
                 this->sync(this->totalDataSize);
                 gate->completed(gateIndex);  // the batch is out and read by the host: the inputs may start the next one (same order as FINN's reference driver)
                 if (!saveMap(stoken)) {
@@ -458,10 +461,11 @@ namespace Finn {
          * @param device XRT device
          * @param pAssociatedKernel XRT kernel
          * @param pShapePacked packed shape of input
+         * @param pMemoryGroup memory group the IP's memory-mapped argument is connected to
          * @param batchSize batch size of the output
          */
-        AsyncDeviceOutputBuffer(const std::string& pCUName, xrt::device& device, xrt::uuid& pDevUUID, const shapePacked_t& pShapePacked, unsigned int batchSize, std::shared_ptr<detail::BatchGate> pGate)
-            : DeviceOutputBuffer<T>(pCUName, device, pDevUUID, pShapePacked, batchSize),
+        AsyncDeviceOutputBuffer(const std::string& pCUName, xrt::device& device, xrt::uuid& pDevUUID, const shapePacked_t& pShapePacked, unsigned int pMemoryGroup, unsigned int batchSize, std::shared_ptr<detail::BatchGate> pGate)
+            : DeviceOutputBuffer<T>(pCUName, device, pDevUUID, pShapePacked, pMemoryGroup, batchSize),
               detail::AsyncBufferWrapper<T>(2 * batchSize * FinnUtils::shapeToElements(pShapePacked)),  // Make output buffer map twice as large to circumvent a very rare deadlock in the case where one thread handles IO alone.
               gate(std::move(pGate)),
               gateIndex(gate->registerOutput()) {

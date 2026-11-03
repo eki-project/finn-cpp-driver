@@ -36,7 +36,7 @@ class DBTest : public ::testing::Test {
 };
 
 TEST_F(DBTest, DBStoreTest) {
-    Finn::SyncDeviceInputBuffer<uint8_t> buffer("InputBuffer", device, uuid, FinnUnittest::myShapePacked, FinnUnittest::parts);
+    Finn::SyncDeviceInputBuffer<uint8_t> buffer("InputBuffer", device, uuid, FinnUnittest::myShapePacked, 0, FinnUnittest::parts);
     Finn::vector<uint8_t> data(buffer.getFeatureMapSize() * buffer.getBatchSize());
     FinnUtils::BufferFiller(0, 255).fillRandom(data.begin(), data.end());
     buffer.store({data.begin(), data.end()});
@@ -44,7 +44,7 @@ TEST_F(DBTest, DBStoreTest) {
 }
 
 TEST_F(DBTest, DBOutputTest) {
-    Finn::SyncDeviceOutputBuffer<uint8_t> buffer("OutputBuffer", device, uuid, FinnUnittest::myShapePacked, FinnUnittest::parts);
+    Finn::SyncDeviceOutputBuffer<uint8_t> buffer("OutputBuffer", device, uuid, FinnUnittest::myShapePacked, 0, FinnUnittest::parts);
     Finn::vector<uint8_t> data(buffer.getTotalDataSize());
     FinnUtils::BufferFiller(0, 255).fillRandom(data.begin(), data.end());
     buffer.testSetMap(data);

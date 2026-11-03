@@ -22,9 +22,11 @@
 #include <cerrno>
 #include <chrono>
 #include <filesystem>  // for path
+#include <format>
 #include <iosfwd>
 #include <memory>
 #include <numeric>
+#include <optional>
 #include <stdexcept>
 #include <system_error>
 #include <utility>  // for move
@@ -41,6 +43,8 @@ namespace Finn {
     DeviceHandler::DeviceHandler(const DeviceWrapper& devWrap, bool pSynchronousInference, unsigned int hostBufferSize)
         : synchronousInference(pSynchronousInference), devInformation(devWrap), batchsize(hostBufferSize), xrtDeviceIndex(devWrap.xrtDeviceIndex), xclbinPath(devWrap.xclbin) {
         checkDeviceWrapper(devWrap);
+        // Parsed once from the file only; setBatchSize re-creates the buffers but the xclbin does not change
+        xclbinMetadata = xrt::xclbin(xclbinPath);
         initializeDevice();
         loadXclbinSetUUID();
         initializeBufferObjects(devWrap, hostBufferSize, pSynchronousInference);
@@ -105,19 +109,21 @@ namespace Finn {
         // output is registered before the first input worker consults the gate
         auto gate = pSynchronousInference ? nullptr : std::make_shared<Finn::detail::BatchGate>(devWrap.idmas.size(), devWrap.odmas.size());
         for (auto&& ebdptr : devWrap.odmas) {
+            const unsigned int memoryGroup = getMemoryGroup(ebdptr->kernelName);
             if (pSynchronousInference) {
-                auto ptr = std::make_shared<Finn::SyncDeviceOutputBuffer<uint8_t>>(ebdptr->kernelName, device, uuid, ebdptr->packedShape, hostBufferSize);
+                auto ptr = std::make_shared<Finn::SyncDeviceOutputBuffer<uint8_t>>(ebdptr->kernelName, device, uuid, ebdptr->packedShape, memoryGroup, hostBufferSize);
                 outputBufferMap.emplace(std::make_pair(ebdptr->kernelName, ptr));
             } else {
-                auto ptr = std::make_shared<Finn::AsyncDeviceOutputBuffer<uint8_t>>(ebdptr->kernelName, device, uuid, ebdptr->packedShape, hostBufferSize, gate);
+                auto ptr = std::make_shared<Finn::AsyncDeviceOutputBuffer<uint8_t>>(ebdptr->kernelName, device, uuid, ebdptr->packedShape, memoryGroup, hostBufferSize, gate);
                 outputBufferMap.emplace(std::make_pair(ebdptr->kernelName, ptr));
             }
         }
         for (auto&& ebdptr : devWrap.idmas) {
+            const unsigned int memoryGroup = getMemoryGroup(ebdptr->kernelName);
             if (pSynchronousInference) {
-                inputBufferMap.emplace(std::make_pair(ebdptr->kernelName, std::make_shared<Finn::SyncDeviceInputBuffer<uint8_t>>(ebdptr->kernelName, device, uuid, ebdptr->packedShape, hostBufferSize)));
+                inputBufferMap.emplace(std::make_pair(ebdptr->kernelName, std::make_shared<Finn::SyncDeviceInputBuffer<uint8_t>>(ebdptr->kernelName, device, uuid, ebdptr->packedShape, memoryGroup, hostBufferSize)));
             } else {
-                inputBufferMap.emplace(std::make_pair(ebdptr->kernelName, std::make_shared<Finn::AsyncDeviceInputBuffer<uint8_t>>(ebdptr->kernelName, device, uuid, ebdptr->packedShape, hostBufferSize, gate)));
+                inputBufferMap.emplace(std::make_pair(ebdptr->kernelName, std::make_shared<Finn::AsyncDeviceInputBuffer<uint8_t>>(ebdptr->kernelName, device, uuid, ebdptr->packedShape, memoryGroup, hostBufferSize, gate)));
             }
         }
         FINN_LOG(loglevel::info) << "Finished initializing buffer objects on device " << xrtDeviceIndex;
@@ -125,6 +131,37 @@ namespace Finn {
 #ifndef NDEBUG
         isBufferMapCollisionFree();
 #endif
+    }
+
+    unsigned int DeviceHandler::getMemoryGroup(const std::string& kernelName) const {
+        // get_ips understands the "kernel:{instance}" syntax used for the kernel names in the config
+        const std::vector<xrt::xclbin::ip> ips = xclbinMetadata.get_ips(kernelName);
+        if (ips.size() != 1) {
+            Finn::logAndError<std::runtime_error>(std::format("Expected exactly one IP matching the kernel name {} in xclbin {}, but found {}.", kernelName, xclbinPath, ips.size()));
+        }
+
+        // FINN IODMAs have exactly one memory-mapped argument (the buffer address); the other arguments are scalars or AXI streams
+        std::optional<int32_t> memoryGroup;
+        std::size_t memoryMappedArgs = 0;
+        for (const xrt::xclbin::arg& arg : ips.front().get_args()) {
+            const std::vector<xrt::xclbin::mem> mems = arg.get_mems();
+            const auto isMemoryMapped = [](const xrt::xclbin::mem& mem) { return mem.get_type() != xrt::xclbin::mem::memory_type::streaming && mem.get_type() != xrt::xclbin::mem::memory_type::streaming_connection; };
+            const auto firstMemoryMapped = std::find_if(mems.begin(), mems.end(), isMemoryMapped);
+            if (firstMemoryMapped == mems.end()) {
+                continue;
+            }
+            ++memoryMappedArgs;
+            // An argument connected to several banks can use any of them, so the first one is taken
+            memoryGroup = firstMemoryMapped->get_index();
+            if (std::count_if(mems.begin(), mems.end(), isMemoryMapped) > 1) {
+                FINN_LOG(loglevel::info) << "(" << xrtDeviceIndex << ") Argument " << arg.get_name() << " of " << kernelName << " is connected to several memory banks, using bank index " << *memoryGroup;
+            }
+        }
+        if (memoryMappedArgs != 1 || !memoryGroup.has_value() || *memoryGroup < 0) {
+            Finn::logAndError<std::runtime_error>(std::format("Expected the IP {} in xclbin {} to have exactly one argument connected to device memory, but found {}.", kernelName, xclbinPath, memoryMappedArgs));
+        }
+        FINN_LOG(loglevel::info) << "(" << xrtDeviceIndex << ") Buffers of " << kernelName << " are allocated in memory group " << *memoryGroup;
+        return static_cast<unsigned int>(*memoryGroup);
     }
 
     /****** GETTER / SETTER ******/

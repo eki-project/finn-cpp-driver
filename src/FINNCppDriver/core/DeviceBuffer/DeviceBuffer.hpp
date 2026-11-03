@@ -76,6 +76,11 @@ namespace Finn {
          */
         size_t mapSize;
         /**
+         * @brief Memory group (index in the xclbin memory topology) in which the buffer objects are allocated. Must be the bank the IP's memory-mapped argument is connected to.
+         *
+         */
+        unsigned int memoryGroup;
+        /**
          * @brief XRT IP core associated with this Buffer
          *
          * Declared (and therefore constructed) before the buffer object: opening the IP establishes the process' context
@@ -149,8 +154,7 @@ namespace Finn {
                 } else if (pollPause.count() > 0) {
                     // Leaves gaps between the reads for register accesses of other threads, see pollPause
                     const auto until = std::chrono::steady_clock::now() + pollPause;
-                    while (std::chrono::steady_clock::now() < until) {
-                    }
+                    while (std::chrono::steady_clock::now() < until) {}
                 }
             }
             return false;
@@ -196,17 +200,20 @@ namespace Finn {
          * @param device XRT device
          * @param pAssociatedKernel XRT kernel
          * @param pShapePacked packed shape of input
+         * @param pMemoryGroup memory group the IP's memory-mapped argument is connected to (see DeviceHandler::getMemoryGroup)
+         * @param batchSize batch size
          */
-        DeviceBuffer(const std::string& pCUName, xrt::device& device, xrt::uuid& pDevUUID, const shapePacked_t& pShapePacked, unsigned int batchSize = 1)
+        DeviceBuffer(const std::string& pCUName, xrt::device& device, xrt::uuid& pDevUUID, const shapePacked_t& pShapePacked, unsigned int pMemoryGroup, unsigned int batchSize = 1)
             : name(pCUName),
               shapePacked(pShapePacked),
               mapSize(FinnUtils::getActualBufferSize(FinnUtils::shapeToElements(pShapePacked) * batchSize)),
+              memoryGroup(pMemoryGroup),
               assocIPCore(xrt::ip(device, pDevUUID, pCUName)),  // Using xrt::kernel/getGroupId after this point leads to a total bricking of the FPGA card!!
-              internalBo(xrt::bo(device, mapSize * sizeof(T), DeviceBuffer::getFlags(Finn::Options::hostMemoryAccess), 0)),
+              internalBo(xrt::bo(device, mapSize * sizeof(T), DeviceBuffer::getFlags(Finn::Options::hostMemoryAccess), memoryGroup)),
               map(internalBo.template map<T*>()),
               bufAdr(internalBo.address()) {
             shapePacked[0] = batchSize;
-            FINN_LOG(loglevel::info) << "New Device Buffer of size " << mapSize * sizeof(T) << "bytes with group id " << 0 << "\n";
+            FINN_LOG(loglevel::info) << "New Device Buffer of size " << mapSize * sizeof(T) << "bytes with group id " << memoryGroup << "\n";
             FINN_LOG(loglevel::info) << "Host Memory Access enabled: " << Finn::Options::hostMemoryAccess << "\n";
             FINN_LOG(loglevel::info) << "Initializing DeviceBuffer " << name << " (SHAPE PACKED: " << FinnUtils::shapeToString(pShapePacked) << " inputs of the given shape, MAP SIZE: " << mapSize << ")\n";
             std::fill(map, map + mapSize, 0);
@@ -407,8 +414,11 @@ namespace Finn {
          * @param device XRT device
          * @param pAssociatedKernel XRT kernel
          * @param pShapePacked packed shape of input
+         * @param pMemoryGroup memory group the IP's memory-mapped argument is connected to
+         * @param batchSize batch size
          */
-        DeviceInputBuffer(const std::string& pCUName, xrt::device& device, xrt::uuid& pDevUUID, const shapePacked_t& pShapePacked, unsigned int batchSize = 1) : DeviceBuffer<T>(pCUName, device, pDevUUID, pShapePacked, batchSize) {};
+        DeviceInputBuffer(const std::string& pCUName, xrt::device& device, xrt::uuid& pDevUUID, const shapePacked_t& pShapePacked, unsigned int pMemoryGroup, unsigned int batchSize = 1)
+            : DeviceBuffer<T>(pCUName, device, pDevUUID, pShapePacked, pMemoryGroup, batchSize){};
 
         /**
          * @brief Store the given vector of data in the FPGA mem map
@@ -462,6 +472,7 @@ namespace Finn {
          *
          */
         const IO ioMode = IO::OUTPUT;
+
          public:
         /**
          * @brief Construct a new Device Output Buffer object
@@ -470,8 +481,11 @@ namespace Finn {
          * @param device XRT device
          * @param pAssociatedKernel XRT kernel
          * @param pShapePacked packed shape of input
+         * @param pMemoryGroup memory group the IP's memory-mapped argument is connected to
+         * @param batchSize batch size
          */
-        DeviceOutputBuffer(const std::string& pCUName, xrt::device& device, xrt::uuid& pDevUUID, const shapePacked_t& pShapePacked, unsigned int batchSize = 1) : DeviceBuffer<T>(pCUName, device, pDevUUID, pShapePacked, batchSize) {};
+        DeviceOutputBuffer(const std::string& pCUName, xrt::device& device, xrt::uuid& pDevUUID, const shapePacked_t& pShapePacked, unsigned int pMemoryGroup, unsigned int batchSize = 1)
+            : DeviceBuffer<T>(pCUName, device, pDevUUID, pShapePacked, pMemoryGroup, batchSize){};
 
         /**
          * @brief Get the data from the buffer and return it as a vector

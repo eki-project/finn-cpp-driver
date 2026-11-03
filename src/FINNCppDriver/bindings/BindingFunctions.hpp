@@ -6,7 +6,6 @@
  * TODO(bwintermann): Doxygen and license header.
  */
 
-#include <FINNCppDriver/config/FinnDriverUsedDatatypes.h>
 #include <FINNCppDriver/utils/ConfigurationStructs.h>
 #include <FINNCppDriver/utils/FinnUtils.h>
 #include <pybind11/numpy.h>

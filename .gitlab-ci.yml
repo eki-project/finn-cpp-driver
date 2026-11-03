@@ -126,7 +126,7 @@ run-unittests:
     SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p fpga --nodelist=fpga1610 -N 1 -n 1 --cpus-per-task=128 -t 2:00:00"
   extends: .load-modules
   script:
-    - export LD_LIBRARY_PATH="$(pwd)/build/libs:$LD_LIBRARY_PATH"
+    - export LD_LIBRARY_PATH="$(pwd)/build/lib:$LD_LIBRARY_PATH"
     - cd build
     - ctest --output-on-failure --output-junit ctest-results.xml
   artifacts:
@@ -149,7 +149,7 @@ run-integrationtests:
     SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p fpga --nodelist=fpga1610 -N 1 -n 1 --cpus-per-task=128 -t 2:00:00"
   extends: .load-modules
   script:
-    - export LD_LIBRARY_PATH="$(pwd)/build/libs:$LD_LIBRARY_PATH"
+    - export LD_LIBRARY_PATH="$(pwd)/build/lib:$LD_LIBRARY_PATH"
     # Reset FPGAs and setup Host Memory Access
     - xbutil reset -d 0000:61:00.1
     - xbutil reset -d 0000:71:00.1
@@ -191,7 +191,7 @@ run-regressiontests:
     SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p fpga --nodelist=fpga1610 -N 1 -n 1 --cpus-per-task=128 -t 10:00:00"
   extends: .load-modules
   script:
-    - export LD_LIBRARY_PATH="$(pwd)/build/libs:$LD_LIBRARY_PATH"
+    - export LD_LIBRARY_PATH="$(pwd)/build/lib:$LD_LIBRARY_PATH"
     
     # Reset FPGAs and setup Host Memory Access
     - xbutil reset -d 0000:61:00.1

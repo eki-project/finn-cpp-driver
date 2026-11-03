@@ -2,7 +2,7 @@
  * @file FPGAReset.hpp
  * @author Linus Jungemann (linus.jungemann@uni-paderborn.de) and others
  * @brief Provides functionality to reset FPGA devices
- * @version 0.1
+ * @version 0.2
  * @date 2025-07-12
  *
  * @copyright Copyright (c) 2025
@@ -13,193 +13,218 @@
 #ifndef FPGARESET_HPP
 #define FPGARESET_HPP
 
-#include <fcntl.h>  // For open()
+#include <fcntl.h>  // For O_WRONLY
+#include <spawn.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
 #include <FINNCppDriver/utils/Logger.hpp>
+#include <cerrno>
 #include <chrono>
+#include <cstdlib>
 #include <cstring>
-#include <iostream>
-#include <sstream>
+#include <stdexcept>
 #include <string>
+#include <string_view>
 #include <thread>
+#include <utility>
 #include <vector>
 
-using namespace std::chrono_literals;
+#ifndef UNITTEST
+    #include "xrt/xrt_device.h"
+#endif
+
+extern char** environ;  // NOLINT: provided by the C runtime, needed by posix_spawnp
 
 namespace Finn {
 
     /**
      * @brief Helper function to execute a command and optionally capture its output
      *
-     * @param args Vector of command arguments (first element is the command)
-     * @param captureOutput Whether to capture and return the command output
-     * @param silenceOutput Whether to silence command's stdout and stderr
+     * Uses posix_spawn instead of fork: the driver is multi-threaded, and only async-signal-safe code may run between
+     * fork and exec in such a process.
+     *
+     * @param args Vector of command arguments (first element is the command, looked up in PATH)
+     * @param captureOutput Whether to capture and return the command's stdout
+     * @param silenceOutput Whether to silence the command's stdout and stderr
      * @return std::pair<bool, std::string> Pair of (success status, command output if requested)
      */
-    std::pair<bool, std::string> executeCommand(const std::vector<std::string>& args, bool captureOutput = false, bool silenceOutput = false) {
-        int pipefd[2];
-        std::string output;
+    inline std::pair<bool, std::string> executeCommand(const std::vector<std::string>& args, bool captureOutput = false, bool silenceOutput = false) {
+        if (args.empty()) {
+            return {false, ""};
+        }
+        std::vector<char*> argv;
+        argv.reserve(args.size() + 1);
+        for (const auto& arg : args) {
+            argv.push_back(const_cast<char*>(arg.c_str()));  // NOLINT: posix_spawn takes char* const[] but does not modify the strings
+        }
+        argv.push_back(nullptr);
 
+        int pipefd[2] = {-1, -1};
         if (captureOutput && pipe(pipefd) == -1) {
-            std::cerr << "Pipe creation failed: " << strerror(errno) << std::endl;
-            return {false, output};
+            FINN_LOG(loglevel::error) << "Pipe creation failed: " << strerror(errno);
+            return {false, ""};
         }
 
-        pid_t pid = fork();
-
-        if (pid == -1) {
-            std::cerr << "Fork failed: " << strerror(errno) << std::endl;
-            if (captureOutput) {
-                close(pipefd[0]);
-                close(pipefd[1]);
-            }
-            return {false, output};
-        } else if (pid == 0) {
-            // Child process
-            if (captureOutput) {
-                close(pipefd[0]);  // Close read end
-                dup2(pipefd[1], STDOUT_FILENO);
-                close(pipefd[1]);
-            } else if (silenceOutput) {
-                // Redirect stdout and stderr to /dev/null
-                int devnull = open("/dev/null", O_WRONLY);
-                if (devnull >= 0) {
-                    dup2(devnull, STDOUT_FILENO);
-                    dup2(devnull, STDERR_FILENO);
-                    close(devnull);
-                }
-            }
-
-            // Prepare arguments for exec
-            std::vector<std::string> mutableArgs(args.begin(), args.end());
-            std::vector<char*> c_args;
-            for (auto& arg : mutableArgs) {
-                c_args.push_back(arg.data());
-            }
-            c_args.push_back(nullptr);
-
-            execvp(c_args[0], c_args.data());
-
-            // If we get here, exec failed
-            std::cerr << "Exec failed for " << args[0] << ": " << strerror(errno) << std::endl;
-            _exit(EXIT_FAILURE);
-        } else {
-            // Parent process
-            if (captureOutput) {
-                close(pipefd[1]);  // Close write end
-
-                // Read output from pipe
-                char buffer[4096];
-                ssize_t bytes_read;
-
-                while ((bytes_read = read(pipefd[0], buffer, sizeof(buffer) - 1)) > 0) {
-                    buffer[bytes_read] = '\0';
-                    output += buffer;
-                }
-
-                close(pipefd[0]);
-            }
-
-            // Wait for child process to finish
-            int status;
-            waitpid(pid, &status, 0);
-
-            return {WIFEXITED(status) && WEXITSTATUS(status) == 0, output};
+        posix_spawn_file_actions_t actions;
+        posix_spawn_file_actions_init(&actions);
+        if (captureOutput) {
+            posix_spawn_file_actions_adddup2(&actions, pipefd[1], STDOUT_FILENO);
+            posix_spawn_file_actions_addclose(&actions, pipefd[0]);
+            posix_spawn_file_actions_addclose(&actions, pipefd[1]);
+        } else if (silenceOutput) {
+            posix_spawn_file_actions_addopen(&actions, STDOUT_FILENO, "/dev/null", O_WRONLY, 0);
+            posix_spawn_file_actions_addopen(&actions, STDERR_FILENO, "/dev/null", O_WRONLY, 0);
         }
+
+        pid_t pid = -1;
+        const int spawnResult = posix_spawnp(&pid, argv[0], &actions, nullptr, argv.data(), environ);
+        posix_spawn_file_actions_destroy(&actions);
+        if (captureOutput) {
+            close(pipefd[1]);
+        }
+        if (spawnResult != 0) {
+            FINN_LOG(loglevel::error) << "Could not run " << args[0] << ": " << strerror(spawnResult);
+            if (captureOutput) {
+                close(pipefd[0]);
+            }
+            return {false, ""};
+        }
+
+        std::string output;
+        if (captureOutput) {
+            char buffer[4096];
+            while (true) {
+                const ssize_t bytesRead = read(pipefd[0], buffer, sizeof(buffer));
+                if (bytesRead > 0) {
+                    output.append(buffer, static_cast<std::size_t>(bytesRead));
+                } else if (bytesRead == 0 || errno != EINTR) {
+                    break;
+                }
+            }
+            close(pipefd[0]);
+        }
+
+        int status = 0;
+        while (waitpid(pid, &status, 0) == -1) {
+            if (errno != EINTR) {
+                FINN_LOG(loglevel::error) << "waitpid failed for " << args[0] << ": " << strerror(errno);
+                return {false, output};
+            }
+        }
+        return {WIFEXITED(status) && WEXITSTATUS(status) == 0, output};
     }
 
     /**
-     * Reset a specific FPGA device
-     * @param deviceId The device ID to reset
+     * @brief Reset a specific FPGA device
+     *
+     * @param bdf The PCIe BDF of the device to reset (xbutil only accepts BDFs)
      * @return Whether the reset was successful
      */
-    bool resetFPGA(const std::string& deviceId) {
-        auto [success, _] = executeCommand({"xbutil", "reset", "--force", "-d", deviceId}, false, true);
+    inline bool resetFPGA(const std::string& bdf) {
+        auto [success, output] = executeCommand({"xbutil", "reset", "--force", "-d", bdf}, false, true);
         if (success) {
-            FINN_LOG(loglevel::info) << "Successfully reset FPGA device: " << deviceId << std::endl;
+            FINN_LOG(loglevel::info) << "Successfully reset FPGA device: " << bdf;
         } else {
-            std::cerr << "Failed to reset FPGA device: " << deviceId << std::endl;
+            FINN_LOG(loglevel::error) << "Failed to reset FPGA device: " << bdf;
         }
         return success;
     }
 
     /**
-     * Get a list of all available FPGA devices
-     * @return Vector of device IDs
+     * @brief Get a list of all available FPGA devices (BDFs) as reported by xbutil examine
+     *
+     * @return Vector of device BDFs
      */
-    std::vector<std::string> getDevices() {
+    inline std::vector<std::string> getDevices() {
         std::vector<std::string> devices;
         auto [success, output] = executeCommand({"xbutil", "examine"}, true);
 
         if (!success) {
-            std::cerr << "Failed to execute 'xbutil examine'" << std::endl;
+            FINN_LOG(loglevel::error) << "Failed to execute 'xbutil examine'";
             return devices;
         }
 
-        // Parse output
-        std::istringstream stream(output);
-        std::string line;
-
-        while (std::getline(stream, line)) {
-            size_t open_bracket = line.find('[');
-            size_t close_bracket = line.find(']');
-
-            if (open_bracket != std::string::npos && close_bracket != std::string::npos) {
-                std::string device = line.substr(open_bracket + 1, close_bracket - open_bracket - 1);
-                devices.push_back(device);
+        // Device lines look like "[0000:61:00.1]  :  xilinx_u55c_..."
+        std::size_t pos = 0;
+        while ((pos = output.find('[', pos)) != std::string::npos) {
+            const std::size_t close = output.find(']', pos);
+            if (close == std::string::npos) {
+                break;
             }
+            const std::string candidate = output.substr(pos + 1, close - pos - 1);
+            if (candidate.size() >= 12 && candidate[4] == ':' && candidate[7] == ':' && candidate[10] == '.') {
+                devices.push_back(candidate);
+            }
+            pos = close + 1;
         }
-
         return devices;
     }
 
     /**
-     * Reset all available FPGA devices
-     * Throws runtime_error if no devices are found or if any reset fails
+     * @brief Whether the user disabled the reset on driver construction via the environment (FINN_SKIP_FPGA_RESET=1)
+     *
+     * Skipping the reset makes driver construction several seconds faster, but a previous run that left data in the
+     * accelerator is then not cleaned up.
      */
-    void resetFPGAS(const int index = -1) {
+    inline bool fpgaResetDisabled() {
+        const char* value = std::getenv("FINN_SKIP_FPGA_RESET");
+        return value != nullptr && *value != '\0' && std::string_view(value) != "0";
+    }
+
+    /**
+     * @brief Reset the FPGA device with the given XRT device index, or all devices for index -1
+     *
+     * The BDF is resolved through XRT itself, so the index always refers to the same card that xrt::device(index) opens.
+     *
+     * @throws std::runtime_error if the device cannot be found or the reset fails
+     */
+    inline void resetFPGAS([[maybe_unused]] const int index = -1) {
 #ifdef UNITTEST
         // In unit tests, we might want to mock this function or skip it
-        FINN_LOG(loglevel::info) << "Skipping FPGA reset in unit tests." << std::endl;
+        FINN_LOG(loglevel::info) << "Skipping FPGA reset in unit tests.";
         return;
-#endif
+#else
+        if (fpgaResetDisabled()) {
+            FINN_LOG(loglevel::warning) << "FPGA reset skipped because FINN_SKIP_FPGA_RESET is set";
+            return;
+        }
+
+        if (index != -1) {
+            std::string bdf;
+            {
+                // Resolve the BDF with a short-lived handle so that no handle is open while the card is reset
+                xrt::device device(static_cast<unsigned int>(index));
+                bdf = device.get_info<xrt::info::device::bdf>();
+            }
+            if (!resetFPGA(bdf)) {
+                logAndError<std::runtime_error>("Failed to reset FPGA device at index: " + std::to_string(index) + " (" + bdf + ")");
+            }
+            std::this_thread::sleep_for(std::chrono::seconds(1));  // Wait for the reset to complete
+            return;
+        }
 
         std::vector<std::string> devices = getDevices();
         if (devices.empty()) {
             logAndError<std::runtime_error>("No FPGA devices found. Cannot reset.");
         }
 
-        if (index != -1) {
-            if (index >= devices.size()) {
-                logAndError<std::runtime_error>("Invalid device index: " + std::to_string(index) + ". Available devices: " + std::to_string(devices.size()));
-            }
-            if (!resetFPGA(devices[index])) {
-                logAndError<std::runtime_error>("Failed to reset FPGA device at index: " + std::to_string(index));
-            }
-            std::this_thread::sleep_for(1000ms);  // Wait for the reset to complete
-            return;
-        }
-
-        bool allSuccessful = true;
         std::string failedDevices;
-
         for (const auto& device : devices) {
             if (!resetFPGA(device)) {
-                allSuccessful = false;
-                if (!failedDevices.empty())
+                if (!failedDevices.empty()) {
                     failedDevices += ", ";
+                }
                 failedDevices += device;
             }
         }
-        std::this_thread::sleep_for(1000ms);  // Wait for the reset to complete
+        std::this_thread::sleep_for(std::chrono::seconds(1));  // Wait for the reset to complete
 
-        if (!allSuccessful) {
+        if (!failedDevices.empty()) {
             logAndError<std::runtime_error>("Failed to reset FPGA device(s): " + failedDevices);
-        } else {
-            FINN_LOG(loglevel::info) << "Successfully reset all " << devices.size() << " FPGA device(s)" << std::endl;
         }
+        FINN_LOG(loglevel::info) << "Successfully reset all " << devices.size() << " FPGA device(s)";
+#endif
     }
 
 }  // namespace Finn

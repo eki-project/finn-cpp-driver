@@ -19,23 +19,23 @@
 
 namespace Finn {
     template<bool SynchronousInference>
-    using Driver = BaseDriver<SynchronousInference, DatatypeInt<8>, DatatypeUInt<16>>;
+    using Driver = BaseDriver<SynchronousInference, DatatypeInt<8>, DatatypeInt<16>>;
 }
 
 TEST(SyncInference, syncInferenceTest) {
     std::string exampleNetworkConfig = "jetConfig.json";
     Finn::Config conf = Finn::createConfigFromPath(exampleNetworkConfig);
 
-    auto driver = Finn::Driver<true>(conf, 0, conf.deviceWrappers[0].idmas[0]->kernelName, 0, conf.deviceWrappers[0].odmas[0]->kernelName, 1);
+    auto driver = Finn::Driver<true>(conf, 1);
 
-    Finn::vector<int8_t> data(driver.getFeatureMapSize(0, conf.deviceWrappers[0].idmas[0]->kernelName), 1);
+    Finn::vector<int8_t> data(driver.getFeatureMapSize(driver.getInputDeviceIndex(), driver.getInputKernelName()), 1);
 
     std::iota(data.begin(), data.end(), -127);
 
     // Run inference
     auto results = driver.inferSynchronous(data.begin(), data.end());
 
-    Finn::vector<uint16_t> expectedResults = {98, 50, 65476, 65493, 27};
+    Finn::vector<int16_t> expectedResults = {98, 50, -60, -43, 27};
 
     EXPECT_EQ(results, expectedResults);
 }
@@ -45,20 +45,20 @@ TEST(SyncInference, syncBatchInferenceTest) {
     Finn::Config conf = Finn::createConfigFromPath(exampleNetworkConfig);
     std::size_t batchLength = 10;
 
-    auto driver = Finn::Driver<true>(conf, 0, conf.deviceWrappers[0].idmas[0]->kernelName, 0, conf.deviceWrappers[0].odmas[0]->kernelName, static_cast<uint>(batchLength));
+    auto driver = Finn::Driver<true>(conf, static_cast<uint>(batchLength));
+    const std::size_t featureMapSize = driver.getFeatureMapSize(driver.getInputDeviceIndex(), driver.getInputKernelName());
 
-    Finn::vector<int8_t> data(driver.getFeatureMapSize(0, conf.deviceWrappers[0].idmas[0]->kernelName) * batchLength, 1);
+    Finn::vector<int8_t> data(featureMapSize * batchLength, 1);
 
     for (std::size_t i = 0; i < batchLength; ++i) {
-        std::iota(data.begin() + static_cast<decltype(data)::difference_type>(i * driver.getFeatureMapSize(0, conf.deviceWrappers[0].idmas[0]->kernelName)),
-                  data.begin() + static_cast<decltype(data)::difference_type>((i + 1) * driver.getFeatureMapSize(0, conf.deviceWrappers[0].idmas[0]->kernelName)), -127 + static_cast<int>(i));
+        std::iota(data.begin() + static_cast<decltype(data)::difference_type>(i * featureMapSize), data.begin() + static_cast<decltype(data)::difference_type>((i + 1) * featureMapSize), -127 + static_cast<int>(i));
     }
 
     // Run inference
     auto results = driver.inferSynchronous(data.begin(), data.end());
 
-    Finn::vector<uint16_t> expectedResults = {98, 50, 65476, 65493, 27, 98, 50, 65476, 65493, 27, 98, 50, 65476, 65493, 27, 98, 50, 65476, 65493, 27, 98, 50, 65476, 65493, 27,
-                                              95, 61, 65483, 65491, 12, 98, 50, 65476, 65493, 27, 92, 53, 65483, 65498, 15, 92, 53, 65483, 65498, 15, 86, 53, 65489, 65498, 9};
+    Finn::vector<int16_t> expectedResults = {98, 50, -60, -43, 27, 98, 50, -60, -43, 27, 98, 50, -60, -43, 27, 98, 50, -60, -43, 27, 98, 50, -60, -43, 27,
+                                             95, 61, -53, -45, 12, 98, 50, -60, -43, 27, 92, 53, -53, -38, 15, 92, 53, -53, -38, 15, 86, 53, -47, -38, 9};
 
     EXPECT_EQ(results, expectedResults);
 }

@@ -29,8 +29,9 @@
 #include <unordered_map>  // for unordered_map
 #include <vector>         // for vector
 
-#include "xrt/xrt_device.h"  // for device
-#include "xrt/xrt_uuid.h"    // for uuid
+#include "experimental/xrt_xclbin.h"  // for xclbin (memory connectivity of the IPs)
+#include "xrt/xrt_device.h"           // for device
+#include "xrt/xrt_uuid.h"             // for uuid
 
 namespace Finn {
     class UncheckedStore;
@@ -78,6 +79,12 @@ namespace Finn {
          */
         std::string xclbinPath;
         xrt::uuid uuid;
+
+        /**
+         * @brief Parsed metadata of the xclbin at xclbinPath. Used to find the memory banks the IODMAs are connected to.
+         *
+         */
+        xrt::xclbin xclbinMetadata;
 
         /**
          * @brief Map containing all DeviceInputBuffers for this device
@@ -129,18 +136,7 @@ namespace Finn {
          */
         ~DeviceHandler() {
             FINN_LOG(loglevel::info) << "Tearing down DeviceHandler" << std::endl;
-
-            // First call prepareForShutdown on all buffers
-            for (auto& [_, buffer] : inputBufferMap) {
-                buffer->prepareForShutdown();
-            }
-            for (auto& [_, buffer] : outputBufferMap) {
-                buffer->prepareForShutdown();
-            }
-
-            // Now safe to destroy buffers
-            inputBufferMap.clear();
-            outputBufferMap.clear();
+            shutdownBuffers();
             FINN_LOG(loglevel::info) << "Destructed Buffers" << std::endl;
         };
 
@@ -332,6 +328,24 @@ namespace Finn {
          * @param synchronousInference
          */
         void initializeBufferObjects(const DeviceWrapper& devWrap, unsigned int hostBufferSize, bool pSynchronousInference);
+
+        /**
+         * @brief Stop the worker threads of all buffers and destroy the buffers
+         *
+         */
+        void shutdownBuffers();
+
+        /**
+         * @brief Look up the memory group in which the buffers of the given IODMA have to be allocated
+         *
+         * Reads the xclbin connectivity (no device access, so no xrt::kernel is created) and returns the memory bank
+         * that the single memory-mapped argument of the IP is connected to.
+         *
+         * @param kernelName Name of the IODMA in "kernel:{instance}" syntax, as in the config
+         * @return unsigned int Index of the memory in the xclbin memory topology
+         * @throws std::runtime_error if the IP is not found exactly once, or does not have exactly one memory-mapped argument
+         */
+        unsigned int getMemoryGroup(const std::string& kernelName) const;
 
          private:
         /**

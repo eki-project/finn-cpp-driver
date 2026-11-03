@@ -2,12 +2,16 @@
  * @file DataPacking.hpp
  * @author Linus Jungemann (linus.jungemann@uni-paderborn.de) and others
  * @brief Implements data packing and unpacking efficiently
- * @version 0.1
+ * @version 0.2
  * @date 2023-10-31
  *
  * @copyright Copyright (c) 2023
  * @license All rights reserved. This program and the accompanying materials are made available under the terms of the MIT license.
  *
+ * Packed format: a continuous little-endian bitstream. Element i of a FINN datatype with bitwidth b occupies bits
+ * [i*b, (i+1)*b), bit 0 of the stream is bit 0 of byte 0, and the last byte is zero-padded. Signed types are stored as
+ * two's complement in b bits, Bipolar stores -1 as 0 and +1 as 1, fixed-point types store the value scaled by
+ * 2^fracBits, and FLOAT32 stores the IEEE-754 bit pattern.
  */
 
 #ifndef DATAPACKING
@@ -22,10 +26,14 @@
 #include <FINNCppDriver/utils/DynamicMdSpan.hpp>
 #include <FINNCppDriver/utils/FinnDatatypes.hpp>
 #include <algorithm>
+#include <bit>
 #include <bitset>
 #include <concepts>
 #include <cstdint>
+#include <cstring>
 #include <iterator>
+#include <span>
+#include <type_traits>
 
 namespace Finn {
     /**
@@ -71,7 +79,7 @@ namespace Finn {
         constexpr T bitshuffle(const T x) {
             static_assert(std::has_unique_object_representations_v<T>, "T may not have padding bits");
             T result = 0;
-            for (int i = 0; i < sizeof(T); ++i) {
+            for (std::size_t i = 0; i < sizeof(T); ++i) {
                 T const mask = T{0xFF} << (i * 8);
                 T const tmp = FUNCTOR{}(static_cast<uint8_t>((x & mask) >> (i * 8)));
                 result = (result << 8) | tmp;
@@ -107,68 +115,13 @@ namespace Finn {
          *
          */
         struct Wrapper {
-            /**
-             * @brief Reverses 1 byte long input
-             *
-             * @param x
-             * @return uint8_t
-             */
             uint8_t operator()(const uint8_t x) const { return Detail{}(x); }
-
-            /**
-             * @brief Reverses 2 byte long input
-             *
-             * @param x
-             * @return uint16_t
-             */
             uint16_t operator()(const uint16_t x) const { return bitshuffleMemCopy<Detail, uint16_t>(x); }
-
-            /**
-             * @brief Reverses 4 byte long input
-             *
-             * @param x
-             * @return uint32_t
-             */
             uint32_t operator()(const uint32_t x) const { return bitshuffleMemCopy<Detail, uint32_t>(x); }
-
-            /**
-             * @brief Reverses 8 byte long input
-             *
-             * @param x
-             * @return uint64_t
-             */
             uint64_t operator()(const uint64_t x) const { return bitshuffleMemCopy<Detail, uint64_t>(x); }
-
-            /**
-             * @brief Reverses 1 byte long input
-             *
-             * @param x
-             * @return int8_t
-             */
             int8_t operator()(const int8_t x) const { return static_cast<int8_t>(Detail{}(static_cast<uint8_t>(x))); }
-
-            /**
-             * @brief Reverses 2 byte long input
-             *
-             * @param x
-             * @return int16_t
-             */
             int16_t operator()(const int16_t x) const { return static_cast<int16_t>(bitshuffleMemCopy<Detail, uint16_t>(static_cast<uint16_t>(x))); }
-
-            /**
-             * @brief Reverses 4 byte long input
-             *
-             * @param x
-             * @return int32_t
-             */
             int32_t operator()(const int32_t x) const { return static_cast<int32_t>(bitshuffleMemCopy<Detail, uint32_t>(static_cast<uint32_t>(x))); }
-
-            /**
-             * @brief Reverses 8 byte long input
-             *
-             * @param x
-             * @return int64_t
-             */
             int64_t operator()(const int64_t x) const { return static_cast<int64_t>(bitshuffleMemCopy<Detail, uint64_t>(static_cast<uint64_t>(x))); }
         };
 
@@ -179,76 +132,48 @@ namespace Finn {
      *
      */
     namespace UnpackingAutoRetType {
-        /**
-         * @brief Returns a signed integer type with 4 bytes if input U can be stored in 4 bytes and a 8 byte long type otherwise
-         *
-         * @tparam U
-         */
         template<IsDatatype U>
         using FourBytesOrLongerSigned = typename std::conditional<U().bitwidth() <= 32, int32_t, int64_t>::type;
 
-        /**
-         * @brief Returns a signed integer type with 2 bytes if input U can be stored in 2 bytes and a 4+ byte long type otherwise
-         *
-         * @tparam U
-         */
         template<IsDatatype U>
         using TwoBytesOrLongerSigned = typename std::conditional<U().bitwidth() <= 16, int16_t, FourBytesOrLongerSigned<U>>::type;
 
         /**
-         * @brief Returns a signed integer type with 1 bytes if input U can be stored in 1 bytes and a 2+ byte long type otherwise
-         *
-         * @tparam U
+         * @brief Smallest signed integer type that holds U
          */
         template<IsDatatype U>
         using SignedRetType = typename std::conditional<U().bitwidth() <= 8, int8_t, TwoBytesOrLongerSigned<U>>::type;
 
-        /**
-         * @brief Returns a unsigned integer type with 4 bytes if input U can be stored in 4 bytes and a 8 byte long type otherwise
-         *
-         * @tparam U
-         */
         template<IsDatatype U>
         using FourBytesOrLongerUnsigned = typename std::conditional<U().bitwidth() <= 32, uint32_t, uint64_t>::type;
 
-        /**
-         * @brief Returns a unsigned integer type with 2 bytes if input U can be stored in 2 bytes and a 4 byte long type otherwise
-         *
-         * @tparam U
-         */
         template<IsDatatype U>
         using TwoBytesOrLongerUnsigned = typename std::conditional<U().bitwidth() <= 16, uint16_t, FourBytesOrLongerUnsigned<U>>::type;
 
         /**
-         * @brief Returns a unsigned integer type with 1 bytes if input U can be stored in 1 bytes and a 2 byte long type otherwise
-         *
-         * @tparam U
+         * @brief Smallest unsigned integer type that holds U
          */
         template<IsDatatype U>
         using UnsignedRetType = typename std::conditional<U().bitwidth() <= 8, uint8_t, TwoBytesOrLongerUnsigned<U>>::type;
 
         /**
          * @brief Returns a unsigned integer type if input U unsigned and a signed type otherwise
-         *
-         * @tparam U
          */
         template<IsDatatype U>
         using IntegralType = typename std::conditional<U().sign(), SignedRetType<U>, UnsignedRetType<U>>::type;
 
         /**
          * @brief Returns a integer type if input U integer type and float otherwise
-         *
-         * @tparam U
          */
         template<IsDatatype U>
         using AutoRetType = typename std::conditional<U().isInteger(), IntegralType<U>, float>::type;
     }  // namespace UnpackingAutoRetType
 
     /**
-     * @brief Creates a bitmask for the upper bits
+     * @brief Creates a bitmask for the lower bits
      *
      * @tparam T Datatype of mask
-     * @param bits Upper bits to be masked
+     * @param bits Number of low bits to set
      * @return consteval Not available at runtime
      */
     template<typename T>
@@ -261,53 +186,203 @@ namespace Finn {
     }
 
     /**
+     * @brief Function for template meta code. Tests if a FinnDatatype and C++ are compatible
+     *
+     * @tparam U FinnDatatype
+     * @tparam T C++ Datatype
+     * @return consteval Not available at runtime
+     */
+    template<IsDatatype U, typename T>
+    consteval bool IsCorrectFinnType() {
+        return std::is_floating_point_v<T> == !U().isInteger() && std::is_signed_v<T> == U().sign() && U().bitwidth() <= sizeof(T) * 8 && (U().isInteger() || std::is_same<float, T>::value) &&
+               (std::is_floating_point_v<T> || std::is_integral_v<T>);
+    }
+
+    /**
      * @brief Internal implementations. Should not be used by user.
      *
      */
     namespace detail {
+        /// Elements below this count are packed/unpacked on the calling thread
+        inline constexpr std::size_t parallelThreshold = 1U << 16;
+
         /**
-         * @brief Internal Implementation of toBitset
-         *
-         * @tparam U Finn Datatype of input data
-         * @tparam invertBytes Flag to reverse direction of bytes in output
-         * @tparam reverseBits Flag to reverse bit direction
-         * @tparam IteratorType
-         * @param first iterator pointing to first element of input
-         * @param last iterator pointing to last element of input
-         * @return Finn::vector<UnpackingAutoRetType::UnsignedRetType<U>> vector of bitsets containing bit representations of inputs
+         * @brief Number of OpenMP threads worth using for `elements` elements: at least 32k elements per thread
          */
-        template<IsDatatype U, bool invertBytes = true, bool reverseBits = true, typename IteratorType>
-        Finn::vector<UnpackingAutoRetType::UnsignedRetType<U>> toBitsetImpl(IteratorType first, IteratorType last) {
-            using T = typename std::iterator_traits<IteratorType>::value_type;
+        inline int packingThreads(std::size_t elements) {
+            const auto wanted = static_cast<int>(std::min<std::size_t>(elements / (1U << 15), static_cast<std::size_t>(omp_get_max_threads())));
+            return std::max(1, wanted);
+        }
+
+        /**
+         * @brief Number of bytes needed to store `elements` elements of `bitwidth` bits as a continuous bitstream
+         */
+        constexpr std::size_t packedBytes(std::size_t elements, std::size_t bitwidth) { return FinnUtils::fastDivCeil(elements * bitwidth, std::size_t{8}); }
+
+        /// Unsigned type holding the raw bit pattern of one element
+        template<std::size_t bitwidth>
+        using RawType = std::conditional_t<(bitwidth <= 8), uint8_t, std::conditional_t<(bitwidth <= 16), uint16_t, std::conditional_t<(bitwidth <= 32), uint32_t, uint64_t>>>;
+
+        /// Accumulator wide enough for one element plus up to 7 pending bits
+        template<std::size_t bitwidth>
+        using Accumulator = std::conditional_t<(bitwidth <= 56), uint64_t, unsigned __int128>;
+
+        /**
+         * @brief Sign-extends the low `bitwidth` bits of raw
+         */
+        template<std::size_t bitwidth>
+        constexpr int64_t signExtend(uint64_t raw) {
+            constexpr unsigned shift = 64 - bitwidth;
+            return static_cast<int64_t>(raw << shift) >> shift;
+        }
+
+        /**
+         * @brief Converts one element of storage type T holding a U into the bit pattern that is stored for it
+         *
+         * Never modifies the input and handles negative values of narrow signed storage types correctly.
+         */
+        template<IsDatatype U, typename T>
+        inline RawType<U().bitwidth()> toRaw(const T& value) {
+            constexpr std::size_t bitwidth = U().bitwidth();
+            constexpr uint64_t mask = (bitwidth >= 64) ? ~uint64_t{0} : ((uint64_t{1} << bitwidth) - 1);
+            using Raw = RawType<bitwidth>;
+            if constexpr (U().isFixedPoint()) {
+                // Scale into the integer grid; truncation toward zero matches a plain shift of the integer value
+                int64_t scaled = 0;
+                if constexpr (std::is_floating_point_v<T>) {
+                    scaled = static_cast<int64_t>(value * static_cast<T>(uint64_t{1} << U().fracBits()));
+                } else {
+                    scaled = static_cast<int64_t>(value) * static_cast<int64_t>(uint64_t{1} << U().fracBits());
+                }
+                return static_cast<Raw>(static_cast<uint64_t>(scaled) & mask);
+            } else if constexpr (!U().isInteger()) {  // FINN FLOAT32: store the IEEE-754 bit pattern of the float value
+                return static_cast<Raw>(std::bit_cast<uint32_t>(static_cast<float>(value)));
+            } else if constexpr (std::is_same_v<U, DatatypeBipolar>) {  // -1 -> 0, +1 -> 1
+                return static_cast<Raw>(value > 0 ? 1 : 0);
+            } else if constexpr (std::is_floating_point_v<T> || std::is_signed_v<T>) {
+                return static_cast<Raw>(static_cast<uint64_t>(static_cast<int64_t>(value)) & mask);
+            } else {
+                return static_cast<Raw>(static_cast<uint64_t>(value) & mask);
+            }
+        }
+
+        /**
+         * @brief Converts the stored bit pattern of one element back into a value of type T
+         */
+        template<IsDatatype U, typename T>
+        inline T fromRaw(RawType<U().bitwidth()> raw) {
+            constexpr std::size_t bitwidth = U().bitwidth();
+            if constexpr (U().isFixedPoint()) {
+                return static_cast<T>(static_cast<float>(signExtend<bitwidth>(raw)) / static_cast<float>(uint64_t{1} << U().fracBits()));
+            } else if constexpr (!U().isInteger()) {
+                return static_cast<T>(std::bit_cast<float>(static_cast<uint32_t>(raw)));
+            } else if constexpr (std::is_same_v<U, DatatypeBipolar>) {
+                return raw != 0 ? static_cast<T>(1) : static_cast<T>(-1);
+            } else if constexpr (U().sign()) {
+                return static_cast<T>(signExtend<bitwidth>(raw));
+            } else {
+                return static_cast<T>(raw);
+            }
+        }
+
+        /**
+         * @brief Packs n elements as a continuous bitstream into dst (fully overwritten, packedBytes(n, bitwidth) bytes)
+         *
+         * @param convert Callable turning one input element into its RawType<bitwidth> bit pattern
+         */
+        template<std::size_t bitwidth, typename InputIt, typename Convert>
+        inline void packRange(InputIt first, std::size_t n, uint8_t* dst, Convert convert) {
+            if constexpr (bitwidth % 8 == 0) {
+                constexpr std::size_t bytes = bitwidth / 8;
+                for (std::size_t i = 0; i < n; ++i, ++first) {
+                    const auto raw = convert(*first);
+                    std::memcpy(dst + i * bytes, &raw, bytes);  // little endian: the low bytes come first
+                }
+            } else {
+                using Acc = Accumulator<bitwidth>;
+                Acc acc = 0;
+                unsigned pending = 0;
+                std::size_t out = 0;
+                for (std::size_t i = 0; i < n; ++i, ++first) {
+                    acc |= static_cast<Acc>(convert(*first)) << pending;
+                    pending += bitwidth;
+                    while (pending >= 8) {
+                        dst[out++] = static_cast<uint8_t>(acc);
+                        acc >>= 8;
+                        pending -= 8;
+                    }
+                }
+                if (pending > 0) {
+                    dst[out] = static_cast<uint8_t>(acc);
+                }
+            }
+        }
+
+        /**
+         * @brief Unpacks n elements from a continuous bitstream
+         *
+         * @param emit Callable receiving (index, RawType<bitwidth> raw) for every element
+         */
+        template<std::size_t bitwidth, typename Emit>
+        inline void unpackRange(const uint8_t* src, std::size_t n, Emit emit) {
+            using Raw = RawType<bitwidth>;
+            if constexpr (bitwidth % 8 == 0) {
+                constexpr std::size_t bytes = bitwidth / 8;
+                for (std::size_t i = 0; i < n; ++i) {
+                    Raw raw = 0;
+                    std::memcpy(&raw, src + i * bytes, bytes);
+                    emit(i, raw);
+                }
+            } else {
+                using Acc = Accumulator<bitwidth>;
+                constexpr Acc mask = (static_cast<Acc>(1) << bitwidth) - 1;
+                Acc acc = 0;
+                unsigned pending = 0;
+                std::size_t in = 0;
+                for (std::size_t i = 0; i < n; ++i) {
+                    while (pending < bitwidth) {
+                        acc |= static_cast<Acc>(src[in++]) << pending;
+                        pending += 8;
+                    }
+                    emit(i, static_cast<Raw>(acc & mask));
+                    acc >>= bitwidth;
+                    pending -= bitwidth;
+                }
+            }
+        }
+
+        /**
+         * @brief Internal Implementation of toBitset (operates on a private copy of the input)
+         */
+        template<IsDatatype U, bool invertBytes = true, bool reverseBits = true, typename T>
+        Finn::vector<UnpackingAutoRetType::UnsignedRetType<U>> toBitsetImpl(Finn::vector<T> values) {
             if constexpr (reverseBits) {
                 constexpr std::size_t shift = (sizeof(T) * 8 - U().bitwidth());
                 bitshuffling::Wrapper wrap{};
-                std::transform(first, last, first, wrap);
+                std::transform(values.begin(), values.end(), values.begin(), wrap);
                 if constexpr (std::is_same_v<U, DatatypeBipolar>) {
-                    std::transform(first, last, first, [](const T& val) { return (val + 1) >> (shift - 1); });  // This converts bipolar to binary
+                    std::transform(values.begin(), values.end(), values.begin(), [](const T& val) { return (val + 1) >> (shift - 1); });  // This converts bipolar to binary
                 } else {
-                    std::transform(first, last, first, [](const T& val) { return val >> shift; });
+                    std::transform(values.begin(), values.end(), values.begin(), [](const T& val) { return val >> shift; });
                 }
             } else {
                 if constexpr (std::is_same_v<U, DatatypeBipolar>) {
-                    std::transform(first, last, first, [](const T& val) { return (val + 1) >> 1; });  // This converts bipolar to binary
+                    std::transform(values.begin(), values.end(), values.begin(), [](const T& val) { return (val + 1) >> 1; });  // This converts bipolar to binary
                 }
             }
             constexpr T mask = createMask<T>(U().bitwidth());
-            std::transform(first, last, first, [](const T& val) { return val & mask; });  // Cut away all bits larger than U().bitwidth()
+            std::transform(values.begin(), values.end(), values.begin(), [](const T& val) { return val & mask; });  // Cut away all bits larger than U().bitwidth()
             if constexpr (invertBytes) {
-                Finn::vector<UnpackingAutoRetType::UnsignedRetType<U>> ret(first, last);
-                return ret;
+                return Finn::vector<UnpackingAutoRetType::UnsignedRetType<U>>(values.begin(), values.end());
             } else {
-                Finn::vector<UnpackingAutoRetType::UnsignedRetType<U>> ret(std::make_reverse_iterator(last), std::make_reverse_iterator(first));
-                return ret;
+                return Finn::vector<UnpackingAutoRetType::UnsignedRetType<U>>(values.rbegin(), values.rend());
             }
         }
     }  // namespace detail
 
 
     /**
-     * @brief Converts vector of inputs to a vector of bitsets representing the inputs
+     * @brief Converts a range of inputs to a vector of bit patterns representing the inputs. The input is not modified.
      *
      * @tparam U Finn Datatype of input data
      * @tparam invertBytes Flag to reverse direction of bytes in output
@@ -319,34 +394,26 @@ namespace Finn {
      */
     template<IsDatatype U, bool invertBytes = true, bool reverseBits = true, typename IteratorType, typename = std::enable_if_t<std::is_integral<typename std::iterator_traits<IteratorType>::value_type>::value>>
     Finn::vector<UnpackingAutoRetType::UnsignedRetType<U>> toBitset(IteratorType first, IteratorType last) {
-        using T = typename std::iterator_traits<IteratorType>::value_type;
+        using T = std::remove_cv_t<typename std::iterator_traits<IteratorType>::value_type>;
         static_assert(sizeof(T) <= 8, "Datatypes with more than 8 bytes are currently not supported!");
-        if constexpr (std::is_signed_v<T>) {  // Needs to be casted to an unsigned input type to avoid undefined behavior of shift operations on negative values
-            using FourBytesOrLonger = typename std::conditional<sizeof(T) <= 4, uint32_t, uint64_t>::type;
-            using TwoBytesOrLonger = typename std::conditional<sizeof(T) == 2, uint16_t, FourBytesOrLonger>::type;
-            using OneByteOrLonger = typename std::conditional<sizeof(T) == 1, uint8_t, TwoBytesOrLonger>::type;
-
-            Finn::vector<OneByteOrLonger> vec(first, last);
-            return detail::toBitsetImpl<U, invertBytes, reverseBits>(vec.begin(), vec.end());
-
-        } else {
-            return detail::toBitsetImpl<U, invertBytes, reverseBits>(first, last);
+        // Work on the unsigned type of the same size to avoid undefined behavior of shift operations on negative values
+        using FourBytesOrLonger = typename std::conditional<sizeof(T) <= 4, uint32_t, uint64_t>::type;
+        using TwoBytesOrLonger = typename std::conditional<sizeof(T) == 2, uint16_t, FourBytesOrLonger>::type;
+        using Unsigned = typename std::conditional<sizeof(T) == 1, uint8_t, TwoBytesOrLonger>::type;
+        Finn::vector<Unsigned> values;
+        values.reserve(static_cast<std::size_t>(std::distance(first, last)));
+        for (; first != last; ++first) {
+            values.push_back(static_cast<Unsigned>(*first));
         }
+        return detail::toBitsetImpl<U, invertBytes, reverseBits>(std::move(values));
     }
 
     /**
-     * @brief Converts vector of inputs to a vector of bitsets representing the inputs
-     *
-     * @tparam U Finn Datatype of input data
-     * @tparam invertBytes Flag to reverse direction of bytes in output
-     * @tparam reverseBits Flag to reverse bit direction
-     * @tparam V
-     * @param input Vector to be converted to vector of bitset
-     * @return Finn::vector<UnpackingAutoRetType::UnsignedRetType<U>> vector of bitsets containing bit representations of inputs
+     * @brief Converts vector of inputs to a vector of bit patterns representing the inputs. The input is not modified.
      */
     template<IsDatatype U, bool invertBytes = true, bool reverseBits = true, std::integral V>
-    Finn::vector<UnpackingAutoRetType::UnsignedRetType<U>> toBitset(Finn::vector<V>& input) {
-        return toBitset<U, invertBytes, reverseBits, typename Finn::vector<V>::iterator>(input.begin(), input.end());
+    Finn::vector<UnpackingAutoRetType::UnsignedRetType<U>> toBitset(const Finn::vector<V>& input) {
+        return toBitset<U, invertBytes, reverseBits>(input.begin(), input.end());
     }
 
     /**
@@ -355,26 +422,20 @@ namespace Finn {
      * @param inout Input and output dataset
      * @param in Input dataset
      */
-    void bitsetOR(DynamicBitset& inout, DynamicBitset& in) { inout |= in; }
+    inline void bitsetOR(DynamicBitset& inout, DynamicBitset& in) { inout |= in; }
 #pragma omp declare reduction(bitsetOR:DynamicBitset : bitsetOR(omp_out, omp_in)) initializer(omp_priv = omp_orig)
-
 
     /**
      * @brief Merges a vector of bitsets into a single bitset without padding between inputs
      *
      * @tparam U Finn Datatype of input data
-     * @tparam invertDirection Flag to reverse bit direction
      * @param input vector of bitsets to be merged
      * @return DynamicBitset Merged bitset
      */
     template<IsDatatype U>
     DynamicBitset mergeBitsets(const Finn::vector<UnpackingAutoRetType::UnsignedRetType<U>>& input) {
         constexpr std::size_t bits = U().bitwidth();
-        const std::size_t outputSize = input.size() * bits;
-        // const std::size_t numThreads = std::min(static_cast<std::size_t>(omp_get_num_procs()), input.size() / 100);
-        DynamicBitset ret(outputSize);
-
-        // #pragma omp parallel for schedule(guided) shared(input, outputSize) reduction(bitsetOR : ret) default(none) num_threads(numThreads) if (input.size() > (static_cast<std::size_t>(omp_get_num_procs()) * 100))
+        DynamicBitset ret(input.size() * bits);
         for (std::size_t i = 0; i < input.size(); ++i) {
             ret.setByte(input[i], i * bits);
         }
@@ -394,36 +455,7 @@ namespace Finn {
     }
 
     /**
-     * @brief Internal implementations. Should not be used by user.
-     *
-     */
-    namespace detail {
-        /**
-         * @brief Implementation of packing a single preprocessed range into a vector of bytes without padding
-         *
-         * @tparam U Finn Datatype of input data
-         * @tparam IteratorType
-         * @param first iterator pointing to first element of input
-         * @param last iterator pointing to last element of input
-         * @return Finn::vector<uint8_t> Vector of packed bytes
-         */
-        template<IsDatatype U, typename IteratorType>
-        Finn::vector<uint8_t> packImpl(IteratorType first, IteratorType last) {
-            constexpr size_t bitw = U().bitwidth();
-            if constexpr (bitw == 8) {                      // FINN Datatype is a byte long
-                return Finn::vector<uint8_t>(first, last);  // It fits exactly in a byte, so casting should be fine
-            } else {
-                // TODO(linusjun): For full bytes this is maybe overkill. So change it?
-                auto bitsetvector = toBitset<U, true, false>(first, last);
-                auto mergedBitset = mergeBitsets<U>(bitsetvector);
-                return bitsetToByteVector<uint8_t>(mergedBitset);
-            }
-        }
-    }  // namespace detail
-
-
-    /**
-     * @brief Function to pack a vector of U stored in T into a vector of bytes without padding bits inbetween
+     * @brief Packs a range of U stored in T into a vector of bytes without padding bits in between. The input is not modified.
      *
      * @tparam U Finn Datatype of input data
      * @tparam IteratorType
@@ -433,69 +465,26 @@ namespace Finn {
      */
     template<IsDatatype U, typename IteratorType>
     Finn::vector<uint8_t> pack(IteratorType first, IteratorType last) {
-        using T = typename std::iterator_traits<IteratorType>::value_type;
-        if constexpr (std::endian::native == std::endian::big) {
-            []<bool flag = false>() { static_assert(flag, "Big-endian architectures are currently not supported!"); }();
-        } else if constexpr (std::endian::native == std::endian::little) {
-            constexpr bool isFix = U().isFixedPoint();
-            constexpr bool isInt = U().isInteger();
-            if constexpr (isFix) {  // Datatype is Fixed Point Number
-                constexpr std::size_t bytes = FinnUtils::fastDivCeil(U().bitwidth(), 8UL);
-                if constexpr (std::is_floating_point_v<T>) {  // floating point T have no shift operation, so replace with multiplication
-                    std::transform(first, last, first, [](const T& val) { return val * (1 << U().fracBits()); });
-                } else {
-                    std::transform(first, last, first, [](const T& val) { return val << U().fracBits(); });
-                }
-
-                // Use smallest possible datatype for storing data
-                using FourBytesOrLonger = typename std::conditional<bytes <= 4, uint32_t, uint64_t>::type;
-                using TwoBytesOrLonger = typename std::conditional<bytes == 2, uint16_t, FourBytesOrLonger>::type;
-                using OneByteOrLonger = typename std::conditional<bytes == 1, uint8_t, TwoBytesOrLonger>::type;
-
-                Finn::vector<OneByteOrLonger> vec(first, last);
-                return detail::packImpl<DatatypeInt<U().bitwidth()>>(vec.begin(), vec.end());
-            } else if constexpr (std::is_floating_point_v<T> && isInt) {  // Datatype is integer number stored in floating point inputs
-                // Use smallest possible datatype for storing data
-                if constexpr (sizeof(T) >= 4 || sizeof(T) <= 8) {
-                    using VecType = typename std::conditional<sizeof(T) == 4, uint32_t, uint64_t>::type;
-                    Finn::vector<VecType> input(first, last);
-                    return detail::packImpl<U>(input.begin(), input.end());
-                } else {
-                    []<bool flag = false>() { static_assert(flag, "Weird floating point data length. Not supported!"); }();
-                }
-            } else if constexpr (std::is_floating_point_v<T>) {  // Datatype is floating point number
-                static_assert(sizeof(float) == 4 && sizeof(double) == 8 && std::numeric_limits<T>::is_iec559, "Floating point format is not iee754 or unexpected type width!");
-                if constexpr (sizeof(T) == 8) {            // FINN only supports 32 bit floating point numbers
-                    Finn::vector<float> vec(first, last);  // This cast is necessary to make sure, that data is in a 32-bit floating point format before the bitcast.
-                    Finn::vector<uint32_t> input;
-                    input.resize(static_cast<std::size_t>(std::distance(first, last)));
-                    std::transform(vec.begin(), vec.end(), input.begin(), [](const float& val) { return std::bit_cast<uint32_t>(val); });
-                    return detail::packImpl<U>(input.begin(), input.end());
-                } else if constexpr (sizeof(T) == 4) {
-                    Finn::vector<uint32_t> input;
-                    input.resize(static_cast<std::size_t>(std::distance(first, last)));
-                    std::transform(first, last, input.begin(), [](const T& val) { return std::bit_cast<uint32_t>(val); });
-                    return detail::packImpl<U>(input.begin(), input.end());
-                } else {
-                    []<bool flag = false>() { static_assert(flag, "Weird floating point data length. Not supported!"); }();
-                }
-            } else if constexpr (!isInt && std::is_integral_v<T>) {  // Datatype is float stored in ints
-                Finn::vector<float> vec(first, last);                // This cast is necessary to make sure, that data is in a 32-bit floating point format before the bitcast.
-                Finn::vector<uint32_t> input;
-                input.resize(static_cast<std::size_t>(std::distance(first, last)));
-                std::transform(vec.begin(), vec.end(), input.begin(), [](const float& val) { return std::bit_cast<uint32_t>(val); });  // This conversion can overflow, but thats the user responsibility
-                return detail::packImpl<U>(input.begin(), input.end());
-
-            } else {  // Everything else
-                return detail::packImpl<U>(first, last);
-            }
-        } else {
-            []<bool flag = false>() { static_assert(flag, "Mixed-endian architectures are currently not supported!"); }();
+        using T = std::remove_cv_t<typename std::iterator_traits<IteratorType>::value_type>;
+        static_assert(std::endian::native == std::endian::little, "Big- and mixed-endian architectures are currently not supported!");
+        static_assert(std::is_arithmetic_v<T>, "Only arithmetic storage types can be packed");
+        constexpr std::size_t bitwidth = U().bitwidth();
+        static_assert(bitwidth <= 64, "Finn Datatypes with more than 64 bit are not supported!");
+        if constexpr (!U().isInteger() && !U().isFixedPoint()) {
+            static_assert(sizeof(float) == 4 && std::numeric_limits<float>::is_iec559, "Floating point format is not iee754 or unexpected type width!");
         }
+
+        const std::size_t elements = static_cast<std::size_t>(std::distance(first, last));
+        if constexpr (bitwidth == 8 && U().isInteger() && std::is_integral_v<T> && sizeof(T) == 1) {
+            return Finn::vector<uint8_t>(first, last);  // Already in the packed format
+        }
+        Finn::vector<uint8_t> packed(detail::packedBytes(elements, bitwidth));
+        detail::packRange<bitwidth>(first, elements, packed.data(), [](const T& value) { return detail::toRaw<U, T>(value); });
+        return packed;
     }
 
     /**
-     * @brief Function to pack a vector of U stored in T into a vector of bytes without padding bits inbetween
+     * @brief Packs a vector of U stored in T into a vector of bytes without padding bits in between. The input is not modified.
      *
      * @tparam U Finn Datatype of input data
      * @tparam T
@@ -503,7 +492,7 @@ namespace Finn {
      * @return Finn::vector<uint8_t> Vector of packed bytes
      */
     template<IsDatatype U, typename T>
-    Finn::vector<uint8_t> pack(Finn::vector<T>& foldedVec) {
+    Finn::vector<uint8_t> pack(const Finn::vector<T>& foldedVec) {
         if constexpr (U().bitwidth() == 8 && std::is_same<T, uint8_t>::value) {
             return foldedVec;
         }
@@ -511,224 +500,145 @@ namespace Finn {
     }
 
     /**
-     * @brief Function for template meta code. Tests if a FinnDatatype and C++ are compatible
-     *
-     * @tparam U FinnDatatype
-     * @tparam T C++ Datatype
-     * @return consteval Not available at runtime
-     */
-    template<IsDatatype U, typename T>
-    consteval bool IsCorrectFinnType() {
-        return std::is_floating_point_v<T> == !U().isInteger() && std::is_signed_v<T> == U().sign() && U().bitwidth() <= sizeof(T) * 8 && (U().isInteger() || std::is_same<float, T>::value) &&
-               (std::is_floating_point_v<T> || std::is_integral_v<T>);
-    }
-
-    /**
-     * @brief Function to pack multi dimensional input arrays
+     * @brief Packs a multi dimensional input: every innermost row is packed on its own and padded to full bytes
      *
      * @tparam U Finn Datatype of input data
      * @tparam IteratorType
      * @param first Iterator to first element of input
-     * @param last  Iterator to last element of input
+     * @param last  Iterator to end of input
      * @param dynamicSpan DynamicMdSpan object that describes the folded structure of the input
      * @param elementsInnerMostDim number of elements in the inner most dimension
      * @return Finn::vector<uint8_t> Vector of packed bytes
      */
     template<IsDatatype U, typename IteratorType>
     Finn::vector<uint8_t> packMultiDimensionalInputs(IteratorType first, IteratorType last, const Finn::DynamicMdSpan<IteratorType>& dynamicSpan, const std::size_t elementsInnerMostDim) {
-        if constexpr (U().bitwidth() % 8 == 0) {  // Whole bytes in input used therefore no padding should be needed (TODO(linusjun): Make sure this is true for bw > 8!)
+        constexpr std::size_t bitwidth = U().bitwidth();
+        if constexpr (bitwidth % 8 == 0) {  // Rows of whole bytes never need padding, so the data can be packed as one range
             return Finn::pack<U>(first, last);
         } else {
-            auto innerVecs = dynamicSpan.getMostInnerDims();
-            std::size_t innerVecSize = innerVecs.size();
-
-            // preallocate memory to make copy more efficient
-            const std::size_t payloadBitsPerInnerDim = elementsInnerMostDim * U().bitwidth();
-            constexpr std::size_t byte = 8;
-            const std::size_t neededBytesPerInnerDim = FinnUtils::fastDivCeil(payloadBitsPerInnerDim, byte);
-            const std::size_t neededBytesTotal = neededBytesPerInnerDim * innerVecSize;
-
-            Finn::vector<uint8_t> packedMerged(neededBytesTotal);
-            std::size_t threadcount = std::min({(innerVecSize >> 5), static_cast<std::size_t>(omp_get_num_procs()), FinnUtils::fastLog2(innerVecSize) << 1});
-            omp_set_num_threads(threadcount);
-            //        std::cout << (std::min({(innerVecSize >> 5), static_cast<std::size_t>(omp_get_num_procs()), FinnUtils::fastLog2(innerVecSize2)<<1})) << "\n";
-
-            // for each most inner dimension
-#pragma omp parallel for
-            for (std::size_t i = 0; i < innerVecSize; ++i) {
-                auto packed = Finn::pack<U>(innerVecs[i].begin(), innerVecs[i].end());
-                // combine packing results
-                std::copy(packed.begin(), packed.end(), packedMerged.begin() + i * neededBytesPerInnerDim);
+            using T = std::remove_cv_t<typename std::iterator_traits<IteratorType>::value_type>;
+            const std::size_t rows = dynamicSpan.innerCount();
+            const std::size_t rowElements = dynamicSpan.innerStride();
+            if (rowElements != elementsInnerMostDim) {
+                Finn::logAndError<std::invalid_argument>("The innermost dimension of the span (" + std::to_string(rowElements) + ") does not match the given innermost dimension (" + std::to_string(elementsInnerMostDim) + ")");
             }
+            const std::size_t bytesPerRow = detail::packedBytes(rowElements, bitwidth);
+            const std::size_t total = rows * rowElements;
+            Finn::vector<uint8_t> packedMerged(bytesPerRow * rows);
+            uint8_t* out = packedMerged.data();
 
+#pragma omp parallel for schedule(static) num_threads(detail::packingThreads(total)) if (total >= detail::parallelThreshold)
+            for (std::size_t row = 0; row < rows; ++row) {
+                detail::packRange<bitwidth>(std::next(first, static_cast<std::iter_difference_t<IteratorType>>(row * rowElements)), rowElements, out + row * bytesPerRow, [](const T& value) { return detail::toRaw<U, T>(value); });
+            }
             return packedMerged;
         }
     }
 
-
     /**
-     * @brief Unpacks a byte vector into a vector of T containing U.
+     * @brief Unpacks a byte range into a vector of T containing U. The input is not modified.
      *
      * @tparam U FinnDatatype that is contained in byte array
-     * @tparam T Type of return vector. Is usually autodeduced, but it is also supported to use larger types for outputs: ex.: uint16_t instead of uint8_t is valid.
-     * @tparam typename Unnamed template param is used to enable the function only for supported types
-     * @param inp Byte vector
-     * @param padding Number of padding bits inserted into last byte of input
+     * @tparam reverseByte Interpret the input in reversed byte order
+     * @tparam T Type of return vector. Is usually autodeduced, but larger types are also supported, e.g. int32_t for Int<4>.
+     * @param inp Bytes
+     * @param padding Number of padding bits at the end of the input
      * @return Finn::vector<T> Vector of T containing U
      */
     template<IsDatatype U, bool reverseByte = false, typename T = UnpackingAutoRetType::AutoRetType<U>, typename = std::enable_if_t<IsCorrectFinnType<U, T>()>>
-    Finn::vector<T> unpack(std::span<uint8_t>& inp, std::size_t padding = 0) {
-        static_assert(U().bitwidth() <= 64, "Finn Datatypes with more than 64 bit are not supported!");
-
-        constexpr std::size_t neededBytes = FinnUtils::fastDivCeil(U().bitwidth(), 8UL);
-
-        using FourBytesOrLonger = typename std::conditional<neededBytes <= 4, int32_t, int64_t>::type;
-        using TwoBytesOrLonger = typename std::conditional<neededBytes == 2, int16_t, FourBytesOrLonger>::type;
-        using FixedPointType = typename std::conditional<neededBytes == 1, int8_t, TwoBytesOrLonger>::type;
-        using RetType = typename std::conditional<U().isFixedPoint(), FixedPointType, T>::type;
+    Finn::vector<T> unpack(std::span<const uint8_t> inp, std::size_t padding = 0) {
+        constexpr std::size_t bitwidth = U().bitwidth();
+        static_assert(bitwidth <= 64, "Finn Datatypes with more than 64 bit are not supported!");
 
         if (inp.empty()) {
             Finn::logAndError<std::runtime_error>("Input to unpacking operation is empty! Abord.");
         }
-
-        if constexpr (reverseByte) {
-            std::reverse(inp.begin(), inp.end());
-        }
-
-        if ((inp.size() * 8 - padding) % U().bitwidth() != 0) {
+        const std::size_t totalBits = inp.size() * 8;
+        if (padding >= totalBits || (totalBits - padding) % bitwidth != 0) {
             Finn::logAndError<std::runtime_error>("Amount of input elements is not a multiple of output elements");
         }
+        const std::size_t elements = (totalBits - padding) / bitwidth;
 
-        constexpr size_t bitw = U().bitwidth();
-        constexpr bool isSigned = U().sign();
-        if constexpr (bitw / 8.0 == neededBytes) {  // complete Bytes, therefore no padding after here
-            Finn::vector<RetType> ret(inp.size() / neededBytes, 0);
-#pragma omp simd
-            for (std::size_t i = 0; i < ret.size(); ++i) {
-                const std::size_t offset = i * neededBytes;
-                if constexpr (isSigned) {  // TODO(linusjun): Test if this needs to be optimized or put into a seperate loop to allow vectorization.
-                    if ((-128 & inp[offset + neededBytes - 1]) != 0) {
-                        ret[i] = -1;
-                    }
-                }
-                std::memcpy(&ret.data()[i], &inp.data()[offset], neededBytes);
-            }
-            constexpr bool isFixed = U().isFixedPoint();
-            if constexpr (isFixed) {
-                Finn::vector<float> fixedRet(ret.size());
-                std::transform(ret.begin(), ret.end(), fixedRet.begin(), [](const RetType& val) { return static_cast<float>(val) / (1 << U().fracBits()); });
-                return fixedRet;
-            } else {
-                return ret;
-            }
-
-
-        } else {
-            constexpr std::size_t bitwidth = U().bitwidth();
-
-            using FourBytesOrLongerUnsigned = typename std::conditional<bitwidth <= 32, uint64_t, __uint128_t>::type;
-            using TwoBytesOrLongerUnsigned = typename std::conditional<bitwidth <= 16, uint32_t, FourBytesOrLongerUnsigned>::type;
-            using BufferType = typename std::conditional<bitwidth <= 8, uint16_t, TwoBytesOrLongerUnsigned>::type;
-
-            constexpr BufferType mask = createMask<BufferType>(bitwidth);
-            const std::size_t elementsInInput = ((inp.size() * 8) - padding) / U().bitwidth();
-            Finn::vector<RetType> ret(elementsInInput, 0);
-
-            for (std::size_t index = 0; index < elementsInInput; ++index) {
-                const std::size_t lowerBit = index * bitwidth;
-                const std::size_t lowerBorderByte = lowerBit / 8;                   // Intentionally rounding down
-                const std::size_t upperBorderByte = (lowerBit + bitwidth - 1) / 8;  // Intentionally rounding down
-                const std::size_t numBytes = upperBorderByte - lowerBorderByte + 1;
-                const std::size_t shiftOffset = lowerBit - (lowerBorderByte * 8);
-
-                BufferType buffer = 0;                                         // This buffer is big enough to contain two FinnDatatype elements. Therefore no problem if one FinnDatatype element is shifted.
-                std::memcpy(&buffer, &inp.data()[lowerBorderByte], numBytes);  // Fill Buffer with from byte inputs
-                buffer = static_cast<BufferType>(buffer >> shiftOffset);       // remove remaining bits from previous element
-                buffer &= mask;                                                // remove bits from next element
-
-                constexpr bool isSigned = U().sign();
-                if constexpr (isSigned) {  // TODO(linusjun): Test if this needs to be optimized or put into a seperate loop to allow vectorization.
-                    if (((BufferType(1U) << (bitwidth - 1)) & buffer) != 0) {
-                        buffer |= ~mask;
-                    }
-                }
-                ret[index] = static_cast<RetType>(buffer);
-            }
-
-            constexpr bool isFixed = U().isFixedPoint();
-            if constexpr (isFixed) {
-                Finn::vector<float> fixedRet(ret.size());
-                std::transform(ret.begin(), ret.end(), fixedRet.begin(), [](const RetType& val) { return static_cast<float>(static_cast<FixedPointType>(val)) / (1 << U().fracBits()); });
-                return fixedRet;
-            } else {
-                return ret;
-            }
+        Finn::vector<uint8_t> reversed;
+        const uint8_t* src = inp.data();
+        if constexpr (reverseByte) {
+            reversed.assign(inp.rbegin(), inp.rend());
+            src = reversed.data();
         }
+
+        Finn::vector<T> ret(elements);
+        T* out = ret.data();
+        detail::unpackRange<bitwidth>(src, elements, [out](std::size_t index, detail::RawType<bitwidth> raw) { out[index] = detail::fromRaw<U, T>(raw); });
+        return ret;
     }
 
     /**
-     * @brief Unpacks a byte vector into a vector of T containing U.
-     *
-     * @tparam U FinnDatatype that is contained in byte array
-     * @tparam T Type of return vector. Is usually autodeduced, but it is also supported to use larger types for outputs: ex.: uint16_t instead of uint8_t is valid.
-     * @tparam typename Unnamed template param is used to enable the function only for supported types
-     * @param inp Byte vector
-     * @param padding Number of padding bits inserted into last byte of input
-     * @return Finn::vector<T> Vector of T containing U
+     * @brief Unpacks a byte vector into a vector of T containing U. The input is not modified.
      */
     template<IsDatatype U, bool reverseByte = false, typename T = UnpackingAutoRetType::AutoRetType<U>, typename = std::enable_if_t<IsCorrectFinnType<U, T>()>>
-    Finn::vector<T> unpack(Finn::vector<uint8_t>& inp, std::size_t padding = 0) {
-        std::span<uint8_t> spa{inp.begin(), inp.end()};
-        return unpack<U, reverseByte, T>(spa, padding);
-    }
-
-    template<IsDatatype U, std::input_iterator IteratorType, bool reverseByte = false, typename T = UnpackingAutoRetType::AutoRetType<U>, typename = std::enable_if_t<IsCorrectFinnType<U, T>()>>
-    Finn::vector<T> unpack(IteratorType begin, IteratorType end, std::size_t padding = 0)
-        requires(std::is_same_v<uint8_t, typename std::iterator_traits<IteratorType>::value_type>)
-    {
-        std::span<uint8_t> spa{begin, end};
-        return unpack<U, reverseByte, T>(spa, padding);
+    Finn::vector<T> unpack(const Finn::vector<uint8_t>& inp, std::size_t padding = 0) {
+        return unpack<U, reverseByte, T>(std::span<const uint8_t>(inp.data(), inp.size()), padding);
     }
 
     /**
-     * @brief Unpacks multi-dimensional output vectors
+     * @brief Unpacks a byte range given by iterators into a vector of T containing U. The input is not modified.
+     */
+    template<IsDatatype U, std::input_iterator IteratorType, bool reverseByte = false, typename T = UnpackingAutoRetType::AutoRetType<U>, typename = std::enable_if_t<IsCorrectFinnType<U, T>()>>
+    Finn::vector<T> unpack(IteratorType begin, IteratorType end, std::size_t padding = 0)
+        requires(std::is_same_v<uint8_t, std::remove_cv_t<typename std::iterator_traits<IteratorType>::value_type>>)
+    {
+        return unpack<U, reverseByte, T>(std::span<const uint8_t>(std::to_address(begin), static_cast<std::size_t>(std::distance(begin, end))), padding);
+    }
+
+    /**
+     * @brief Unpacks multi-dimensional output vectors: every innermost row of the byte array is unpacked on its own
      *
      * @tparam U FinnDatatype that is contained in byte array
      * @tparam IteratorType Iterator of container containing uint8_t
-     * @tparam reverseByte Switch to reverse input vectors
+     * @tparam reverseByte Switch to reverse input rows
      * @tparam T Type of return vector. Usually autodeduced.
      * @param begin Iterator to first element of linearized byte array
      * @param end Iterator to the end of linearized byte array
-     * @param dynSpan DynamicMdSpan describing the structure of the byte array
+     * @param dynSpan DynamicMdSpan describing the structure of the byte array (packed shape)
      * @param foldedShape Shape of the target vector
      * @return Finn::vector<T> Vector of T containing U
      */
     template<IsDatatype U, std::input_iterator IteratorType, bool reverseByte = false, typename T = UnpackingAutoRetType::AutoRetType<U>, typename = std::enable_if_t<IsCorrectFinnType<U, T>()>>
     Finn::vector<T> unpackMultiDimensionalOutputs(IteratorType begin, IteratorType end, const Finn::DynamicMdSpan<IteratorType>& dynSpan, const shapeFolded_t& foldedShape)
-        requires(std::is_same_v<uint8_t, typename std::iterator_traits<IteratorType>::value_type>)
+        requires(std::is_same_v<uint8_t, std::remove_cv_t<typename std::iterator_traits<IteratorType>::value_type>>)
     {
-        if constexpr (U().bitwidth() % 8 == 0) {
-            return Finn::unpack<U>(begin, end, 0);
+        constexpr std::size_t bitwidth = U().bitwidth();
+        if constexpr (bitwidth % 8 == 0) {
+            return Finn::unpack<U, IteratorType, reverseByte, T>(begin, end, 0);
         } else {
-            constexpr std::size_t bytes = 8;
-            auto innerDimVecs = dynSpan.getMostInnerDims();
-            std::size_t innerVecSize = innerDimVecs.size();
-            const std::size_t padding = innerDimVecs[0].size() * bytes - foldedShape.back() * U().bitwidth();
-
-            // preallocate memory to make copy more efficient
-            const std::size_t retSizeTotal = FinnUtils::shapeToElements(foldedShape);
-            Finn::vector<T> unpackedMerged(retSizeTotal);
-
-#pragma omp parallel for
-            for (std::size_t i = 0; i < innerDimVecs.size(); ++i) {
-                auto unpacked = Finn::unpack<U>(innerDimVecs[i], padding);
-                std::copy(unpacked.begin(), unpacked.end(), unpackedMerged.begin() + i * foldedShape.back());
+            const std::size_t rows = dynSpan.innerCount();
+            const std::size_t bytesPerRow = dynSpan.innerStride();
+            const std::size_t elementsPerRow = foldedShape.back();
+            const std::size_t total = FinnUtils::shapeToElements(foldedShape);
+            if (bytesPerRow * 8 < elementsPerRow * bitwidth || total != rows * elementsPerRow) {
+                Finn::logAndError<std::invalid_argument>("Packed shape (" + std::to_string(rows) + " rows of " + std::to_string(bytesPerRow) + " bytes) cannot hold the folded shape (" + std::to_string(rows) + " rows of " +
+                                                         std::to_string(elementsPerRow) + " elements of " + std::to_string(bitwidth) + " bit)");
             }
 
+            Finn::vector<T> unpackedMerged(total);
+            T* out = unpackedMerged.data();
+            const uint8_t* src = std::to_address(begin);
+
+#pragma omp parallel for schedule(static) num_threads(detail::packingThreads(total)) if (total >= detail::parallelThreshold)
+            for (std::size_t row = 0; row < rows; ++row) {
+                const uint8_t* rowSrc = src + row * bytesPerRow;
+                Finn::vector<uint8_t> reversed;
+                if constexpr (reverseByte) {
+                    reversed.assign(std::make_reverse_iterator(rowSrc + bytesPerRow), std::make_reverse_iterator(rowSrc));
+                    rowSrc = reversed.data();
+                }
+                T* rowOut = out + row * elementsPerRow;
+                detail::unpackRange<bitwidth>(rowSrc, elementsPerRow, [rowOut](std::size_t index, detail::RawType<bitwidth> raw) { rowOut[index] = detail::fromRaw<U, T>(raw); });
+            }
             return unpackedMerged;
         }
     }
 
 }  // namespace Finn
 
-#endif  // DATAPACKING
+#endif /* DATAPACKING */

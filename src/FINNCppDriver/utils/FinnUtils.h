@@ -36,7 +36,7 @@ namespace FinnUtils {
          private:
         std::random_device rd;
         std::mt19937 engine{rd()};
-        std::uniform_int_distribution<uint8_t> sampler;
+        std::uniform_int_distribution<int> sampler;  // uint8_t is not a valid distribution type, so sample ints and narrow
 
          public:
         /**
@@ -45,7 +45,7 @@ namespace FinnUtils {
          * @param min
          * @param max
          */
-        BufferFiller(uint8_t min, uint8_t max) : sampler(std::uniform_int_distribution<uint8_t>(min, max)) {}
+        BufferFiller(uint8_t min, uint8_t max) : sampler(std::uniform_int_distribution<int>(min, max)) {}
 
         /**
          * @brief Create a BufferFiller with specified range
@@ -65,7 +65,7 @@ namespace FinnUtils {
          */
         template<typename IteratorType>
         void fillRandom(IteratorType first, IteratorType last) {
-            std::generate(first, last, [this, &sampler = sampler, &engine = engine]() { return sampler(engine); });
+            std::generate(first, last, [&sampler = sampler, &engine = engine]() { return static_cast<uint8_t>(sampler(engine)); });
         }
 
         /**
@@ -204,7 +204,12 @@ namespace FinnUtils {
      * @param shape
      * @return unsigned int
      */
-    inline unsigned int innermostDimension(const shape_t& shape) { return shape.back(); }
+    inline unsigned int innermostDimension(const shape_t& shape) {
+        if (shape.empty()) {
+            throw std::invalid_argument("Cannot get the innermost dimension of an empty shape");
+        }
+        return shape.back();
+    }
 
     /**
      * @brief The XRT buffers have to be of a certain size and alignment. The size needs to be a power of 2, depending on the platform >=4096 and page-aligned. This returns the correct size
@@ -221,7 +226,7 @@ namespace FinnUtils {
      * @param pShape
      * @return size_t
      */
-    inline size_t shapeToElements(const shape_t& pShape) { return (pShape.empty()) ? 0 : static_cast<size_t>(std::accumulate(pShape.begin(), pShape.end(), 1, std::multiplies<>())); }
+    inline size_t shapeToElements(const shape_t& pShape) { return (pShape.empty()) ? 0 : std::accumulate(pShape.begin(), pShape.end(), std::size_t{1}, std::multiplies<std::size_t>()); }
 
     /**
      * @brief Constexpr version of shapeToElements
@@ -233,7 +238,7 @@ namespace FinnUtils {
      */
     template<typename T, size_t S>
     constexpr size_t shapeToElementsConstexpr(std::array<T, S> pShape) {
-        return (S == 0) ? 0 : static_cast<size_t>(std::accumulate(pShape.begin(), pShape.end(), 1, std::multiplies<>()));
+        return (S == 0) ? 0 : std::accumulate(pShape.begin(), pShape.end(), std::size_t{1}, std::multiplies<std::size_t>());
     }
 
     /**

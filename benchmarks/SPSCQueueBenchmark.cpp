@@ -99,7 +99,7 @@ static void BM_ProducerConsumer(benchmark::State& state) {
         }
 
         // Use a smaller maximum to avoid potential deadlocks
-        const size_t num_items = std::min<size_t>(static_cast<size_t>(state.range(0)), static_cast<size_t>(state.range(1)) * 5);
+        const size_t num_items = std::min<size_t>(static_cast<size_t>(state.range(0)), QueueSize * 5);
 
         // Start timing again before creating threads
         state.ResumeTiming();
@@ -145,7 +145,7 @@ static void BM_ProducerConsumer(benchmark::State& state) {
         }
     }
 
-    const size_t num_items = std::min<size_t>(static_cast<size_t>(state.range(0)), static_cast<size_t>(state.range(1)) * 5);
+    const size_t num_items = std::min<size_t>(static_cast<size_t>(state.range(0)), QueueSize * 5);
 
     state.SetItemsProcessed(state.iterations() * static_cast<int64_t>(num_items) * 2);
     if constexpr (std::is_same_v<T, std::string>) {
@@ -1024,5 +1024,34 @@ BENCHMARK(BM_DynamicBlockingBulkEnqueue)
     ->Args({50, 1024})   // Queue 50% full, capacity 1024
     ->Args({75, 1024})   // Queue 75% full, capacity 1024
     ->Args({95, 1024});  // Queue 95% full, capacity 1024
+
+// Mirrors the asynchronous device buffers: feature-map sized byte blocks, stored from a const pointer with blocking
+// enqueue_bulk on one thread and fetched into a vector with blocking dequeue_bulk on another
+static void BM_DriverStyleTransfer(benchmark::State& state) {
+    const auto featureMapBytes = static_cast<size_t>(state.range(0));
+    constexpr size_t featureMapCount = 5;  // Same buffering depth as AsyncBufferWrapper
+    constexpr size_t mapsPerIteration = 64;
+
+    DynamicSPSCQueue<uint8_t> queue(featureMapBytes * featureMapCount);
+    const std::vector<uint8_t> input(featureMapBytes, 0x5A);
+    std::vector<uint8_t> output(featureMapBytes);
+
+    for (auto _ : state) {
+        std::thread producer([&] {
+            const uint8_t* src = input.data();
+            for (size_t i = 0; i < mapsPerIteration; ++i) {
+                queue.enqueue_bulk(src, featureMapBytes);
+            }
+        });
+        for (size_t i = 0; i < mapsPerIteration; ++i) {
+            queue.dequeue_bulk(output.begin(), featureMapBytes);
+        }
+        producer.join();
+        benchmark::DoNotOptimize(output.data());
+    }
+    state.SetBytesProcessed(state.iterations() * static_cast<int64_t>(featureMapBytes * mapsPerIteration));
+}
+
+BENCHMARK(BM_DriverStyleTransfer)->Arg(4 << 10)->Arg(64 << 10)->Arg(1 << 20)->UseRealTime();
 
 BENCHMARK_MAIN();
